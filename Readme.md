@@ -5,8 +5,22 @@
 > Built using **MERN Stack**, **Tailwind CSS**, and **Multiple SQL Server Databases**
 
 ---
+## 🖼️ Screenshots
 
+Here are screenshots from the Tool Report Dashboard:
+![Screenshot 2025-06-06 105534](https://github.com/user-attachments/assets/1f084f4d-cb74-41ee-8d02-3116addd459f)
+
+![Screenshot 2025-06-06 105637](https://github.com/user-attachments/assets/767895a2-cedf-4ce5-92f9-d6fb03e394c9)
+
+![Screenshot 2025-06-06 105735](https://github.com/user-attachments/assets/09f1e360-fd1d-4199-87de-9bf827a913fd)
+
+
+![Screenshot 2025-06-06 105802](https://github.com/user-attachments/assets/ab1b8d03-ceda-40f3-9f4e-8d676a502e76)
+
+---
 ## 📌 Overview
+
+
 
 This project is a powerful and scalable **internal web-based MES dashboard** developed for  
 **Western Refrigeration Pvt. Ltd.**, Asia’s largest commercial refrigeration company.
