@@ -8,6 +8,8 @@
 
 ## 📌 Overview
 
+
+
 This project is a powerful and scalable **internal web-based MES dashboard** developed for  
 **Western Refrigeration Pvt. Ltd.**, Asia’s largest commercial refrigeration company.
 
@@ -16,6 +18,16 @@ It provides real-time, department-wise, and timeline-based reporting, used daily
 > ✅ Designed for 20+ different user roles across multiple factory departments  
 > 🧩 Connected to **three different Microsoft SQL Server databases**  
 > 🖥️ Replaces legacy desktop reporting tools with a modern React-based dashboard
+
+---
+
+## 🖼️ Screenshots
+
+Here are screenshots from the Tool Report Dashboard:
+
+| ![Screenshot 1](https://github.com/user-attachments/assets/1f084f4d-cb74-41ee-8d02-3116addd459f) | ![Screenshot 2](https://github.com/user-attachments/assets/767895a2-cedf-4ce5-92f9-d6fb03e394c9) |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| ![Screenshot 4](https://github.com/user-attachments/assets/ab1b8d03-ceda-40f3-9f4e-8d676a502e76) | ![Screenshot 3](https://github.com/user-attachments/assets/09f1e360-fd1d-4199-87de-9bf827a913fd) |
 
 ---
 
