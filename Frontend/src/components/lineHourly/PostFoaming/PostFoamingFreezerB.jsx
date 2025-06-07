@@ -1,6 +1,6 @@
 import { Bar } from "react-chartjs-2";
 
-const FormingA = ({ title, data }) => {
+const PostFoamingFreezerB = ({ title, data }) => {
   const count = data && data.reduce((sum, item) => sum + (item.COUNT || 0), 0);
 
   const prepareChartData = () => {
@@ -109,7 +109,6 @@ const FormingA = ({ title, data }) => {
           </div>
         </div>
       </div>
-
       {/* Chart Section */}
       {chartData && (
         <div
@@ -124,4 +123,4 @@ const FormingA = ({ title, data }) => {
   );
 };
 
-export default FormingA;
+export default PostFoamingFreezerB;

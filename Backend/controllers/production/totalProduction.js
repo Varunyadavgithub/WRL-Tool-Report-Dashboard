@@ -20,7 +20,7 @@ export const getBarcodeDetails = async (req, res) => {
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     const finalStationCodes = ["1220010", "1230017"];
-    const postFormingStationCodes = [
+    const postFoamingStationCodes = [
       "1230007",
       "1220003",
       "1220004",
@@ -28,7 +28,7 @@ export const getBarcodeDetails = async (req, res) => {
     ];
 
     const selectedStationCodes =
-      department === "final" ? finalStationCodes : postFormingStationCodes;
+      department === "final" ? finalStationCodes : postFoamingStationCodes;
 
     const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const request = pool
@@ -110,7 +110,7 @@ export const fetchExportData = async (req, res) => {
     const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
     const finalStationCodes = ["1220010", "1230017"];
-    const postFormingStationCodes = [
+    const postFoamingStationCodes = [
       "1230007",
       "1220003",
       "1220004",
@@ -118,7 +118,7 @@ export const fetchExportData = async (req, res) => {
     ];
 
     const selectedStationCodes =
-      department === "final" ? finalStationCodes : postFormingStationCodes;
+      department === "final" ? finalStationCodes : postFoamingStationCodes;
 
     const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const request = pool

@@ -175,7 +175,7 @@ ORDER BY TotalCount DESC;
   }
 };
 
-// Post Forming
+// Post Foaming
 export const getPostHPFrzA = async (req, res) => {
   const { StartTime, EndTime } = req.query;
 
@@ -341,8 +341,8 @@ ORDER BY TotalCount DESC;
   }
 };
 
-// Forming
-export const getFormingHpFomA = async (req, res) => {
+// Foaming
+export const getFoamingHpFomA = async (req, res) => {
   const { StartTime, EndTime } = req.query;
   try {
     const query = `
@@ -385,7 +385,7 @@ ORDER BY TIMEHOUR, TIMEDAY;
   }
 };
 
-export const getFormingHpFomB = async (req, res) => {
+export const getFoamingHpFomB = async (req, res) => {
   const { StartTime, EndTime } = req.query;
   try {
     const query = `
@@ -428,7 +428,7 @@ ORDER BY TIMEHOUR, TIMEDAY;
   }
 };
 
-export const getFormingHpFomCat = async (req, res) => {
+export const getFoamingHpFomCat = async (req, res) => {
   const { StartTime, EndTime } = req.query;
   try {
     const query = `

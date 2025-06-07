@@ -1,6 +1,6 @@
 import { Bar } from "react-chartjs-2";
 
-const FormingB = ({ title, data }) => {
+const FoamingB = ({ title, data }) => {
   const count = data && data.reduce((sum, item) => sum + (item.COUNT || 0), 0);
 
   const prepareChartData = () => {
@@ -124,4 +124,4 @@ const FormingB = ({ title, data }) => {
   );
 };
 
-export default FormingB;
+export default FoamingB;

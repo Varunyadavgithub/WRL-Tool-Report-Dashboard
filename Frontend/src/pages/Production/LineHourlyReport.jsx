@@ -17,13 +17,13 @@ import FinalFreezer from "../../components/lineHourly/FinalLine/FinalFreezer";
 import FinalChoc from "../../components/lineHourly/FinalLine/FinalChoc";
 import FinalSUS from "../../components/lineHourly/FinalLine/FinalSUS";
 import FinalCategoryCount from "../../components/lineHourly/FinalLine/FinalCategoryCount";
-import PostFormingFreezerA from "../../components/lineHourly/PostForming/PostFormingFreezerA";
-import PostFormingFreezerB from "../../components/lineHourly/PostForming/PostFormingFreezerB";
-import PostFormingSUS from "../../components/lineHourly/PostForming/PostFormingSUS";
-import PostFormingCategoryCount from "../../components/lineHourly/PostForming/PostFormingCategoryCount";
-import FormingA from "../../components/lineHourly/Forming/FormingA";
-import FormingB from "../../components/lineHourly/Forming/FormingB";
-import FormingCategoryCount from "../../components/lineHourly/Forming/FormingCategoryCount";
+import PostFoamingFreezerA from "../../components/lineHourly/PostFoaming/PostFoamingFreezerA";
+import PostFoamingFreezerB from "../../components/lineHourly/PostFoaming/PostFoamingFreezerB";
+import PostFoamingSUS from "../../components/lineHourly/PostFoaming/PostFoamingSUS";
+import PostFoamingCategoryCount from "../../components/lineHourly/PostFoaming/PostFoamingCategoryCount";
+import FoamingA from "../../components/lineHourly/Foaming/FoamingA";
+import FoamingB from "../../components/lineHourly/Foaming/FoamingB";
+import FoamingCategoryCount from "../../components/lineHourly/Foaming/FoamingCategoryCount";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
@@ -42,14 +42,14 @@ const LineHourlyReport = () => {
   const [finalSUSData, setFinalSUSData] = useState([]);
   const [finalCategoryCountData, setFinalCategoryCountData] = useState([]);
 
-  const [postFormingFreezerAData, setPostFormingFreezerAData] = useState([]);
-  const [postFormingFreezerBData, setPostFormingFreezerBData] = useState([]);
-  const [postFormingSUSData, setPostFormingSUSData] = useState([]);
+  const [postFoamingFreezerAData, setPostFoamingFreezerAData] = useState([]);
+  const [postFoamingFreezerBData, setPostFoamingFreezerBData] = useState([]);
+  const [postFoamingSUSData, setPostFoamingSUSData] = useState([]);
   const [postCategoryCountData, setPostCategoryCountData] = useState([]);
 
-  const [formingFOMAData, setFormingFOMAData] = useState([]);
-  const [formingFOMBData, setFormingFOMBData] = useState([]);
-  const [formingCategoryData, setFormingCategoryData] = useState([]);
+  const [FoamingFOMAData, setFoamingFOMAData] = useState([]);
+  const [FoamingFOMBData, setFoamingFOMBData] = useState([]);
+  const [FoamingCategoryData, setFoamingCategoryData] = useState([]);
 
   // API Base URL
   const API_BASE_URL = `${baseURL}prod`;
@@ -67,12 +67,12 @@ const LineHourlyReport = () => {
     setFinalFreezerData([]);
     setFinalChocData([]);
     setFinalSUSData([]);
-    setPostFormingFreezerAData([]);
-    setPostFormingFreezerBData([]);
-    setPostFormingSUSData([]);
-    setFormingFOMAData([]);
-    setFormingFOMBData([]);
-    setFormingCategoryData([]);
+    setPostFoamingFreezerAData([]);
+    setPostFoamingFreezerBData([]);
+    setPostFoamingSUSData([]);
+    setFoamingFOMAData([]);
+    setFoamingFOMBData([]);
+    setFoamingCategoryData([]);
     setPostCategoryCountData([]);
     setFinalCategoryCountData([]);
 
@@ -114,26 +114,26 @@ const LineHourlyReport = () => {
           toast.error("Failed to fetch Final Line data");
         }
       }
-      // Handle Post Forming data
-      else if (lineType === "post_forming") {
+      // Handle Post Foaming data
+      else if (lineType === "post_Foaming") {
         try {
-          // Post Forming Freezer A
+          // Post Foaming Freezer A
           const res1 = await axios.get(`${API_BASE_URL}/post-hp-frz-a`, {
             params,
           });
-          setPostFormingFreezerAData(res1?.data || []);
+          setPostFoamingFreezerAData(res1?.data || []);
 
-          // Post Forming Freezer B
+          // Post Foaming Freezer B
           const res2 = await axios.get(`${API_BASE_URL}/post-hp-frz-b`, {
             params,
           });
-          setPostFormingFreezerBData(res2?.data || []);
+          setPostFoamingFreezerBData(res2?.data || []);
 
-          // Post Forming SUS
+          // Post Foaming SUS
           const res3 = await axios.get(`${API_BASE_URL}/post-hp-sus`, {
             params,
           });
-          setPostFormingSUSData(res3?.data || []);
+          setPostFoamingSUSData(res3?.data || []);
 
           // Category Count
           const res4 = await axios.get(`${API_BASE_URL}/post-hp-cat`, {
@@ -141,33 +141,33 @@ const LineHourlyReport = () => {
           });
           setPostCategoryCountData(res4?.data || []);
         } catch (error) {
-          console.error("Error fetching Post Forming data:", error);
-          toast.error("Failed to fetch Post Forming data");
+          console.error("Error fetching Post Foaming data:", error);
+          toast.error("Failed to fetch Post Foaming data");
         }
       }
-      // Handle Forming data
-      else if (lineType === "forming") {
+      // Handle Foaming data
+      else if (lineType === "Foaming") {
         try {
-          // Forming FOM A
-          const res1 = await axios.get(`${API_BASE_URL}/forming-hp-fom-a`, {
+          // Foaming FOM A
+          const res1 = await axios.get(`${API_BASE_URL}/Foaming-hp-fom-a`, {
             params,
           });
-          setFormingFOMAData(res1?.data || []);
+          setFoamingFOMAData(res1?.data || []);
 
-          // Forming FOM B
-          const res2 = await axios.get(`${API_BASE_URL}/forming-hp-fom-b`, {
+          // Foaming FOM B
+          const res2 = await axios.get(`${API_BASE_URL}/Foaming-hp-fom-b`, {
             params,
           });
-          setFormingFOMBData(res2?.data || []);
+          setFoamingFOMBData(res2?.data || []);
 
-          // Forming Category
-          const res3 = await axios.get(`${API_BASE_URL}/forming-hp-fom-cat`, {
+          // Foaming Category
+          const res3 = await axios.get(`${API_BASE_URL}/Foaming-hp-fom-cat`, {
             params,
           });
-          setFormingCategoryData(res3?.data || []);
+          setFoamingCategoryData(res3?.data || []);
         } catch (error) {
-          console.error("Error fetching Forming data:", error);
-          toast.error("Failed to fetch Forming data");
+          console.error("Error fetching Foaming data:", error);
+          toast.error("Failed to fetch Foaming data");
         }
       }
     } catch (error) {
@@ -232,21 +232,21 @@ const LineHourlyReport = () => {
                   <input
                     type="radio"
                     name="lineType"
-                    value="post_forming"
-                    checked={lineType === "post_forming"}
+                    value="post_Foaming"
+                    checked={lineType === "post_Foaming"}
                     onChange={(e) => setLineType(e.target.value)}
                   />
-                  Post Forming
+                  Post Foaming
                 </label>
                 <label>
                   <input
                     type="radio"
                     name="lineType"
-                    value="forming"
-                    checked={lineType === "forming"}
+                    value="Foaming"
+                    checked={lineType === "Foaming"}
                     onChange={(e) => setLineType(e.target.value)}
                   />
-                  Forming
+                  Foaming
                 </label>
               </div>
             </div>
@@ -294,22 +294,22 @@ const LineHourlyReport = () => {
                 </>
               )}
 
-              {lineType === "post_forming" && (
+              {lineType === "post_Foaming" && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <PostFormingFreezerA
+                    <PostFoamingFreezerA
                       title={"Foam Frz A"}
-                      data={postFormingFreezerAData}
+                      data={postFoamingFreezerAData}
                     />
-                    <PostFormingFreezerB
+                    <PostFoamingFreezerB
                       title={"Post Foam Frz B"}
-                      data={postFormingFreezerBData}
+                      data={postFoamingFreezerBData}
                     />
-                    <PostFormingSUS
+                    <PostFoamingSUS
                       title={"Post Foam SUS"}
-                      data={postFormingSUSData}
+                      data={postFoamingSUSData}
                     />
-                    <PostFormingCategoryCount
+                    <PostFoamingCategoryCount
                       title={"Category Count"}
                       data={postCategoryCountData}
                     />
@@ -317,14 +317,14 @@ const LineHourlyReport = () => {
                 </>
               )}
 
-              {lineType === "forming" && (
+              {lineType === "Foaming" && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <FormingA title={"Forming A"} data={formingFOMAData} />
-                    <FormingB title={"Forming B"} data={formingFOMBData} />
-                    <FormingCategoryCount
+                    <FoamingA title={"Foaming A"} data={FoamingFOMAData} />
+                    <FoamingB title={"Foaming B"} data={FoamingFOMBData} />
+                    <FoamingCategoryCount
                       title={"Category Count"}
-                      data={formingCategoryData}
+                      data={FoamingCategoryData}
                     />
                   </div>
                 </>

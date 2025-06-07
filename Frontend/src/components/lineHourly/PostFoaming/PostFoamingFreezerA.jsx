@@ -1,8 +1,7 @@
 import { Bar } from "react-chartjs-2";
 
-const PostFormingCategoryCount = ({ title, data }) => {
-  const count =
-    data && data.reduce((sum, item) => sum + (item.TotalCount || 0), 0);
+const PostFoamingFreezerA = ({ title, data }) => {
+  const count = data && data.reduce((sum, item) => sum + (item.COUNT || 0), 0);
 
   const prepareChartData = () => {
     if (!data || data.length === 0) {
@@ -10,12 +9,12 @@ const PostFormingCategoryCount = ({ title, data }) => {
     }
 
     const chartData = {
-      labels: data.map((item) => item.category),
+      labels: data.map((item) => `H ${item.TIMEHOUR}`),
       datasets: [
         {
-          label: "Category Count",
-          data: data.map((item) => item.TotalCount || 0),
-          backgroundColor: "rgba(99, 255, 132, 0.6)",
+          label: "Hourly Count",
+          data: data.map((item) => item.COUNT || 0),
+          backgroundColor: "rgba(54, 162, 235, 0.6)",
           borderRadius: 5,
         },
       ],
@@ -54,7 +53,7 @@ const PostFormingCategoryCount = ({ title, data }) => {
       scales: {
         y: {
           beginAtZero: true,
-          max: Math.max(...data.map((item) => item.TotalCount || 0), 0) + 30,
+          max: Math.max(...data.map((item) => item.COUNT || 0), 0) + 10,
         },
       },
     };
@@ -69,7 +68,7 @@ const PostFormingCategoryCount = ({ title, data }) => {
         <div className="flex items-center justify-between px-3 py-2">
           <h3 className="text-lg font-bold">{title}</h3>
           <div className="font-semibold text-lg">
-            Total Count: <span className="text-blue-700">{count}</span>
+            Count: <span className="text-blue-700">{count}</span>
           </div>
         </div>
 
@@ -78,7 +77,8 @@ const PostFormingCategoryCount = ({ title, data }) => {
             <table className="min-w-full border text-left bg-white rounded-lg">
               <thead className="text-center">
                 <tr className="bg-gray-200">
-                  <th className="px-1 py-1 border">Category</th>
+                  <th className="px-1 py-1 border">Hour No.</th>
+                  <th className="px-1 py-1 border">Time Hour</th>
                   <th className="px-1 py-1 border">Count</th>
                 </tr>
               </thead>
@@ -87,16 +87,19 @@ const PostFormingCategoryCount = ({ title, data }) => {
                   data.map((item, index) => (
                     <tr key={index} className="hover:bg-gray-100 text-center">
                       <td className="px-1 py-1 border">
-                        {item.category || "N/A"}
+                        {item.HOUR_NUMBER || "N/A"}
                       </td>
                       <td className="px-1 py-1 border">
-                        {item.TotalCount || "N/A"}
+                        {item.TIMEHOUR || "N/A"}
+                      </td>
+                      <td className="px-1 py-1 border">
+                        {item.COUNT || "N/A"}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={2} className="text-center px-1 py-1 border">
+                    <td colSpan={3} className="text-center px-1 py-1 border">
                       No Data Available
                     </td>
                   </tr>
@@ -106,6 +109,7 @@ const PostFormingCategoryCount = ({ title, data }) => {
           </div>
         </div>
       </div>
+
       {/* Chart Section */}
       {chartData && (
         <div
@@ -120,4 +124,4 @@ const PostFormingCategoryCount = ({ title, data }) => {
   );
 };
 
-export default PostFormingCategoryCount;
+export default PostFoamingFreezerA;

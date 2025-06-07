@@ -1,7 +1,8 @@
 import { Bar } from "react-chartjs-2";
 
-const PostFormingSUS = ({ title, data }) => {
-  const count = data && data.reduce((sum, item) => sum + (item.COUNT || 0), 0);
+const FoamingCategoryCount = ({ title, data }) => {
+  const count =
+    data && data.reduce((sum, item) => sum + (item.TotalCount || 0), 0);
 
   const prepareChartData = () => {
     if (!data || data.length === 0) {
@@ -9,12 +10,12 @@ const PostFormingSUS = ({ title, data }) => {
     }
 
     const chartData = {
-      labels: data.map((item) => `H ${item.TIMEHOUR}`),
+      labels: data.map((item) => item.category),
       datasets: [
         {
-          label: "Hourly Count",
-          data: data.map((item) => item.COUNT || 0),
-          backgroundColor: "rgba(75, 192, 192, 0.6)",
+          label: "Category Count",
+          data: data.map((item) => item.TotalCount || 0),
+          backgroundColor: "rgba(99, 255, 132, 0.6)",
           borderRadius: 5,
         },
       ],
@@ -53,7 +54,7 @@ const PostFormingSUS = ({ title, data }) => {
       scales: {
         y: {
           beginAtZero: true,
-          max: Math.max(...data.map((item) => item.COUNT || 0), 0) + 10,
+          max: Math.max(...data.map((item) => item.TotalCount || 0), 0) + 30,
         },
       },
     };
@@ -64,11 +65,12 @@ const PostFormingSUS = ({ title, data }) => {
   const { chartData, chartOptions } = prepareChartData();
   return (
     <div className="flex flex-col gap-4">
+      {/* Table */}
       <div key={title} className="bg-white rounded shadow flex flex-col">
         <div className="flex items-center justify-between px-3 py-2">
           <h3 className="text-lg font-bold">{title}</h3>
           <div className="font-semibold text-lg">
-            Count: <span className="text-blue-700">{count}</span>
+            Total Count: <span className="text-blue-700">{count}</span>
           </div>
         </div>
 
@@ -77,8 +79,7 @@ const PostFormingSUS = ({ title, data }) => {
             <table className="min-w-full border text-left bg-white rounded-lg">
               <thead className="text-center">
                 <tr className="bg-gray-200">
-                  <th className="px-1 py-1 border">Hour No.</th>
-                  <th className="px-1 py-1 border">Time Hour</th>
+                  <th className="px-1 py-1 border">Category</th>
                   <th className="px-1 py-1 border">Count</th>
                 </tr>
               </thead>
@@ -87,19 +88,16 @@ const PostFormingSUS = ({ title, data }) => {
                   data.map((item, index) => (
                     <tr key={index} className="hover:bg-gray-100 text-center">
                       <td className="px-1 py-1 border">
-                        {item.HOUR_NUMBER || "N/A"}
+                        {item.category || "N/A"}
                       </td>
                       <td className="px-1 py-1 border">
-                        {item.TIMEHOUR || "N/A"}
-                      </td>
-                      <td className="px-1 py-1 border">
-                        {item.COUNT || "N/A"}
+                        {item.TotalCount || "N/A"}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={3} className="text-center px-1 py-1 border">
+                    <td colSpan={2} className="text-center px-1 py-1 border">
                       No Data Available
                     </td>
                   </tr>
@@ -109,6 +107,7 @@ const PostFormingSUS = ({ title, data }) => {
           </div>
         </div>
       </div>
+
       {/* Chart Section */}
       {chartData && (
         <div
@@ -123,4 +122,4 @@ const PostFormingSUS = ({ title, data }) => {
   );
 };
 
-export default PostFormingSUS;
+export default FoamingCategoryCount;

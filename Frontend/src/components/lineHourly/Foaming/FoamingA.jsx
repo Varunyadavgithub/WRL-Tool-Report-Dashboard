@@ -1,6 +1,6 @@
 import { Bar } from "react-chartjs-2";
 
-const PostFormingFreezerA = ({ title, data }) => {
+const FoamingA = ({ title, data }) => {
   const count = data && data.reduce((sum, item) => sum + (item.COUNT || 0), 0);
 
   const prepareChartData = () => {
@@ -14,7 +14,7 @@ const PostFormingFreezerA = ({ title, data }) => {
         {
           label: "Hourly Count",
           data: data.map((item) => item.COUNT || 0),
-          backgroundColor: "rgba(54, 162, 235, 0.6)",
+          backgroundColor: "rgba(255, 99, 132, 0.6)",
           borderRadius: 5,
         },
       ],
@@ -124,4 +124,4 @@ const PostFormingFreezerA = ({ title, data }) => {
   );
 };
 
-export default PostFormingFreezerA;
+export default FoamingA;

@@ -24,7 +24,7 @@ const TotalProduction = () => {
 
   const departmentOption = [
     { label: "Final", value: "final" },
-    { label: "Post Forming", value: "postforming" },
+    { label: "Post Foaming", value: "postFoaming" },
   ];
   const [selecedDep, setSelectedDep] = useState(departmentOption[0]);
 

@@ -5,9 +5,9 @@ import {
   getFinalHPChoc,
   getFinalHPFrz,
   getFinalHPSUS,
-  getFormingHpFomA,
-  getFormingHpFomB,
-  getFormingHpFomCat,
+  getFoamingHpFomA,
+  getFoamingHpFomB,
+  getFoamingHpFomCat,
   // getHourlyLoadingQuery,
   getPostHPCAT,
   getPostHPFrzA,
@@ -33,9 +33,9 @@ router.get("/post-hp-frz-b", getPostHPFrzB);
 router.get("/post-hp-sus", getPostHPSUS);
 router.get("/post-hp-cat", getPostHPCAT);
 
-// FormingHP Routes
-router.get("/forming-hp-fom-a", getFormingHpFomA);
-router.get("/forming-hp-fom-b", getFormingHpFomB);
-router.get("/forming-hp-fom-cat", getFormingHpFomCat);
+// FoamingHP Routes
+router.get("/Foaming-hp-fom-a", getFoamingHpFomA);
+router.get("/Foaming-hp-fom-b", getFoamingHpFomB);
+router.get("/Foaming-hp-fom-cat", getFoamingHpFomCat);
 
 export default router;
