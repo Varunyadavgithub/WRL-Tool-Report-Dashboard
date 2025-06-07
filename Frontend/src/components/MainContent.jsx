@@ -104,7 +104,7 @@ function MainContent() {
         <Route path="/quality/fpa-report" element={<FPAReports />} />
 
         {/* 🚫 Restricted Route: Only Line Quality Engineer, Quality Manager and Admin */}
-        {canAccess(["line quality engineer", "quality manager"]) && (
+        {canAccess(["line quality engineer","fpa", "quality manager"]) && (
           <Route path="/quality/dispatch-hold" element={<DispatchHold />} />
         )}
 

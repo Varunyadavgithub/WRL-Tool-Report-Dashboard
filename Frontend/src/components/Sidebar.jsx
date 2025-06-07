@@ -69,7 +69,7 @@ const MENU_CONFIG = [
       {
         path: "/quality/dispatch-hold",
         label: "Dispatch Hold",
-        roles: ["line quality engineer", "quality manager"],
+        roles: ["line quality engineer", "fpa", "quality manager"],
       },
       { path: "/quality/hold-cabinate-details", label: "Hold Cabinet Details" },
       {
