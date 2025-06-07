@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Title from "../../components/common/Title";
 import Button from "../../components/common/Button";
 import SelectField from "../../components/common/SelectField";
 import DateTimePicker from "../../components/common/DateTimePicker";
-import { useEffect } from "react";
-import axios from "axios";
 import ExportButton from "../../components/common/ExportButton";
+import axios from "axios";
 import toast from "react-hot-toast";
+import Loader from "../../components/common/Loader";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
@@ -18,14 +18,31 @@ const TotalProduction = () => {
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [totalProductionData, setTotalProductionData] = useState([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [limit] = useState(1000);
+  const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+
   const departmentOption = [
     { label: "Final", value: "final" },
     { label: "Post Forming", value: "postforming" },
   ];
   const [selecedDep, setSelectedDep] = useState(departmentOption[0]);
+
+  const observer = useRef();
+  const lastRowRef = useCallback(
+    (node) => {
+      if (loading) return;
+      if (observer.current) observer.current.disconnect();
+
+      observer.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          setPage((prevPage) => prevPage + 1);
+        }
+      });
+      if (node) observer.current.observe(node);
+    },
+    [loading, hasMore]
+  );
 
   const fetchModelVariants = async () => {
     try {
@@ -52,28 +69,31 @@ const TotalProduction = () => {
 
     try {
       setLoading(true);
-
       const params = {
         startDate: startTime,
         endDate: endTime,
         page: pageNumber,
         limit,
         department: selecedDep.value,
+        model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
       };
-
-      if (selectedVariant) {
-        params.model = parseInt(selectedVariant.value, 10);
-      } else {
-        params.model = 0;
-      }
 
       const res = await axios.get(`${baseURL}prod/barcode-details`, { params });
 
       if (res?.data?.success) {
-        setTotalProductionData(res?.data?.data);
-        setTotalCount(res?.data?.totalCount);
-        setTotalPages(Math.ceil(res?.data?.totalCount / limit));
-        setPage(pageNumber);
+        setTotalProductionData((prev) => {
+          const existing = new Set(prev.map((d) => d.FG_SR));
+          const uniqueNew = res.data.data.filter(
+            (item) => !existing.has(item.FG_SR)
+          );
+          return [...prev, ...uniqueNew];
+        });
+
+        if (pageNumber === 1) {
+          setTotalCount(res?.data?.totalCount);
+        }
+
+        setHasMore(res?.data?.data.length > 0);
       }
     } catch (error) {
       console.error("Failed to fetch total production data:", error);
@@ -82,40 +102,40 @@ const TotalProduction = () => {
     }
   };
 
+  useEffect(() => {
+    if (page === 1) return;
+    fetchTotalProductionData(page);
+  }, [page]);
+
+  const handleQuery = () => {
+    setPage(1);
+    setTotalProductionData([]);
+    setHasMore(false);
+    fetchTotalProductionData(1);
+  };
+
   const fetchExportData = async () => {
     if (!startTime || !endTime) {
       toast.error("Please select Time Range.");
       return;
     }
-
     try {
       const params = {
         startDate: startTime,
         endDate: endTime,
         department: selecedDep.value,
+        model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
       };
-
-      if (selectedVariant) {
-        params.model = parseInt(selectedVariant.value, 10);
-      } else {
-        params.model = 0;
-      }
-
       const res = await axios.get(`${baseURL}prod/export-total-production`, {
         params,
       });
-
-      if (res?.data?.success) {
-        return res?.data?.data;
-      }
-      return [];
+      return res?.data?.success ? res?.data?.data : [];
     } catch (error) {
       console.error("Failed to fetch export total production data:", error);
       return [];
     }
   };
 
-  // Helper function to get category counts
   const getCategoryCounts = (data) => {
     const counts = {};
     data.forEach((item) => {
@@ -134,24 +154,11 @@ const TotalProduction = () => {
     return counts;
   };
 
-  const handlePrevPage = () => {
-    if (page > 1) {
-      fetchTotalProductionData(page - 1);
-    }
-  };
-
-  const handleNextPage = () => {
-    if (page < totalPages) {
-      fetchTotalProductionData(page + 1);
-    }
-  };
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="Total Production" align="center" />
 
-      {/* Filters Section */}
       <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
-        {/* First Row */}
         <div className="flex flex-wrap gap-4">
           <SelectField
             label="Model Variant"
@@ -159,7 +166,7 @@ const TotalProduction = () => {
             value={selectedVariant?.value || ""}
             onChange={(e) =>
               setSelectedVariant(
-                variants.find((opt) => opt.value === e.target.value) || 0
+                variants.find((opt) => opt.value === e.target.value) || null
               )
             }
             className="max-w-64"
@@ -171,14 +178,12 @@ const TotalProduction = () => {
             onChange={(e) =>
               setSelectedDep(
                 departmentOption.find((opt) => opt.value === e.target.value) ||
-                  0
+                  null
               )
             }
             className="max-w-64"
           />
         </div>
-
-        {/* Second Row */}
         <div className="flex flex-wrap gap-4 mt-4">
           <DateTimePicker
             label="Start Time"
@@ -195,63 +200,31 @@ const TotalProduction = () => {
             className="max-w-64"
           />
         </div>
-
-        {/* Third Row */}
-        <div className="flex items-center gap-2">
-          <div className="flex flex-wrap items-end gap-2 mt-4">
-            <Button
-              bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
-              textColor={loading ? "text-white" : "text-black"}
-              className={`font-semibold ${loading ? "cursor-not-allowed" : ""}`}
-              onClick={() => fetchTotalProductionData(1)}
-              disabled={loading}
-            >
-              Query
-            </Button>
-            {totalProductionData && totalProductionData.length > 0 && (
-              <ExportButton
-                fetchData={fetchExportData}
-                filename="Total_Production_Report"
-              />
-            )}
-          </div>
-
-          {/* Count */}
-          <div className="mt-4 text-left font-bold text-lg">
-            COUNT: <span className="text-blue-700">{totalCount || 0} </span>
+        <div className="flex items-center gap-2 mt-4">
+          <Button
+            onClick={handleQuery}
+            bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
+            textColor={loading ? "text-white" : "text-black"}
+            className={`font-semibold ${loading ? "cursor-not-allowed" : ""}`}
+            disabled={loading}
+          >
+            Query
+          </Button>
+          {totalProductionData.length > 0 && (
+            <ExportButton
+              fetchData={fetchExportData}
+              filename="Total_Production_Report"
+            />
+          )}
+          <div className="ml-4 font-bold text-lg">
+            COUNT: <span className="text-blue-700">{totalCount}</span>
           </div>
         </div>
       </div>
 
-      {/* Summary Section */}
       <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
         <div className="bg-white border border-gray-300 rounded-md p-4">
-          {/* Pagination Controls */}
-          <div className="flex justify-center items-center gap-4 my-4">
-            <Button
-              onClick={handlePrevPage}
-              disabled={page === 1 || loading}
-              bgColor={page === 1 || loading ? "bg-gray-400" : "bg-blue-500"}
-              textColor="text-white"
-            >
-              Previous
-            </Button>
-            <span className="font-semibold">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              onClick={handleNextPage}
-              disabled={page === totalPages || loading}
-              bgColor={
-                page === totalPages || loading ? "bg-gray-400" : "bg-blue-500"
-              }
-              textColor="text-white"
-            >
-              Next
-            </Button>
-          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Table 1 */}
             <div className="max-h-[600px] overflow-x-auto w-full">
               <table className="w-full border bg-white text-xs text-left rounded-lg table-auto">
                 <thead className="bg-gray-200 sticky top-0 z-10 text-center">
@@ -268,15 +241,21 @@ const TotalProduction = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {totalProductionData?.length > 0 ? (
-                    totalProductionData.map((item, index) => (
-                      <tr key={index} className="hover:bg-gray-100 text-center">
+                  {totalProductionData.map((item, index) => {
+                    const isLast = index === totalProductionData.length - 1;
+                    return (
+                      <tr
+                        key={index}
+                        ref={isLast ? lastRowRef : null}
+                        className="hover:bg-gray-100 text-center"
+                      >
                         <td className="px-1 py-1 border">{item.Model_Name}</td>
                         <td className="px-1 py-1 border">{item.FG_SR}</td>
                         <td className="px-1 py-1 border">{item.Asset_tag}</td>
                       </tr>
-                    ))
-                  ) : (
+                    );
+                  })}
+                  {!loading && totalProductionData.length === 0 && (
                     <tr>
                       <td colSpan={3} className="text-center py-4">
                         No data found.
@@ -285,9 +264,13 @@ const TotalProduction = () => {
                   )}
                 </tbody>
               </table>
+              {loading && (
+                <div className="text-center my-4 text-sm text-gray-500">
+                  <Loader />
+                </div>
+              )}
             </div>
 
-            {/* Table 2 */}
             <div className="max-h-[500px] overflow-x-auto w-full">
               <table className="w-full border bg-white text-xs text-left rounded-lg table-auto">
                 <thead className="bg-gray-200 sticky top-0 z-10 text-center">
@@ -299,30 +282,18 @@ const TotalProduction = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {totalProductionData.length > 0 ? (
-                    Object.entries(getModelNameCount(totalProductionData)).map(
-                      ([modelName, count], index) => (
-                        <tr
-                          key={index}
-                          className="hover:bg-gray-100 text-center"
-                        >
-                          <td className="px-1 py-1 border">{modelName}</td>
-                          <td className="px-1 py-1 border">{count}</td>
-                        </tr>
-                      )
+                  {Object.entries(getModelNameCount(totalProductionData)).map(
+                    ([modelName, count], index) => (
+                      <tr key={index} className="hover:bg-gray-100 text-center">
+                        <td className="px-1 py-1 border">{modelName}</td>
+                        <td className="px-1 py-1 border">{count}</td>
+                      </tr>
                     )
-                  ) : (
-                    <tr>
-                      <td colSpan={2} className="text-center py-4">
-                        No data found.
-                      </td>
-                    </tr>
                   )}
                 </tbody>
               </table>
             </div>
 
-            {/* Table 3 */}
             <div className="max-h-[500px] overflow-x-auto w-full">
               <table className="w-full border bg-white text-xs text-left rounded-lg table-auto">
                 <thead className="bg-gray-200 sticky top-0 z-10 text-center">
@@ -332,24 +303,13 @@ const TotalProduction = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {totalProductionData.length > 0 ? (
-                    Object.entries(getCategoryCounts(totalProductionData)).map(
-                      ([category, count], index) => (
-                        <tr
-                          key={index}
-                          className="hover:bg-gray-100 text-center"
-                        >
-                          <td className="px-1 py-1 border">{category}</td>
-                          <td className="px-1 py-1 border">{count}</td>
-                        </tr>
-                      )
+                  {Object.entries(getCategoryCounts(totalProductionData)).map(
+                    ([category, count], index) => (
+                      <tr key={index} className="hover:bg-gray-100 text-center">
+                        <td className="px-1 py-1 border">{category}</td>
+                        <td className="px-1 py-1 border">{count}</td>
+                      </tr>
                     )
-                  ) : (
-                    <tr>
-                      <td colSpan={2} className="text-center py-4">
-                        No data found.
-                      </td>
-                    </tr>
                   )}
                 </tbody>
               </table>
