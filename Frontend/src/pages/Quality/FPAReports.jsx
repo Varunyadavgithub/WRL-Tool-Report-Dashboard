@@ -6,6 +6,7 @@ import SelectField from "../../components/common/SelectField";
 import InputField from "../../components/common/InputField";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { useMemo } from "react";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
@@ -40,14 +41,22 @@ const FPAReports = () => {
     }
     setLoading(true);
     try {
-      const params = {
+      let params = {
         startDate: startTime,
         endDate: endTime,
       };
 
       if (reportType === "fpaReport") {
+        if (selectedVariant && selectedVariant.value) {
+          params = {
+            ...params,
+            model: selectedVariant.label,
+          };
+        }
+
         const res = await axios.get(`${baseURL}quality/fpa-report`, { params });
         setReportData(res.data);
+        setSelectedVariant(null);
       } else if (reportType === "dailyFpaReport") {
         const res = await axios.get(`${baseURL}quality/fpa-daily-report`, {
           params,
@@ -67,12 +76,17 @@ const FPAReports = () => {
         alert("Please select the Report Type.");
         return;
       }
+      console.log(params);
     } catch (error) {
       console.error("Failed to fetch FPA Report:", error);
     } finally {
       setLoading(false);
     }
   };
+
+  const uniqueFGSRNoCount = useMemo(() => {
+    return new Set(reportData.map((item) => item.FGSRNo)).size;
+  }, [reportData]);
 
   useEffect(() => {
     fetchModelVariants();
@@ -109,24 +123,28 @@ const FPAReports = () => {
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
           />
-          <SelectField
-            label="Model Variant"
-            options={variants}
-            value={selectedVariant?.value || ""}
-            onChange={(e) =>
-              setSelectedVariant(
-                variants.find((opt) => opt.value === e.target.value) || 0
-              )
-            }
-          />
-          <InputField
-            label="Search"
-            type="text"
-            placeholder="Enter details"
-            className="w-full"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          {reportType === "fpaReport" && (
+            <>
+              <SelectField
+                label="Model Variant"
+                options={variants}
+                value={selectedVariant?.value || ""}
+                onChange={(e) =>
+                  setSelectedVariant(
+                    variants.find((opt) => opt.value === e.target.value) || 0
+                  )
+                }
+              />
+              <InputField
+                label="Search"
+                type="text"
+                placeholder="Enter details"
+                className="w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </>
+          )}
         </div>
 
         <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-md mt-6">
@@ -193,7 +211,7 @@ const FPAReports = () => {
               <div className="text-left font-bold text-lg">
                 COUNT:{" "}
                 <span className="text-blue-700">
-                  {reportData.length || "0"}
+                  {uniqueFGSRNoCount || "0"}
                 </span>
               </div>
             </div>
@@ -300,9 +318,7 @@ const DailyFpaReportTable = ({ data }) => {
           {data && data.length > 0 ? (
             data.map((row, index) => (
               <tr key={index} className="hover:bg-gray-100 text-center">
-                <td className="px-1 py-1 border">
-                  {row.Date && row.Date.replace("T", " ").replace("Z", "")}
-                </td>
+                <td className="px-1 py-1 border">{row.Date.slice(0, 10)}</td>
                 <td className="px-1 py-1 border">{row.Month}</td>
                 <td className="px-1 py-1 border">{row.NoOfCritical}</td>
                 <td className="px-1 py-1 border">{row.NoOfMajor}</td>

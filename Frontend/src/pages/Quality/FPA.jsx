@@ -11,11 +11,6 @@ import { getFormattedISTDate } from "../../utils/dateUtils";
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const FPA = () => {
-  const Shift = [
-    { label: "Shift 1", value: "shift 1" },
-    { label: "Shift 2", value: "shift 2" },
-  ];
-
   const DefectCategory = [
     { label: "Minor", value: "minor" },
     { label: "Major", value: "major" },
@@ -35,11 +30,27 @@ const FPA = () => {
   const [fpaDefect, setFpaDefect] = useState([]);
 
   const [remark, setRemark] = useState("");
-  const [country, setCountry] = useState("");
-  const [shift, setShift] = useState(Shift[0]);
+  const [country, setCountry] = useState("India");
   const [selectedDefectCategory, setSelectedDefectCategory] = useState(
     DefectCategory[0]
   );
+
+  const getCurrentShift = () => {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+
+    // Convert current time to minutes since midnight
+    const totalMinutes = hours * 60 + minutes;
+
+    // Shift 1: 08:00 (480 minutes) to 20:00 (1200 minutes)
+    // Shift 2: 20:01 to 07:59 (the rest of the day)
+    if (totalMinutes >= 480 && totalMinutes < 1200) {
+      return { label: "Shift 1", value: "shift 1" };
+    } else {
+      return { label: "Shift 2", value: "shift 2" };
+    }
+  };
 
   const getFPACountData = async () => {
     try {
@@ -131,9 +142,11 @@ const FPA = () => {
     try {
       setLoading(true);
 
-      const params = {
+      const dynamicShift = getCurrentShift();
+
+      const payload = {
         model: assetDetails.ModelName,
-        shift: shift.value,
+        shift: dynamicShift.value,
         FGSerialNumber: assetDetails.FGNo,
         Category: selectedDefectCategory.value,
         AddDefect: defectToAdd,
@@ -141,18 +154,23 @@ const FPA = () => {
         currentDateTime: getFormattedISTDate(),
         country,
       };
-      const res = await axios.post(`${baseURL}quality/add-fpa-defect`, params);
+
+      const res = await axios.post(`${baseURL}quality/add-fpa-defect`, payload);
+
+      console.log(res);
 
       if (res?.data?.success) {
-        toast.success("Defect added successfully!");
+        toast.success(res?.data?.message || "Defect added successfully!");
         setRemark("");
         setManualCategory("");
-        window.location.reload();
-      } else {
-        toast.error("Failed to add defect.");
+        setSelectedFpaDefectCategory(null);
+        setAddManually(false);
+        getFpaDefect(); // Refresh defect table
+        getFPACountData(); // Refresh count data
+        getFPQIDetails(); // Refresh FPQI values
       }
     } catch (error) {
-      console.error("Error adding defect:", error);
+      console.error("Add Defect Error:", error.response?.data || error.message);
       toast.error("An error occurred while adding the defect.");
     } finally {
       setLoading(false);
@@ -293,18 +311,14 @@ const FPA = () => {
               value={country}
               onChange={(e) => setCountry(e.target.value)}
             />
-            <SelectField
-              label="Shift"
-              options={Shift}
-              value={shift?.value || ""}
-              onChange={(e) => {
-                const selected = Shift.find(
-                  (item) => item.value === e.target.value
-                );
-                setShift(selected);
-              }}
+            <InputField
+              label="Current Shift"
+              type="text"
+              value={getCurrentShift().label}
+              readOnly
               className="max-w-65"
             />
+
             <div className="flex flex-col gap-2 w-72">
               {/* Radio Button Toggle */}
               <div className="flex items-center gap-2">

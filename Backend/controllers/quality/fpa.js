@@ -1,6 +1,6 @@
 import sql, { dbConfig1 } from "../../config/db.js";
 
-export const getFpaCount = async (req, res) => {
+export const getFpaCount = async (_, res) => {
   const now = new Date();
 
   // Set start date: today at 08:00:00
@@ -143,7 +143,7 @@ export const getAssetDetails = async (req, res) => {
   }
 };
 
-export const getFPQIDetails = async (req, res) => {
+export const getFPQIDetails = async (_, res) => {
   const now = new Date();
   // Set start date: today at 08:00:00
   const startDate = new Date(
@@ -215,7 +215,7 @@ export const getFPQIDetails = async (req, res) => {
   }
 };
 
-export const getFpaDefect = async (req, res) => {
+export const getFpaDefect = async (_, res) => {
   const now = new Date();
 
   // Set start date: today at 08:00:00
@@ -266,7 +266,7 @@ export const getFpaDefect = async (req, res) => {
   }
 };
 
-export const getDefectCategory = async (req, res) => {
+export const getDefectCategory = async (_, res) => {
   try {
     const query = `
     Select Code, Name from DefectCodeMaster
@@ -296,32 +296,41 @@ export const addDefect = async (req, res) => {
   } = req.body;
 
   try {
+    // Convert to IST (UTC+5:30)
+    const currDate = new Date(
+      new Date(currentDateTime).getTime() + 330 * 60000
+    );
+
     const query = `
-    INSERT INTO FPAReport
-    (Date, Model, Shift, FGSRNo, Country, Category, AddDefect, Remark)
-    VALUES (@Date, @Model, @Shift, @FGSRNo, @Country, @Category, @AddDefect, @Remark)
-  `;
+      INSERT INTO FPAReport
+      (Date, Model, Shift, FGSRNo, Country, Category, AddDefect, Remark)
+      VALUES (@Date, @Model, @Shift, @FGSRNo, @Country, @Category, @AddDefect, @Remark)
+    `;
 
     const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const request = pool.request();
 
-    request.input("Date", sql.DateTime, currentDateTime);
-    request.input("Model", sql.NVarChar, model);
-    request.input("Shift", sql.NVarChar, shift);
-    request.input("FGSRNo", sql.NVarChar, FGSerialNumber);
-    request.input("Country", sql.NVarChar, country);
-    request.input("Category", sql.NVarChar, Category);
-    request.input("AddDefect", sql.NVarChar, AddDefect);
-    request.input("Remark", sql.NVarChar, Remark);
+    request.input("Date", sql.DateTime, currDate);
+    request.input("Model", sql.NVarChar, model?.trim() || null);
+    request.input("Shift", sql.NVarChar, shift?.trim() || null);
+    request.input("FGSRNo", sql.NVarChar, FGSerialNumber?.trim() || null);
+    request.input("Country", sql.NVarChar, country?.trim() || null);
+    request.input("Category", sql.NVarChar, Category?.trim() || null);
+    request.input("AddDefect", sql.NVarChar, AddDefect?.trim() || null);
+    request.input("Remark", sql.NVarChar, Remark?.trim() || null);
 
-    const result = await request.query(query);
-    res
-      .status(200)
-      .json({ success: true, message: "Defect added successfully" });
-
+    await request.query(query);
     await pool.close();
+
+    return res.status(200).json({
+      success: true,
+      message: "Defect added successfully",
+    });
   } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
+    console.error("Error adding defect:", err.message);
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 };
