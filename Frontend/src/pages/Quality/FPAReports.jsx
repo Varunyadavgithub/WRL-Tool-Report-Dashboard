@@ -62,7 +62,7 @@ const FPAReports = () => {
         const res = await axios.get(`${baseURL}quality/fpa-daily-report`, {
           params,
         });
-        console.log(res)
+        console.log(res);
         setReportData(res.data);
       } else if (reportType === "monthlyFpaReport") {
         const res = await axios.get(`${baseURL}quality/fpa-monthly-report`, {
@@ -85,7 +85,6 @@ const FPAReports = () => {
       setLoading(false);
     }
   };
-
 
   const uniqueFGSRNoCount = useMemo(() => {
     return new Set(reportData.map((item) => item.FGSRNo)).size;

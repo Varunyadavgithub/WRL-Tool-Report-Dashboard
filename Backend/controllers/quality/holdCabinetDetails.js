@@ -14,10 +14,19 @@ export const getDispatchHoldDetails = async (req, res) => {
   if (status) {
     const lowerStatus = status.toLowerCase();
     if (lowerStatus === "hold") {
-      statusCondition = " AND mb.Status = 11 AND dh.ReleasedDateTime IS NULL";
+      statusCondition =
+        "dh.HoldDatetime BETWEEN @startDate AND @endDate AND mb.Status = 11 AND dh.ReleasedDateTime IS NULL ORDER BY dh.HoldDatetime DESC";
     } else if (lowerStatus === "release") {
       statusCondition =
-        " AND mb.Status = 1 AND dh.ReleasedDateTime IS NOT NULL";
+        "dh.ReleasedDateTime BETWEEN @startDate AND @endDate  AND mb.Status = 1 AND dh.ReleasedDateTime IS NOT NULL ORDER BY dh.ReleasedDateTime DESC";
+    } else {
+      statusCondition = `    (
+        (mb.Status = 11 AND dh.ReleasedDateTime IS NULL AND dh.HoldDatetime BETWEEN '2025-05-08 08:00:00.000' AND '2025-06-08 08:00:00.000')
+        OR
+        (mb.Status = 1 AND dh.ReleasedDateTime IS NOT NULL AND dh.ReleasedDateTime BETWEEN '2025-05-08 08:00:00.000' AND '2025-06-08 08:00:00.000')
+    )
+    ORDER BY
+      ISNULL(dh.ReleasedDateTime, dh.HoldDatetime) DESC;`;
     }
   }
 
@@ -28,7 +37,11 @@ export const getDispatchHoldDetails = async (req, res) => {
       dh.DefectCode AS HoldReason,
       dh.HoldDatetime AS HoldDate,
       u.UserName AS HoldBy,
-      DATEDIFF(DAY, dh.HoldDateTime, dh.ReleasedDateTime) AS DaysOnHold,
+      DATEDIFF(
+        DAY,
+        dh.HoldDateTime,
+        ISNULL(dh.ReleasedDateTime, GETDATE())
+    ) AS DaysOnHold,
       ISNULL(dh.Action, 'Not Released') AS CorrectiveAction,
       dh.ReleasedDateTime AS ReleasedOn,
       us.UserName AS ReleasedBy,
@@ -41,9 +54,8 @@ export const getDispatchHoldDetails = async (req, res) => {
     INNER JOIN Material m ON m.MatCode = dh.Material
     LEFT JOIN Users u ON u.UserCode = dh.HoldUserCode
     LEFT JOIN Users us ON us.UserCode = dh.ReleasedUserCode
-    WHERE dh.HoldDatetime BETWEEN @startDate AND @endDate
-    ${statusCondition}
-    ORDER BY dh.HoldDatetime DESC;
+    WHERE
+    ${statusCondition};
   `;
 
   try {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Title from "../../components/common/Title";
 import DateTimePicker from "../../components/common/DateTimePicker";
 import InputField from "../../components/common/InputField";
@@ -35,6 +35,8 @@ const HoldCabinateDetails = () => {
     groupingOptions[0]
   );
   const [totalCount, setTotalCount] = useState(0);
+  // const [searchTerm, setSearchTerm] = useState("");
+  // const [details, setDetails] = useState("");
 
   const fetchHoldCabietDetails = async () => {
     if (!startTime || !endTime || !state) {
@@ -82,6 +84,14 @@ const HoldCabinateDetails = () => {
     }));
   };
 
+  // useEffect(() => {
+  //   const delayDebounceFn = setTimeout(() => {
+  //     setDetails(searchTerm);
+  //   }, 300);
+
+  //   return () => clearTimeout(delayDebounceFn);
+  // }, [searchTerm]);
+
   const handleClearFilters = () => {
     setStartTime("");
     setEndTime("");
@@ -124,10 +134,12 @@ const HoldCabinateDetails = () => {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 items-center justify-center gap-2">
             <InputField
-              label="Details"
+              label="Search"
               type="text"
               placeholder="Enter details"
               className="w-full"
+              // value={searchTerm}
+              // onChange={(e) => setSearchTerm(e.target.value)}
             />
             <div className="flex items-center justify-center">
               <div className="text-left font-bold text-lg">
@@ -141,7 +153,7 @@ const HoldCabinateDetails = () => {
                 className={`font-semibold ${
                   loading ? "cursor-not-allowed" : ""
                 }`}
-                onClick={() => fetchHoldCabietDetails(1)}
+                onClick={() => fetchHoldCabietDetails()}
                 disabled={loading}
               >
                 Query
@@ -288,7 +300,7 @@ const HoldCabinateDetails = () => {
                 </div>
               </div>
               {/* Summary Table */}
-              <div className="w-full max-h-[500px] overflow-x-auto">
+              <div className="w-full overflow-x-auto">
                 {loading ? (
                   <Loader />
                 ) : (
