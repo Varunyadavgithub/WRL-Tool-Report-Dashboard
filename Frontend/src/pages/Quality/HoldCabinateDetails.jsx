@@ -34,12 +34,9 @@ const HoldCabinateDetails = () => {
   const [groupingCondition, setGroupingCondition] = useState(
     groupingOptions[0]
   );
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [limit] = useState(1000);
   const [totalCount, setTotalCount] = useState(0);
 
-  const fetchHoldCabietDetails = async (pageNumber = 1) => {
+  const fetchHoldCabietDetails = async () => {
     if (!startTime || !endTime || !state) {
       toast.error("Please select State and Time Range.");
       return;
@@ -51,8 +48,6 @@ const HoldCabinateDetails = () => {
         status: state.value,
         startDate: startTime,
         endDate: endTime,
-        page: pageNumber,
-        limit,
       };
       const res = await axios.get(`${baseURL}quality/hold-cabinet-details`, {
         params,
@@ -61,8 +56,6 @@ const HoldCabinateDetails = () => {
       if (res?.data?.success) {
         setHoldCabinetDetails(res?.data?.data);
         setTotalCount(res?.data?.totalCount);
-        setTotalPages(Math.ceil(res?.data?.totalCount / limit));
-        setPage(pageNumber);
       }
     } catch (error) {
       console.error("Failed to fetch Hold Cabiet Details data:", error);
@@ -95,22 +88,8 @@ const HoldCabinateDetails = () => {
     setState(State[0]);
     setHoldCabinetDetails([]);
     setGroupingCondition(groupingOptions[0]);
-    setPage(1);
-    setTotalPages(1);
   };
 
-  const handlePrevPage = () => {
-    if (page > 1) {
-      fetchHoldCabietDetails(page - 1);
-    }
-  };
-
-  const handleNextPage = () => {
-    if (page < totalPages) {
-      fetchHoldCabietDetails(page + 1);
-    }
-  };
-  
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
       <Title title="Hold Cabinate Details" align="center" />
@@ -179,30 +158,6 @@ const HoldCabinateDetails = () => {
       {/* Summary Section */}
       <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
         <div className="bg-white border border-gray-300 rounded-md p-2">
-          {/* Pagination Controls */}
-          <div className="flex justify-center items-center gap-4 my-4">
-            <Button
-              onClick={handlePrevPage}
-              disabled={page === 1 || loading}
-              bgColor={page === 1 || loading ? "bg-gray-400" : "bg-blue-500"}
-              textColor="text-white"
-            >
-              Previous
-            </Button>
-            <span className="font-semibold">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              onClick={handleNextPage}
-              disabled={page === totalPages || loading}
-              bgColor={
-                page === totalPages || loading ? "bg-gray-400" : "bg-blue-500"
-              }
-              textColor="text-white"
-            >
-              Next
-            </Button>
-          </div>
           <div className="flex flex-col md:flex-row items-start gap-1">
             {/* Left Side - Detailed Table */}
             <div className="w-full md:flex-1">
