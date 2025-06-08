@@ -35,8 +35,8 @@ const HoldCabinateDetails = () => {
     groupingOptions[0]
   );
   const [totalCount, setTotalCount] = useState(0);
-  // const [searchTerm, setSearchTerm] = useState("");
-  // const [details, setDetails] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [details, setDetails] = useState("");
 
   const fetchHoldCabietDetails = async () => {
     if (!startTime || !endTime || !state) {
@@ -84,13 +84,13 @@ const HoldCabinateDetails = () => {
     }));
   };
 
-  // useEffect(() => {
-  //   const delayDebounceFn = setTimeout(() => {
-  //     setDetails(searchTerm);
-  //   }, 300);
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      setDetails(searchTerm);
+    }, 300);
 
-  //   return () => clearTimeout(delayDebounceFn);
-  // }, [searchTerm]);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
 
   const handleClearFilters = () => {
     setStartTime("");
@@ -138,8 +138,8 @@ const HoldCabinateDetails = () => {
               type="text"
               placeholder="Enter details"
               className="w-full"
-              // value={searchTerm}
-              // onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
             <div className="flex items-center justify-center">
               <div className="text-left font-bold text-lg">
@@ -213,47 +213,70 @@ const HoldCabinateDetails = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {holdCabinetDetails.length > 0 ? (
-                        holdCabinetDetails.map((item, index) => (
-                          <tr
-                            key={index}
-                            className="hover:bg-gray-100 text-center"
-                          >
-                            <td className="px-1 py-1 border">{item.ModelNo}</td>
-                            <td className="px-1 py-1 border">
-                              {item.FGSerialNo}
-                            </td>
-                            <td className="px-1 py-1 border">
-                              {item.HoldReason}
-                            </td>
-                            <td className="px-1 py-1 border">
-                              {item.HoldDate &&
-                                item.HoldDate.replace("T", " ").replace(
-                                  "Z",
-                                  ""
-                                )}
-                            </td>
-                            <td className="px-1 py-1 border">{item.HoldBy}</td>
-                            <td className="px-1 py-1 border">
-                              {item.DaysOnHold}
-                            </td>
-                            <td className="px-1 py-1 border">
-                              {item.CorrectiveAction}
-                            </td>
-                            <td className="px-1 py-1 border">
-                              {item.ReleasedOn &&
-                                item.ReleasedOn.replace("T", " ").replace(
-                                  "Z",
-                                  ""
-                                )}
-                            </td>
-                            <td className="px-1 py-1 border">
-                              {item.ReleasedBy}
-                            </td>
-                            <td className="px-1 py-1 border">{item.Status}</td>
-                          </tr>
-                        ))
-                      ) : (
+                      {holdCabinetDetails &&
+                        holdCabinetDetails
+                          .filter((item) =>
+                            details
+                              ? item.ModelNo?.toLowerCase().includes(
+                                  details.toLowerCase()
+                                ) ||
+                                item.FGSerialNo?.toLowerCase().includes(
+                                  details.toLocaleLowerCase()
+                                ) ||
+                                item.HoldReason?.toLowerCase().includes(
+                                  details.toLowerCase()
+                                ) ||
+                                item.HoldBy?.toLowerCase().includes(
+                                  details.toLowerCase()
+                                )
+                              : true
+                          )
+                          .map((item, index) => (
+                            <tr
+                              key={index}
+                              className="hover:bg-gray-100 text-center"
+                            >
+                              <td className="px-1 py-1 border">
+                                {item.ModelNo}
+                              </td>
+                              <td className="px-1 py-1 border">
+                                {item.FGSerialNo}
+                              </td>
+                              <td className="px-1 py-1 border">
+                                {item.HoldReason}
+                              </td>
+                              <td className="px-1 py-1 border">
+                                {item.HoldDate &&
+                                  item.HoldDate.replace("T", " ").replace(
+                                    "Z",
+                                    ""
+                                  )}
+                              </td>
+                              <td className="px-1 py-1 border">
+                                {item.HoldBy}
+                              </td>
+                              <td className="px-1 py-1 border">
+                                {item.DaysOnHold}
+                              </td>
+                              <td className="px-1 py-1 border">
+                                {item.CorrectiveAction}
+                              </td>
+                              <td className="px-1 py-1 border">
+                                {item.ReleasedOn &&
+                                  item.ReleasedOn.replace("T", " ").replace(
+                                    "Z",
+                                    ""
+                                  )}
+                              </td>
+                              <td className="px-1 py-1 border">
+                                {item.ReleasedBy}
+                              </td>
+                              <td className="px-1 py-1 border">
+                                {item.Status}
+                              </td>
+                            </tr>
+                          ))}
+                      {holdCabinetDetails.length === 0 && (
                         <tr>
                           <td colSpan={12} className="text-center py-4">
                             No data found.
@@ -267,7 +290,7 @@ const HoldCabinateDetails = () => {
             </div>
 
             {/* Right Side - Controls and Summary */}
-            <div className="w-full md:w-[30%] flex flex-col gap-2 overflow-x-hidden">
+            <div className="w-full max-h-[500px] maxh md:w-[30%] flex flex-col gap-2 overflow-x-hidden">
               {/* Filter + Export Buttons */}
               <div className="flex flex-wrap gap-2 items-center justify-center my-4">
                 <Button
@@ -305,7 +328,7 @@ const HoldCabinateDetails = () => {
                   <Loader />
                 ) : (
                   <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
-                    <thead className="bg-gray-200 sticky top-0 z-10 text-center">
+                    <thead className="bg-gray-200 sticky top-0 text-center">
                       <tr>
                         <th className="px-1 py-1 border min-w-[120px]">
                           {groupingCondition.label}
