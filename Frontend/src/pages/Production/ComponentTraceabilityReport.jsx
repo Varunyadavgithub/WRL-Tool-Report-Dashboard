@@ -47,7 +47,8 @@ const ComponentTraceabilityReport = () => {
       }));
       setVariants(formatted);
     } catch (error) {
-      console.error("Failed to fetch variants:", error);
+      console.error("Failed to fetch model variants:", error);
+      toast.error("Failed to fetch model variants.");
     }
   };
 
@@ -81,6 +82,7 @@ const ComponentTraceabilityReport = () => {
       }
     } catch (error) {
       console.error("Failed to fetch component traceability data:", error);
+      toast.error("Failed to fetch component traceability data.");
     } finally {
       setLoading(false);
     }
@@ -113,6 +115,7 @@ const ComponentTraceabilityReport = () => {
         "Failed to fetch export component traceability data:",
         error
       );
+      toast.error("Failed to fetch export component traceability data.");
       return [];
     }
   };

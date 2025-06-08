@@ -65,7 +65,8 @@ const HoldCabinateDetails = () => {
         setPage(pageNumber);
       }
     } catch (error) {
-      console.error("Failed to fetch production data:", error);
+      console.error("Failed to fetch Hold Cabiet Details data:", error);
+      toast.error("Failed to fetch Hold Cabiet Details data.");
     } finally {
       setLoading(false);
     }
@@ -109,6 +110,7 @@ const HoldCabinateDetails = () => {
       fetchHoldCabietDetails(page + 1);
     }
   };
+  
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
       <Title title="Hold Cabinate Details" align="center" />

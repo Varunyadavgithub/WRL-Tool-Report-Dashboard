@@ -53,7 +53,8 @@ const TotalProduction = () => {
       }));
       setVariants(formatted);
     } catch (error) {
-      console.error("Failed to fetch variants:", error);
+      console.error("Failed to fetch model variants:", error);
+      toast.error("Failed to fetch model variants.");
     }
   };
 
@@ -97,6 +98,7 @@ const TotalProduction = () => {
       }
     } catch (error) {
       console.error("Failed to fetch total production data:", error);
+      toast.error("Failed to fetch total production data.");
     } finally {
       setLoading(false);
     }
@@ -132,6 +134,7 @@ const TotalProduction = () => {
       return res?.data?.success ? res?.data?.data : [];
     } catch (error) {
       console.error("Failed to fetch export total production data:", error);
+      toast.error("Failed to fetch export total production data.");
       return [];
     }
   };

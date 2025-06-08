@@ -39,7 +39,8 @@ const FGCasting = () => {
       const data = res.data;
       setFetchFgCastingData(data);
     } catch (error) {
-      console.error("Failed to fetch fetch Fg Casting data:", error);
+      console.error("Failed to fetch Fg Casting data:", error);
+      toast.error("Failed to fetch Fg Casting data");
     } finally {
       setLoading(false);
     }

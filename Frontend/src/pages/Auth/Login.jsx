@@ -32,6 +32,12 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formData.empcod || !formData.password) {
+      toast.error("Please fill in both Employee Code and Password");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -42,11 +48,12 @@ const Login = () => {
           withCredentials: true,
         }
       );
-      if (res.data.success) {
-        dispatch(setAuthUser(res.data.user));
+      if (res?.data?.success) {
+        dispatch(setAuthUser(res?.data?.user));
         toast.success("Login successful");
         navigate("/");
       } else {
+        console.warn("Login response:", res.data);
         toast.error(res.data.message || "Login failed");
       }
     } catch (err) {
@@ -90,7 +97,6 @@ const Login = () => {
                 onChange={handleChange}
                 name="empcod"
                 className="w-full px-2 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
               />
             </div>
             <div className="mb-4">
@@ -105,7 +111,6 @@ const Login = () => {
                   onChange={handleChange}
                   name="password"
                   className="w-full px-2 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
                 />
                 <span
                   onClick={() => setShowPass(!showPass)}

@@ -64,8 +64,8 @@ const DispatchHold = () => {
         setAssemblySerial("");
       }, 500); // half-second delay to let it render
     } catch (error) {
-      console.error("Failed to fetch model name:", error);
-      toast.error("Error fetching model name");
+      console.error("Failed to Add FG:", error);
+      toast.error("Error while adding FG");
     } finally {
       setLoading(false);
     }
@@ -91,7 +91,7 @@ const DispatchHold = () => {
 
         const newFgData = [];
 
-        worksheet.eachRow((row, rowNumber) => {
+        worksheet.eachRow((row, _) => {
           const modelName = row.getCell(1).value?.toString().trim(); // Column A
           const assemblySerial = row.getCell(2).value?.toString().trim(); // Column B
 

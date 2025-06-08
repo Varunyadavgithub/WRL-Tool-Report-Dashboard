@@ -49,7 +49,8 @@ const Overview = () => {
       }));
       setVariants(formatted);
     } catch (error) {
-      console.error("Failed to fetch variants:", error);
+      console.error("Failed to fetch model variants:", error);
+      toast.error("Failed to fetch model variants.");
     }
   };
 
@@ -62,7 +63,8 @@ const Overview = () => {
       }));
       setStages(formatted);
     } catch (error) {
-      console.error("Failed to fetch stages:", error);
+      console.error("Failed to fetch stages name:", error);
+      toast.error("Failed to fetch stages name.");
     }
   };
 
@@ -92,6 +94,7 @@ const Overview = () => {
         }
       } catch (error) {
         console.error("Failed to fetch production data:", error);
+        toast.error("Failed to fetch production data.");
       } finally {
         setLoading(false);
       }
@@ -119,7 +122,8 @@ const Overview = () => {
         }
         return [];
       } catch (error) {
-        console.error("Failed to fetch production data:", error);
+        console.error("Failed to fetch export production data:", error);
+        toast.error("Failed to fetch export production data.");
         return [];
       }
     } else {

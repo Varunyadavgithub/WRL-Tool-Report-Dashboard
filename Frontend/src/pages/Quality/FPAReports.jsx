@@ -30,7 +30,8 @@ const FPAReports = () => {
       }));
       setVariants(formatted);
     } catch (error) {
-      console.error("Failed to fetch variants:", error);
+      console.error("Failed to fetch model variants:", error);
+      toast.error("Failed to fetch model variants.");
     }
   };
 
@@ -76,9 +77,9 @@ const FPAReports = () => {
         alert("Please select the Report Type.");
         return;
       }
-      console.log(params);
     } catch (error) {
       console.error("Failed to fetch FPA Report:", error);
+      toast.error("Failed to fetch FPA Report.");
     } finally {
       setLoading(false);
     }

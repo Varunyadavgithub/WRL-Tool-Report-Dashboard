@@ -172,6 +172,7 @@ const LineHourlyReport = () => {
       }
     } catch (error) {
       console.error("Error in Fetch Hourly Report:", error);
+      toast.error("Error in Fetch Hourly Report.");
     } finally {
       setLoading(false);
     }

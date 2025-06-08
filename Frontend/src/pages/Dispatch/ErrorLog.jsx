@@ -59,6 +59,7 @@ const ErrorLog = () => {
       }
     } catch (error) {
       console.error("Failed to fetch Error Log data:", error);
+      toast.error("Failed to fetch Error Log data.");
     } finally {
       setLoading(false);
     }
@@ -106,6 +107,7 @@ const ErrorLog = () => {
       fetchErrorLogData(page + 1);
     }
   };
+  
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       <Title title="Dispatch Error Log" align="center" />

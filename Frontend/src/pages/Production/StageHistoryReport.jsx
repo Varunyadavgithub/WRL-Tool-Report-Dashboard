@@ -33,7 +33,8 @@ function StageHistoryReport() {
         setProductName("");
       }
     } catch (error) {
-      console.error("Failed to fetch production data:", error);
+      console.error("Failed to fetch fetch Stage History data:", error);
+      toast.error("Failed to fetch fetch Stage History data.");
     } finally {
       setLoading(false);
     }

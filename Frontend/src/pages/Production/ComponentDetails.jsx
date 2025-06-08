@@ -27,11 +27,13 @@ const ComponentDetails = () => {
       const data = res.data || [];
       setComponentDetailsData(data);
     } catch (error) {
-      console.error("Failed to fetch production data:", error);
+      console.error("Failed to fetch Component Details Data:", error);
+      toast.error("Failed to fetch Component Details Data.");
     } finally {
       setLoading(false);
     }
   };
+
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="Component Details" align="center" />

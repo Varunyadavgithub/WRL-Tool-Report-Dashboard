@@ -43,6 +43,7 @@ const TagUpdate = () => {
       setSerial2(res?.data?.Serial2);
     } catch (error) {
       console.error("Failed to fetch Asset Details data:", error);
+      toast.error("Failed to fetch Asset Details data.");
     } finally {
       setLoading(false);
     }
@@ -74,6 +75,7 @@ const TagUpdate = () => {
       }
     } catch (error) {
       console.error("Failed to update the New Asset Number Data:", error);
+      toast.error("Failed to update the New Asset Number Data.");
     } finally {
       setLoading(false);
     }
@@ -105,6 +107,7 @@ const TagUpdate = () => {
       }
     } catch (error) {
       console.error("Failed to update the New Customer QR data:", error);
+      toast.error("Failed to update the New Customer QR data.");
     } finally {
       setLoading(false);
     }

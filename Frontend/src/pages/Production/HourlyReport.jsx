@@ -43,7 +43,8 @@ const HourlyReport = () => {
       }));
       setModel(formatted);
     } catch (error) {
-      console.error("Failed to fetch variants:", error);
+      console.error("Failed to fetch model variants:", error);
+      toast.error("Failed to fetch model variants.");
     }
   };
 
@@ -57,7 +58,8 @@ const HourlyReport = () => {
 
       setStages(formatted);
     } catch (error) {
-      console.error("Failed to fetch variants:", error);
+      console.error("Failed to fetch stage name:", error);
+      toast.error("Failed to fetch stage name.");
     }
   };
 
@@ -87,6 +89,7 @@ const HourlyReport = () => {
       setHourData(res.data);
     } catch (error) {
       console.error("Error fetching hourly production data:", error);
+      toast.error("Error fetching hourly production data.");
     } finally {
       setLoading(false);
     }
@@ -120,6 +123,7 @@ const HourlyReport = () => {
       setHourlyModelCount(res?.data);
     } catch (error) {
       console.error("Error fetching hourly model count data:", error);
+      toast.error("Error fetching hourly model count data.");
     } finally {
       setLoading(false);
     }
@@ -145,14 +149,13 @@ const HourlyReport = () => {
         params.line = lineType;
       }
 
-      console.log(params);
-
       const res = await axios.get(`${baseURL}prod/hourly-category-count`, {
         params,
       });
       setHourlyCategoryCount(res?.data);
     } catch (error) {
       console.error("Error fetching hourly Category count data:", error);
+      toast.error("Error fetching hourly Category count data.");
     } finally {
       setLoading(false);
     }

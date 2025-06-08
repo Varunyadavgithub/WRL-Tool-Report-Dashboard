@@ -41,6 +41,7 @@ const ProductionPlaning = () => {
       setModelNameOptions(formatted);
     } catch (error) {
       console.error("Failed to fetch model name:", error);
+      toast.error("Failed to fetch model name.");
     }
   };
 
@@ -60,6 +61,7 @@ const ProductionPlaning = () => {
       setPlanMonthOptions(formatted);
     } catch (error) {
       console.error("Failed to fetch plan month year:", error);
+      toast.error("Failed to fetch plan month year.");
     }
   };
 
@@ -94,6 +96,7 @@ const ProductionPlaning = () => {
       }
     } catch (error) {
       console.error("Failed to fetch Production Planing Data:", error);
+      toast.error("Failed to fetch Production Planing Data.");
     } finally {
       setLoading(false);
     }
@@ -135,7 +138,8 @@ const ProductionPlaning = () => {
         setRemark("");
       }
     } catch (error) {
-      console.error("Failed to fetch Production Planing Data:", error);
+      console.error("Failed to update Production Planing Data:", error);
+      toast.error("Failed to update Production Planing Data.");
     } finally {
       setLoading(false);
     }
@@ -152,6 +156,7 @@ const ProductionPlaning = () => {
       setRemark("");
     } catch (error) {
       console.error("Update or fetch failed:", error);
+      toast.error("Update or fetch failed.");
     }
   };
 

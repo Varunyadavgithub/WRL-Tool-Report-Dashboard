@@ -59,7 +59,8 @@ const FPA = () => {
       const res = await axios.get(`${baseURL}quality/fpa-count`);
       setFpaCountData(res?.data);
     } catch (error) {
-      console.error("Failed to fetch production data:", error);
+      console.error("Failed to fetch FPA Count data:", error);
+      toast.error("Failed to fetch FPA Count data.");
     } finally {
       setLoading(false);
     }
@@ -82,7 +83,8 @@ const FPA = () => {
       });
       setAssetDetails(res?.data);
     } catch (error) {
-      console.error("Failed to fetch production data:", error);
+      console.error("Failed to fetch Asset Details data:", error);
+      toast.error("Failed to fetch Asset Details data.");
     } finally {
       setLoading(false);
     }
@@ -93,7 +95,8 @@ const FPA = () => {
       const res = await axios.get(`${baseURL}quality/fpqi-details`);
       setFpqiDetails(res?.data);
     } catch (error) {
-      console.error("Failed to fetch production data:", error);
+      console.error("Failed to fetch FPQI Details data:", error);
+      toast.error("Failed to fetch FPQI Details data.");
     }
   };
 
@@ -102,7 +105,8 @@ const FPA = () => {
       const res = await axios.get(`${baseURL}quality/fpa-defect`);
       setFpaDefect(res?.data);
     } catch (error) {
-      console.error("Failed to fetch production data:", error);
+      console.error("Failed to fetch Fpa Defect data:", error);
+      toast.error("Failed to fetch Fpa Defect data.");
     }
   };
 
@@ -115,7 +119,8 @@ const FPA = () => {
       }));
       setFpaDefectCategory(formatted);
     } catch (error) {
-      console.error("Failed to fetch production data:", error);
+      console.error("Failed to fetch Fpa Defect Category data:", error);
+      toast.error("Failed to fetch Fpa Defect Category data.");
     }
   };
 
@@ -156,8 +161,6 @@ const FPA = () => {
       };
 
       const res = await axios.post(`${baseURL}quality/add-fpa-defect`, payload);
-
-      console.log(res);
 
       if (res?.data?.success) {
         toast.success(res?.data?.message || "Defect added successfully!");

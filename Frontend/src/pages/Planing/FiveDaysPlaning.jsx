@@ -26,6 +26,7 @@ const FiveDaysPlanning = () => {
       setFiles(res.data.files);
     } catch (error) {
       console.error("Failed to fetch files:", error);
+      toast.error("Failed to fetch files:");
     }
   };
 

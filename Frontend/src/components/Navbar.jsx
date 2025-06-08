@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { FiLogOut } from "react-icons/fi";
 import axios from "axios";
 import { logoutUser } from "../redux/authSlice";
+import toast from "react-hot-toast";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
@@ -20,10 +21,11 @@ const NavBar = () => {
       // Clear user from redux state
       dispatch(logoutUser());
 
-      // Redirect to login page
+      toast.success("Logout Successfully");
       navigate("/login");
     } catch (error) {
       console.error("Logout failed", error);
+      toast.error("Logout failed. Please try again.");
     }
   };
 

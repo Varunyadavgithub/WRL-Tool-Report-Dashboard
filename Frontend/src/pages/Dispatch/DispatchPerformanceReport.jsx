@@ -34,6 +34,7 @@ const DispatchPerformanceReport = () => {
           params,
         });
         setDispatchData(res.data);
+
         const summRes = await axios.get(`${baseURL}dispatch/vehicle-summary`, {
           params,
         });
@@ -43,6 +44,7 @@ const DispatchPerformanceReport = () => {
           params,
         });
         setDispatchData(res.data);
+
         const summRes = await axios.get(`${baseURL}dispatch/model-summary`, {
           params,
         });
@@ -52,6 +54,7 @@ const DispatchPerformanceReport = () => {
           params,
         });
         setDispatchData(res.data);
+
         const summRes = await axios.get(`${baseURL}dispatch/category-summary`, {
           params,
         });
@@ -61,7 +64,10 @@ const DispatchPerformanceReport = () => {
         return;
       }
     } catch (error) {
-      console.error("Failed to fetch FPA Report:", error);
+      console.error("Failed to fetch Dispatch Performance Report:", error);
+      toast.error(
+        "Failed to fetch Dispatch Performance Report data. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -79,6 +85,7 @@ const DispatchPerformanceReport = () => {
     setDispatchData([]);
     setDispatchSummaryData([]);
   };
+
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="Performance Report" align="center" />

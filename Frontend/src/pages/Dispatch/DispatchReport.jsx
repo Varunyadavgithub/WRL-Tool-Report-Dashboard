@@ -61,7 +61,8 @@ const DispatchReport = () => {
         setPageUnloading(pageNumber);
       }
     } catch (error) {
-      console.error("Failed to fetch fetch Fg Casting data:", error);
+      console.error("Failed to fetch Fg Unloading Data:", error);
+      toast.error("Failed to fetch Fg Unloading Data. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -91,7 +92,8 @@ const DispatchReport = () => {
         setPageDispatch(pageNumber);
       }
     } catch (error) {
-      console.error("Failed to fetch fetch Fg Casting data:", error);
+      console.error("Failed to fetch Fg Dispatch Data:", error);
+      toast.error("Failed to fetch Fg Dispatch Data. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -104,6 +106,7 @@ const DispatchReport = () => {
       fetchFgDispatchData(1);
     }
   };
+  
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       <Title title="Dispatch Report" align="center" />
