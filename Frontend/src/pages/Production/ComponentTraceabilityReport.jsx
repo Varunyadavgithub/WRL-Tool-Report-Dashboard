@@ -210,9 +210,7 @@ const ComponentTraceabilityReport = () => {
                 <tr>
                   <th className="px-1 py-1 border min-w-[120px]">PS_No.</th>
                   <th className="px-1 py-1 border min-w-[120px]">Model_Name</th>
-                  <th className="px-1 py-1 border min-w-[120px]">
-                    Reference Barcode
-                  </th>
+
                   <th className="px-1 py-1 border min-w-[120px]">
                     Component Serial No.
                   </th>
@@ -244,9 +242,7 @@ const ComponentTraceabilityReport = () => {
                     >
                       <td className="px-1 py-1 border">{item.PSNo}</td>
                       <td className="px-1 py-1 border">{item.Model_Name}</td>
-                      <td className="px-1 py-1 border">
-                        {item.Reference_Barcode}
-                      </td>
+
                       <td className="px-1 py-1 border">
                         {item.Component_Serial_Number}
                       </td>
