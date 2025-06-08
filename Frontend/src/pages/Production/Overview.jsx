@@ -20,7 +20,7 @@ const Overview = () => {
   const [endTime, setEndTime] = useState("");
   const [productionData, setProductionData] = useState([]);
   const [page, setPage] = useState(1);
-  const [limit] = useState(50);
+  const [limit] = useState(1000);
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
 
@@ -118,7 +118,7 @@ const Overview = () => {
         });
 
         if (res?.data?.success) {
-          return res.data.data;
+          return res?.data?.data;
         }
         return [];
       } catch (error) {

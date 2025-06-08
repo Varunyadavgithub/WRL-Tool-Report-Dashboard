@@ -18,7 +18,7 @@ const ComponentTraceabilityReport = () => {
   const [endTime, setEndTime] = useState("");
   const [traceabilityData, setTraceabilityData] = useState([]);
   const [page, setPage] = useState(1);
-  const [limit] = useState(50);
+  const [limit] = useState(1000);
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
 
