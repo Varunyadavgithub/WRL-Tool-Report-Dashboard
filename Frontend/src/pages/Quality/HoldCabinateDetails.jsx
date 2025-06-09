@@ -67,6 +67,192 @@ const HoldCabinateDetails = () => {
     }
   };
 
+  const fetchYesterdayHoldCabietDetails = async () => {
+    if (!state) {
+      toast.error("Please select a state.");
+      return;
+    }
+
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0);
+
+    const yesterday8AM = new Date(today8AM);
+    yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(yesterday8AM);
+    const formattedEnd = formatDate(today8AM);
+
+    try {
+      setLoading(true);
+      const params = {
+        status: state.value,
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+      const res = await axios.get(`${baseURL}quality/hold-cabinet-details`, {
+        params,
+      });
+
+      if (res?.data?.success) {
+        setHoldCabinetDetails(res?.data?.data);
+        setTotalCount(res?.data?.totalCount);
+      }
+    } catch (error) {
+      console.error(
+        "Failed to fetch Yesterday Hold Cabinet Details data:",
+        error
+      );
+      toast.error("Failed to fetch Yesterday Hold Cabinet Details data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTodayHoldCabietDetails = async () => {
+    if (!state) {
+      toast.error("Please select a state.");
+      return;
+    }
+
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(today8AM);
+    const formattedEnd = formatDate(now); // Now = current time
+
+    try {
+      setLoading(true);
+      const params = {
+        status: state.value,
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+      console.log(params);
+      const res = await axios.get(`${baseURL}quality/hold-cabinet-details`, {
+        params,
+      });
+
+      if (res?.data?.success) {
+        setHoldCabinetDetails(res?.data?.data);
+        setTotalCount(res?.data?.totalCount);
+      }
+    } catch (error) {
+      console.error("Failed to fetch Today Hold Cabinet Details data:", error);
+      toast.error("Failed to fetch Today Hold Cabinet Details data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMTDHoldCabinetDetails = async () => {
+    if (!state) {
+      toast.error("Please select a state.");
+      return;
+    }
+
+    const now = new Date();
+    const startOfMonth = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1,
+      8,
+      0,
+      0
+    ); // 1st day at 08:00 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(startOfMonth);
+    const formattedEnd = formatDate(now);
+
+    try {
+      setLoading(true);
+      const params = {
+        status: state.value,
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+
+      const res = await axios.get(`${baseURL}quality/hold-cabinet-details`, {
+        params,
+      });
+
+      if (res?.data?.success) {
+        setHoldCabinetDetails(res?.data?.data);
+        setTotalCount(res?.data?.totalCount);
+      }
+    } catch (error) {
+      console.error("Failed to fetch MTD data:", error);
+      toast.error("Failed to fetch MTD Hold Cabinet Details.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchYTDHoldCabinetDetails = async () => {
+    if (!state) {
+      toast.error("Please select a state.");
+      return;
+    }
+
+    const now = new Date();
+    const startOfYear = new Date(now.getFullYear(), 0, 1, 8, 0, 0); // Jan 1st at 08:00 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(startOfYear);
+    const formattedEnd = formatDate(now);
+
+    try {
+      setLoading(true);
+      const params = {
+        status: state.value,
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+
+      const res = await axios.get(`${baseURL}quality/hold-cabinet-details`, {
+        params,
+      });
+
+      if (res?.data?.success) {
+        setHoldCabinetDetails(res?.data?.data);
+        setTotalCount(res?.data?.totalCount);
+      }
+    } catch (error) {
+      console.error("Failed to fetch YTD data:", error);
+      toast.error("Failed to fetch YTD Hold Cabinet Details.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getGroupedData = () => {
     if (!holdCabinetDetails.length || !groupingCondition) {
       return [];
@@ -163,6 +349,37 @@ const HoldCabinateDetails = () => {
                 filename="hold_cabinet_details"
               />
             </div>
+          </div>
+        </div>
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-6 rounded-xl w-full max-w-xs">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
+            Quick Filters
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              className="bg-yellow-400 text-white font-medium py-2 rounded-lg hover:opacity-90 transition duration-200 cursor-pointer"
+              onClick={() => fetchYesterdayHoldCabietDetails()}
+            >
+              YDAY
+            </button>
+            <button
+              className="bg-blue-500 text-white font-medium py-2 rounded-lg hover:opacity-90 transition duration-200 cursor-pointer"
+              onClick={() => fetchTodayHoldCabietDetails()}
+            >
+              TDAY
+            </button>
+            <button
+              className="bg-green-500 text-white font-medium py-2 rounded-lg hover:opacity-90 transition duration-200 cursor-pointer"
+              onClick={() => fetchMTDHoldCabinetDetails()}
+            >
+              MTD
+            </button>
+            <button
+              className="bg-pink-500 text-white font-medium py-2 rounded-lg hover:opacity-90 transition duration-200 cursor-pointer"
+              onClick={() => fetchYTDHoldCabinetDetails()}
+            >
+              YTD
+            </button>
           </div>
         </div>
       </div>
