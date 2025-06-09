@@ -92,7 +92,7 @@ const ErrorLog = () => {
       <Title title="Dispatch Error Log" align="center" />
 
       {/* Filters Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 max-w-fit rounded-md">
         <div className="flex flex-wrap gap-4">
           <DateTimePicker
             label="Start Time"

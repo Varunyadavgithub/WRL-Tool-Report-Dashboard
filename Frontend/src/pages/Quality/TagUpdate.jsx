@@ -118,8 +118,8 @@ const TagUpdate = () => {
       <Title title="Tag Update" align="center" />
 
       {/* Filters */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-md flex flex-col gap-6">
-        <div>
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 max-w-fit rounded-md">
+        <div className="">
           <fieldset className="border border-black p-4 rounded-md">
             <legend className="font-semibold text-gray-700 px-2">
               Asset Tag Update

@@ -161,7 +161,7 @@ const TotalProduction = () => {
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="Total Production" align="center" />
 
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 max-w-fit rounded-md">
         <div className="flex flex-wrap gap-4">
           <SelectField
             label="Model Variant"

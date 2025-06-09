@@ -139,23 +139,19 @@ const ComponentTraceabilityReport = () => {
       <Title title="Component Traceability Report" align="center" />
 
       {/* Filters Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
-        {/* First Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <SelectField
-            label="Model Variant"
-            options={variants}
-            value={selectedVariant?.value || ""}
-            onChange={(e) =>
-              setSelectedVariant(
-                variants.find((opt) => opt.value === e.target.value) || null
-              )
-            }
-            className="max-w-64"
-          />
-        </div>
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 max-w-fit rounded-md">
+        <SelectField
+          label="Model Variant"
+          options={variants}
+          value={selectedVariant?.value || ""}
+          onChange={(e) =>
+            setSelectedVariant(
+              variants.find((opt) => opt.value === e.target.value) || null
+            )
+          }
+          className="max-w-64"
+        />
 
-        {/* Second Row */}
         <div className="flex flex-wrap gap-4 mt-4">
           <DateTimePicker
             label="Start Time"
@@ -173,7 +169,6 @@ const ComponentTraceabilityReport = () => {
           />
         </div>
 
-        {/* Third Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           <div className="flex flex-wrap items-end gap-2 mt-4 w-full">
             <Button
