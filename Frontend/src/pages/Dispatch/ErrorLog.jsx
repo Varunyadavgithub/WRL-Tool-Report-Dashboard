@@ -6,7 +6,6 @@ import Loader from "../../components/common/Loader";
 import { useState } from "react";
 import DateTimePicker from "../../components/common/DateTimePicker";
 import axios from "axios";
-import ExportButton from "../../components/common/ExportButton";
 import toast from "react-hot-toast";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
@@ -30,12 +29,9 @@ const ErrorLog = () => {
   const [groupingCondition, setGroupingCondition] = useState(
     groupingOptions[0]
   );
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [limit] = useState(1000);
   const [totalCount, setTotalCount] = useState(0);
 
-  const fetchErrorLogData = async (pageNumber = 1) => {
+  const fetchErrorLogData = async () => {
     if (!startTime || !endTime) {
       toast.error("Please select Time Range.");
       return;
@@ -46,16 +42,12 @@ const ErrorLog = () => {
         params: {
           startDate: startTime,
           endDate: endTime,
-          page: pageNumber,
-          limit,
         },
       });
 
       if (res?.data?.success) {
         setErrorLogData(res?.data?.data);
         setTotalCount(res?.data?.totalCount);
-        setTotalPages(Math.ceil(res?.data?.totalCount / limit));
-        setPage(pageNumber);
       }
     } catch (error) {
       console.error("Failed to fetch Error Log data:", error);
@@ -92,22 +84,9 @@ const ErrorLog = () => {
     setErrorLogData([]);
     setSearchTerm("");
     setGroupingCondition(groupingOptions[0]);
-    setPage(1);
-    setTotalPages(1);
+    setTotalCount(0);
   };
 
-  const handlePrevPage = () => {
-    if (page > 1) {
-      fetchErrorLogData(page - 1);
-    }
-  };
-
-  const handleNextPage = () => {
-    if (page < totalPages) {
-      fetchErrorLogData(page + 1);
-    }
-  };
-  
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       <Title title="Dispatch Error Log" align="center" />
@@ -150,7 +129,16 @@ const ErrorLog = () => {
             >
               Query
             </Button>
-            <ExportButton />
+            <div className="flex items-center gap-4 mt-4">
+              <Button
+                bgColor="bg-white"
+                textColor="text-black"
+                className="border border-gray-400 hover:bg-gray-100"
+                onClick={handleClearFilters}
+              >
+                Clear Filter
+              </Button>
+            </div>
           </div>
         </div>
         <div className="mt-4 text-left font-bold text-lg">
@@ -162,53 +150,9 @@ const ErrorLog = () => {
       <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
         <div className="flex flex-col items-center mb-4">
           <span className="text-xl font-semibold">Summary</span>
-
-          <div className="flex items-center gap-4 mt-4">
-            <Button
-              bgColor="bg-white"
-              textColor="text-black"
-              className="border border-gray-400 hover:bg-gray-100"
-              onClick={handleClearFilters}
-            >
-              Clear Filter
-            </Button>
-
-            <Button
-              bgColor="bg-yellow-300"
-              textColor="text-black"
-              className="font-semibold hover:bg-yellow-400"
-              onClick={() => console.log("EXPORT clicked")}
-            >
-              EXPORT
-            </Button>
-          </div>
         </div>
 
         <div className="bg-white border border-gray-300 rounded-md p-2">
-          {/* Pagination Controls */}
-          <div className="flex justify-center items-center gap-4 my-4">
-            <Button
-              onClick={handlePrevPage}
-              disabled={page === 1 || loading}
-              bgColor={page === 1 || loading ? "bg-gray-400" : "bg-blue-500"}
-              textColor="text-white"
-            >
-              Previous
-            </Button>
-            <span className="font-semibold">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              onClick={handleNextPage}
-              disabled={page === totalPages || loading}
-              bgColor={
-                page === totalPages || loading ? "bg-gray-400" : "bg-blue-500"
-              }
-              textColor="text-white"
-            >
-              Next
-            </Button>
-          </div>
           <div className="flex flex-col md:flex-row items-start gap-4">
             {/* Left Side - Detailed Table */}
             <div className="w-full md:flex-1">
@@ -293,11 +237,12 @@ const ErrorLog = () => {
             {/* Right Side - Controls and Summary */}
             <div className="w-full md:w-[30%] flex flex-col gap-2 overflow-x-hidden">
               <div className="bg-white border border-gray-300 rounded-md p-4">
-                <h4 className="font-semibold mb-3">Grouping Condition</h4>
+                <h4 className="flex items-center justify-center font-semibold mb-3">
+                  Grouping Condition
+                </h4>
                 <div className="flex flex-wrap items-center gap-4">
-                  <label className="font-medium">Group By</label>
                   <SelectField
-                    label="Group"
+                    label="Group By"
                     options={groupingOptions}
                     value={groupingCondition.value}
                     onChange={(e) => {
