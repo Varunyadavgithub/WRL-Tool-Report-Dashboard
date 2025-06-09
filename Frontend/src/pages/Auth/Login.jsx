@@ -94,10 +94,10 @@ const Login = () => {
 
         {/* Content Overlay */}
         <div className="absolute inset-0 flex flex-col justify-center items-center text-white p-8 text-center">
-          <h1 className="text-4xl font-bold mb-4">
+          <h1 className="text-5xl font-bold mb-4 font-playfair">
             Western Refrigeration Pvt.Ltd
           </h1>
-          <p className="text-xl max-w-md">
+          <p className="text-xl max-w-md font-playfair">
             Innovative Cooling Solutions for Modern Industries
           </p>
         </div>
