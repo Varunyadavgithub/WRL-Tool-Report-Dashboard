@@ -27,6 +27,9 @@ const HoldCabinateDetails = () => {
   ];
 
   const [loading, setLoading] = useState(false);
+  const [ydayLoading, setYdayLoading] = useState(false);
+  const [todayLoading, setTodayLoading] = useState(false);
+  const [monthLoading, setMonthLoading] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [state, setState] = useState(State[0]);
@@ -91,7 +94,11 @@ const HoldCabinateDetails = () => {
     const formattedEnd = formatDate(today8AM);
 
     try {
-      setLoading(true);
+      setYdayLoading(true);
+
+      setHoldCabinetDetails([]);
+      setTotalCount(0);
+
       const params = {
         status: state.value,
         startDate: formattedStart,
@@ -112,7 +119,7 @@ const HoldCabinateDetails = () => {
       );
       toast.error("Failed to fetch Yesterday Hold Cabinet Details data.");
     } finally {
-      setLoading(false);
+      setYdayLoading(false);
     }
   };
 
@@ -137,7 +144,11 @@ const HoldCabinateDetails = () => {
     const formattedEnd = formatDate(now); // Now = current time
 
     try {
-      setLoading(true);
+      setTodayLoading(true);
+
+      setHoldCabinetDetails([]);
+      setTotalCount(0);
+
       const params = {
         status: state.value,
         startDate: formattedStart,
@@ -156,7 +167,7 @@ const HoldCabinateDetails = () => {
       console.error("Failed to fetch Today Hold Cabinet Details data:", error);
       toast.error("Failed to fetch Today Hold Cabinet Details data.");
     } finally {
-      setLoading(false);
+      setTodayLoading(false);
     }
   };
 
@@ -187,7 +198,11 @@ const HoldCabinateDetails = () => {
     const formattedEnd = formatDate(now);
 
     try {
-      setLoading(true);
+      setMonthLoading(true);
+
+      setHoldCabinetDetails([]);
+      setTotalCount(0);
+
       const params = {
         status: state.value,
         startDate: formattedStart,
@@ -206,50 +221,7 @@ const HoldCabinateDetails = () => {
       console.error("Failed to fetch MTD data:", error);
       toast.error("Failed to fetch MTD Hold Cabinet Details.");
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchYTDHoldCabinetDetails = async () => {
-    if (!state) {
-      toast.error("Please select a state.");
-      return;
-    }
-
-    const now = new Date();
-    const startOfYear = new Date(now.getFullYear(), 0, 1, 8, 0, 0); // Jan 1st at 08:00 AM
-
-    const formatDate = (date) => {
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
-      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
-    const formattedStart = formatDate(startOfYear);
-    const formattedEnd = formatDate(now);
-
-    try {
-      setLoading(true);
-      const params = {
-        status: state.value,
-        startDate: formattedStart,
-        endDate: formattedEnd,
-      };
-
-      const res = await axios.get(`${baseURL}quality/hold-cabinet-details`, {
-        params,
-      });
-
-      if (res?.data?.success) {
-        setHoldCabinetDetails(res?.data?.data);
-        setTotalCount(res?.data?.totalCount);
-      }
-    } catch (error) {
-      console.error("Failed to fetch YTD data:", error);
-      toast.error("Failed to fetch YTD Hold Cabinet Details.");
-    } finally {
-      setLoading(false);
+      setMonthLoading(false);
     }
   };
 
@@ -356,31 +328,40 @@ const HoldCabinateDetails = () => {
           <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
             Quick Filters
           </h2>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              className="bg-yellow-400 text-white font-medium py-2 rounded-lg hover:opacity-90 transition duration-200 cursor-pointer"
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Button
+              bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
+              textColor={ydayLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
               onClick={() => fetchYesterdayHoldCabietDetails()}
+              disabled={ydayLoading}
             >
               YDAY
-            </button>
-            <button
-              className="bg-blue-500 text-white font-medium py-2 rounded-lg hover:opacity-90 transition duration-200 cursor-pointer"
+            </Button>
+            <Button
+              bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
+              textColor={todayLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                todayLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
               onClick={() => fetchTodayHoldCabietDetails()}
+              disabled={todayLoading}
             >
               TDAY
-            </button>
-            <button
-              className="bg-green-500 text-white font-medium py-2 rounded-lg hover:opacity-90 transition duration-200 cursor-pointer"
+            </Button>
+            <Button
+              bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
+              textColor={monthLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                monthLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
               onClick={() => fetchMTDHoldCabinetDetails()}
+              disabled={monthLoading}
             >
               MTD
-            </button>
-            <button
-              className="bg-pink-500 text-white font-medium py-2 rounded-lg hover:opacity-90 transition duration-200 cursor-pointer"
-              onClick={() => fetchYTDHoldCabinetDetails()}
-            >
-              YTD
-            </button>
+            </Button>
           </div>
         </div>
       </div>

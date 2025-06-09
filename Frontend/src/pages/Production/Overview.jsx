@@ -15,7 +15,6 @@ const Overview = () => {
   const [ydayLoading, setYdayLoading] = useState(false);
   const [todayLoading, setTodayLoading] = useState(false);
   const [monthLoading, setMonthLoading] = useState(false);
-  const [yearLoading, setYearLoading] = useState(false);
   const [variants, setVariants] = useState([]);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [stages, setStages] = useState([]);
@@ -281,51 +280,6 @@ const Overview = () => {
     }
   };
 
-  const fetchYTDProductionData = async () => {
-    if (selectedVariant || selectedStage) {
-      const now = new Date();
-      const startOfYear = new Date(now.getFullYear(), 0, 1, 8, 0, 0); // Jan 1st at 08:00 AM
-
-      const formatDate = (date) => {
-        const pad = (n) => (n < 10 ? "0" + n : n);
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-          date.getDate()
-        )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-      };
-
-      const formattedStart = formatDate(startOfYear);
-      const formattedEnd = formatDate(now);
-
-      try {
-        setYearLoading(true);
-
-        setProductionData([]);
-        setTotalCount(0);
-
-        const params = {
-          startTime: formattedStart,
-          endTime: formattedEnd,
-          stationCode: selectedStage?.value || null,
-          model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
-        };
-        console.log(params);
-        const res = await axios.get(`${baseURL}prod/year-fgdata`, { params });
-        console.log("Res:", res);
-        if (res?.data?.success) {
-          setProductionData(res?.data?.data);
-          setTotalCount(res?.data?.totalCount);
-        }
-      } catch (error) {
-        console.error("Failed to fetch this Year production data:", error);
-        toast.error("Failed to fetch this Year production data.");
-      } finally {
-        setYearLoading(false);
-      }
-    } else {
-      toast.error("Please select Stage.");
-    }
-  };
-
   useEffect(() => {
     fetchModelVariants();
     fetchStages();
@@ -431,7 +385,7 @@ const Overview = () => {
           <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
             Quick Filters
           </h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-3">
             <Button
               bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
               textColor={ydayLoading ? "text-white" : "text-black"}
@@ -464,17 +418,6 @@ const Overview = () => {
               disabled={monthLoading}
             >
               MTD
-            </Button>
-            <Button
-              bgColor={yearLoading ? "bg-gray-400" : "bg-pink-500"}
-              textColor={yearLoading ? "text-white" : "text-black"}
-              className={`font-semibold ${
-                yearLoading ? "cursor-not-allowed" : "cursor-pointer"
-              }`}
-              onClick={() => fetchYTDProductionData()}
-              disabled={yearLoading}
-            >
-              YTD
             </Button>
           </div>
         </div>
