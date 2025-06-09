@@ -7,11 +7,14 @@ import axios from "axios";
 import Loader from "../../components/common/Loader";
 import ExportButton from "../../components/common/ExportButton";
 import toast from "react-hot-toast";
+import InputField from "../../components/common/InputField";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const ComponentTraceabilityReport = () => {
   const [loading, setLoading] = useState(false);
+  const [ydayLoading, setYdayLoading] = useState(false);
+  const [todayLoading, setTodayLoading] = useState(false);
   const [variants, setVariants] = useState([]);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [startTime, setStartTime] = useState("");
@@ -21,6 +24,8 @@ const ComponentTraceabilityReport = () => {
   const [limit] = useState(1000);
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [details, setDetails] = useState("");
 
   const observer = useRef();
   const lastRowRef = useCallback(
@@ -120,6 +125,118 @@ const ComponentTraceabilityReport = () => {
     }
   };
 
+  // Quick Filters
+  const fetchYesterdayTraceabilityData = async () => {
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0);
+
+    const yesterday8AM = new Date(today8AM);
+    yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(yesterday8AM);
+    const formattedEnd = formatDate(today8AM);
+    try {
+      setYdayLoading(true);
+
+      setTraceabilityData([]);
+      setTotalCount(0);
+
+      const params = {
+        startTime: formattedStart,
+        endTime: formattedEnd,
+        model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+      };
+
+      const res = await axios.get(
+        `${baseURL}prod/yday-component-traceability`,
+        {
+          params,
+        }
+      );
+
+      if (res?.data?.success) {
+        setTraceabilityData(res?.data?.data);
+        setTotalCount(res?.data?.totalCount);
+      }
+    } catch (error) {
+      console.error(
+        "Failed to fetch Yesterday component traceability data:",
+        error
+      );
+      toast.error("Failed to fetch Yesterday component traceability data.");
+    } finally {
+      setYdayLoading(false);
+    }
+  };
+
+  const fetchTodayTraceabilityData = async () => {
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(today8AM);
+    const formattedEnd = formatDate(now); // Now = current time
+    try {
+      setTodayLoading(true);
+
+      setTraceabilityData([]);
+      setTotalCount(0);
+
+      const params = {
+        startTime: formattedStart,
+        endTime: formattedEnd,
+        model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+      };
+
+      const res = await axios.get(
+        `${baseURL}prod/today-component-traceability`,
+        {
+          params,
+        }
+      );
+
+      if (res?.data?.success) {
+        setTraceabilityData(res?.data?.data);
+        setTotalCount(res?.data?.totalCount);
+      }
+    } catch (error) {
+      console.error(
+        "Failed to fetch Today component traceability data:",
+        error
+      );
+      toast.error("Failed to fetch Today component traceability data.");
+    } finally {
+      setTodayLoading(false);
+    }
+  };
+
+  const filteredTraceabilityData = traceabilityData.filter((item) => {
+    if (!details) return true;
+
+    const searchTermLower = details.toLowerCase();
+
+    return (
+      item.Model_Name?.toLowerCase().includes(searchTermLower) ||
+      item.Component_Serial_Number?.toLowerCase().includes(searchTermLower) ||
+      item.Fg_Sr_No?.toLowerCase().includes(searchTermLower)
+    );
+  });
+
   useEffect(() => {
     fetchModelVariants();
   }, []);
@@ -134,70 +251,127 @@ const ComponentTraceabilityReport = () => {
     setPage(1);
     fetchTraceabilityData(1);
   };
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      setDetails(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="Component Traceability Report" align="center" />
 
       {/* Filters Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 max-w-fit rounded-md">
-        <SelectField
-          label="Model Variant"
-          options={variants}
-          value={selectedVariant?.value || ""}
-          onChange={(e) =>
-            setSelectedVariant(
-              variants.find((opt) => opt.value === e.target.value) || null
-            )
-          }
-          className="max-w-64"
-        />
+      <div className="flex gap-4">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl max-w-fit items-center">
+          <div className="flex flex-wrap gap-4">
+            <SelectField
+              label="Model Variant"
+              options={variants}
+              value={selectedVariant?.value || ""}
+              onChange={(e) =>
+                setSelectedVariant(
+                  variants.find((opt) => opt.value === e.target.value) || null
+                )
+              }
+              className="max-w-64"
+            />
+            <InputField
+              label="Search"
+              type="text"
+              placeholder="Enter details"
+              className="max-w-64"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
 
-        <div className="flex flex-wrap gap-4 mt-4">
-          <DateTimePicker
-            label="Start Time"
-            name="startTime"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            className="max-w-64"
-          />
-          <DateTimePicker
-            label="End Time"
-            name="endTime"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-            className="max-w-64"
-          />
+          <div className="flex flex-wrap gap-4 mt-4">
+            <DateTimePicker
+              label="Start Time"
+              name="startTime"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              className="max-w-64"
+            />
+            <DateTimePicker
+              label="End Time"
+              name="endTime"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              className="max-w-64"
+            />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          <div className="flex flex-wrap items-end gap-2 mt-4 w-full">
-            <Button
-              bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
-              textColor={loading ? "text-white" : "text-black"}
-              className={`font-semibold ${loading ? "cursor-not-allowed" : ""}`}
-              onClick={handleTraceabilityData}
-              disabled={loading}
-            >
-              Query
-            </Button>
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-6 rounded-xl max-w-fit items-center">
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-wrap gap-2 mt-4">
+              <Button
+                bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
+                textColor={loading ? "text-white" : "text-black"}
+                className={`font-semibold ${
+                  loading ? "cursor-not-allowed" : ""
+                }`}
+                onClick={handleTraceabilityData}
+                disabled={loading}
+              >
+                Query
+              </Button>
 
-            {traceabilityData && traceabilityData.length > 0 && (
-              <ExportButton
-                fetchData={fetchExportData}
-                filename="Component_Traceability_Report"
-              />
-            )}
-
-            {/* Count */}
-            <div className="mt-4 text-left font-bold text-lg">
-              COUNT: <span className="text-blue-700">{totalCount || 0}</span>
+              {traceabilityData && traceabilityData.length > 0 && (
+                <ExportButton
+                  fetchData={fetchExportData}
+                  filename="Component_Traceability_Report"
+                />
+              )}
             </div>
+            <div className="mt-4 text-left font-bold text-lg">
+              COUNT:{" "}
+              <span className="text-blue-700">
+                {totalCount || searchTerm
+                  ? filteredTraceabilityData.length
+                  : 0 || 0}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-6 rounded-xl max-w-fit">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
+            Quick Filters
+          </h2>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Button
+              bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
+              textColor={ydayLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
+              onClick={() => fetchYesterdayTraceabilityData()}
+              disabled={ydayLoading}
+            >
+              YDAY
+            </Button>
+            <Button
+              bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
+              textColor={todayLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                todayLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
+              onClick={() => fetchTodayTraceabilityData()}
+              disabled={todayLoading}
+            >
+              TDAY
+            </Button>
           </div>
         </div>
       </div>
 
       {/* Summary Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
         <div className="w-full bg-white border border-gray-300 rounded-md p-4">
           <div className="w-full max-h-[600px] overflow-x-auto">
             <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
@@ -227,8 +401,8 @@ const ComponentTraceabilityReport = () => {
                 </tr>
               </thead>
               <tbody>
-                {traceabilityData.map((item, index) => {
-                  const isLast = index === traceabilityData.length - 1;
+                {filteredTraceabilityData.map((item, index) => {
+                  const isLast = index === filteredTraceabilityData.length - 1;
                   return (
                     <tr
                       key={index}
@@ -258,7 +432,7 @@ const ComponentTraceabilityReport = () => {
                     </tr>
                   );
                 })}
-                {!loading && traceabilityData.length === 0 && (
+                {!loading && filteredTraceabilityData.length === 0 && (
                   <tr>
                     <td colSpan={12} className="text-center py-4">
                       No data found.
