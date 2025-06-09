@@ -26,6 +26,7 @@ const Overview = () => {
   const [limit] = useState(1000);
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [selectedModelName, setSelectedModelName] = useState(null);
 
   const observer = useRef();
   const lastRowRef = useCallback(
@@ -106,6 +107,44 @@ const Overview = () => {
     }
   };
 
+  const aggregateProductionData = () => {
+    const aggregatedData = {};
+
+    productionData.forEach((item) => {
+      const modelName = item.Model_Name;
+      const serial = item.FG_SR || item.Assembly_Sr_No;
+
+      if (!serial) return;
+
+      if (!aggregatedData[modelName]) {
+        aggregatedData[modelName] = {
+          startSerial: serial,
+          endSerial: serial,
+          count: 1,
+        };
+      } else {
+        // Update end serial if current serial is greater (assuming serials are comparable)
+        if (serial > aggregatedData[modelName].endSerial) {
+          aggregatedData[modelName].endSerial = serial;
+        }
+        // Update start serial if current serial is smaller (in case start and end range matters)
+        if (serial < aggregatedData[modelName].startSerial) {
+          aggregatedData[modelName].startSerial = serial;
+        }
+        // Increment count
+        aggregatedData[modelName].count += 1;
+      }
+    });
+
+    // Convert aggregated data to array
+    return Object.entries(aggregatedData).map(([modelName, data]) => ({
+      Model_Name: modelName,
+      StartSerial: data.startSerial,
+      EndSerial: data.endSerial,
+      TotalCount: data.count,
+    }));
+  };
+
   const fetchExportData = async () => {
     if (startTime && endTime && (selectedVariant || selectedStage)) {
       try {
@@ -134,6 +173,7 @@ const Overview = () => {
     }
   };
 
+  // Quick Filters
   const fetchYesterdayProductionData = async () => {
     if (selectedVariant || selectedStage) {
       const now = new Date();
@@ -165,9 +205,9 @@ const Overview = () => {
           stationCode: selectedStage?.value || null,
           model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
         };
-        console.log(params);
+
         const res = await axios.get(`${baseURL}prod/yday-fgdata`, { params });
-        console.log("Res:", res);
+
         if (res?.data?.success) {
           setProductionData(res?.data?.data);
           setTotalCount(res?.data?.totalCount);
@@ -211,9 +251,9 @@ const Overview = () => {
           stationCode: selectedStage?.value || null,
           model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
         };
-        console.log(params);
+
         const res = await axios.get(`${baseURL}prod/today-fgdata`, { params });
-        console.log("Res:", res);
+
         if (res?.data?.success) {
           setProductionData(res?.data?.data);
           setTotalCount(res?.data?.totalCount);
@@ -262,9 +302,9 @@ const Overview = () => {
           stationCode: selectedStage?.value || null,
           model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
         };
-        console.log(params);
+
         const res = await axios.get(`${baseURL}prod/month-fgdata`, { params });
-        console.log("Res:", res);
+
         if (res?.data?.success) {
           setProductionData(res?.data?.data);
           setTotalCount(res?.data?.totalCount);
@@ -294,25 +334,27 @@ const Overview = () => {
     setProductionData([]);
     setPage(1);
     fetchProductionData(1);
+    setSelectedModelName(null);
   };
 
   const handleClearFilters = () => {
-    setSelectedVariant(null);
-    setSelectedStage(null);
-    setStartTime("");
-    setEndTime("");
-    setProductionData([]);
-    setPage(1);
-    setTotalCount(0);
+    setSelectedModelName(null);
   };
 
+  const filteredProductionData = selectedModelName
+    ? productionData.filter((item) => item.Model_Name === selectedModelName)
+    : productionData;
+
+  const handleModelRowClick = (modelName) => {
+    setSelectedModelName(modelName === selectedModelName ? null : modelName);
+  };
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
       <Title title="Production Overview" align="center" />
 
       {/* Filters Section */}
       <div className="flex gap-4">
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-md max-w-4xl items-center">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl max-w-fit items-center">
           <div className="flex flex-wrap gap-2">
             <SelectField
               label="Model Variant"
@@ -353,8 +395,9 @@ const Overview = () => {
               onChange={(e) => setEndTime(e.target.value)}
             />
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
+        </div>
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-6 rounded-xl max-w-fit items-center">
+          <div className="flex flex-col items-center gap-2">
             <div className="flex flex-wrap gap-2 mt-4">
               <Button
                 bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
@@ -380,8 +423,7 @@ const Overview = () => {
             </div>
           </div>
         </div>
-
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-6 rounded-xl w-full max-w-xs">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-6 rounded-xl max-w-fit">
           <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
             Quick Filters
           </h2>
@@ -424,7 +466,7 @@ const Overview = () => {
       </div>
 
       {/* Summary Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
         <div className="flex flex-col items-center mb-4">
           <span className="text-xl font-semibold">Summary</span>
         </div>
@@ -468,15 +510,18 @@ const Overview = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {productionData.map((item, index) => {
-                      const isLast = index === productionData.length - 1;
+                    {filteredProductionData.map((item, index) => {
+                      const isLast =
+                        index === filteredProductionData.length - 1;
                       return (
                         <tr
                           key={index}
                           ref={isLast ? lastRowRef : null}
                           className="hover:bg-gray-100 text-center"
                         >
-                          <td className="px-1 py-1 border">{item.SrNo}</td>
+                          <td className="px-1 py-1 border">
+                            {item.SrNo || index + 1}
+                          </td>
                           <td className="px-1 py-1 border">
                             {item.Model_Name}
                           </td>
@@ -513,17 +558,26 @@ const Overview = () => {
             </div>
 
             {/* Left Side - Controls and Summary */}
-            <div className="w-full md:w-[30%] flex flex-col gap-2 overflow-x-hidden">
-              <div className="flex flex-wrap gap-2 items-center justify-center my-4">
-                <Button
-                  bgColor="bg-white"
-                  textColor="text-black"
-                  className="border border-gray-400 hover:bg-gray-100 px-3 py-1"
-                  onClick={handleClearFilters}
-                >
-                  Clear Filter
-                </Button>
-                <ExportButton />
+            <div className="w-full md:w-[30%] flex flex-col overflow-x-hidden">
+              <div className="flex flex-wrap gap-2 items-center justify-center">
+                {productionData && productionData.length > 0 && (
+                  <>
+                    <div className="flex my-4 gap-2">
+                      <Button
+                        bgColor="bg-white"
+                        textColor="text-black"
+                        className="border border-gray-400 hover:bg-gray-100 px-3 py-1"
+                        onClick={handleClearFilters}
+                      >
+                        Clear Filter
+                      </Button>
+                      <ExportButton
+                        fetchData={aggregateProductionData}
+                        filename="Production_Report"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="w-full max-h-[500px] overflow-x-auto">
@@ -549,10 +603,15 @@ const Overview = () => {
                     </thead>
                     <tbody>
                       {productionData.length > 0 ? (
-                        productionData.map((item, index) => (
+                        aggregateProductionData().map((item, index) => (
                           <tr
                             key={index}
-                            className="hover:bg-gray-100 text-center"
+                            className={`hover:bg-gray-100 text-center cursor-pointer ${
+                              selectedModelName === item.Model_Name
+                                ? "bg-blue-100"
+                                : "bg-white"
+                            }`}
+                            onClick={() => handleModelRowClick(item.Model_Name)}
                           >
                             <td className="px-1 py-1 border">
                               {item.Model_Name}

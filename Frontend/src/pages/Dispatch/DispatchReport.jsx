@@ -106,7 +106,7 @@ const DispatchReport = () => {
       fetchFgDispatchData(1);
     }
   };
-  
+
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       <Title title="Dispatch Report" align="center" />

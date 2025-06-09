@@ -38,7 +38,7 @@ export const fetchFGData = async (req, res) => {
     }
 
     const query = `
-        ;WITH FilteredData AS (
+        WITH FilteredData AS (
     SELECT 
         mb.Material,
         CASE WHEN mb.VSerial IS NULL THEN mb.Serial ELSE mb.Alias END AS Assembly_Sr_No,
