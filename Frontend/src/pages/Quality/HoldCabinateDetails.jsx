@@ -289,6 +289,7 @@ const HoldCabinateDetails = () => {
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
       <Title title="Hold Cabinate Details" align="center" />
+
       {/* Filters Section */}
       <div className="flex gap-4">
         <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-md max-w-4xl items-center">

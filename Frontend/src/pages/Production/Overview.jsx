@@ -12,6 +12,10 @@ const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const Overview = () => {
   const [loading, setLoading] = useState(false);
+  const [ydayLoading, setYdayLoading] = useState(false);
+  const [todayLoading, setTodayLoading] = useState(false);
+  const [monthLoading, setMonthLoading] = useState(false);
+  const [yearLoading, setYearLoading] = useState(false);
   const [variants, setVariants] = useState([]);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [stages, setStages] = useState([]);
@@ -131,6 +135,197 @@ const Overview = () => {
     }
   };
 
+  const fetchYesterdayProductionData = async () => {
+    if (selectedVariant || selectedStage) {
+      const now = new Date();
+      const today8AM = new Date(now);
+      today8AM.setHours(8, 0, 0, 0);
+
+      const yesterday8AM = new Date(today8AM);
+      yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
+
+      const formatDate = (date) => {
+        const pad = (n) => (n < 10 ? "0" + n : n);
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+          date.getDate()
+        )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      };
+
+      const formattedStart = formatDate(yesterday8AM);
+      const formattedEnd = formatDate(today8AM);
+
+      try {
+        setYdayLoading(true);
+
+        setProductionData([]);
+        setTotalCount(0);
+
+        const params = {
+          startTime: formattedStart,
+          endTime: formattedEnd,
+          stationCode: selectedStage?.value || null,
+          model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+        };
+        console.log(params);
+        const res = await axios.get(`${baseURL}prod/yday-fgdata`, { params });
+        console.log("Res:", res);
+        if (res?.data?.success) {
+          setProductionData(res?.data?.data);
+          setTotalCount(res?.data?.totalCount);
+        }
+      } catch (error) {
+        console.error("Failed to fetch Yesterday production data:", error);
+        toast.error("Failed to fetch Yesterday production data.");
+      } finally {
+        setYdayLoading(false);
+      }
+    } else {
+      toast.error("Please select Stage.");
+    }
+  };
+
+  const fetchTodayProductionData = async () => {
+    if (selectedVariant || selectedStage) {
+      const now = new Date();
+      const today8AM = new Date(now);
+      today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
+
+      const formatDate = (date) => {
+        const pad = (n) => (n < 10 ? "0" + n : n);
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+          date.getDate()
+        )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      };
+
+      const formattedStart = formatDate(today8AM);
+      const formattedEnd = formatDate(now); // Now = current time
+
+      try {
+        setTodayLoading(true);
+
+        setProductionData([]);
+        setTotalCount(0);
+
+        const params = {
+          startTime: formattedStart,
+          endTime: formattedEnd,
+          stationCode: selectedStage?.value || null,
+          model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+        };
+        console.log(params);
+        const res = await axios.get(`${baseURL}prod/today-fgdata`, { params });
+        console.log("Res:", res);
+        if (res?.data?.success) {
+          setProductionData(res?.data?.data);
+          setTotalCount(res?.data?.totalCount);
+        }
+      } catch (error) {
+        console.error("Failed to fetch Today production data:", error);
+        toast.error("Failed to fetch Today production data.");
+      } finally {
+        setTodayLoading(false);
+      }
+    } else {
+      toast.error("Please select Stage.");
+    }
+  };
+
+  const fetchMTDProductionData = async () => {
+    if (selectedVariant || selectedStage) {
+      const now = new Date();
+      const startOfMonth = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        1,
+        8,
+        0,
+        0
+      ); // 1st day at 08:00 AM
+
+      const formatDate = (date) => {
+        const pad = (n) => (n < 10 ? "0" + n : n);
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+          date.getDate()
+        )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      };
+
+      const formattedStart = formatDate(startOfMonth);
+      const formattedEnd = formatDate(now);
+      try {
+        setMonthLoading(true);
+
+        setProductionData([]);
+        setTotalCount(0);
+
+        const params = {
+          startTime: formattedStart,
+          endTime: formattedEnd,
+          stationCode: selectedStage?.value || null,
+          model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+        };
+        console.log(params);
+        const res = await axios.get(`${baseURL}prod/month-fgdata`, { params });
+        console.log("Res:", res);
+        if (res?.data?.success) {
+          setProductionData(res?.data?.data);
+          setTotalCount(res?.data?.totalCount);
+        }
+      } catch (error) {
+        console.error("Failed to fetch this Month production data:", error);
+        toast.error("Failed to fetch this Month production data.");
+      } finally {
+        setMonthLoading(false);
+      }
+    } else {
+      toast.error("Please select Stage.");
+    }
+  };
+
+  const fetchYTDProductionData = async () => {
+    if (selectedVariant || selectedStage) {
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1, 8, 0, 0); // Jan 1st at 08:00 AM
+
+      const formatDate = (date) => {
+        const pad = (n) => (n < 10 ? "0" + n : n);
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+          date.getDate()
+        )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      };
+
+      const formattedStart = formatDate(startOfYear);
+      const formattedEnd = formatDate(now);
+
+      try {
+        setYearLoading(true);
+
+        setProductionData([]);
+        setTotalCount(0);
+
+        const params = {
+          startTime: formattedStart,
+          endTime: formattedEnd,
+          stationCode: selectedStage?.value || null,
+          model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+        };
+        console.log(params);
+        const res = await axios.get(`${baseURL}prod/year-fgdata`, { params });
+        console.log("Res:", res);
+        if (res?.data?.success) {
+          setProductionData(res?.data?.data);
+          setTotalCount(res?.data?.totalCount);
+        }
+      } catch (error) {
+        console.error("Failed to fetch this Year production data:", error);
+        toast.error("Failed to fetch this Year production data.");
+      } finally {
+        setYearLoading(false);
+      }
+    } else {
+      toast.error("Please select Stage.");
+    }
+  };
+
   useEffect(() => {
     fetchModelVariants();
     fetchStages();
@@ -162,68 +357,126 @@ const Overview = () => {
       <Title title="Production Overview" align="center" />
 
       {/* Filters Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
-        <div className="flex flex-wrap gap-2">
-          <SelectField
-            label="Model Variant"
-            options={variants}
-            value={selectedVariant?.value || ""}
-            onChange={(e) =>
-              setSelectedVariant(
-                variants.find((opt) => opt.value === e.target.value) || 0
-              )
-            }
-            className="max-w-64"
-          />
-
-          <SelectField
-            label="Stage Name"
-            options={stages}
-            value={selectedStage?.value || ""}
-            onChange={(e) =>
-              setSelectedStage(
-                stages.find((opt) => opt.value === e.target.value) || 0
-              )
-            }
-            className="max-w-64"
-          />
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <DateTimePicker
-            label="Start Time"
-            name="startTime"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-          />
-          <DateTimePicker
-            label="End Time"
-            name="endTime"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-          />
-        </div>
-
-        <div className="flex flex-wrap gap-2 mt-4">
-          <Button
-            bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
-            textColor={loading ? "text-white" : "text-black"}
-            className={`font-semibold ${loading ? "cursor-not-allowed" : ""}`}
-            onClick={handleFgData}
-            disabled={loading}
-          >
-            Query
-          </Button>
-          {productionData && productionData.length > 0 && (
-            <ExportButton
-              fetchData={fetchExportData}
-              filename="Production_Report"
+      <div className="flex gap-4">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-md max-w-4xl items-center">
+          <div className="flex flex-wrap gap-2">
+            <SelectField
+              label="Model Variant"
+              options={variants}
+              value={selectedVariant?.value || ""}
+              onChange={(e) =>
+                setSelectedVariant(
+                  variants.find((opt) => opt.value === e.target.value) || 0
+                )
+              }
+              className="max-w-64"
             />
-          )}
+
+            <SelectField
+              label="Stage Name"
+              options={stages}
+              value={selectedStage?.value || ""}
+              onChange={(e) =>
+                setSelectedStage(
+                  stages.find((opt) => opt.value === e.target.value) || 0
+                )
+              }
+              className="max-w-64"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <DateTimePicker
+              label="Start Time"
+              name="startTime"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+            <DateTimePicker
+              label="End Time"
+              name="endTime"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap gap-2 mt-4">
+              <Button
+                bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
+                textColor={loading ? "text-white" : "text-black"}
+                className={`font-semibold ${
+                  loading ? "cursor-not-allowed" : ""
+                }`}
+                onClick={() => handleFgData()}
+                disabled={loading}
+              >
+                Query
+              </Button>
+              {productionData && productionData.length > 0 && (
+                <ExportButton
+                  fetchData={fetchExportData}
+                  filename="Production_Report"
+                />
+              )}
+            </div>
+
+            <div className="mt-4 text-left font-bold text-lg">
+              COUNT: <span className="text-blue-700">{totalCount || 0}</span>
+            </div>
+          </div>
         </div>
 
-        <div className="mt-4 text-left font-bold text-lg">
-          COUNT: <span className="text-blue-700">{totalCount || 0}</span>
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-6 rounded-xl w-full max-w-xs">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
+            Quick Filters
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
+              textColor={ydayLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
+              onClick={() => fetchYesterdayProductionData()}
+              disabled={ydayLoading}
+            >
+              YDAY
+            </Button>
+            <Button
+              bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
+              textColor={todayLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                todayLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
+              onClick={() => fetchTodayProductionData()}
+              disabled={todayLoading}
+            >
+              TDAY
+            </Button>
+            <Button
+              bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
+              textColor={monthLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                monthLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
+              onClick={() => fetchMTDProductionData()}
+              disabled={monthLoading}
+            >
+              MTD
+            </Button>
+            <Button
+              bgColor={yearLoading ? "bg-gray-400" : "bg-pink-500"}
+              textColor={yearLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                yearLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
+              onClick={() => fetchYTDProductionData()}
+              disabled={yearLoading}
+            >
+              YTD
+            </Button>
+          </div>
         </div>
       </div>
 
