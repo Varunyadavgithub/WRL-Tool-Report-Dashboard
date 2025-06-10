@@ -45,7 +45,7 @@ function StageHistoryReport() {
       <Title title="Stage History Report" align="center" />
 
       {/* Filters Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 max-w-fit rounded-md">
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
         {/* First Row */}
         <div className="flex flex-wrap items-center gap-4">
           <InputField
@@ -82,7 +82,7 @@ function StageHistoryReport() {
       </div>
 
       {/* Summary Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
         <div className="bg-white border border-gray-300 rounded-md p-4">
           <div className="flex flex-wrap items-center gap-4">
             {/* Table 1 */}

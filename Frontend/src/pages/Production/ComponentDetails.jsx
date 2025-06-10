@@ -39,7 +39,7 @@ const ComponentDetails = () => {
       <Title title="Component Details" align="center" />
 
       {/* Filters Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 max-w-fit rounded-md">
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 max-w-fit rounded-xl">
         <div className="flex flex-wrap items-center gap-4">
           <InputField
             label="Serial Number"
@@ -78,7 +78,7 @@ const ComponentDetails = () => {
       </div>
 
       {/* Summary Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
         <div className="w-full flex items-center justify-center bg-white border border-gray-300 rounded-md p-4">
           {loading ? (
             <Loader />

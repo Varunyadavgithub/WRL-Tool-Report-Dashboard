@@ -265,7 +265,7 @@ const ComponentTraceabilityReport = () => {
 
       {/* Filters Section */}
       <div className="flex gap-4">
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl max-w-fit items-center">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit items-center">
           <div className="flex flex-wrap gap-4">
             <SelectField
               label="Model Variant"
@@ -306,7 +306,7 @@ const ComponentTraceabilityReport = () => {
           </div>
         </div>
 
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-6 rounded-xl max-w-fit items-center">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit items-center">
           <div className="flex flex-col items-center gap-2">
             <div className="flex flex-wrap gap-2 mt-4">
               <Button
@@ -339,7 +339,7 @@ const ComponentTraceabilityReport = () => {
           </div>
         </div>
 
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-6 rounded-xl max-w-fit">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
           <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
             Quick Filters
           </h2>

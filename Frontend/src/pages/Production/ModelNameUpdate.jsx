@@ -163,7 +163,7 @@ const ModelNameUpdate = () => {
       <Title title="Model Name Update" align="center" />
       {/* Filters Section */}
       <div className="flex gap-2">
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
           <div className="flex flex-col gap-2">
             <InputField
               label="FG Serial No."
@@ -197,7 +197,7 @@ const ModelNameUpdate = () => {
             </div>
           </div>
         </div>
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
           <div className="flex flex-wrap gap-2">
             <InputField
               label="FG Serial No. File"
@@ -238,7 +238,7 @@ const ModelNameUpdate = () => {
       </div>
 
       {/* Summary Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
         <div className="flex flex-col items-center mb-4">
           <span className="text-xl font-semibold">Summary</span>
         </div>

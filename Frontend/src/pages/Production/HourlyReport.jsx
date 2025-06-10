@@ -594,7 +594,7 @@ const HourlyReport = () => {
 
       {/* Filters */}
       <div className="flex gap-4">
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 max-w-4xl">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
           <SelectField
             label="Model"
             value={selectedModel?.value}
@@ -627,7 +627,7 @@ const HourlyReport = () => {
             onChange={(e) => setEndTime(e.target.value)}
           />
         </div>
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl mt-4">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
           {/* Buttons and Checkboxes */}
           <div className="flex flex-col flex-wrap items-center gap-4">
             <div className="flex gap-4">
@@ -690,7 +690,7 @@ const HourlyReport = () => {
             </div>
           </div>
         </div>
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-6 mt-4 rounded-xl max-w-fit">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
           <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
             Quick Filters
           </h2>
