@@ -10,11 +10,7 @@ import ExportButton from "../../components/common/ExportButton";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
-const DispatchReport = () => {
-  const Status = [
-    { label: "Completed", value: "completed" },
-    { label: "Open", value: "open" },
-  ];
+const DispatchUnloading = () => {
   const [loading, setLoading] = useState(false);
   const [ydayLoading, setYdayLoading] = useState(false);
   const [todayLoading, setTodayLoading] = useState(false);
@@ -22,46 +18,44 @@ const DispatchReport = () => {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
 
-  const [status, setStatus] = useState(Status[0]);
-  const [fgDispatchData, setFgDispatchData] = useState([]);
-  const [pageDispatch, setPageDispatch] = useState(1);
-  const [totalDispatchPages, setTotalDispatchPages] = useState(1);
+  const [fgUnloadingData, setFgUnloadingData] = useState([]);
+  const [pageUnloading, setPageUnloading] = useState(1);
+  const [totalUnloadingPages, setTotalUnloadingPages] = useState(1);
   const [limit] = useState(1000);
-  const [totalFgDispatchDataCount, setTotalFgDispatchDataCount] = useState(0);
+  const [totalFgUnloadingDataCount, setTotalFgUnloadingDataCount] = useState(0);
 
-  const fetchFgDispatchData = async (pageNumber = 1) => {
-    if (!startTime || !endTime || !status) {
-      toast.error("Please select Time Range and Status.");
+  const fetchFgUnloadingData = async (pageNumber = 1) => {
+    if (!startTime || !endTime) {
+      toast.error("Please select Time Range.");
       return;
     }
     try {
       setLoading(true);
-      const res = await axios.get(`${baseURL}dispatch/fg-dispatch`, {
+      const res = await axios.get(`${baseURL}dispatch/fg-unloading`, {
         params: {
           startDate: startTime,
           endDate: endTime,
-          status: status.value,
           page: pageNumber,
           limit,
         },
       });
 
       if (res?.data?.success) {
-        setFgDispatchData(res?.data?.data);
-        setTotalFgDispatchDataCount(res?.data?.totalCount);
-        setTotalDispatchPages(Math.ceil(res?.data?.totalCount / limit));
-        setPageDispatch(pageNumber);
+        setFgUnloadingData(res?.data?.data);
+        setTotalFgUnloadingDataCount(res?.data?.totalCount);
+        setTotalUnloadingPages(Math.ceil(res?.data?.totalCount / limit));
+        setPageUnloading(pageNumber);
       }
     } catch (error) {
-      console.error("Failed to fetch Fg Dispatch Data:", error);
-      toast.error("Failed to fetch Fg Dispatch Data. Please try again.");
+      console.error("Failed to fetch Fg Unloading Data:", error);
+      toast.error("Failed to fetch Fg Unloading Data. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   // Quick Filters
-  const fetchYesterdayFgDispatchData = async () => {
+  const fetchYesterdayFgUnloadingData = async () => {
     const now = new Date();
     const today8AM = new Date(now);
     today8AM.setHours(8, 0, 0, 0);
@@ -82,32 +76,31 @@ const DispatchReport = () => {
     try {
       setYdayLoading(true);
 
-      setFgDispatchData([]);
-      setTotalFgDispatchDataCount(0);
+      setFgUnloadingData([]);
+      setTotalFgUnloadingDataCount(0);
 
-      const res = await axios.get(`${baseURL}dispatch/quick-fg-dispatch`, {
+      const res = await axios.get(`${baseURL}dispatch/quick-fg-unloading`, {
         params: {
           startDate: formattedStart,
           endDate: formattedEnd,
-          status: status.value,
         },
       });
 
       if (res?.data?.success) {
-        setFgDispatchData(res?.data?.data);
-        setTotalFgDispatchDataCount(res?.data?.totalCount);
+        setFgUnloadingData(res?.data?.data);
+        setTotalFgUnloadingDataCount(res?.data?.totalCount);
       }
     } catch (error) {
-      console.error("Failed to fetch Yesterday Fg Dispatch Data:", error);
+      console.error("Failed to fetch Yesterday Fg Unloading Data:", error);
       toast.error(
-        "Failed to fetch Yesterday Fg Dispatch Data. Please try again."
+        "Failed to fetch Yesterday Fg Unloading Data. Please try again."
       );
     } finally {
       setYdayLoading(false);
     }
   };
 
-  const fetchTodayFgDispatchData = async () => {
+  const fetchTodayFgUnloadingData = async () => {
     const now = new Date();
     const today8AM = new Date(now);
     today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
@@ -121,34 +114,32 @@ const DispatchReport = () => {
 
     const formattedStart = formatDate(today8AM);
     const formattedEnd = formatDate(now); // Now = current time
-
     try {
       setTodayLoading(true);
 
-      setFgDispatchData([]);
-      setTotalFgDispatchDataCount(0);
+      setFgUnloadingData([]);
+      setTotalFgUnloadingDataCount(0);
 
-      const res = await axios.get(`${baseURL}dispatch/quick-fg-dispatch`, {
+      const res = await axios.get(`${baseURL}dispatch/quick-fg-unloading`, {
         params: {
           startDate: formattedStart,
           endDate: formattedEnd,
-          status: status.value,
         },
       });
 
       if (res?.data?.success) {
-        setFgDispatchData(res?.data?.data);
-        setTotalFgDispatchDataCount(res?.data?.totalCount);
+        setFgUnloadingData(res?.data?.data);
+        setTotalFgUnloadingDataCount(res?.data?.totalCount);
       }
     } catch (error) {
-      console.error("Failed to fetch Today Fg Dispatch Data:", error);
-      toast.error("Failed to fetch Today Fg Dispatch Data. Please try again.");
+      console.error("Failed to fetch Today Fg Unloading Data:", error);
+      toast.error("Failed to fetch Today Fg Unloading Data. Please try again.");
     } finally {
       setTodayLoading(false);
     }
   };
 
-  const fetchMTDFgDispatchData = async () => {
+  const fetchMTDFgUnloadingData = async () => {
     const now = new Date();
     const startOfMonth = new Date(
       now.getFullYear(),
@@ -171,25 +162,24 @@ const DispatchReport = () => {
     try {
       setMonthLoading(true);
 
-      setFgDispatchData([]);
-      setTotalFgDispatchDataCount(0);
+      setFgUnloadingData([]);
+      setTotalFgUnloadingDataCount(0);
 
-      const res = await axios.get(`${baseURL}dispatch/quick-fg-dispatch`, {
+      const res = await axios.get(`${baseURL}dispatch/quick-fg-unloading`, {
         params: {
           startDate: formattedStart,
           endDate: formattedEnd,
-          status: status.value,
         },
       });
 
       if (res?.data?.success) {
-        setFgDispatchData(res?.data?.data);
-        setTotalFgDispatchDataCount(res?.data?.totalCount);
+        setFgUnloadingData(res?.data?.data);
+        setTotalFgUnloadingDataCount(res?.data?.totalCount);
       }
     } catch (error) {
-      console.error("Failed to fetch this Month Fg Dispatch Data:", error);
+      console.error("Failed to fetch this Month Fg Unloading Data:", error);
       toast.error(
-        "Failed to fetch this Month Fg Dispatch Data. Please try again."
+        "Failed to fetch this Month Fg Unloading Data. Please try again."
       );
     } finally {
       setMonthLoading(false);
@@ -197,24 +187,23 @@ const DispatchReport = () => {
   };
 
   const handleQuery = () => {
-    fetchFgDispatchData(1);
+    fetchFgUnloadingData(1);
   };
 
   const handleYesterdayQuery = () => {
-    fetchYesterdayFgDispatchData();
+    fetchYesterdayFgUnloadingData();
   };
 
   const handleTodayQuery = () => {
-    fetchTodayFgDispatchData();
+    fetchTodayFgUnloadingData();
   };
 
   const handleMonthQuery = () => {
-    fetchMTDFgDispatchData();
+    fetchMTDFgUnloadingData();
   };
-
   return (
     <div className="min-h-screen bg-gray-100 p-4">
-      <Title title="Dispatch Report" align="center" />
+      <Title title="Dispatch Unloading" align="center" />
 
       {/* Filters Section */}
       <div className="flex gap-2">
@@ -230,19 +219,6 @@ const DispatchReport = () => {
             name="endTime"
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
-          />
-
-          <SelectField
-            label="Status"
-            options={Status}
-            value={status.value}
-            onChange={(e) => {
-              const selected = Status.find(
-                (item) => item.value === e.target.value
-              );
-              setStatus(selected);
-            }}
-            className="max-w-32"
           />
         </div>
         <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
@@ -266,7 +242,7 @@ const DispatchReport = () => {
               <div className="text-left font-bold text-lg">
                 COUNT:{" "}
                 <span className="text-blue-700">
-                  {totalFgDispatchDataCount}
+                  {totalFgUnloadingDataCount}
                 </span>
               </div>
             </div>
@@ -315,16 +291,15 @@ const DispatchReport = () => {
       </div>
 
       <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
-        <>
-          <PaginationControls
-            page={pageDispatch}
-            totalPages={totalDispatchPages}
-            onPageChange={fetchFgDispatchData}
-          />
-        </>
+        <PaginationControls
+          page={pageUnloading}
+          totalPages={totalUnloadingPages}
+          onPageChange={fetchFgUnloadingData}
+        />
+
         <div className="bg-white border border-gray-300 rounded-md p-4">
           <div className="flex flex-wrap items-center gap-4">
-            {loading ? <Loader /> : <FgDispatchTable data={fgDispatchData} />}
+            {loading ? <Loader /> : <FgUnloadingTable data={fgUnloadingData} />}
           </div>
         </div>
       </div>
@@ -332,7 +307,7 @@ const DispatchReport = () => {
   );
 };
 
-const FgDispatchTable = ({ data }) => {
+const FgUnloadingTable = ({ data }) => {
   return (
     <div className="w-full max-h-[600px] overflow-x-auto">
       <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
@@ -341,15 +316,9 @@ const FgDispatchTable = ({ data }) => {
             <th className="px-1 py-1 border min-w-[120px]">Model Name</th>
             <th className="px-1 py-1 border min-w-[120px]">FG Serial No.</th>
             <th className="px-1 py-1 border min-w-[120px]">Asset Code</th>
-            <th className="px-1 py-1 border min-w-[120px]">Session ID</th>
-            <th className="px-1 py-1 border min-w-[120px]">Added On</th>
-            <th className="px-1 py-1 border min-w-[120px]">Added By</th>
-            <th className="px-1 py-1 border min-w-[120px]">Document ID</th>
-            <th className="px-1 py-1 border min-w-[120px]">Model Code</th>
-            <th className="px-1 py-1 border min-w-[120px]">Dock No</th>
-            <th className="px-1 py-1 border min-w-[120px]">Vehicle No</th>
-            <th className="px-1 py-1 border min-w-[120px]">Generated By</th>
-            <th className="px-1 py-1 border min-w-[120px]">Scan ID</th>
+            <th className="px-1 py-1 border min-w-[120px]">Batch Code</th>
+            <th className="px-1 py-1 border min-w-[120px]">Scanner No.</th>
+            <th className="px-1 py-1 border min-w-[120px]">Date Time</th>
           </tr>
         </thead>
         <tbody>
@@ -359,23 +328,17 @@ const FgDispatchTable = ({ data }) => {
                 <td className="px-1 py-1 border">{row.ModelName}</td>
                 <td className="px-1 py-1 border">{row.FGSerialNo}</td>
                 <td className="px-1 py-1 border">{row.AssetCode}</td>
-                <td className="px-1 py-1 border">{row.Session_ID}</td>
+                <td className="px-1 py-1 border">{row.BatchCode}</td>
+                <td className="px-1 py-1 border">{row.ScannerNo}</td>
                 <td className="px-1 py-1 border">
-                  {row.AddedOn &&
-                    row.AddedOn.replace("T", " ").replace("Z", "")}
+                  {row.DateTime &&
+                    row.DateTime.replace("T", " ").replace("Z", "")}
                 </td>
-                <td className="px-1 py-1 border">{row.AddedBy}</td>
-                <td className="px-1 py-1 border">{row.Document_ID}</td>
-                <td className="px-1 py-1 border">{row.ModelCode}</td>
-                <td className="px-1 py-1 border">{row.DockNo}</td>
-                <td className="px-1 py-1 border">{row.Vehicle_No}</td>
-                <td className="px-1 py-1 border">{row.Generated_By}</td>
-                <td className="px-1 py-1 border">{row.Scan_ID}</td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan={12} className="text-center py-4">
+              <td colSpan={3} className="text-center py-4">
                 No data found.
               </td>
             </tr>
@@ -416,4 +379,4 @@ const PaginationControls = ({ page, totalPages, onPageChange }) => {
   );
 };
 
-export default DispatchReport;
+export default DispatchUnloading;

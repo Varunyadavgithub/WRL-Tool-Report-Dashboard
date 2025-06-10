@@ -17,11 +17,14 @@ import ESTReport from "../pages/Quality/ESTReport";
 import MFTReport from "../pages/Quality/MFTReport";
 import FPA from "../pages/Quality/FPA";
 import FPAReports from "../pages/Quality/FPAReports";
+import LPT from "../pages/Quality/LPT";
+import LPTReport from "../pages/Quality/LPTReport";
 import DispatchHold from "../pages/Quality/DispatchHold";
 import HoldCabinateDetails from "../pages/Quality/HoldCabinateDetails";
 
 import DispatchPerformanceReport from "../pages/Dispatch/DispatchPerformanceReport";
 import DispatchReport from "../pages/Dispatch/DispatchReport";
+import DispatchUnloading from "../pages/Dispatch/DispatchUnloading";
 import FGCasting from "../pages/Dispatch/FGCasting";
 import GateEntry from "../pages/Dispatch/GateEntry";
 import ErrorLog from "../pages/Dispatch/ErrorLog";
@@ -38,6 +41,7 @@ function MainContent() {
 
   const canAccess = (allowedRoles) =>
     allowedRoles.includes(userRole) || userRole === "admin";
+
   return (
     <div className="flex-1 p-4 min-h-screen overflow-auto">
       <Routes>
@@ -103,8 +107,16 @@ function MainContent() {
 
         <Route path="/quality/fpa-report" element={<FPAReports />} />
 
+        {/* 🚫 Restricted Route: Only Line Quality Engineer, Quality Manager, Lpt and Admin */}
+        {canAccess(["line quality engineer", "quality manager", "lpt"]) && (
+          <Route path="/quality/lpt" element={<LPT />} />
+        )}
+        {canAccess(["line quality engineer", "quality manager", "lpt"]) && (
+          <Route path="/quality/lpt-report" element={<LPTReport />} />
+        )}
+
         {/* 🚫 Restricted Route: Only Line Quality Engineer, Quality Manager and Admin */}
-        {canAccess(["line quality engineer","fpa", "quality manager"]) && (
+        {canAccess(["line quality engineer", "fpa", "quality manager"]) && (
           <Route path="/quality/dispatch-hold" element={<DispatchHold />} />
         )}
 
@@ -124,6 +136,10 @@ function MainContent() {
           element={<DispatchPerformanceReport />}
         />
         <Route path="/dispatch/dispatch-report" element={<DispatchReport />} />
+        <Route
+          path="/dispatch/dispatch-unloading"
+          element={<DispatchUnloading />}
+        />
 
         {/* 🚫 Restricted Route: Only Logistic and Admin */}
         {canAccess(["logistic"]) && (

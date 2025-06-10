@@ -67,6 +67,16 @@ const MENU_CONFIG = [
       { path: "/quality/fpa", label: "FPA", roles: ["fpa", "quality manager"] },
       { path: "/quality/fpa-report", label: "FPA Report" },
       {
+        path: "/quality/lpt",
+        label: "LPT",
+        roles: ["line quality engineer", "quality manager", "lpt"],
+      },
+      {
+        path: "/quality/lpt-report",
+        label: "LPT Report",
+        roles: ["line quality engineer", "quality manager", "lpt"],
+      },
+      {
         path: "/quality/dispatch-hold",
         label: "Dispatch Hold",
         roles: ["line quality engineer", "fpa", "quality manager"],
@@ -89,6 +99,7 @@ const MENU_CONFIG = [
         label: "Dispatch Performance Report",
       },
       { path: "/dispatch/dispatch-report", label: "Dispatch Report" },
+      { path: "/dispatch/dispatch-unloading", label: "Dispatch Unloading" },
       {
         path: "/dispatch/fg-casting",
         label: "FG Casting",
