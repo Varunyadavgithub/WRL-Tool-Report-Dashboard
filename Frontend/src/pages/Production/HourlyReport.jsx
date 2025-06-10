@@ -27,6 +27,8 @@ const HourlyReport = () => {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [loading, setLoading] = useState(false);
+  const [ydayLoading, setYdayLoading] = useState(false);
+  const [todayLoading, setTodayLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [hourData, setHourData] = useState([]);
   const [hourlyModelCount, setHourlyModelCount] = useState([]);
@@ -161,6 +163,323 @@ const HourlyReport = () => {
     }
   };
 
+  // Quick Filters
+  const fetchYesterdayHourlyProduction = async () => {
+    if (!stationCode) {
+      return;
+    }
+
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0);
+
+    const yesterday8AM = new Date(today8AM);
+    yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(yesterday8AM);
+    const formattedEnd = formatDate(today8AM);
+    try {
+      setYdayLoading(true);
+      setHourData([]);
+
+      const params = {
+        stationCode,
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+
+      if (selectedModel?.value && selectedModel.value !== "0") {
+        params.model = selectedModel.value;
+      }
+      if (lineType) {
+        params.line = lineType;
+      }
+
+      const res = await axios.get(`${baseURL}prod/hourly-summary`, {
+        params,
+      });
+      setHourData(res.data);
+    } catch (error) {
+      console.error("Error fetching Yesterday hourly production data:", error);
+      toast.error("Error fetching Yesterday hourly production data.");
+    } finally {
+      setYdayLoading(false);
+    }
+  };
+
+  const fetchYesterdayHourlyModelCount = async () => {
+    if (!stationCode) {
+      toast.error("Please select Station Code and Time Range.");
+      return;
+    }
+
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0);
+
+    const yesterday8AM = new Date(today8AM);
+    yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(yesterday8AM);
+    const formattedEnd = formatDate(today8AM);
+
+    try {
+      setYdayLoading(true);
+
+      setHourlyModelCount([]);
+
+      const params = {
+        stationCode,
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+      if (selectedModel?.value && selectedModel.value !== "0") {
+        params.model = selectedModel.value;
+      }
+      if (lineType) {
+        params.line = lineType;
+      }
+
+      const res = await axios.get(`${baseURL}prod/hourly-model-count`, {
+        params,
+      });
+      setHourlyModelCount(res?.data);
+    } catch (error) {
+      console.error("Error fetching Yesterday hourly model count data:", error);
+      toast.error("Error fetching Yesterday hourly model count data.");
+    } finally {
+      setYdayLoading(false);
+    }
+  };
+
+  const getYesterdayHourlyCategoryCount = async () => {
+    if (!stationCode) {
+      toast.error("Please select Station Code and Time Range.");
+      return;
+    }
+
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0);
+
+    const yesterday8AM = new Date(today8AM);
+    yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(yesterday8AM);
+    const formattedEnd = formatDate(today8AM);
+
+    try {
+      setYdayLoading(true);
+
+      setHourlyCategoryCount([]);
+
+      const params = {
+        stationCode,
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+      if (selectedModel?.value && selectedModel.value !== "0") {
+        params.model = selectedModel.value;
+      }
+      if (lineType) {
+        params.line = lineType;
+      }
+
+      const res = await axios.get(`${baseURL}prod/hourly-category-count`, {
+        params,
+      });
+      setHourlyCategoryCount(res?.data);
+    } catch (error) {
+      console.error(
+        "Error fetching Yesterday hourly Category count data:",
+        error
+      );
+      toast.error("Error fetching Yesterday hourly Category count data.");
+    } finally {
+      setYdayLoading(false);
+    }
+  };
+
+  const fetchTodayHourlyProduction = async () => {
+    if (!stationCode) {
+      return;
+    }
+
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(today8AM);
+    const formattedEnd = formatDate(now); // Now = current time
+
+    try {
+      setTodayLoading(true);
+
+      setHourData([]);
+
+      const params = {
+        stationCode,
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+
+      if (selectedModel?.value && selectedModel.value !== "0") {
+        params.model = selectedModel.value;
+      }
+      if (lineType) {
+        params.line = lineType;
+      }
+
+      const res = await axios.get(`${baseURL}prod/hourly-summary`, {
+        params,
+      });
+      setHourData(res.data);
+    } catch (error) {
+      console.error("Error fetching Today hourly production data:", error);
+      toast.error("Error fetching Today hourly production data.");
+    } finally {
+      setTodayLoading(false);
+    }
+  };
+
+  const fetchTodayHourlyModelCount = async () => {
+    if (!stationCode) {
+      toast.error("Please select Station Code and Time Range.");
+      return;
+    }
+
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(today8AM);
+    const formattedEnd = formatDate(now); // Now = current time
+
+    try {
+      setTodayLoading(true);
+
+      setHourlyModelCount([]);
+
+      const params = {
+        stationCode,
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+      if (selectedModel?.value && selectedModel.value !== "0") {
+        params.model = selectedModel.value;
+      }
+      if (lineType) {
+        params.line = lineType;
+      }
+
+      const res = await axios.get(`${baseURL}prod/hourly-model-count`, {
+        params,
+      });
+      setHourlyModelCount(res?.data);
+    } catch (error) {
+      console.error("Error fetching Today hourly model count data:", error);
+      toast.error("Error fetching Today hourly model count data.");
+    } finally {
+      setTodayLoading(false);
+    }
+  };
+
+  const getTodayHourlyCategoryCount = async () => {
+    if (!stationCode) {
+      toast.error("Please select Station Code and Time Range.");
+      return;
+    }
+
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(today8AM);
+    const formattedEnd = formatDate(now); // Now = current time
+
+    try {
+      setTodayLoading(true);
+
+      setHourlyCategoryCount([]);
+
+      const params = {
+        stationCode,
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+      if (selectedModel?.value && selectedModel.value !== "0") {
+        params.model = selectedModel.value;
+      }
+      if (lineType) {
+        params.line = lineType;
+      }
+
+      const res = await axios.get(`${baseURL}prod/hourly-category-count`, {
+        params,
+      });
+      setHourlyCategoryCount(res?.data);
+    } catch (error) {
+      console.error("Error fetching Today hourly Category count data:", error);
+      toast.error("Error fetching Today hourly Category count data.");
+    } finally {
+      setTodayLoading(false);
+    }
+  };
+
+  const handleYesterday = async () => {
+    await fetchYesterdayHourlyProduction();
+    await fetchYesterdayHourlyModelCount();
+    await getYesterdayHourlyCategoryCount();
+  };
+
+  const handleToday = async () => {
+    await fetchTodayHourlyProduction();
+    await fetchTodayHourlyModelCount();
+    await getTodayHourlyCategoryCount();
+  };
+
   useEffect(() => {
     fetchModel();
     fetchStages();
@@ -275,7 +594,7 @@ const HourlyReport = () => {
 
       {/* Filters */}
       <div className="flex gap-4">
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-md grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 max-w-4xl">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 max-w-4xl">
           <SelectField
             label="Model"
             value={selectedModel?.value}
@@ -308,7 +627,7 @@ const HourlyReport = () => {
             onChange={(e) => setEndTime(e.target.value)}
           />
         </div>
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-md mt-6">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl mt-4">
           {/* Buttons and Checkboxes */}
           <div className="flex flex-col flex-wrap items-center gap-4">
             <div className="flex gap-4">
@@ -371,9 +690,38 @@ const HourlyReport = () => {
             </div>
           </div>
         </div>
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-6 mt-4 rounded-xl max-w-fit">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
+            Quick Filters
+          </h2>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Button
+              bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
+              textColor={ydayLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
+              onClick={() => handleYesterday()}
+              disabled={ydayLoading}
+            >
+              YDAY
+            </Button>
+            <Button
+              bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
+              textColor={todayLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                todayLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
+              onClick={() => handleToday()}
+              disabled={todayLoading}
+            >
+              TDAY
+            </Button>
+          </div>
+        </div>
       </div>
 
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md max-h-[80vh] overflow-auto">
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-h-[80vh] overflow-auto">
         {loading ? (
           <Loader />
         ) : (
