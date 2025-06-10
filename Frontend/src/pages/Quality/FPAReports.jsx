@@ -12,6 +12,9 @@ const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const FPAReports = () => {
   const [loading, setLoading] = useState(false);
+  const [ydayLoading, setYdayLoading] = useState(false);
+  const [todayLoading, setTodayLoading] = useState(false);
+  const [monthLoading, setMonthLoading] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [variants, setVariants] = useState([]);
@@ -86,6 +89,163 @@ const FPAReports = () => {
     }
   };
 
+  // Quick Filters
+  const handleYesterdayQuery = async () => {
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0);
+
+    const yesterday8AM = new Date(today8AM);
+    yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(yesterday8AM);
+    const formattedEnd = formatDate(today8AM);
+
+    try {
+      setYdayLoading(true);
+
+      setReportData([]);
+      setSelectedVariant(null);
+
+      let params = {
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+
+      if (reportType === "fpaReport") {
+        if (selectedVariant && selectedVariant.value) {
+          params = {
+            ...params,
+            model: selectedVariant.label,
+          };
+        }
+
+        const res = await axios.get(`${baseURL}quality/fpa-report`, { params });
+        setReportData(res.data);
+        setSelectedVariant(null);
+      } else {
+        alert("Please select only FPA Report Type.");
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to fetch Yesterday FPA Report:", error);
+      toast.error("Failed to fetch Yesterday FPA Report.");
+    } finally {
+      setYdayLoading(false);
+    }
+  };
+
+  const handleTodayQuery = async () => {
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(today8AM);
+    const formattedEnd = formatDate(now); // Now = current time
+
+    try {
+      setTodayLoading(true);
+
+      setReportData([]);
+      setSelectedVariant(null);
+
+      let params = {
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+
+      if (reportType === "fpaReport") {
+        if (selectedVariant && selectedVariant.value) {
+          params = {
+            ...params,
+            model: selectedVariant.label,
+          };
+        }
+
+        const res = await axios.get(`${baseURL}quality/fpa-report`, { params });
+        setReportData(res.data);
+        setSelectedVariant(null);
+      } else {
+        alert("Please select only FPA Report Type.");
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to fetch Today FPA Report:", error);
+      toast.error("Failed to fetch Today FPA Report.");
+    } finally {
+      setTodayLoading(false);
+    }
+  };
+
+  const handleMTDQuery = async () => {
+    const now = new Date();
+    const startOfMonth = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1,
+      8,
+      0,
+      0
+    ); // 1st day at 08:00 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(startOfMonth);
+    const formattedEnd = formatDate(now);
+
+    try {
+      setMonthLoading(true);
+
+      setReportData([]);
+      setSelectedVariant(null);
+
+      let params = {
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+
+      if (reportType === "fpaReport") {
+        if (selectedVariant && selectedVariant.value) {
+          params = {
+            ...params,
+            model: selectedVariant.label,
+          };
+        }
+
+        const res = await axios.get(`${baseURL}quality/fpa-report`, { params });
+        setReportData(res.data);
+        setSelectedVariant(null);
+      } else {
+        alert("Please select only FPA Report Type.");
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to fetch Month FPA Report:", error);
+      toast.error("Failed to fetch Month FPA Report.");
+    } finally {
+      setMonthLoading(false);
+    }
+  };
+
   const uniqueFGSRNoCount = useMemo(() => {
     return new Set(reportData.map((item) => item.FGSRNo)).size;
   }, [reportData]);
@@ -112,7 +272,7 @@ const FPAReports = () => {
 
       {/* Filters Section */}
       <div className="flex gap-2">
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-md grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 max-w-4xl items-center">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl items-center">
           <DateTimePicker
             label="Start Time"
             name="startTime"
@@ -149,7 +309,7 @@ const FPAReports = () => {
           )}
         </div>
 
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-md mt-6">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
           {/* Buttons and Checkboxes */}
           <div className="flex flex-wrap items-center gap-4">
             <div>
@@ -219,10 +379,51 @@ const FPAReports = () => {
             </div>
           </div>
         </div>
+
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
+            Quick Filters
+          </h2>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Button
+              bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
+              textColor={ydayLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
+              onClick={() => handleYesterdayQuery()}
+              disabled={ydayLoading}
+            >
+              YDAY
+            </Button>
+            <Button
+              bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
+              textColor={todayLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                todayLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
+              onClick={() => handleTodayQuery()}
+              disabled={todayLoading}
+            >
+              TDAY
+            </Button>
+            <Button
+              bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
+              textColor={monthLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                monthLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
+              onClick={() => handleMTDQuery()}
+              disabled={monthLoading}
+            >
+              MTD
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Summary Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
         <div className="mt-6">
           {reportType === "fpaReport" && (
             <FpaReportTable
