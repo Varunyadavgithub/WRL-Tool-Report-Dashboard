@@ -312,63 +312,129 @@ const DispatchUnloading = () => {
 
       <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
         <div className="bg-white border border-gray-300 rounded-md p-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="w-full max-h-[600px] overflow-x-auto">
-              <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
-                <thead className="bg-gray-200 sticky top-0 z-10 text-center">
-                  <tr>
-                    <th className="px-1 py-1 border min-w-[120px]">
-                      Model Name
-                    </th>
-                    <th className="px-1 py-1 border min-w-[120px]">
-                      FG Serial No.
-                    </th>
-                    <th className="px-1 py-1 border min-w-[120px]">
-                      Asset Code
-                    </th>
-                    <th className="px-1 py-1 border min-w-[120px]">
-                      Batch Code
-                    </th>
-                    <th className="px-1 py-1 border min-w-[120px]">
-                      Scanner No.
-                    </th>
-                    <th className="px-1 py-1 border min-w-[120px]">
-                      Date Time
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fgUnloadingData.map((item, index) => {
-                    const isLast = index === fgUnloadingData.length - 1;
-                    return (
-                      <tr
-                        key={index}
-                        ref={isLast ? lastRowRef : null}
-                        className="hover:bg-gray-100 text-center"
-                      >
-                        <td className="px-1 py-1 border">{item.ModelName}</td>
-                        <td className="px-1 py-1 border">{item.FGSerialNo}</td>
-                        <td className="px-1 py-1 border">{item.AssetCode}</td>
-                        <td className="px-1 py-1 border">{item.BatchCode}</td>
-                        <td className="px-1 py-1 border">{item.ScannerNo}</td>
-                        <td className="px-1 py-1 border">
-                          {item.DateTime &&
-                            item.DateTime.replace("T", " ").replace("Z", "")}
+          <div className="flex flex-wrap gap-4">
+            <div className="w-full md:flex-1">
+              <div className="w-full max-h-[600px] overflow-x-auto">
+                <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
+                  <thead className="bg-gray-200 sticky top-0 z-10 text-center">
+                    <tr>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Model Name
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        FG Serial No.
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Asset Code
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Batch Code
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Scanner No.
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Date Time
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fgUnloadingData.map((item, index) => {
+                      const isLast = index === fgUnloadingData.length - 1;
+                      return (
+                        <tr
+                          key={index}
+                          ref={isLast ? lastRowRef : null}
+                          className="hover:bg-gray-100 text-center"
+                        >
+                          <td className="px-1 py-1 border">{item.ModelName}</td>
+                          <td className="px-1 py-1 border">
+                            {item.FGSerialNo}
+                          </td>
+                          <td className="px-1 py-1 border">{item.AssetCode}</td>
+                          <td className="px-1 py-1 border">{item.BatchCode}</td>
+                          <td className="px-1 py-1 border">{item.ScannerNo}</td>
+                          <td className="px-1 py-1 border">
+                            {item.DateTime &&
+                              item.DateTime.replace("T", " ").replace("Z", "")}
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {!loading && fgUnloadingData.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="text-center py-4">
+                          No data found.
                         </td>
                       </tr>
-                    );
-                  })}
+                    )}
+                  </tbody>
+                </table>
+                {loading && <Loader />}
+              </div>
+            </div>
 
-                  {!loading && fgUnloadingData.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="text-center py-4">
-                        No data found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-              {loading && <Loader />}
+            {/* Left Side - Controls and Summary */}
+            <div className="md:w-[30%] flex flex-col overflow-x-hidden">
+              <div className="w-full max-h-[500px] overflow-x-auto">
+                {loading ? (
+                  <Loader />
+                ) : (
+                  <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
+                    <thead className="bg-gray-200 sticky top-0 z-10 text-center">
+                      <tr>
+                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
+                          Model_Name
+                        </th>
+                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
+                          StartSerial
+                        </th>
+                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
+                          EndSerial
+                        </th>
+                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
+                          Count
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* {productionData.length > 0 ? (
+                        aggregateProductionData().map((item, index) => (
+                          <tr
+                            key={index}
+                            className={`hover:bg-gray-100 text-center cursor-pointer ${
+                              selectedModelName === item.Model_Name
+                                ? "bg-blue-100"
+                                : "bg-white"
+                            }`}
+                            onClick={() => handleModelRowClick(item.Model_Name)}
+                          >
+                            <td className="px-1 py-1 border">
+                              {item.Model_Name}
+                            </td>
+                            <td className="px-1 py-1 border">
+                              {item.StartSerial}
+                            </td>
+                            <td className="px-1 py-1 border">
+                              {item.EndSerial}
+                            </td>
+                            <td className="px-1 py-1 border">
+                              {item.TotalCount}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={4} className="text-center py-4">
+                            No data found.
+                          </td>
+                        </tr>
+                      )} */}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Title from "../../components/common/Title";
 import SelectField from "../../components/common/SelectField";
@@ -21,13 +21,28 @@ const DispatchReport = () => {
   const [monthLoading, setMonthLoading] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-
   const [status, setStatus] = useState(Status[0]);
-  const [fgDispatchData, setFgDispatchData] = useState([]);
-  const [pageDispatch, setPageDispatch] = useState(1);
-  const [totalDispatchPages, setTotalDispatchPages] = useState(1);
+  const [page, setPage] = useState(1);
   const [limit] = useState(1000);
-  const [totalFgDispatchDataCount, setTotalFgDispatchDataCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [fgDispatchData, setFgDispatchData] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+
+  const observer = useRef();
+  const lastRowRef = useCallback(
+    (node) => {
+      if (loading) return;
+      if (observer.current) observer.current.disconnect();
+
+      observer.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          setPage((prevPage) => prevPage + 1);
+        }
+      });
+      if (node) observer.current.observe(node);
+    },
+    [loading, hasMore]
+  );
 
   const fetchFgDispatchData = async (pageNumber = 1) => {
     if (!startTime || !endTime || !status) {
@@ -48,9 +63,10 @@ const DispatchReport = () => {
 
       if (res?.data?.success) {
         setFgDispatchData(res?.data?.data);
-        setTotalFgDispatchDataCount(res?.data?.totalCount);
-        setTotalDispatchPages(Math.ceil(res?.data?.totalCount / limit));
-        setPageDispatch(pageNumber);
+        if (pageNumber === 1) {
+          setTotalCount(res?.data?.totalCount);
+        }
+        setHasMore(res?.data?.data.length > 0);
       }
     } catch (error) {
       console.error("Failed to fetch Fg Dispatch Data:", error);
@@ -59,6 +75,11 @@ const DispatchReport = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (page === 1) return;
+    fetchFgDispatchData(page);
+  }, [page]);
 
   // Quick Filters
   const fetchYesterdayFgDispatchData = async () => {
@@ -83,7 +104,7 @@ const DispatchReport = () => {
       setYdayLoading(true);
 
       setFgDispatchData([]);
-      setTotalFgDispatchDataCount(0);
+      setTotalCount(0);
 
       const res = await axios.get(`${baseURL}dispatch/quick-fg-dispatch`, {
         params: {
@@ -95,7 +116,7 @@ const DispatchReport = () => {
 
       if (res?.data?.success) {
         setFgDispatchData(res?.data?.data);
-        setTotalFgDispatchDataCount(res?.data?.totalCount);
+        setTotalCount(res?.data?.totalCount);
       }
     } catch (error) {
       console.error("Failed to fetch Yesterday Fg Dispatch Data:", error);
@@ -126,7 +147,7 @@ const DispatchReport = () => {
       setTodayLoading(true);
 
       setFgDispatchData([]);
-      setTotalFgDispatchDataCount(0);
+      setTotalCount(0);
 
       const res = await axios.get(`${baseURL}dispatch/quick-fg-dispatch`, {
         params: {
@@ -138,7 +159,7 @@ const DispatchReport = () => {
 
       if (res?.data?.success) {
         setFgDispatchData(res?.data?.data);
-        setTotalFgDispatchDataCount(res?.data?.totalCount);
+        setTotalCount(res?.data?.totalCount);
       }
     } catch (error) {
       console.error("Failed to fetch Today Fg Dispatch Data:", error);
@@ -172,7 +193,7 @@ const DispatchReport = () => {
       setMonthLoading(true);
 
       setFgDispatchData([]);
-      setTotalFgDispatchDataCount(0);
+      setTotalCount(0);
 
       const res = await axios.get(`${baseURL}dispatch/quick-fg-dispatch`, {
         params: {
@@ -184,7 +205,7 @@ const DispatchReport = () => {
 
       if (res?.data?.success) {
         setFgDispatchData(res?.data?.data);
-        setTotalFgDispatchDataCount(res?.data?.totalCount);
+        setTotalCount(res?.data?.totalCount);
       }
     } catch (error) {
       console.error("Failed to fetch this Month Fg Dispatch Data:", error);
@@ -264,10 +285,7 @@ const DispatchReport = () => {
                 <ExportButton />
               </div>
               <div className="text-left font-bold text-lg">
-                COUNT:{" "}
-                <span className="text-blue-700">
-                  {totalFgDispatchDataCount}
-                </span>
+                COUNT: <span className="text-blue-700">{totalCount}</span>
               </div>
             </div>
           </div>
@@ -315,103 +333,165 @@ const DispatchReport = () => {
       </div>
 
       <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
-        <>
-          <PaginationControls
-            page={pageDispatch}
-            totalPages={totalDispatchPages}
-            onPageChange={fetchFgDispatchData}
-          />
-        </>
         <div className="bg-white border border-gray-300 rounded-md p-4">
-          <div className="flex flex-wrap items-center gap-4">
-            {loading ? <Loader /> : <FgDispatchTable data={fgDispatchData} />}
+          <div className="flex flex-wrap gap-4">
+            <div className="w-full md:flex-1">
+              <div className="w-full max-h-[600px] overflow-x-auto">
+                <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
+                  <thead className="bg-gray-200 sticky top-0 z-10 text-center">
+                    <tr>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Model Name
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        FG Serial No.
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Asset Code
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Session ID
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Added On
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Added By
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Document ID
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Model Code
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Dock No
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Vehicle No
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Generated By
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Scan ID
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fgDispatchData.map((item, index) => {
+                      const isLast = index === fgDispatchData.length - 1;
+                      return (
+                        <tr
+                          key={index}
+                          ref={isLast ? lastRowRef : null}
+                          className="hover:bg-gray-100 text-center"
+                        >
+                          <td className="px-1 py-1 border">{item.ModelName}</td>
+                          <td className="px-1 py-1 border">
+                            {item.FGSerialNo}
+                          </td>
+                          <td className="px-1 py-1 border">{item.AssetCode}</td>
+                          <td className="px-1 py-1 border">
+                            {item.Session_ID}
+                          </td>
+                          <td className="px-1 py-1 border">
+                            {item.AddedOn &&
+                              item.AddedOn.replace("T", " ").replace("Z", "")}
+                          </td>
+                          <td className="px-1 py-1 border">{item.AddedBy}</td>
+                          <td className="px-1 py-1 border">
+                            {item.Document_ID}
+                          </td>
+                          <td className="px-1 py-1 border">{item.ModelCode}</td>
+                          <td className="px-1 py-1 border">{item.DockNo}</td>
+                          <td className="px-1 py-1 border">
+                            {item.Vehicle_No}
+                          </td>
+                          <td className="px-1 py-1 border">
+                            {item.Generated_By}
+                          </td>
+                          <td className="px-1 py-1 border">{item.Scan_ID}</td>
+                        </tr>
+                      );
+                    })}
+                    {!loading && fgDispatchData.length === 0 && (
+                      <tr>
+                        <td colSpan={12} className="text-center py-4">
+                          No data found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                {loading && <Loader />}
+              </div>
+            </div>
+
+            {/* Left Side - Controls and Summary */}
+            <div className="md:w-[30%] flex flex-col overflow-x-hidden">
+              <div className="w-full max-h-[500px] overflow-x-auto">
+                {loading ? (
+                  <Loader />
+                ) : (
+                  <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
+                    <thead className="bg-gray-200 sticky top-0 z-10 text-center">
+                      <tr>
+                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
+                          Model_Name
+                        </th>
+                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
+                          StartSerial
+                        </th>
+                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
+                          EndSerial
+                        </th>
+                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
+                          Count
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* {productionData.length > 0 ? (
+                        aggregateProductionData().map((item, index) => (
+                          <tr
+                            key={index}
+                            className={`hover:bg-gray-100 text-center cursor-pointer ${
+                              selectedModelName === item.Model_Name
+                                ? "bg-blue-100"
+                                : "bg-white"
+                            }`}
+                            onClick={() => handleModelRowClick(item.Model_Name)}
+                          >
+                            <td className="px-1 py-1 border">
+                              {item.Model_Name}
+                            </td>
+                            <td className="px-1 py-1 border">
+                              {item.StartSerial}
+                            </td>
+                            <td className="px-1 py-1 border">
+                              {item.EndSerial}
+                            </td>
+                            <td className="px-1 py-1 border">
+                              {item.TotalCount}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={4} className="text-center py-4">
+                            No data found.
+                          </td>
+                        </tr>
+                      )} */}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-};
-
-const FgDispatchTable = ({ data }) => {
-  return (
-    <div className="w-full max-h-[600px] overflow-x-auto">
-      <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
-        <thead className="bg-gray-200 sticky top-0 z-10 text-center">
-          <tr>
-            <th className="px-1 py-1 border min-w-[120px]">Model Name</th>
-            <th className="px-1 py-1 border min-w-[120px]">FG Serial No.</th>
-            <th className="px-1 py-1 border min-w-[120px]">Asset Code</th>
-            <th className="px-1 py-1 border min-w-[120px]">Session ID</th>
-            <th className="px-1 py-1 border min-w-[120px]">Added On</th>
-            <th className="px-1 py-1 border min-w-[120px]">Added By</th>
-            <th className="px-1 py-1 border min-w-[120px]">Document ID</th>
-            <th className="px-1 py-1 border min-w-[120px]">Model Code</th>
-            <th className="px-1 py-1 border min-w-[120px]">Dock No</th>
-            <th className="px-1 py-1 border min-w-[120px]">Vehicle No</th>
-            <th className="px-1 py-1 border min-w-[120px]">Generated By</th>
-            <th className="px-1 py-1 border min-w-[120px]">Scan ID</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data && data.length > 0 ? (
-            data.map((row, index) => (
-              <tr key={index} className="hover:bg-gray-100 text-center">
-                <td className="px-1 py-1 border">{row.ModelName}</td>
-                <td className="px-1 py-1 border">{row.FGSerialNo}</td>
-                <td className="px-1 py-1 border">{row.AssetCode}</td>
-                <td className="px-1 py-1 border">{row.Session_ID}</td>
-                <td className="px-1 py-1 border">
-                  {row.AddedOn &&
-                    row.AddedOn.replace("T", " ").replace("Z", "")}
-                </td>
-                <td className="px-1 py-1 border">{row.AddedBy}</td>
-                <td className="px-1 py-1 border">{row.Document_ID}</td>
-                <td className="px-1 py-1 border">{row.ModelCode}</td>
-                <td className="px-1 py-1 border">{row.DockNo}</td>
-                <td className="px-1 py-1 border">{row.Vehicle_No}</td>
-                <td className="px-1 py-1 border">{row.Generated_By}</td>
-                <td className="px-1 py-1 border">{row.Scan_ID}</td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={12} className="text-center py-4">
-                No data found.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-};
-
-// ========== Pagination Controls ==========
-const PaginationControls = ({ page, totalPages, onPageChange }) => {
-  const isPrevDisabled = page <= 1;
-  const isNextDisabled = page >= totalPages;
-
-  return (
-    <div className="flex justify-center items-center gap-4 my-4">
-      <Button
-        onClick={() => onPageChange(page - 1)}
-        disabled={isPrevDisabled}
-        bgColor={isPrevDisabled ? "bg-gray-400" : "bg-blue-500"}
-        textColor="text-white"
-      >
-        Previous
-      </Button>
-      <span className="font-semibold">
-        Page {page} of {totalPages}
-      </span>
-      <Button
-        onClick={() => onPageChange(page + 1)}
-        disabled={isNextDisabled}
-        bgColor={isNextDisabled ? "bg-gray-400" : "bg-blue-500"}
-        textColor="text-white"
-      >
-        Next
-      </Button>
     </div>
   );
 };
