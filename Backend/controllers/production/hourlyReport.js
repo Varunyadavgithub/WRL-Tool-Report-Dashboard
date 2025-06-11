@@ -219,7 +219,7 @@ HourlySummary AS (
         DATEPART(HOUR, b.ActivityOn) AS TIMEHOUR,
         b.Operator,
         m.Name AS Material_Name,
-        mc.Alias AS Category_Name
+        mc.Alias AS category
     FROM Psno
     JOIN ProcessActivity b ON b.PSNo = Psno.DocNo
     JOIN WorkCenter c ON b.StationCode = c.StationCode
@@ -236,17 +236,17 @@ HourlySummary AS (
 HourlyCount AS (
     SELECT 
         TIMEHOUR,
-        Category_Name,
+        category,
         COUNT(*) AS Loading_Count
     FROM HourlySummary
-    GROUP BY TIMEHOUR, Category_Name
+    GROUP BY TIMEHOUR, category
 )
 SELECT 
     TIMEHOUR,
-    Category_Name,
+    category,
     Loading_Count AS COUNT
 FROM HourlyCount
-ORDER BY TIMEHOUR, Category_Name;
+ORDER BY TIMEHOUR, category;
     `;
 
     const pool = await new sql.ConnectionPool(dbConfig1).connect();

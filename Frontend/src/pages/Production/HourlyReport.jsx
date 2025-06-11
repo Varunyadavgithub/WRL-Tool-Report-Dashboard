@@ -832,9 +832,7 @@ const HourlyReport = () => {
                           className="hover:bg-gray-100 text-center"
                         >
                           <td className="px-1 py-1 border">{item.TIMEHOUR}</td>
-                          <td className="px-1 py-1 border">
-                            {item.Category_Name}
-                          </td>
+                          <td className="px-1 py-1 border">{item.category}</td>
                           <td className="px-1 py-1 border">{item.COUNT}</td>
                         </tr>
                       ))

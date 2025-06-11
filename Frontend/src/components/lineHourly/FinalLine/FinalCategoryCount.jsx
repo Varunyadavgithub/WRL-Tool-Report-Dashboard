@@ -89,9 +89,7 @@ const FinalCategoryCount = ({ title, data }) => {
                       <td className="px-1 py-1 border">
                         {item.category || "N/A"}
                       </td>
-                      <td className="px-1 py-1 border">
-                        {item.TotalCount}
-                      </td>
+                      <td className="px-1 py-1 border">{item.TotalCount}</td>
                     </tr>
                   ))
                 ) : (

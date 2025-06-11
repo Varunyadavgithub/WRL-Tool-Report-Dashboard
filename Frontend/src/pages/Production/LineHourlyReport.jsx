@@ -24,6 +24,7 @@ import PostFoamingCategoryCount from "../../components/lineHourly/PostFoaming/Po
 import FoamingA from "../../components/lineHourly/Foaming/FoamingA";
 import FoamingB from "../../components/lineHourly/Foaming/FoamingB";
 import FoamingCategoryCount from "../../components/lineHourly/Foaming/FoamingCategoryCount";
+import { mapCategory } from "../../utils/mapCategories.js";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
@@ -110,7 +111,8 @@ const LineHourlyReport = () => {
           const res4 = await axios.get(`${API_BASE_URL}/final-hp-cat`, {
             params,
           });
-          setFinalCategoryCountData(res4?.data || []);
+          const data = await mapCategory(res4?.data);
+          setFinalCategoryCountData(data || []);
         } catch (error) {
           console.error("Error fetch Final Line data:", error);
           toast.error("Failed to fetch Final Line data");
@@ -141,7 +143,8 @@ const LineHourlyReport = () => {
           const res4 = await axios.get(`${API_BASE_URL}/post-hp-cat`, {
             params,
           });
-          setPostCategoryCountData(res4?.data || []);
+          const data = await mapCategory(res4?.data);
+          setPostCategoryCountData(data || []);
         } catch (error) {
           console.error("Error fetch Post Foaming data:", error);
           toast.error("Failed to fetch Post Foaming data");
@@ -166,7 +169,8 @@ const LineHourlyReport = () => {
           const res3 = await axios.get(`${API_BASE_URL}/Foaming-hp-fom-cat`, {
             params,
           });
-          setFoamingCategoryData(res3?.data || []);
+          const data = await mapCategory(res3?.data);
+          setFoamingCategoryData(data || []);
         } catch (error) {
           console.error("Error fetch Foaming data:", error);
           toast.error("Failed to fetch Foaming data");
@@ -246,7 +250,8 @@ const LineHourlyReport = () => {
           const res4 = await axios.get(`${API_BASE_URL}/final-hp-cat`, {
             params,
           });
-          setFinalCategoryCountData(res4?.data || []);
+          const data = await mapCategory(res4?.data);
+          setFinalCategoryCountData(data || []);
         } catch (error) {
           console.error("Error fetch Yesterday Final Line data:", error);
           toast.error("Failed to fetch Yesterday Final Line data");
@@ -277,7 +282,8 @@ const LineHourlyReport = () => {
           const res4 = await axios.get(`${API_BASE_URL}/post-hp-cat`, {
             params,
           });
-          setPostCategoryCountData(res4?.data || []);
+          const data = await mapCategory(res4?.data);
+          setPostCategoryCountData(data || []);
         } catch (error) {
           console.error("Error fetch Yesterday Post Foaming data:", error);
           toast.error("Failed to fetch Yesterday Post Foaming data");
@@ -302,7 +308,8 @@ const LineHourlyReport = () => {
           const res3 = await axios.get(`${API_BASE_URL}/Foaming-hp-fom-cat`, {
             params,
           });
-          setFoamingCategoryData(res3?.data || []);
+          const data = await mapCategory(res3?.data);
+          setFoamingCategoryData(data || []);
         } catch (error) {
           console.error("Error fetch Yesterday Foaming data:", error);
           toast.error("Failed to fetch Yesterday Foaming data");
@@ -378,7 +385,8 @@ const LineHourlyReport = () => {
           const res4 = await axios.get(`${API_BASE_URL}/final-hp-cat`, {
             params,
           });
-          setFinalCategoryCountData(res4?.data || []);
+          const data = await mapCategory(res4?.data);
+          setFinalCategoryCountData(data || []);
         } catch (error) {
           console.error("Error fetch Today Final Line data:", error);
           toast.error("Failed to fetch Today Final Line data");
@@ -409,7 +417,8 @@ const LineHourlyReport = () => {
           const res4 = await axios.get(`${API_BASE_URL}/post-hp-cat`, {
             params,
           });
-          setPostCategoryCountData(res4?.data || []);
+          const data = await mapCategory(res4?.data);
+          setPostCategoryCountData(data || []);
         } catch (error) {
           console.error("Error fetch Today Post Foaming data:", error);
           toast.error("Failed to fetch Today Post Foaming data");
@@ -434,7 +443,8 @@ const LineHourlyReport = () => {
           const res3 = await axios.get(`${API_BASE_URL}/Foaming-hp-fom-cat`, {
             params,
           });
-          setFoamingCategoryData(res3?.data || []);
+          const data = await mapCategory(res3?.data);
+          setFoamingCategoryData(data || []);
         } catch (error) {
           console.error("Error fetch Today Foaming data:", error);
           toast.error("Failed to fetch Today Foaming data");
