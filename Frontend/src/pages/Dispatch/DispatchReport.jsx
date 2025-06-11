@@ -15,6 +15,7 @@ const DispatchReport = () => {
     { label: "Completed", value: "completed" },
     { label: "Open", value: "open" },
   ];
+
   const [loading, setLoading] = useState(false);
   const [ydayLoading, setYdayLoading] = useState(false);
   const [todayLoading, setTodayLoading] = useState(false);
@@ -27,6 +28,7 @@ const DispatchReport = () => {
   const [hasMore, setHasMore] = useState(false);
   const [fgDispatchData, setFgDispatchData] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [selectedSessionID, setSelectedSessionID] = useState(null);
 
   const observer = useRef();
   const lastRowRef = useCallback(
@@ -62,7 +64,7 @@ const DispatchReport = () => {
       });
 
       if (res?.data?.success) {
-        setFgDispatchData(res?.data?.data);
+        setFgDispatchData((prev) => [...prev, ...res?.data?.data]);
         if (pageNumber === 1) {
           setTotalCount(res?.data?.totalCount);
         }
@@ -74,6 +76,31 @@ const DispatchReport = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const aggregateFgDispatchData = () => {
+    const aggregatedData = {};
+
+    fgDispatchData.forEach((item) => {
+      const sessionID = item.Session_ID;
+
+      if (!sessionID) return;
+
+      if (!aggregatedData[sessionID]) {
+        aggregatedData[sessionID] = {
+          count: 1,
+        };
+      } else {
+        // Increment count
+        aggregatedData[sessionID].count += 1;
+      }
+    });
+
+    // Convert aggregated data to array
+    return Object.entries(aggregatedData).map(([sessionID, data]) => ({
+      Session_ID: sessionID,
+      TotalCount: data.count,
+    }));
   };
 
   useEffect(() => {
@@ -233,6 +260,17 @@ const DispatchReport = () => {
     fetchMTDFgDispatchData();
   };
 
+  const filteredFgDispatchData = selectedSessionID
+    ? fgDispatchData.filter((item) => item.Session_ID === selectedSessionID)
+    : fgDispatchData;
+
+  const handleModelRowClick = (sessionID) => {
+    setSelectedSessionID(sessionID === selectedSessionID ? null : sessionID);
+  };
+
+  const handleClearFilters = () => {
+    setSelectedSessionID(null);
+  };
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       <Title title="Dispatch Report" align="center" />
@@ -332,55 +370,58 @@ const DispatchReport = () => {
         </div>
       </div>
 
+      {/* Summary */}
       <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
         <div className="bg-white border border-gray-300 rounded-md p-4">
-          <div className="flex flex-wrap gap-4">
-            <div className="w-full md:flex-1">
+          <div className="flex flex-col md:flex-row md:flex-nowrap gap-4">
+            <div className="w-full md:flex-1 md:min-w-0">
               <div className="w-full max-h-[600px] overflow-x-auto">
                 <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
                   <thead className="bg-gray-200 sticky top-0 z-10 text-center">
                     <tr>
-                      <th className="px-1 py-1 border min-w-[120px]">
+                      <th className="px-1 py-1 border min-w-[100px]">
                         Model Name
                       </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
+                      <th className="px-1 py-1 border min-w-[100px]">
                         FG Serial No.
                       </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
+                      <th className="px-1 py-1 border min-w-[100px]">
                         Asset Code
                       </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
+                      <th className="px-1 py-1 border min-w-[100px]">
                         Session ID
                       </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
+                      <th className="px-1 py-1 border min-w-[100px]">
                         Added On
                       </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
+                      <th className="px-1 py-1 border min-w-[100px]">
                         Added By
                       </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
+                      <th className="px-1 py-1 border min-w-[100px]">
                         Document ID
                       </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
+                      <th className="px-1 py-1 border min-w-[100px]">
                         Model Code
                       </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
+                      <th className="px-1 py-1 border min-w-[100px]">
                         Dock No
                       </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
+                      <th className="px-1 py-1 border min-w-[100px]">
                         Vehicle No
                       </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
+                      <th className="px-1 py-1 border min-w-[100px]">
                         Generated By
                       </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
+                      <th className="px-1 py-1 border min-w-[100px]">
                         Scan ID
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {fgDispatchData.map((item, index) => {
-                      const isLast = index === fgDispatchData.length - 1;
+                    {filteredFgDispatchData.map((item, index) => {
+                      const isLast =
+                        index === filteredFgDispatchData.length - 1;
+
                       return (
                         <tr
                           key={index}
@@ -388,29 +429,40 @@ const DispatchReport = () => {
                           className="hover:bg-gray-100 text-center"
                         >
                           <td className="px-1 py-1 border">{item.ModelName}</td>
+
                           <td className="px-1 py-1 border">
                             {item.FGSerialNo}
                           </td>
+
                           <td className="px-1 py-1 border">{item.AssetCode}</td>
+
                           <td className="px-1 py-1 border">
                             {item.Session_ID}
                           </td>
+
                           <td className="px-1 py-1 border">
                             {item.AddedOn &&
                               item.AddedOn.replace("T", " ").replace("Z", "")}
                           </td>
+
                           <td className="px-1 py-1 border">{item.AddedBy}</td>
+
                           <td className="px-1 py-1 border">
                             {item.Document_ID}
                           </td>
+
                           <td className="px-1 py-1 border">{item.ModelCode}</td>
+
                           <td className="px-1 py-1 border">{item.DockNo}</td>
+
                           <td className="px-1 py-1 border">
                             {item.Vehicle_No}
                           </td>
+
                           <td className="px-1 py-1 border">
                             {item.Generated_By}
                           </td>
+
                           <td className="px-1 py-1 border">{item.Scan_ID}</td>
                         </tr>
                       );
@@ -429,7 +481,28 @@ const DispatchReport = () => {
             </div>
 
             {/* Left Side - Controls and Summary */}
-            <div className="md:w-[30%] flex flex-col overflow-x-hidden">
+            <div className="flex flex-col overflow-x-hidden">
+              <div className="flex flex-wrap gap-2 items-center justify-center">
+                {fgDispatchData && fgDispatchData.length > 0 && (
+                  <>
+                    <div className="flex my-4 gap-2">
+                      <Button
+                        bgColor="bg-white"
+                        textColor="text-black"
+                        className="border border-gray-400 hover:bg-gray-100 px-3 py-1"
+                        onClick={handleClearFilters}
+                      >
+                        Clear Filter
+                      </Button>
+                      <ExportButton
+                        fetchData={aggregateFgDispatchData}
+                        filename="Dispatch_Report"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
               <div className="w-full max-h-[500px] overflow-x-auto">
                 {loading ? (
                   <Loader />
@@ -437,40 +510,28 @@ const DispatchReport = () => {
                   <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
                     <thead className="bg-gray-200 sticky top-0 z-10 text-center">
                       <tr>
-                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                          Model_Name
+                        <th className="px-1 py-1 border min-w-[100px]">
+                          Session ID
                         </th>
-                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                          StartSerial
-                        </th>
-                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                          EndSerial
-                        </th>
-                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
+                        <th className="px-1 py-1 border min-w-[100px]">
                           Count
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {/* {productionData.length > 0 ? (
-                        aggregateProductionData().map((item, index) => (
+                      {fgDispatchData.length > 0 ? (
+                        aggregateFgDispatchData().map((item, index) => (
                           <tr
                             key={index}
                             className={`hover:bg-gray-100 text-center cursor-pointer ${
-                              selectedModelName === item.Model_Name
+                              selectedSessionID === item.Session_ID
                                 ? "bg-blue-100"
                                 : "bg-white"
                             }`}
-                            onClick={() => handleModelRowClick(item.Model_Name)}
+                            onClick={() => handleModelRowClick(item.Session_ID)}
                           >
                             <td className="px-1 py-1 border">
-                              {item.Model_Name}
-                            </td>
-                            <td className="px-1 py-1 border">
-                              {item.StartSerial}
-                            </td>
-                            <td className="px-1 py-1 border">
-                              {item.EndSerial}
+                              {item.Session_ID}
                             </td>
                             <td className="px-1 py-1 border">
                               {item.TotalCount}
@@ -479,11 +540,11 @@ const DispatchReport = () => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={4} className="text-center py-4">
+                          <td colSpan={2} className="text-center py-4">
                             No data found.
                           </td>
                         </tr>
-                      )} */}
+                      )}
                     </tbody>
                   </table>
                 )}
