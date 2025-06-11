@@ -16,12 +16,12 @@ const DispatchUnloading = () => {
   const [monthLoading, setMonthLoading] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-
   const [fgUnloadingData, setFgUnloadingData] = useState([]);
   const [page, setPage] = useState(1);
   const [limit] = useState(1000);
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [selectedModelName, setSelectedModelName] = useState(null);
 
   const observer = useRef();
   const lastRowRef = useCallback(
@@ -70,6 +70,44 @@ const DispatchUnloading = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const aggregateFgUnloadingData = () => {
+    const aggregatedData = {};
+
+    fgUnloadingData.forEach((item) => {
+      const modelName = item.ModelName;
+      const serial = item.FGSerialNo;
+
+      if (!serial) return;
+
+      if (!aggregatedData[modelName]) {
+        aggregatedData[modelName] = {
+          startSerial: serial,
+          endSerial: serial,
+          count: 1,
+        };
+      } else {
+        if (serial > aggregatedData[modelName].endSerial) {
+          aggregatedData[modelName].endSerial = serial;
+        }
+
+        // Update start serial if current serial is smaller
+        if (serial < aggregatedData[modelName].startSerial) {
+          aggregatedData[modelName].startSerial = serial;
+        }
+
+        // Increment count
+        aggregatedData[modelName].count += 1;
+      }
+    });
+
+    return Object.entries(aggregatedData).map(([modelName, data]) => ({
+      ModelName: modelName,
+      StartSerial: data.startSerial,
+      EndSerial: data.endSerial,
+      TotalCount: data.count,
+    }));
   };
 
   useEffect(() => {
@@ -224,6 +262,19 @@ const DispatchUnloading = () => {
   const handleMonthQuery = () => {
     fetchMTDFgUnloadingData();
   };
+
+  const filteredFgUnloadingData = selectedModelName
+    ? fgUnloadingData.filter((item) => item.ModelName === selectedModelName)
+    : fgUnloadingData;
+
+  const handleModelRowClick = (modelName) => {
+    setSelectedModelName(modelName === selectedModelName ? null : modelName);
+  };
+
+  const handleClearFilters = () => {
+    setSelectedModelName(null);
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       <Title title="Dispatch Unloading" align="center" />
@@ -339,8 +390,9 @@ const DispatchUnloading = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {fgUnloadingData.map((item, index) => {
-                      const isLast = index === fgUnloadingData.length - 1;
+                    {filteredFgUnloadingData.map((item, index) => {
+                      const isLast =
+                        index === filteredFgUnloadingData.length - 1;
                       return (
                         <tr
                           key={index}
@@ -377,6 +429,26 @@ const DispatchUnloading = () => {
 
             {/* Left Side - Controls and Summary */}
             <div className="md:w-[30%] flex flex-col overflow-x-hidden">
+              <div className="flex flex-wrap gap-2 items-center justify-center">
+                {fgUnloadingData && fgUnloadingData.length > 0 && (
+                  <>
+                    <div className="flex my-4 gap-2">
+                      <Button
+                        bgColor="bg-white"
+                        textColor="text-black"
+                        className="border border-gray-400 hover:bg-gray-100 px-3 py-1"
+                        onClick={handleClearFilters}
+                      >
+                        Clear Filter
+                      </Button>
+                      <ExportButton
+                        fetchData={aggregateFgUnloadingData}
+                        filename="Dispatch_Unloading_Report"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
               <div className="w-full max-h-[500px] overflow-x-auto">
                 {loading ? (
                   <Loader />
@@ -385,7 +457,7 @@ const DispatchUnloading = () => {
                     <thead className="bg-gray-200 sticky top-0 z-10 text-center">
                       <tr>
                         <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                          Model_Name
+                          Model Name
                         </th>
                         <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
                           StartSerial
@@ -399,26 +471,29 @@ const DispatchUnloading = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {/* {productionData.length > 0 ? (
-                        aggregateProductionData().map((item, index) => (
+                      {fgUnloadingData.length > 0 ? (
+                        aggregateFgUnloadingData().map((item, index) => (
                           <tr
                             key={index}
                             className={`hover:bg-gray-100 text-center cursor-pointer ${
-                              selectedModelName === item.Model_Name
+                              selectedModelName === item.ModelName
                                 ? "bg-blue-100"
                                 : "bg-white"
                             }`}
-                            onClick={() => handleModelRowClick(item.Model_Name)}
+                            onClick={() => handleModelRowClick(item.ModelName)}
                           >
                             <td className="px-1 py-1 border">
-                              {item.Model_Name}
+                              {item.ModelName}
                             </td>
+
                             <td className="px-1 py-1 border">
                               {item.StartSerial}
                             </td>
+
                             <td className="px-1 py-1 border">
                               {item.EndSerial}
                             </td>
+
                             <td className="px-1 py-1 border">
                               {item.TotalCount}
                             </td>
@@ -430,7 +505,7 @@ const DispatchUnloading = () => {
                             No data found.
                           </td>
                         </tr>
-                      )} */}
+                      )}
                     </tbody>
                   </table>
                 )}
