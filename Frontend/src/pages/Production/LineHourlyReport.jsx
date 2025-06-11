@@ -598,7 +598,7 @@ const LineHourlyReport = () => {
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <PostFoamingFreezerA
-                      title={"Foam Frz A"}
+                      title={"Post Foam Frz A"}
                       data={postFoamingFreezerAData}
                     />
                     <PostFoamingFreezerB

@@ -15,6 +15,7 @@ import DateTimePicker from "../../components/common/DateTimePicker";
 import axios from "axios";
 import Loader from "../../components/common/Loader";
 import toast from "react-hot-toast";
+import { mapCategory } from "../../utils/mapCategories.js";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
@@ -154,7 +155,8 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-category-count`, {
         params,
       });
-      setHourlyCategoryCount(res?.data);
+      const data = await mapCategory(res?.data);
+      setHourlyCategoryCount(data);
     } catch (error) {
       console.error("Error fetching hourly Category count data:", error);
       toast.error("Error fetching hourly Category count data.");
@@ -309,7 +311,8 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-category-count`, {
         params,
       });
-      setHourlyCategoryCount(res?.data);
+      const data = await mapCategory(res?.data);
+      setHourlyCategoryCount(data);
     } catch (error) {
       console.error(
         "Error fetching Yesterday hourly Category count data:",
@@ -459,7 +462,8 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-category-count`, {
         params,
       });
-      setHourlyCategoryCount(res?.data);
+      const data = await mapCategory(res?.data);
+      setHourlyCategoryCount(data);
     } catch (error) {
       console.error("Error fetching Today hourly Category count data:", error);
       toast.error("Error fetching Today hourly Category count data.");

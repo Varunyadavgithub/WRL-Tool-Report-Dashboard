@@ -72,7 +72,7 @@ const FoamingB = ({ title, data }) => {
           </div>
         </div>
 
-        <div className="px-4 py-2">
+        <div className="max-h-[500px] overflow-y-auto px-4 py-2">
           <div className="overflow-x-auto">
             <table className="min-w-full border text-left bg-white rounded-lg">
               <thead className="text-center">
@@ -90,10 +90,10 @@ const FoamingB = ({ title, data }) => {
                         {item.HOUR_NUMBER || "N/A"}
                       </td>
                       <td className="px-1 py-1 border">
-                        {item.TIMEHOUR || "N/A"}
+                        {item.TIMEHOUR}
                       </td>
                       <td className="px-1 py-1 border">
-                        {item.COUNT || "N/A"}
+                        {item.COUNT}
                       </td>
                     </tr>
                   ))

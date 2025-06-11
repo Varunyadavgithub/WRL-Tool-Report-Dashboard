@@ -588,18 +588,18 @@ const DispatchCategoryUph = ({ data }) => {
       <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
         <thead className="bg-gray-200 sticky top-0 z-10 text-center">
           <tr>
-            <th className="px-1 py-1 border min-w-[120px]">COUNT</th>
             <th className="px-1 py-1 border min-w-[120px]">HOUR NUMBER</th>
             <th className="px-1 py-1 border min-w-[120px]">TIME HOUR</th>
+            <th className="px-1 py-1 border min-w-[120px]">COUNT</th>
           </tr>
         </thead>
         <tbody>
           {data && data.length > 0 ? (
             data.map((row, index) => (
               <tr key={index} className="hover:bg-gray-100 text-center">
-                <td className="px-1 py-1 border">{row.COUNT}</td>
                 <td className="px-1 py-1 border">{row.HOUR_NUMBER}</td>
-                <td className="px-1 py-1 border">{row.TIMEHOUR}</td>{" "}
+                <td className="px-1 py-1 border">{row.TIMEHOUR}</td>
+                <td className="px-1 py-1 border">{row.COUNT}</td>
               </tr>
             ))
           ) : (
