@@ -1,7 +1,12 @@
 import { Bar } from "react-chartjs-2";
 
-const PostFoamingFreezerB = ({ title, data }) => {
-  const count = data && data.reduce((sum, item) => sum + (item.COUNT || 0), 0);
+const ManualPostFoaming = ({ title, data }) => {
+  const count =
+    data &&
+    data.reduce(
+      (sum, item) => sum + (item.GroupB_Count || 0) + (item.FOW_Count || 0),
+      0
+    );
 
   const prepareChartData = () => {
     if (!data || data.length === 0) {
@@ -10,10 +15,17 @@ const PostFoamingFreezerB = ({ title, data }) => {
 
     const chartData = {
       labels: data.map((item) => `H ${item.TIMEHOUR}`),
+
       datasets: [
         {
-          label: "Hourly Count",
-          data: data.map((item) => item.COUNT || 0),
+          label: "Group B",
+          data: data.map((item) => item.GroupB_Count || 0),
+          backgroundColor: "rgba(75, 192, 192, 0.6)",
+          borderRadius: 5,
+        },
+        {
+          label: "FOW Count",
+          data: data.map((item) => item.FOW_Count || 0),
           backgroundColor: "rgba(255, 99, 132, 0.6)",
           borderRadius: 5,
         },
@@ -23,7 +35,7 @@ const PostFoamingFreezerB = ({ title, data }) => {
     const chartOptions = {
       responsive: true,
       maintainAspectRatio: false,
-         animation: {
+      animation: {
         onComplete: (animationContext) => {
           const chart = animationContext.chart;
           const ctx = chart.ctx;
@@ -53,7 +65,12 @@ const PostFoamingFreezerB = ({ title, data }) => {
       scales: {
         y: {
           beginAtZero: true,
-          max: Math.max(...data.map((item) => item.COUNT || 0), 0) + 10,
+          max:
+            Math.max(
+              ...data.map((item) =>
+                Math.max(item.GroupB_Count || 0, item.FOW_Count || 0)
+              )
+            ) + 10,
         },
       },
     };
@@ -79,7 +96,8 @@ const PostFoamingFreezerB = ({ title, data }) => {
                 <tr className="bg-gray-200">
                   <th className="px-1 py-1 border">Hour No.</th>
                   <th className="px-1 py-1 border">Time Hour</th>
-                  <th className="px-1 py-1 border">Count</th>
+                  <th className="px-1 py-1 border">GroupB Count</th>
+                  <th className="px-1 py-1 border">FOW Count</th>
                 </tr>
               </thead>
               <tbody>
@@ -87,19 +105,16 @@ const PostFoamingFreezerB = ({ title, data }) => {
                   data.map((item, index) => (
                     <tr key={index} className="hover:bg-gray-100 text-center">
                       <td className="px-1 py-1 border">
-                        {item.HOUR_NUMBER || "N/A"}
+                        {item.HourNumber || "N/A"}
                       </td>
-                      <td className="px-1 py-1 border">
-                        {item.TIMEHOUR}
-                      </td>
-                      <td className="px-1 py-1 border">
-                        {item.COUNT}
-                      </td>
+                      <td className="px-1 py-1 border">{item.TIMEHOUR}</td>
+                      <td className="px-1 py-1 border">{item.GroupB_Count}</td>
+                      <td className="px-1 py-1 border">{item.FOW_Count}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={3} className="text-center px-1 py-1 border">
+                    <td colSpan={4} className="text-center px-1 py-1 border">
                       No Data Available
                     </td>
                   </tr>
@@ -123,4 +138,4 @@ const PostFoamingFreezerB = ({ title, data }) => {
   );
 };
 
-export default PostFoamingFreezerB;
+export default ManualPostFoaming;

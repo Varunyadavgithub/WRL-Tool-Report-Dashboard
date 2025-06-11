@@ -181,28 +181,30 @@ export const getPostHPFrz = async (req, res) => {
 
   try {
     const query = `
-   WITH FilteredActivity AS (
+      WITH FilteredActivity AS (
     SELECT 
         DATEPART(DAY, b.ActivityOn) AS TIMEDAY,
         DATEPART(HOUR, b.ActivityOn) AS TIMEHOUR,
-        b.StationCode
+        m.Category,
+        c.StationCode
     FROM MaterialBarcode mb
     JOIN ProcessActivity b ON b.PSNo = mb.DocNo
     JOIN WorkCenter c ON b.StationCode = c.StationCode
+    JOIN Material m ON mb.Material = m.MatCode
     WHERE 
         mb.PrintStatus = 1
         AND mb.Status <> 99
         AND mb.Type NOT IN (200)
         AND b.ActivityType = 5
-        AND b.StationCode IN (1220003, 1220004)
+        AND b.StationCode IN (1220003, 1230007)  -- Group A and CHOC
         AND b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}'
 ),
-Aggregated AS (
+Grouped AS (
     SELECT 
         TIMEDAY,
         TIMEHOUR,
         SUM(CASE WHEN StationCode = 1220003 THEN 1 ELSE 0 END) AS GroupA_Count,
-        SUM(CASE WHEN StationCode = 1220004 THEN 1 ELSE 0 END) AS GroupB_Count
+        SUM(CASE WHEN StationCode = 1230007 AND Category = 1220010 THEN 1 ELSE 0 END) AS CHOC_Count
     FROM FilteredActivity
     GROUP BY TIMEDAY, TIMEHOUR
 )
@@ -210,8 +212,59 @@ SELECT
     CONCAT('H', ROW_NUMBER() OVER (ORDER BY TIMEHOUR, TIMEDAY)) AS HourNumber,
     TIMEHOUR,
     GroupA_Count,
-    GroupB_Count
-FROM Aggregated
+    CHOC_Count
+FROM Grouped
+ORDER BY TIMEHOUR, TIMEDAY;
+  `;
+    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+    const result = await pool
+      .request()
+      .query(replacePlaceholders(query, StartTime, EndTime));
+    res.status(200).json(result.recordset);
+    await pool.close();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const getManualPostHP = async (req, res) => {
+  const { StartTime, EndTime } = req.query;
+
+  try {
+    const query = `
+WITH FilteredActivity AS (
+    SELECT 
+        DATEPART(DAY, b.ActivityOn) AS TIMEDAY,
+        DATEPART(HOUR, b.ActivityOn) AS TIMEHOUR,
+        m.Category,
+        c.StationCode
+    FROM MaterialBarcode mb
+    JOIN ProcessActivity b ON b.PSNo = mb.DocNo
+    JOIN WorkCenter c ON b.StationCode = c.StationCode
+    JOIN Material m ON mb.Material = m.MatCode
+    WHERE 
+        mb.PrintStatus = 1
+        AND mb.Status <> 99
+        AND mb.Type NOT IN (200)
+        AND b.ActivityType = 5
+        AND b.StationCode IN (1220004, 1230007)  -- Group B and FOW
+        AND b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}'
+),
+Grouped AS (
+    SELECT 
+        TIMEDAY,
+        TIMEHOUR,
+        SUM(CASE WHEN StationCode = 1220004 THEN 1 ELSE 0 END) AS GroupB_Count,
+        SUM(CASE WHEN StationCode = 1230007 AND Category <> 1220010 THEN 1 ELSE 0 END) AS FOW_Count
+    FROM FilteredActivity
+    GROUP BY TIMEDAY, TIMEHOUR
+)
+SELECT 
+    CONCAT('H', ROW_NUMBER() OVER (ORDER BY TIMEHOUR, TIMEDAY)) AS HourNumber,
+    TIMEHOUR,
+    GroupB_Count,
+    FOW_Count
+FROM Grouped
 ORDER BY TIMEHOUR, TIMEDAY;
   `;
     const pool = await new sql.ConnectionPool(dbConfig1).connect();

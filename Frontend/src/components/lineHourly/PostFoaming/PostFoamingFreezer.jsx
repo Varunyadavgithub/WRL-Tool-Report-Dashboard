@@ -4,7 +4,7 @@ const PostFoamingFreezer = ({ title, data }) => {
   const count =
     data &&
     data.reduce(
-      (sum, item) => sum + (item.GroupA_Count || 0) + (item.GroupB_Count || 0),
+      (sum, item) => sum + (item.GroupA_Count || 0) + (item.CHOC_Count || 0),
       0
     );
   const prepareChartData = () => {
@@ -22,8 +22,8 @@ const PostFoamingFreezer = ({ title, data }) => {
           borderRadius: 5,
         },
         {
-          label: "Group B",
-          data: data.map((item) => item.GroupB_Count || 0),
+          label: "CHOC Count",
+          data: data.map((item) => item.CHOC_Count || 0),
           backgroundColor: "rgba(255, 99, 132, 0.6)",
           borderRadius: 5,
         },
@@ -66,7 +66,7 @@ const PostFoamingFreezer = ({ title, data }) => {
           max:
             Math.max(
               ...data.map((item) =>
-                Math.max(item.GroupA_Count || 0, item.GroupB_Count || 0)
+                Math.max(item.GroupA_Count || 0, item.CHOC_Count || 0)
               )
             ) + 10,
         },
@@ -95,7 +95,7 @@ const PostFoamingFreezer = ({ title, data }) => {
                   <th className="px-1 py-1 border">Hour No.</th>
                   <th className="px-1 py-1 border">Time Hour</th>
                   <th className="px-1 py-1 border">GroupA Count</th>
-                  <th className="px-1 py-1 border">GroupB Count</th>
+                  <th className="px-1 py-1 border">CHOC Count</th>
                 </tr>
               </thead>
               <tbody>
@@ -107,7 +107,7 @@ const PostFoamingFreezer = ({ title, data }) => {
                       </td>
                       <td className="px-1 py-1 border">{item.TIMEHOUR}</td>
                       <td className="px-1 py-1 border">{item.GroupA_Count}</td>
-                      <td className="px-1 py-1 border">{item.GroupB_Count}</td>
+                      <td className="px-1 py-1 border">{item.CHOC_Count}</td>
                     </tr>
                   ))
                 ) : (

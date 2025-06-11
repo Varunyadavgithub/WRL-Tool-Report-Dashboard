@@ -7,6 +7,7 @@ import {
   getFoamingHpFomA,
   getFoamingHpFomB,
   getFoamingHpFomCat,
+  getManualPostHP,
   getPostHPCAT,
   getPostHPFrz,
   getPostHPSUS,
@@ -22,6 +23,7 @@ router.get("/final-hp-cat", getFinalHPCAT);
 
 // PostHP Routes
 router.get("/post-hp-frz", getPostHPFrz);
+router.get("/manual-post-hp", getManualPostHP);
 router.get("/post-hp-sus", getPostHPSUS);
 router.get("/post-hp-cat", getPostHPCAT);
 

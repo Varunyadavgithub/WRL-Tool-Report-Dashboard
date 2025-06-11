@@ -437,6 +437,9 @@ const TotalProduction = () => {
                     <th className="px-1 py-1 border min-w-[120px]">
                       Asset tag
                     </th>
+                    <th className="px-1 py-1 border min-w-[120px]">
+                      Customer QR
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -451,12 +454,13 @@ const TotalProduction = () => {
                         <td className="px-1 py-1 border">{item.Model_Name}</td>
                         <td className="px-1 py-1 border">{item.FG_SR}</td>
                         <td className="px-1 py-1 border">{item.Asset_tag}</td>
+                        <td className="px-1 py-1 border">{item.CustomerQR}</td>
                       </tr>
                     );
                   })}
                   {!loading && totalProductionData.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="text-center py-4">
+                      <td colSpan={4} className="text-center py-4">
                         No data found.
                       </td>
                     </tr>

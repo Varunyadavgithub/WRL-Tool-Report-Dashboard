@@ -24,6 +24,7 @@ import FoamingA from "../../components/lineHourly/Foaming/FoamingA";
 import FoamingB from "../../components/lineHourly/Foaming/FoamingB";
 import FoamingCategoryCount from "../../components/lineHourly/Foaming/FoamingCategoryCount";
 import { mapCategory } from "../../utils/mapCategories.js";
+import ManualPostFoaming from "../../components/lineHourly/PostFoaming/ManualPostFoaming.jsx";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
@@ -45,6 +46,7 @@ const LineHourlyReport = () => {
   const [finalCategoryCountData, setFinalCategoryCountData] = useState([]);
 
   const [postFoamingFreezerData, setPostFoamingFreezerData] = useState([]);
+  const [manualPostFoamingData, setManualPostFoamingData] = useState([]);
   const [postFoamingSUSData, setPostFoamingSUSData] = useState([]);
   const [postCategoryCountData, setPostCategoryCountData] = useState([]);
 
@@ -69,6 +71,7 @@ const LineHourlyReport = () => {
     setFinalChocData([]);
     setFinalSUSData([]);
     setPostFoamingFreezerData([]);
+    setManualPostFoamingData([]);
     setPostFoamingSUSData([]);
     setFoamingFOMAData([]);
     setFoamingFOMBData([]);
@@ -123,6 +126,12 @@ const LineHourlyReport = () => {
             params,
           });
           setPostFoamingFreezerData(res1?.data || []);
+
+          // Manual Post Foaming
+          const res2 = await axios.get(`${API_BASE_URL}/manual-post-hp`, {
+            params,
+          });
+          setManualPostFoamingData(res2?.data || []);
 
           // Post Foaming SUS
           const res3 = await axios.get(`${API_BASE_URL}/post-hp-sus`, {
@@ -184,6 +193,7 @@ const LineHourlyReport = () => {
     setFinalChocData([]);
     setFinalSUSData([]);
     setPostFoamingFreezerData([]);
+    setManualPostFoamingData([]);
     setPostFoamingSUSData([]);
     setFoamingFOMAData([]);
     setFoamingFOMBData([]);
@@ -254,8 +264,13 @@ const LineHourlyReport = () => {
           const res1 = await axios.get(`${API_BASE_URL}/post-hp-frz`, {
             params,
           });
-          console.log(res1.data)
           setPostFoamingFreezerData(res1?.data || []);
+
+          // Manual Post Foaming
+          const res2 = await axios.get(`${API_BASE_URL}/manual-post-hp`, {
+            params,
+          });
+          setManualPostFoamingData(res2?.data || []);
 
           // Post Foaming SUS
           const res3 = await axios.get(`${API_BASE_URL}/post-hp-sus`, {
@@ -316,6 +331,7 @@ const LineHourlyReport = () => {
     setFinalChocData([]);
     setFinalSUSData([]);
     setPostFoamingFreezerData([]);
+    setManualPostFoamingData([]);
     setPostFoamingSUSData([]);
     setFoamingFOMAData([]);
     setFoamingFOMBData([]);
@@ -384,6 +400,12 @@ const LineHourlyReport = () => {
             params,
           });
           setPostFoamingFreezerData(res1?.data || []);
+
+          // Manual Post Foaming
+          const res2 = await axios.get(`${API_BASE_URL}/manual-post-hp`, {
+            params,
+          });
+          setManualPostFoamingData(res2?.data || []);
 
           // Post Foaming SUS
           const res3 = await axios.get(`${API_BASE_URL}/post-hp-sus`, {
@@ -588,6 +610,10 @@ const LineHourlyReport = () => {
                     <PostFoamingFreezerA
                       title={"Post Foam Frz"}
                       data={postFoamingFreezerData}
+                    />
+                    <ManualPostFoaming
+                      title={"Manual Post Foam"}
+                      data={manualPostFoamingData}
                     />
                     <PostFoamingSUS
                       title={"Post Foam SUS"}

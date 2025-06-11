@@ -56,6 +56,7 @@ export const getBarcodeDetails = async (req, res) => {
           ROW_NUMBER() OVER (ORDER BY Psno.Serial) AS RowNum,
           (SELECT Name FROM Material WHERE MatCode = Psno.Material) AS Model_Name,
           ISNULL(Psno.VSerial, '') AS Asset_tag,
+          ISNULL(Psno.Serial2, '') AS CustomerQR,
         COALESCE(NULLIF(CASE WHEN SUBSTRING(Psno.Serial, 1, 1) IN ('S', 'F', 'L') THEN '' ELSE Psno.Serial END, ''),
             CASE 
                 WHEN Psno.VSerial IS NULL THEN Psno.Serial 
@@ -226,6 +227,7 @@ export const getQuickFiltersBarcodeDetails = async (req, res) => {
       SELECT 
         (SELECT Name FROM Material WHERE MatCode = Psno.Material) AS Model_Name,
         ISNULL(Psno.VSerial, '') AS Asset_tag,
+        ISNULL(Psno.Serial2, '') AS CustomerQR,
         COALESCE(NULLIF(CASE WHEN SUBSTRING(Psno.Serial, 1, 1) IN ('S', 'F', 'L') THEN '' ELSE Psno.Serial END, ''),
             CASE 
                 WHEN Psno.VSerial IS NULL THEN Psno.Serial 
