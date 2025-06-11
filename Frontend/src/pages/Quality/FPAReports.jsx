@@ -130,9 +130,6 @@ const FPAReports = () => {
         const res = await axios.get(`${baseURL}quality/fpa-report`, { params });
         setReportData(res.data);
         setSelectedVariant(null);
-      } else {
-        alert("Please select only FPA Report Type.");
-        return;
       }
     } catch (error) {
       console.error("Failed to fetch Yesterday FPA Report:", error);
@@ -379,47 +376,48 @@ const FPAReports = () => {
             </div>
           </div>
         </div>
-
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
-            Quick Filters
-          </h2>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <Button
-              bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
-              textColor={ydayLoading ? "text-white" : "text-black"}
-              className={`font-semibold ${
-                ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
-              }`}
-              onClick={() => handleYesterdayQuery()}
-              disabled={ydayLoading}
-            >
-              YDAY
-            </Button>
-            <Button
-              bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
-              textColor={todayLoading ? "text-white" : "text-black"}
-              className={`font-semibold ${
-                todayLoading ? "cursor-not-allowed" : "cursor-pointer"
-              }`}
-              onClick={() => handleTodayQuery()}
-              disabled={todayLoading}
-            >
-              TDAY
-            </Button>
-            <Button
-              bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
-              textColor={monthLoading ? "text-white" : "text-black"}
-              className={`font-semibold ${
-                monthLoading ? "cursor-not-allowed" : "cursor-pointer"
-              }`}
-              onClick={() => handleMTDQuery()}
-              disabled={monthLoading}
-            >
-              MTD
-            </Button>
+        {reportType === "fpaReport" && (
+          <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
+              Quick Filters
+            </h2>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Button
+                bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
+                textColor={ydayLoading ? "text-white" : "text-black"}
+                className={`font-semibold ${
+                  ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
+                }`}
+                onClick={() => handleYesterdayQuery()}
+                disabled={ydayLoading}
+              >
+                YDAY
+              </Button>
+              <Button
+                bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
+                textColor={todayLoading ? "text-white" : "text-black"}
+                className={`font-semibold ${
+                  todayLoading ? "cursor-not-allowed" : "cursor-pointer"
+                }`}
+                onClick={() => handleTodayQuery()}
+                disabled={todayLoading}
+              >
+                TDAY
+              </Button>
+              <Button
+                bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
+                textColor={monthLoading ? "text-white" : "text-black"}
+                className={`font-semibold ${
+                  monthLoading ? "cursor-not-allowed" : "cursor-pointer"
+                }`}
+                onClick={() => handleMTDQuery()}
+                disabled={monthLoading}
+              >
+                MTD
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Summary Section */}
