@@ -176,79 +176,42 @@ ORDER BY TotalCount DESC;
 };
 
 // Post Foaming
-export const getPostHPFrzA = async (req, res) => {
+export const getPostHPFrz = async (req, res) => {
   const { StartTime, EndTime } = req.query;
 
   try {
     const query = `
-   WITH Psno AS (
-    SELECT DocNo, Material, Serial, VSerial, Alias, Type
-    FROM MaterialBarcode
-    WHERE PrintStatus = 1 AND Status <> 99 AND Type NOT IN (200)
-),
-HourlySummary AS (
+   WITH FilteredActivity AS (
     SELECT 
         DATEPART(DAY, b.ActivityOn) AS TIMEDAY,
         DATEPART(HOUR, b.ActivityOn) AS TIMEHOUR,
-        COUNT(*) AS Loading_Count
-    FROM Psno
-    JOIN ProcessActivity b ON b.PSNo = Psno.DocNo
+        b.StationCode
+    FROM MaterialBarcode mb
+    JOIN ProcessActivity b ON b.PSNo = mb.DocNo
     JOIN WorkCenter c ON b.StationCode = c.StationCode
-    JOIN Material m ON Psno.Material = m.MatCode
-    WHERE
-	 c.StationCode = 1220003  
-    AND b.ActivityType = 5 
-    AND b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}' 
-	GROUP BY DATEPART(DAY, b.ActivityOn), DATEPART(HOUR, b.ActivityOn)
-) 
-SELECT 
-    CONCAT('H', ROW_NUMBER() OVER (ORDER BY TIMEHOUR, TIMEDAY)) AS HOUR_NUMBER,
-    TIMEHOUR,
-    Loading_Count AS COUNT
-FROM HourlySummary
-ORDER BY TIMEHOUR, TIMEDAY;
-  `;
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
-    const result = await pool
-      .request()
-      .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-export const getPostHPFrzB = async (req, res) => {
-  const { StartTime, EndTime } = req.query;
-
-  try {
-    const query = `
-  WITH Psno AS (
-    SELECT DocNo, Material, Serial, VSerial, Alias, Type
-    FROM MaterialBarcode
-    WHERE PrintStatus = 1 AND Status <> 99 AND Type NOT IN (200)
+    WHERE 
+        mb.PrintStatus = 1
+        AND mb.Status <> 99
+        AND mb.Type NOT IN (200)
+        AND b.ActivityType = 5
+        AND b.StationCode IN (1220003, 1220004)
+        AND b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}'
 ),
-HourlySummary AS (
+Aggregated AS (
     SELECT 
-        DATEPART(DAY, b.ActivityOn) AS TIMEDAY,
-        DATEPART(HOUR, b.ActivityOn) AS TIMEHOUR,
-        COUNT(*) AS Loading_Count
-    FROM Psno
-    JOIN ProcessActivity b ON b.PSNo = Psno.DocNo
-    JOIN WorkCenter c ON b.StationCode = c.StationCode
-    JOIN Material m ON Psno.Material = m.MatCode
-    WHERE
-	 c.StationCode = 1220004  
-    AND b.ActivityType = 5 
-    AND b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}' 
-	GROUP BY DATEPART(DAY, b.ActivityOn), DATEPART(HOUR, b.ActivityOn)
-) 
+        TIMEDAY,
+        TIMEHOUR,
+        SUM(CASE WHEN StationCode = 1220003 THEN 1 ELSE 0 END) AS GroupA_Count,
+        SUM(CASE WHEN StationCode = 1220004 THEN 1 ELSE 0 END) AS GroupB_Count
+    FROM FilteredActivity
+    GROUP BY TIMEDAY, TIMEHOUR
+)
 SELECT 
-    CONCAT('H', ROW_NUMBER() OVER (ORDER BY TIMEHOUR, TIMEDAY)) AS HOUR_NUMBER,
+    CONCAT('H', ROW_NUMBER() OVER (ORDER BY TIMEHOUR, TIMEDAY)) AS HourNumber,
     TIMEHOUR,
-    Loading_Count AS COUNT
-FROM HourlySummary
+    GroupA_Count,
+    GroupB_Count
+FROM Aggregated
 ORDER BY TIMEHOUR, TIMEDAY;
   `;
     const pool = await new sql.ConnectionPool(dbConfig1).connect();
