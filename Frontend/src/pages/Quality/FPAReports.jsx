@@ -7,6 +7,7 @@ import InputField from "../../components/common/InputField";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { useMemo } from "react";
+import ExportButton from "../../components/common/ExportButton";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
@@ -230,8 +231,21 @@ const FPAReports = () => {
         const res = await axios.get(`${baseURL}quality/fpa-report`, { params });
         setReportData(res.data);
         setSelectedVariant(null);
+      } else if (reportType === "dailyFpaReport") {
+        if (selectedVariant && selectedVariant.value) {
+          params = {
+            ...params,
+            model: selectedVariant.label,
+          };
+        }
+
+         const res = await axios.get(`${baseURL}quality/fpa-daily-report`, {
+          params,
+        });
+        setReportData(res.data);
+        setSelectedVariant(null);
       } else {
-        alert("Please select only FPA Report Type.");
+        alert("Please select only FPA and Daily Report Type.");
         return;
       }
     } catch (error) {
@@ -353,7 +367,7 @@ const FPAReports = () => {
               </div>
             </div>
             <div className="flex flex-col items-center gap-4">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
                   textColor={loading ? "text-white" : "text-black"}
@@ -365,6 +379,9 @@ const FPAReports = () => {
                 >
                   Query
                 </Button>
+                {reportData && reportData.length > 0 && (
+                  <ExportButton data={reportData} filename="FPA_Report" />
+                )}
               </div>
               <div className="text-left font-bold text-lg">
                 COUNT:{" "}
@@ -375,6 +392,7 @@ const FPAReports = () => {
             </div>
           </div>
         </div>
+
         {reportType === "fpaReport" && (
           <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
             <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
@@ -403,6 +421,26 @@ const FPAReports = () => {
               >
                 TDAY
               </Button>
+              <Button
+                bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
+                textColor={monthLoading ? "text-white" : "text-black"}
+                className={`font-semibold ${
+                  monthLoading ? "cursor-not-allowed" : "cursor-pointer"
+                }`}
+                onClick={() => handleMTDQuery()}
+                disabled={monthLoading}
+              >
+                MTD
+              </Button>
+            </div>
+          </div>
+        )}
+        {reportType === "dailyFpaReport" && (
+          <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
+              Quick Filters
+            </h2>
+            <div className="flex flex-wrap items-center justify-center gap-3">
               <Button
                 bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
                 textColor={monthLoading ? "text-white" : "text-black"}
@@ -518,7 +556,7 @@ const DailyFpaReportTable = ({ data }) => {
           {data && data.length > 0 ? (
             data.map((row, index) => (
               <tr key={index} className="hover:bg-gray-100 text-center">
-                <td className="px-1 py-1 border">{row.Date.slice(0, 10)}</td>
+                <td className="px-1 py-1 border">{row.ShiftDate.slice(0, 10)}</td>
                 <td className="px-1 py-1 border">{row.Month}</td>
                 <td className="px-1 py-1 border">{row.NoOfCritical}</td>
                 <td className="px-1 py-1 border">{row.NoOfMajor}</td>
@@ -560,7 +598,7 @@ const MonthlyFpaReportTable = ({ data }) => {
             data.map((row, index) => (
               <tr key={index} className="hover:bg-gray-100 text-center">
                 <td className="px-1 py-1 border">{row.Month}</td>
-                <td className="px-1 py-1 border">{row.Year}</td>
+                <td className="px-1 py-1 border">{row.MonthKey}</td>
                 <td className="px-1 py-1 border">{row.NoOfCritical}</td>
                 <td className="px-1 py-1 border">{row.NoOfMajor}</td>
                 <td className="px-1 py-1 border">{row.NoOfMinor}</td>
