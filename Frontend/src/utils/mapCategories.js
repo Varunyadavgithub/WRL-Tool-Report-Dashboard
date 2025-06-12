@@ -1,4 +1,4 @@
-const CATEGORY_MAPPINGS = {
+export const CATEGORY_MAPPINGS = {
   COOLER: "Choc Cooler",
   "FOW MODELS": "FOW",
   "ICE LINED REFRIGERATOR": "Freezer",
@@ -19,22 +19,22 @@ const CATEGORY_MAPPINGS = {
   "VISI COOLER": "VISI COOLER",
 };
 
-export const mapCategory = async (data, mappings = CATEGORY_MAPPINGS) => {
-  if (!data) return [];
+// export const mapCategory = async (data, mappings = CATEGORY_MAPPINGS) => {
+//   if (!data) return [];
 
-  const normalize = (str) => str.replace(/\s+/g, " ").trim().toUpperCase();
+//   const normalize = (str) => str.replace(/\s+/g, " ").trim().toUpperCase();
 
-  const dataArray = Array.isArray(data) ? data : [data];
+//   const dataArray = Array.isArray(data) ? data : [data];
 
-  return dataArray.map((item) => {
-    const mappedItem = { ...item };
+//   return dataArray.map((item) => {
+//     const mappedItem = { ...item };
 
-    if (mappedItem?.category) {
-      const normalizedCategory = normalize(mappedItem.category);
-      mappedItem.category =
-        mappings[normalizedCategory] || mappedItem.category.trim();
-    }
+//     if (mappedItem?.category) {
+//       const normalizedCategory = normalize(mappedItem.category);
+//       mappedItem.category =
+//         mappings[normalizedCategory] || mappedItem.category.trim();
+//     }
 
-    return mappedItem;
-  });
-};
+//     return mappedItem;
+//   });
+// };

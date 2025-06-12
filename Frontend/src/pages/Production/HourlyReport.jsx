@@ -15,11 +15,31 @@ import DateTimePicker from "../../components/common/DateTimePicker";
 import axios from "axios";
 import Loader from "../../components/common/Loader";
 import toast from "react-hot-toast";
-import { mapCategory } from "../../utils/mapCategories.js";
+import { CATEGORY_MAPPINGS } from "../../utils/mapCategories.js";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
+
+const mapCategory = async (data, mappings = CATEGORY_MAPPINGS) => {
+  if (!data) return [];
+
+  const normalize = (str) => str.replace(/\s+/g, " ").trim().toUpperCase();
+
+  const dataArray = Array.isArray(data) ? data : [data];
+
+  return dataArray.map((item) => {
+    const mappedItem = { ...item };
+
+    if (mappedItem?.category) {
+      const normalizedCategory = normalize(mappedItem.category);
+      mappedItem.category =
+        mappings[normalizedCategory] || mappedItem.category.trim();
+    }
+
+    return mappedItem;
+  });
+};
 
 const HourlyReport = () => {
   const [model, setModel] = useState([]);

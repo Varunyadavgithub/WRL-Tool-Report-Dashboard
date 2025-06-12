@@ -24,7 +24,7 @@ const PostFoamingCategoryCount = ({ title, data }) => {
     const chartOptions = {
       responsive: true,
       maintainAspectRatio: false,
-         animation: {
+      animation: {
         onComplete: (animationContext) => {
           const chart = animationContext.chart;
           const ctx = chart.ctx;
@@ -86,12 +86,8 @@ const PostFoamingCategoryCount = ({ title, data }) => {
                 {data && data.length > 0 ? (
                   data.map((item, index) => (
                     <tr key={index} className="hover:bg-gray-100 text-center">
-                      <td className="px-1 py-1 border">
-                        {item.category || "N/A"}
-                      </td>
-                      <td className="px-1 py-1 border">
-                        {item.TotalCount}
-                      </td>
+                      <td className="px-1 py-1 border">{item.category}</td>
+                      <td className="px-1 py-1 border">{item.TotalCount}</td>
                     </tr>
                   ))
                 ) : (

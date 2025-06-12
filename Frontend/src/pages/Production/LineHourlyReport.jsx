@@ -23,12 +23,44 @@ import PostFoamingCategoryCount from "../../components/lineHourly/PostFoaming/Po
 import FoamingA from "../../components/lineHourly/Foaming/FoamingA";
 import FoamingB from "../../components/lineHourly/Foaming/FoamingB";
 import FoamingCategoryCount from "../../components/lineHourly/Foaming/FoamingCategoryCount";
-import { mapCategory } from "../../utils/mapCategories.js";
+import { CATEGORY_MAPPINGS } from "../../utils/mapCategories.js";
 import ManualPostFoaming from "../../components/lineHourly/PostFoaming/ManualPostFoaming.jsx";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
+const mapCategory = async (data, mappings = CATEGORY_MAPPINGS) => {
+  if (!data) return [];
+
+  const normalize = (str) => str.replace(/\s+/g, " ").trim().toUpperCase();
+
+  const dataArray = Array.isArray(data) ? data : [data];
+
+  const grouped = {};
+
+  dataArray.forEach((item) => {
+    const mappedItem = { ...item };
+    if (mappedItem?.category) {
+      const normalizedCategory = normalize(mappedItem.category);
+      const finalCategory =
+        mappings[normalizedCategory] || mappedItem.category.trim();
+
+      if (grouped[finalCategory]) {
+        // If category exists, add to TotalCount
+        grouped[finalCategory].TotalCount += mappedItem.TotalCount || 0;
+      } else {
+        // Otherwise, create new
+        grouped[finalCategory] = {
+          category: finalCategory,
+          TotalCount: mappedItem.TotalCount || 0,
+        };
+      }
+    }
+  });
+
+  // Convert grouped object back to array
+  return Object.values(grouped);
+};
 
 const LineHourlyReport = () => {
   const [loading, setLoading] = useState(false);

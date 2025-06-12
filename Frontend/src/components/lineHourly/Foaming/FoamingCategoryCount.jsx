@@ -88,7 +88,7 @@ const FoamingCategoryCount = ({ title, data }) => {
                   data.map((item, index) => (
                     <tr key={index} className="hover:bg-gray-100 text-center">
                       <td className="px-1 py-1 border">
-                        {item.category || "N/A"}
+                        {item.category}
                       </td>
                       <td className="px-1 py-1 border">
                         {item.TotalCount}
