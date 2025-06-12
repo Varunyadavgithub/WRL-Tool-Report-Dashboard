@@ -154,9 +154,7 @@ const HourlyReport = () => {
       if (lineType) {
         params.line = lineType;
       }
-
-      console.log(params);
-
+      
       const res = await axios.get(`${baseURL}prod/hourly-model-count`, {
         params,
       });

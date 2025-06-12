@@ -1,8 +1,8 @@
 import express from "express";
 import { getComponentDetails } from "../../controllers/production/componentDetails.js";
 
-const route = express.Router();
+const router = express.Router();
 
-route.get("/component-details", getComponentDetails);
+router.get("/component-details", getComponentDetails);
 
-export default route;
+export default router;

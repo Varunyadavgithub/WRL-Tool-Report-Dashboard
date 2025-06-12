@@ -19,7 +19,7 @@ export const uploadFile = (req, res) => {
 };
 
 // Get files list controller
-export const getFiles = (req, res) => {
+export const getFiles = (_, res) => {
   try {
     const files = fs.readdirSync(uploadDir);
     const fileList = files.map((file, index) => ({

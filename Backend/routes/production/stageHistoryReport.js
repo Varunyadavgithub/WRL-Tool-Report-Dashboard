@@ -1,8 +1,8 @@
 import express from "express";
 import { getCurrentStageStatus } from "../../controllers/production/stageHistoryReport.js";
 
-const route = express.Router();
+const router = express.Router();
 
-route.get("/stage-history", getCurrentStageStatus);
+router.get("/stage-history", getCurrentStageStatus);
 
-export default route;
+export default router;

@@ -154,7 +154,6 @@ const HoldCabinateDetails = () => {
         startDate: formattedStart,
         endDate: formattedEnd,
       };
-      console.log(params);
       const res = await axios.get(`${baseURL}quality/hold-cabinet-details`, {
         params,
       });

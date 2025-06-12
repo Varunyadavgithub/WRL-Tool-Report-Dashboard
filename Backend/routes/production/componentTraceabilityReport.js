@@ -5,11 +5,11 @@ import {
   fetchQuickFiltersData,
 } from "../../controllers/production/componentTraceabilityReport.js";
 
-const route = express.Router();
+const router = express.Router();
 
-route.get("/component-traceability", generateReport);
-route.get("/export-component-traceability", fetchExportData);
-route.get("/yday-component-traceability", fetchQuickFiltersData);
-route.get("/today-component-traceability", fetchQuickFiltersData);
+router.get("/component-traceability", generateReport);
+router.get("/export-component-traceability", fetchExportData);
+router.get("/yday-component-traceability", fetchQuickFiltersData);
+router.get("/today-component-traceability", fetchQuickFiltersData);
 
-export default route;
+export default router;

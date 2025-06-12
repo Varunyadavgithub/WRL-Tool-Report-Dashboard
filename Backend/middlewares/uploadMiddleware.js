@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
 });
 
 // File filter (only Excel)
-const fileFilter = (req, file, cb) => {
+const fileFilter = (_, file, cb) => {
   const allowedTypes = [
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.ms-excel",

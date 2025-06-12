@@ -65,7 +65,6 @@ const FPAReports = () => {
         const res = await axios.get(`${baseURL}quality/fpa-daily-report`, {
           params,
         });
-        console.log(res);
         setReportData(res.data);
       } else if (reportType === "monthlyFpaReport") {
         const res = await axios.get(`${baseURL}quality/fpa-monthly-report`, {
