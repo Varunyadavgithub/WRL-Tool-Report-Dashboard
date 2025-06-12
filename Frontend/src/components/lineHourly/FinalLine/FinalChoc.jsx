@@ -9,7 +9,7 @@ const FinalChoc = ({ title, data }) => {
     }
 
     const chartData = {
-      labels: data.map((item) => `H ${item.TIMEHOUR}`),
+      labels: data.map((item) => `${item.TIMEHOUR}:00`),
       datasets: [
         {
           label: "Hourly Count",
@@ -89,12 +89,8 @@ const FinalChoc = ({ title, data }) => {
                       <td className="px-1 py-1 border">
                         {item.HOUR_NUMBER || "N/A"}
                       </td>
-                      <td className="px-1 py-1 border">
-                        {item.TIMEHOUR}
-                      </td>
-                      <td className="px-1 py-1 border">
-                        {item.COUNT}
-                      </td>
+                      <td className="px-1 py-1 border">{item.TIMEHOUR}</td>
+                      <td className="px-1 py-1 border">{item.COUNT}</td>
                     </tr>
                   ))
                 ) : (

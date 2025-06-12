@@ -36,26 +36,32 @@ HourlySummary AS (
     SELECT 
         DATEPART(DAY, b.ActivityOn) AS TIMEDAY,
         DATEPART(HOUR, b.ActivityOn) AS TIMEHOUR,
+        CAST(CAST(CAST(b.ActivityOn AS DATE) AS VARCHAR) + ' ' + 
+             CAST(DATEPART(HOUR, b.ActivityOn) AS VARCHAR) + ':00:00' AS DATETIME) AS HourTime,
         COUNT(*) AS Loading_Count
     FROM Psno
     JOIN ProcessActivity b ON b.PSNo = Psno.DocNo
     JOIN WorkCenter c ON b.StationCode = c.StationCode
     JOIN Material m ON Psno.Material = m.MatCode
     JOIN Users u ON b.Operator = u.UserCode
-    WHERE 
+    WHERE
         c.StationCode = @stationCode
         AND b.ActivityType = 5
         AND b.ActivityOn BETWEEN @startDate AND @endDate
         ${model && model !== "0" ? "AND Psno.Material = @model" : ""}
         ${userRoleCondition}
-    GROUP BY DATEPART(DAY, b.ActivityOn), DATEPART(HOUR, b.ActivityOn)
+        GROUP BY 
+        DATEPART(DAY, b.ActivityOn), 
+        DATEPART(HOUR, b.ActivityOn),
+        CAST(CAST(CAST(b.ActivityOn AS DATE) AS VARCHAR) + ' ' + 
+             CAST(DATEPART(HOUR, b.ActivityOn) AS VARCHAR) + ':00:00' AS DATETIME)
 )
 SELECT 
-    CONCAT('H', ROW_NUMBER() OVER (ORDER BY TIMEHOUR, TIMEDAY)) AS HOUR_NUMBER,
+    CONCAT('H', ROW_NUMBER() OVER (ORDER BY HourTime)) AS HOUR_NUMBER,
     TIMEHOUR,
     Loading_Count AS COUNT
 FROM HourlySummary
-ORDER BY TIMEHOUR, TIMEDAY;
+ORDER BY HourTime;;
     `;
 
     const pool = await new sql.ConnectionPool(dbConfig1).connect();

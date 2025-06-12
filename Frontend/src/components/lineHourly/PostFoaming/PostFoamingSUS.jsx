@@ -9,7 +9,7 @@ const PostFoamingSUS = ({ title, data }) => {
     }
 
     const chartData = {
-      labels: data.map((item) => `H ${item.TIMEHOUR}`),
+      labels: data.map((item) => `${item.TIMEHOUR}:00`),
       datasets: [
         {
           label: "Hourly Count",
