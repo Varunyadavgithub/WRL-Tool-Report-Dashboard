@@ -1,5 +1,6 @@
 export const CATEGORY_MAPPINGS = {
-  COOLER: "Choc Cooler",
+  COOLER: "Freezer",
+  "Choc Cooler": "Choc Cooler",
   "FOW MODELS": "FOW",
   "ICE LINED REFRIGERATOR": "Freezer",
   "COOLER AND FREEZER": "Freezer",
