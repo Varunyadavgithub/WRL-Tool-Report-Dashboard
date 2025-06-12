@@ -166,6 +166,8 @@ const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
             <li key={index}>
               <Link
                 to={item.path}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={`block p-2 rounded-lg hover:bg-gray-700 transition ${isActive(
                   item.path
                 )}`}
