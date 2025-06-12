@@ -20,7 +20,7 @@ import { CATEGORY_MAPPINGS } from "../../utils/mapCategories.js";
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
-
+// Map Categories with TIMEHOUR grouping
 const mapCategory = async (data, mappings = CATEGORY_MAPPINGS) => {
   if (!data) return [];
 
@@ -28,17 +28,34 @@ const mapCategory = async (data, mappings = CATEGORY_MAPPINGS) => {
 
   const dataArray = Array.isArray(data) ? data : [data];
 
-  return dataArray.map((item) => {
+  const grouped = {};
+
+  dataArray.forEach((item) => {
     const mappedItem = { ...item };
+    if (mappedItem?.category || mappedItem?.TIMEHOUR !== undefined) {
+      const normalizedCategory = normalize(mappedItem.category || "");
+      const finalCategory =
+        mappings[normalizedCategory] ||
+        mappedItem.category?.trim() ||
+        "UNKNOWN";
+      const timeHour = mappedItem.TIMEHOUR || 0;
 
-    if (mappedItem?.category) {
-      const normalizedCategory = normalize(mappedItem.category);
-      mappedItem.category =
-        mappings[normalizedCategory] || mappedItem.category.trim();
+      // Use a combination key of category and TIMEHOUR
+      const groupKey = `${finalCategory}_${timeHour}`;
+
+      if (grouped[groupKey]) {
+        grouped[groupKey].COUNT += mappedItem.COUNT || 0;
+      } else {
+        grouped[groupKey] = {
+          category: finalCategory,
+          TIMEHOUR: timeHour,
+          COUNT: mappedItem.COUNT || 0,
+        };
+      }
     }
-
-    return mappedItem;
   });
+
+  return Object.values(grouped);
 };
 
 const HourlyReport = () => {

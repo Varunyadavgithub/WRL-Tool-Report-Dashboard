@@ -18,23 +18,3 @@ export const CATEGORY_MAPPINGS = {
   "STORAGE WATER COOLER": "SWC",
   "VISI COOLER": "VISI COOLER",
 };
-
-// export const mapCategory = async (data, mappings = CATEGORY_MAPPINGS) => {
-//   if (!data) return [];
-
-//   const normalize = (str) => str.replace(/\s+/g, " ").trim().toUpperCase();
-
-//   const dataArray = Array.isArray(data) ? data : [data];
-
-//   return dataArray.map((item) => {
-//     const mappedItem = { ...item };
-
-//     if (mappedItem?.category) {
-//       const normalizedCategory = normalize(mappedItem.category);
-//       mappedItem.category =
-//         mappings[normalizedCategory] || mappedItem.category.trim();
-//     }
-
-//     return mappedItem;
-//   });
-// };

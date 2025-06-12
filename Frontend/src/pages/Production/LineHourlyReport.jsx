@@ -29,6 +29,7 @@ import ManualPostFoaming from "../../components/lineHourly/PostFoaming/ManualPos
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
+// Map Categories
 const mapCategory = async (data, mappings = CATEGORY_MAPPINGS) => {
   if (!data) return [];
 
