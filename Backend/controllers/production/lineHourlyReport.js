@@ -226,7 +226,7 @@ Grouped AS (
         TIMEHOUR,
         DATEADD(HOUR, TIMEHOUR, ActivityDate) AS HourTime,
         SUM(CASE WHEN StationCode = 1220003 THEN 1 ELSE 0 END) AS GroupA_Count,
-        SUM(CASE WHEN StationCode = 1230007 AND Category = 1220010 THEN 1 ELSE 0 END) AS CHOC_Count
+        SUM(CASE WHEN StationCode = 1230007 AND Category = 1250005 THEN 1 ELSE 0 END) AS CHOC_Count
     FROM FilteredActivity
     GROUP BY TIMEDAY, TIMEHOUR, ActivityDate
 )
@@ -280,7 +280,7 @@ Grouped AS (
         TIMEHOUR,
         DATEADD(HOUR, TIMEHOUR, ActivityDate) AS HourTime,
         SUM(CASE WHEN StationCode = 1220004 THEN 1 ELSE 0 END) AS GroupB_Count,
-        SUM(CASE WHEN StationCode = 1230007 AND Category <> 1220010 THEN 1 ELSE 0 END) AS FOW_Count
+        SUM(CASE WHEN StationCode = 1230007 AND Category <> 1250005 THEN 1 ELSE 0 END) AS FOW_Count
     FROM FilteredActivity
     GROUP BY TIMEDAY, TIMEHOUR, ActivityDate
 )
@@ -374,7 +374,7 @@ JOIN Users us ON us.UserCode = b.Operator
 JOIN Material m ON m.MatCode = Psno.Material
 LEFT JOIN MaterialCategory mc ON mc.CategoryCode = m.Category
 WHERE b.ActivityType = 5
-  AND c.StationCode IN (1220003, 1220004, 1230012)   
+  AND c.StationCode IN (1220003, 1220004, 1230012, 1230007)   
   AND b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}'
 GROUP BY ISNULL(mc.Alias, 'N/A')
 ORDER BY TotalCount DESC;

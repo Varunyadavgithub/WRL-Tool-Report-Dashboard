@@ -332,7 +332,7 @@ const FPAReports = () => {
                     checked={reportType === "fpaReport"}
                     onChange={(e) => setReportType(e.target.value)}
                   />
-                  Fpa Report
+                  FPA Report
                 </label>
                 <label>
                   <input
@@ -352,7 +352,7 @@ const FPAReports = () => {
                     checked={reportType === "monthlyFpaReport"}
                     onChange={(e) => setReportType(e.target.value)}
                   />
-                  Monthly Fpa Report
+                  Monthly FPA Report
                 </label>
                 <label>
                   <input
