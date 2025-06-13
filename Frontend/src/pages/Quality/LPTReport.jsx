@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Button from "../../components/common/Button";
 import Loader from "../../components/common/Loader";
 import Title from "../../components/common/Title";
 import DateTimePicker from "../../components/common/DateTimePicker";
+import SelectField from "../../components/common/SelectField";
+import InputField from "../../components/common/InputField";
+import axios from "axios";
 
 const LPTReport = () => {
   const [loading, setLoading] = useState(false);
@@ -11,11 +14,30 @@ const LPTReport = () => {
   const [monthLoading, setMonthLoading] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [variants, setVariants] = useState([]);
+  const [selectedVariant, setSelectedVariant] = useState(null);
   const [reportType, setReportType] = useState("lptReport");
   const [reportData, setReportData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [details, setDetails] = useState("");
 
+  const fetchModelVariants = async () => {
+    try {
+      const res = await axios.get(`${baseURL}shared/model-variants`);
+      const formatted = res?.data.map((item) => ({
+        label: item.MaterialName,
+        value: item.MatCode.toString(),
+      }));
+      setVariants(formatted);
+    } catch (error) {
+      console.error("Failed to fetch model variants:", error);
+      toast.error("Failed to fetch model variants.");
+    }
+  };
+
+  useEffect(() => {
+    fetchModelVariants();
+  }, []);
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
       <Title title="LPT Report" align="center" />
@@ -35,6 +57,28 @@ const LPTReport = () => {
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
           />
+          {reportType === "lptReport" && (
+            <>
+              <SelectField
+                label="Model Variant"
+                options={variants}
+                value={selectedVariant?.value || ""}
+                onChange={(e) =>
+                  setSelectedVariant(
+                    variants.find((opt) => opt.value === e.target.value) || 0
+                  )
+                }
+              />
+              <InputField
+                label="Search"
+                type="text"
+                placeholder="Enter details"
+                className="w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </>
+          )}
         </div>
 
         <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
@@ -61,26 +105,6 @@ const LPTReport = () => {
                     onChange={(e) => setReportType(e.target.value)}
                   />
                   Daily LPT Report
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="reportType"
-                    value="monthlyLptReport"
-                    checked={reportType === "monthlyLptReport"}
-                    onChange={(e) => setReportType(e.target.value)}
-                  />
-                  Monthly LPT Report
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="reportType"
-                    value="yearlyLptReport"
-                    checked={reportType === "yearlyLptReport"}
-                    onChange={(e) => setReportType(e.target.value)}
-                  />
-                  Yearly LPT Report
                 </label>
               </div>
             </div>

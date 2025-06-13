@@ -6,7 +6,7 @@ import InputField from "../../components/common/InputField";
 import Button from "../../components/common/Button";
 import SelectField from "../../components/common/SelectField";
 import Loader from "../../components/common/Loader";
-import { getFormattedISTDate } from "../../utils/dateUtils";
+import { getFormattedISTDate } from "../../utils/dateUtils.js";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
