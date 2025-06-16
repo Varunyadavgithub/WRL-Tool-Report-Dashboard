@@ -35,6 +35,7 @@ import { useSelector } from "react-redux";
 import NotFound from "../pages/NotFound";
 import ComponentDetails from "../pages/Production/ComponentDetails";
 import TagUpdate from "../pages/Quality/TagUpdate";
+import LPTRecipe from "../pages/Quality/LPTRecipe";
 
 function MainContent() {
   const userRole = useSelector((state) => state.auth.user?.role || "");
@@ -46,7 +47,6 @@ function MainContent() {
     <div className="flex-1 p-4 min-h-screen overflow-auto">
       <Routes>
         <Route path="/" index element={<Home />} />
-
         {/* Production */}
         <Route path="/production/overview" element={<ProductionOverview />} />
         <Route
@@ -62,7 +62,6 @@ function MainContent() {
           path="/production/stage-history-report"
           element={<StageHistoryReport />}
         />
-
         {/* 🚫 Restricted Route: Only Logistic and Admin */}
         {canAccess(["logistic"]) && (
           <Route
@@ -70,7 +69,6 @@ function MainContent() {
             element={<ModelNameUpdate />}
           />
         )}
-
         <Route
           path="/production/component-details"
           element={<ComponentDetails />}
@@ -79,7 +77,6 @@ function MainContent() {
           path="/production/total-production"
           element={<TotalProduction />}
         />
-
         {/* Quality */}
         {canAccess([]) && (
           <Route path="/quality/rework-report" element={<ReworkReport />} />
@@ -99,14 +96,11 @@ function MainContent() {
         {canAccess([]) && (
           <Route path="/quality/mft-report" element={<MFTReport />} />
         )}
-
         {/* 🚫 Restricted Route: Only FPA, Quality Manager and Admin */}
         {canAccess(["fpa", "quality manager"]) && (
           <Route path="/quality/fpa" element={<FPA />} />
         )}
-
         <Route path="/quality/fpa-report" element={<FPAReports />} />
-
         {/* 🚫 Restricted Route: Only Line Quality Engineer, Quality Manager, Lpt and Admin */}
         {canAccess(["line quality engineer", "quality manager", "lpt"]) && (
           <Route path="/quality/lpt" element={<LPT />} />
@@ -114,22 +108,23 @@ function MainContent() {
         {canAccess(["line quality engineer", "quality manager", "lpt"]) && (
           <Route path="/quality/lpt-report" element={<LPTReport />} />
         )}
+        {/* 🚫 Restricted Route: Only Line Quality Engineer and Admin */}
+        {canAccess(["line quality engineer"]) && (
+          <Route path="/quality/lpt-recipe" element={<LPTRecipe />} />
+        )}
 
         {/* 🚫 Restricted Route: Only Line Quality Engineer, Quality Manager and Admin */}
         {canAccess(["line quality engineer", "fpa", "quality manager"]) && (
           <Route path="/quality/dispatch-hold" element={<DispatchHold />} />
         )}
-
         <Route
           path="/quality/hold-cabinate-details"
           element={<HoldCabinateDetails />}
         />
-
         {/* 🚫 Restricted Route: Only Line Quality Engineer, Quality Manager and Admin */}
         {canAccess(["line quality engineer", "quality manager"]) && (
           <Route path="/quality/tag-update" element={<TagUpdate />} />
         )}
-
         {/* Dispatch */}
         <Route
           path="/dispatch/dispatch-performance-report"
@@ -140,19 +135,15 @@ function MainContent() {
           path="/dispatch/dispatch-unloading"
           element={<DispatchUnloading />}
         />
-
         {/* 🚫 Restricted Route: Only Logistic and Admin */}
         {canAccess(["logistic"]) && (
           <Route path="/dispatch/fg-casting" element={<FGCasting />} />
         )}
-
         <Route path="/dispatch/gate-entry" element={<GateEntry />} />
-
         {/* 🚫 Restricted Route: Only Logistic and Admin */}
         {canAccess(["logistic"]) && (
           <Route path="/dispatch/error-log" element={<ErrorLog />} />
         )}
-
         {/* Planing */}
         {/* 🚫 Restricted Route: Only Production Manager, Planning Team and Admin */}
         {canAccess(["production manager", "planning team"]) && (
@@ -161,9 +152,7 @@ function MainContent() {
             element={<ProductionPlaning />}
           />
         )}
-
         <Route path="/planing/5-days-planing" element={<FiveDaysPlaning />} />
-
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>

@@ -17,11 +17,8 @@ const LPT = () => {
   const [loading, setLoading] = useState(false);
   const [barcodeNumber, setBarcodeNumber] = useState("");
   const [assetDetails, setAssetDetails] = useState([]);
-  const [setTemp, setSetTemp] = useState("");
   const [actualTemp, setActualTemp] = useState("");
-  const [setCurrent, setSetCurrent] = useState("");
   const [actualCurrent, setActualCurrent] = useState("");
-  const [setPower, setSetPower] = useState("");
   const [actualPower, setActualPower] = useState("");
   const [addManually, setAddManually] = useState(false);
   const [manualCategory, setManualCategory] = useState("");
@@ -74,7 +71,17 @@ const LPT = () => {
       const res = await axios.get(`${baseURL}quality/lpt-asset-details`, {
         params,
       });
-      setAssetDetails(res?.data);
+      const assetData = res?.data?.data;
+
+      if (!assetData) {
+        toast.error(
+          "No Mode Name found for this Serial Number. Please add Recipe for this Model."
+        );
+        setAssetDetails(null); // Optional: clear old data
+        return;
+      }
+
+      setAssetDetails(assetData);
     } catch (error) {
       console.error("Failed to fetch Asset Details data:", error);
       toast.error("Failed to fetch Asset Details data.");
@@ -114,6 +121,34 @@ const LPT = () => {
     }
   };
 
+  const calculatePerformance = (
+    assetDetails,
+    actualTemp,
+    actualCurrent,
+    actualPower
+  ) => {
+    const minTemp = Number(assetDetails.MinTemp);
+    const maxTemp = Number(assetDetails.MaxTemp);
+    const actTemp = Number(actualTemp);
+
+    const minCurrent = Number(assetDetails.MinCurrent);
+    const maxCurrent = Number(assetDetails.MaxCurrent);
+    const actCurrent = Number(actualCurrent);
+
+    const minPower = Number(assetDetails.MinPower);
+    const maxPower = Number(assetDetails.MaxPower);
+    const actPower = Number(actualPower);
+
+    const tempCheck = actTemp >= minTemp && actTemp <= maxTemp;
+    const currentCheck = actCurrent >= minCurrent && actCurrent <= maxCurrent;
+    const powerCheck = actPower >= minPower && actPower <= maxPower;
+
+    const overallPerformance =
+      tempCheck && currentCheck && powerCheck ? "Pass" : "Fail";
+
+    return overallPerformance;
+  };
+
   const handleAddDefect = async () => {
     if (!assetDetails.ModelName) {
       toast.error("Asset details not available. Please scan a barcode.");
@@ -124,6 +159,13 @@ const LPT = () => {
     //   toast.error("Please select a defect category.");
     //   return;
     // }
+
+    const performanceStatus = calculatePerformance(
+      assetDetails,
+      actualTemp,
+      actualCurrent,
+      actualPower
+    );
 
     const defectToAdd = addManually
       ? manualCategory?.trim()
@@ -142,15 +184,19 @@ const LPT = () => {
       const payload = {
         AssemblyNo: barcodeNumber,
         ModelName: assetDetails.ModelName,
-        SetTemp: setTemp,
+        MinTemp: assetDetails.MinTemp,
+        MaxTemp: assetDetails.MaxTemp,
         ActualTemp: actualTemp,
-        SetCurrent: setCurrent,
+        MinCurrent: assetDetails.MinCurrent,
+        MaxCurrent: assetDetails.MaxCurrent,
         ActualCurrent: actualCurrent,
-        SetPower: setPower,
+        MinPower: assetDetails.MinPower,
+        MaxPower: assetDetails.MaxPower,
         ActualPower: actualPower,
         shift: dynamicShift.value,
         AddDefect: defectToAdd,
         Remark: remark,
+        Performance: performanceStatus,
         currentDateTime: getFormattedISTDate(),
       };
 
@@ -162,6 +208,9 @@ const LPT = () => {
         setManualCategory("");
         setSelectedLptDefectCategory(null);
         setAddManually(false);
+        setActualTemp("");
+        setActualCurrent("");
+        setActualPower("");
         getLptDefectReport();
       }
     } catch (error) {
@@ -216,7 +265,7 @@ const LPT = () => {
               <h1 className="font-semibold text-md">
                 Model Name:{" "}
                 <span className="text-blue-700 text-sm">
-                  {assetDetails.ModelName || "N/A"}
+                  {assetDetails?.ModelName || "N/A"}
                 </span>
               </h1>
             </div>
@@ -235,20 +284,33 @@ const LPT = () => {
                 <WiThermometer className="text-2xl" />
                 Temperature
               </h1>
-              <div className="flex gap-2">
-                <InputField
-                  label="Set Temp"
-                  type="text"
-                  value={setTemp}
-                  onChange={(e) => setSetTemp(e.target.value)}
-                  className="w-32"
-                />
+
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between px-4">
+                  <div className="flex flex-col items-center">
+                    <span className="text-sm font-medium text-gray-600">
+                      Min
+                    </span>
+                    <span className="text-base font-semibold text-blue-600">
+                      {assetDetails?.MinTemp || "0"}°C
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-sm font-medium text-gray-600">
+                      Max
+                    </span>
+                    <span className="text-base font-semibold text-red-600">
+                      {assetDetails?.MaxTemp || "0"}°C
+                    </span>
+                  </div>
+                </div>
+
                 <InputField
                   label="Actual Temp"
                   type="text"
                   value={actualTemp}
                   onChange={(e) => setActualTemp(e.target.value)}
-                  className="w-32"
+                  className="w-32 mx-auto"
                 />
               </div>
             </div>
@@ -259,20 +321,32 @@ const LPT = () => {
                 <FaBolt className="text-xl" />
                 Current
               </h1>
-              <div className="flex gap-2">
-                <InputField
-                  label="Set Current"
-                  type="text"
-                  value={setCurrent}
-                  onChange={(e) => setSetCurrent(e.target.value)}
-                  className="w-32"
-                />
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between px-4">
+                  <div className="flex flex-col items-center">
+                    <span className="text-sm font-medium text-gray-600">
+                      Min
+                    </span>
+                    <span className="text-base font-semibold text-blue-600">
+                      {assetDetails?.MinCurrent || "0"}°C
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-sm font-medium text-gray-600">
+                      Max
+                    </span>
+                    <span className="text-base font-semibold text-red-600">
+                      {assetDetails?.MaxCurrent || "0"}°C
+                    </span>
+                  </div>
+                </div>
+
                 <InputField
                   label="Actual Current"
                   type="text"
                   value={actualCurrent}
                   onChange={(e) => setActualCurrent(e.target.value)}
-                  className="w-32"
+                  className="w-32 mx-auto"
                 />
               </div>
             </div>
@@ -283,20 +357,31 @@ const LPT = () => {
                 <MdPowerSettingsNew className="text-xl" />
                 Power
               </h1>
-              <div className="flex gap-2">
-                <InputField
-                  label="Set Power"
-                  type="text"
-                  value={setPower}
-                  onChange={(e) => setSetPower(e.target.value)}
-                  className="w-32"
-                />
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between px-4">
+                  <div className="flex flex-col items-center">
+                    <span className="text-sm font-medium text-gray-600">
+                      Min
+                    </span>
+                    <span className="text-base font-semibold text-blue-600">
+                      {assetDetails?.MinPower || "0"}°C
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-sm font-medium text-gray-600">
+                      Max
+                    </span>
+                    <span className="text-base font-semibold text-red-600">
+                      {assetDetails?.MaxPower || "0"}°C
+                    </span>
+                  </div>
+                </div>
                 <InputField
                   label="Actual Power"
                   type="text"
                   value={actualPower}
                   onChange={(e) => setActualPower(e.target.value)}
-                  className="w-32"
+                  className="w-32 mx-auto"
                 />
               </div>
             </div>
@@ -385,8 +470,8 @@ const LPT = () => {
                 <Loader />
               ) : (
                 <div className="w-full max-h-[600px] overflow-x-auto">
-                  <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
-                    <thead className="bg-gray-200 sticky top-0 z-10 text-center">
+                  <table className="min-w-full border border-black bg-white text-xs text-left rounded-lg table-auto">
+                    <thead className="bg-gray-200 text-center">
                       <tr>
                         <th className="px-1 py-1 border" rowSpan={2}>
                           Sr. No.
@@ -418,14 +503,17 @@ const LPT = () => {
                         <th className="px-1 py-1 border" rowSpan={2}>
                           Remark
                         </th>
+                        <th className="px-1 py-1 border" rowSpan={2}>
+                          Performance
+                        </th>
                       </tr>
                       <tr>
-                        <th className="px-1 py-1 border">Set Temp</th>
-                        <th className="px-1 py-1 border">Actual Temp</th>
-                        <th className="px-1 py-1 border">Set Current</th>
-                        <th className="px-1 py-1 border">Actual Current</th>
-                        <th className="px-1 py-1 border">Set Power</th>
-                        <th className="px-1 py-1 border">Actual Power</th>
+                        <th className="px-1 py-1 border">Min Temp</th>
+                        <th className="px-1 py-1 border">Max Temp</th>
+                        <th className="px-1 py-1 border">Min Current</th>
+                        <th className="px-1 py-1 border">Max Current</th>
+                        <th className="px-1 py-1 border">Min Power</th>
+                        <th className="px-1 py-1 border">Max Power</th>
                       </tr>
                     </thead>
                     <tbody className="text-center">
@@ -447,29 +535,43 @@ const LPT = () => {
                             <td className="px-1 py-1 border">
                               {item.AssemblyNo}
                             </td>
-                            <td className="px-1 py-1 border">{item.SetTemp}</td>
+
+                            {/* Temperature */}
+                            <td className="px-1 py-1 border">{item.minTemp}</td>
+                            <td className="px-1 py-1 border">{item.maxTemp}</td>
+
+                            {/* Current */}
                             <td className="px-1 py-1 border">
-                              {item.ActualTemp}
+                              {item.minCurrent}
                             </td>
                             <td className="px-1 py-1 border">
-                              {item.SetCurrent}
+                              {item.maxCurrent}
+                            </td>
+
+                            {/* Power */}
+                            <td className="px-1 py-1 border">
+                              {item.minPower}
                             </td>
                             <td className="px-1 py-1 border">
-                              {item.ActualCurrent}
+                              {item.maxPower}
                             </td>
-                            <td className="px-1 py-1 border">
-                              {item.SetPower}
-                            </td>
-                            <td className="px-1 py-1 border">
-                              {item.ActualPower}
-                            </td>
+
                             <td className="px-1 py-1 border">{item.Defect}</td>
                             <td className="px-1 py-1 border">{item.Remark}</td>
+                            <td
+                              className={`px-1 py-1 border border-black ${
+                                item.Performance === "Pass"
+                                  ? "bg-green-500 text-white"
+                                  : "bg-red-500 text-white"
+                              }`}
+                            >
+                              {item.Performance}
+                            </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={10} className="text-center py-4">
+                          <td colSpan={17} className="text-center py-4">
                             No LPT defect data found.
                           </td>
                         </tr>
@@ -488,7 +590,7 @@ const LPT = () => {
               ) : (
                 <div className="w-full max-h-[500px] overflow-x-auto">
                   <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
-                    <thead className="bg-gray-200 sticky top-0 z-10 text-center">
+                    <thead className="bg-gray-200 text-center">
                       <tr>
                         <th className="px-1 py-1 border">Model Name</th>
                         <th className="px-1 py-1 border">Production Count</th>

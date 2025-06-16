@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Button from "../../components/common/Button";
 import Loader from "../../components/common/Loader";
 import Title from "../../components/common/Title";
@@ -6,6 +6,10 @@ import DateTimePicker from "../../components/common/DateTimePicker";
 import SelectField from "../../components/common/SelectField";
 import InputField from "../../components/common/InputField";
 import axios from "axios";
+import toast from "react-hot-toast";
+import ExportButton from "../../components/common/ExportButton";
+
+const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const LPTReport = () => {
   const [loading, setLoading] = useState(false);
@@ -16,7 +20,6 @@ const LPTReport = () => {
   const [endTime, setEndTime] = useState("");
   const [variants, setVariants] = useState([]);
   const [selectedVariant, setSelectedVariant] = useState(null);
-  const [reportType, setReportType] = useState("lptReport");
   const [reportData, setReportData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [details, setDetails] = useState("");
@@ -35,9 +38,194 @@ const LPTReport = () => {
     }
   };
 
+  const handleQuery = async () => {
+    if (!startTime || !endTime) {
+      toast.error("Please select Time Range.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      let params = {
+        startDate: startTime,
+        endDate: endTime,
+      };
+
+      if (selectedVariant && selectedVariant.value) {
+        params = {
+          ...params,
+          model: selectedVariant.label,
+        };
+      }
+      const res = await axios.get(`${baseURL}quality/lpt-report`, { params });
+      setReportData(res.data);
+      setSelectedVariant(null);
+    } catch (error) {
+      console.error("Failed to fetch LPT Report:", error);
+      toast.error("Failed to fetch LPT Report.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Quick Filters
+  const handleYesterdayQuery = async () => {
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0);
+
+    const yesterday8AM = new Date(today8AM);
+    yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(yesterday8AM);
+    const formattedEnd = formatDate(today8AM);
+
+    try {
+      setYdayLoading(true);
+
+      setReportData([]);
+      setSelectedVariant(null);
+
+      let params = {
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+
+      if (selectedVariant && selectedVariant.value) {
+        params = {
+          ...params,
+          model: selectedVariant.label,
+        };
+      }
+
+      const res = await axios.get(`${baseURL}quality/lpt-report`, { params });
+      setReportData(res.data);
+      setSelectedVariant(null);
+    } catch (error) {
+      console.error("Failed to fetch Yesterday LPT Report:", error);
+      toast.error("Failed to fetch Yesterday LPT Report.");
+    } finally {
+      setYdayLoading(false);
+    }
+  };
+
+  const handleTodayQuery = async () => {
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(today8AM);
+    const formattedEnd = formatDate(now); // Now = current time
+
+    try {
+      setTodayLoading(true);
+
+      setReportData([]);
+      setSelectedVariant(null);
+
+      let params = {
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+
+      if (selectedVariant && selectedVariant.value) {
+        params = {
+          ...params,
+          model: selectedVariant.label,
+        };
+      }
+
+      const res = await axios.get(`${baseURL}quality/lpt-report`, { params });
+      setReportData(res.data);
+      setSelectedVariant(null);
+    } catch (error) {
+      console.error("Failed to fetch Today LPT Report:", error);
+      toast.error("Failed to fetch Today LPT Report.");
+    } finally {
+      setTodayLoading(false);
+    }
+  };
+
+  const handleMTDQuery = async () => {
+    const now = new Date();
+    const startOfMonth = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1,
+      8,
+      0,
+      0
+    ); // 1st day at 08:00 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(startOfMonth);
+    const formattedEnd = formatDate(now);
+
+    try {
+      setMonthLoading(true);
+
+      setReportData([]);
+      setSelectedVariant(null);
+
+      let params = {
+        startDate: formattedStart,
+        endDate: formattedEnd,
+      };
+
+      if (selectedVariant && selectedVariant.value) {
+        params = {
+          ...params,
+          model: selectedVariant.label,
+        };
+      }
+
+      const res = await axios.get(`${baseURL}quality/lpt-report`, { params });
+      setReportData(res.data);
+      setSelectedVariant(null);
+    } catch (error) {
+      console.error("Failed to fetch Month LPT Report:", error);
+      toast.error("Failed to fetch Month LPT Report.");
+    } finally {
+      setMonthLoading(false);
+    }
+  };
+
+  const uniqueAssemblyNoCount = useMemo(() => {
+    return new Set(reportData.map((item) => item.AssemblyNo)).size;
+  }, [reportData]);
+
   useEffect(() => {
     fetchModelVariants();
   }, []);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      setDetails(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
+
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
       <Title title="LPT Report" align="center" />
@@ -57,57 +245,30 @@ const LPTReport = () => {
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
           />
-          {reportType === "lptReport" && (
-            <>
-              <SelectField
-                label="Model Variant"
-                options={variants}
-                value={selectedVariant?.value || ""}
-                onChange={(e) =>
-                  setSelectedVariant(
-                    variants.find((opt) => opt.value === e.target.value) || 0
-                  )
-                }
-              />
-              <InputField
-                label="Search"
-                type="text"
-                placeholder="Enter details"
-                className="w-full"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </>
-          )}
+
+          <SelectField
+            label="Model Variant"
+            options={variants}
+            value={selectedVariant?.value || ""}
+            onChange={(e) =>
+              setSelectedVariant(
+                variants.find((opt) => opt.value === e.target.value) || 0
+              )
+            }
+          />
+          <InputField
+            label="Search"
+            type="text"
+            placeholder="Enter details"
+            className="w-full"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
 
         <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
           {/* Buttons and Checkboxes */}
           <div className="flex flex-wrap items-center gap-4">
-            <div>
-              <div className="flex flex-col gap-1">
-                <label>
-                  <input
-                    type="radio"
-                    name="reportType"
-                    value="lptReport"
-                    checked={reportType === "lptReport"}
-                    onChange={(e) => setReportType(e.target.value)}
-                  />
-                  LPT Report
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="reportType"
-                    value="dailyLptReport"
-                    checked={reportType === "dailyLptReport"}
-                    onChange={(e) => setReportType(e.target.value)}
-                  />
-                  Daily LPT Report
-                </label>
-              </div>
-            </div>
             <div className="flex flex-col items-center gap-4">
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -116,7 +277,7 @@ const LPTReport = () => {
                   className={`font-semibold ${
                     loading ? "cursor-not-allowed" : ""
                   }`}
-                  onClick={console.log("Handle Query")}
+                  onClick={() => handleQuery()}
                   disabled={loading}
                 >
                   Query
@@ -126,7 +287,10 @@ const LPTReport = () => {
                 )}
               </div>
               <div className="text-left font-bold text-lg">
-                COUNT: <span className="text-blue-700">0 </span>
+                Sample Inspected:{" "}
+                <span className="text-blue-700">
+                  {uniqueAssemblyNoCount || "0"}
+                </span>
               </div>
             </div>
           </div>
@@ -142,7 +306,7 @@ const LPTReport = () => {
               className={`font-semibold ${
                 ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
               }`}
-              onClick={() => console.log("YDAY")}
+              onClick={() => handleYesterdayQuery()}
               disabled={ydayLoading}
             >
               YDAY
@@ -153,7 +317,7 @@ const LPTReport = () => {
               className={`font-semibold ${
                 todayLoading ? "cursor-not-allowed" : "cursor-pointer"
               }`}
-              onClick={() => console.log("TDAY")}
+              onClick={() => handleTodayQuery()}
               disabled={todayLoading}
             >
               TDAY
@@ -164,7 +328,7 @@ const LPTReport = () => {
               className={`font-semibold ${
                 monthLoading ? "cursor-not-allowed" : "cursor-pointer"
               }`}
-              onClick={() => console.log("MTD")}
+              onClick={() => handleMTDQuery()}
               disabled={monthLoading}
             >
               MTD
@@ -180,66 +344,113 @@ const LPTReport = () => {
             {/* Left Side */}
             <div className="w-full md:flex-1 flex flex-col gap-2">
               {/* Left Side Table */}
-              {loading ? (
-                <Loader />
-              ) : (
-                <div className="w-full max-h-[600px] overflow-x-auto">
-                  <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
-                    <thead className="bg-gray-200 sticky top-0 z-10 text-center">
-                      <tr>
-                        <th className="px-1 py-1 border">Sr.No.</th>
-                        <th className="px-1 py-1 border">Date Time</th>
-                        <th className="px-1 py-1 border">Shift</th>
-                        <th className="px-1 py-1 border">Model</th>
-                        <th className="px-1 py-1 border">Assembly No.</th>
-                        <th className="px-1 py-1 border">Set Temp</th>
-                        <th className="px-1 py-1 border">Actual Temp</th>
-                        <th className="px-1 py-1 border">Set Current</th>
-                        <th className="px-1 py-1 border">Actual Current</th>
-                        <th className="px-1 py-1 border">Set Power</th>
-                        <th className="px-1 py-1 border">Actual Power</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {/* {fpaDefect && fpaDefect.length > 0 ? (
-                        fpaDefect.map((item, index) => (
-                          <tr
-                            key={index}
-                            className="hover:bg-gray-100 text-center"
-                          >
-                            <td className="px-1 py-1 border">{item.SRNo}</td>
-                            <td className="px-1 py-1 border">
-                              {item.Date &&
-                                item.Date.replace("T", " ").replace("Z", "")}
-                            </td>
-                            <td className="px-1 py-1 border">{item.Model}</td>
-                            <td className="px-1 py-1 border">{item.Shift}</td>
-
-                            <td className="px-1 py-1 border">{item.FGSRNo}</td>
-                            <td className="px-1 py-1 border">
-                              {item.Category}
-                            </td>
-                            <td className="px-1 py-1 border">
-                              {item.AddDefect}
-                            </td>
-                            <td className="px-1 py-1 border">{item.Remark}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={8} className="text-center py-4">
-                            No data found.
-                          </td>
-                        </tr>
-                      )} */}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <LptReportTable
+                data={reportData.filter((item) =>
+                  details
+                    ? item.ModelName?.toLowerCase().includes(
+                        details.toLowerCase()
+                      ) ||
+                      item.AssemblyNo?.toLowerCase().includes(
+                        details.toLocaleLowerCase()
+                      )
+                    : true
+                )}
+              />
             </div>
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+const LptReportTable = ({ data }) => {
+  return (
+    <div className="w-full max-h-[600px] overflow-x-auto">
+      <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
+        <thead className="bg-gray-200 text-center">
+          <tr>
+            <th className="px-1 py-1 border" rowSpan={2}>
+              Sr.No.
+            </th>
+            <th className="px-1 py-1 border min-w-[120px]" rowSpan={2}>
+              Date Time
+            </th>
+            <th className="px-1 py-1 border min-w-[120px]" rowSpan={2}>
+              Shift
+            </th>
+            <th className="px-1 py-1 border min-w-[120px]" rowSpan={2}>
+              Model
+            </th>
+            <th className="px-1 py-1 border min-w-[120px]" rowSpan={2}>
+              Assembly No.
+            </th>
+            <th className="px-1 py-1 border" colSpan={3}>
+              Temperature
+            </th>
+            <th className="px-1 py-1 border" colSpan={3}>
+              Current
+            </th>
+            <th className="px-1 py-1 border" colSpan={3}>
+              Power
+            </th>
+            <th className="px-1 py-1 border" rowSpan={2}>
+              Performance
+            </th>
+          </tr>
+          <tr>
+            <th className="px-1 py-1 border min-w-[100px]">Min</th>
+            <th className="px-1 py-1 border min-w-[100px]">Max</th>
+            <th className="px-1 py-1 border min-w-[100px]">Actual</th>
+            <th className="px-1 py-1 border min-w-[100px]">Min</th>
+            <th className="px-1 py-1 border min-w-[100px]">Max</th>
+            <th className="px-1 py-1 border min-w-[100px]">Actual</th>
+            <th className="px-1 py-1 border min-w-[100px]">Min</th>
+            <th className="px-1 py-1 border min-w-[100px]">Max</th>
+            <th className="px-1 py-1 border min-w-[100px]">Actual</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data && data.length > 0 ? (
+            data.map((row, index) => (
+              <tr key={index} className="hover:bg-gray-100 text-center">
+                <td className="px-1 py-1 border">{row.SrNo}</td>
+                <td className="px-1 py-1 border">
+                  {row.DateTime &&
+                    row.DateTime.replace("T", " ").replace("Z", "")}
+                </td>
+                <td className="px-1 py-1 border">{row.Shift}</td>
+                <td className="px-1 py-1 border">{row.ModelName}</td>
+                <td className="px-1 py-1 border">{row.AssemblyNo}</td>
+                <td className="px-1 py-1 border">{row.minTemp}</td>
+                <td className="px-1 py-1 border">{row.maxTemp}</td>
+                <td className="px-1 py-1 border">{row.ActualTemp}</td>
+                <td className="px-1 py-1 border">{row.minCurrent}</td>
+                <td className="px-1 py-1 border">{row.maxCurrent}</td>
+                <td className="px-1 py-1 border">{row.ActualCurrent}</td>
+                <td className="px-1 py-1 border">{row.minPower}</td>
+                <td className="px-1 py-1 border">{row.maxPower}</td>
+                <td className="px-1 py-1 border">{row.ActualPower}</td>
+                <td
+                  className={`px-1 py-1 border border-black ${
+                    row.Performance === "Pass"
+                      ? "bg-green-500 text-white"
+                      : "bg-red-500 text-white"
+                  }`}
+                >
+                  {row.Performance}
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={15} className="text-center py-4">
+                No data found.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 };

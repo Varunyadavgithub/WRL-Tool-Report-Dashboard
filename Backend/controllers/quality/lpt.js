@@ -9,22 +9,34 @@ export const getLptAssetDetails = async (req, res) => {
 
   try {
     const query = `
-      SELECT m.Name 
-      FROM MaterialBarcode mb 
-      INNER JOIN Material m ON m.MatCode = mb.Material
-      WHERE mb.Serial = @AssemblySerial
+SELECT 
+    m.Name as ModelName,
+    r.MinTemp,
+    r.MaxTemp,
+    r.MinCurrent,
+    r.MaxCurrent,
+    r.MinPower,
+    r.MaxPower
+FROM 
+    MaterialBarcode mb
+JOIN 
+    Material m ON m.MatCode = mb.Material
+JOIN 
+    LPTRecipe r ON r.Matcode = m.MatCode
+WHERE 
+        mb.Serial = @AssemblySerial
+        OR mb.Alias = @AssemblySerial;
     `;
-
     const pool = await new sql.ConnectionPool(dbConfig1).connect();
-
+    
     const result = await pool
-      .request()
-      .input("AssemblySerial", sql.VarChar, AssemblySerial)
-      .query(query);
+    .request()
+    .input("AssemblySerial", sql.VarChar, AssemblySerial)
+    .query(query);
+    
+    const data = result?.recordset[0] || null;
 
-    const ModelName = result?.recordset[0]?.Name || null;
-
-    res.json({ success: true, ModelName });
+    res.json({ success: true, data });
     await pool.close();
   } catch (err) {
     console.error("SQL Error:", err.message);
@@ -53,15 +65,19 @@ export const addLptDefect = async (req, res) => {
   const {
     AssemblyNo,
     ModelName,
-    SetTemp,
+    MinTemp,
+    MaxTemp,
     ActualTemp,
-    SetCurrent,
+    MinCurrent,
+    MaxCurrent,
     ActualCurrent,
-    SetPower,
+    MinPower,
+    MaxPower,
     ActualPower,
     AddDefect,
     Category,
     Remark,
+    Performance,
     currentDateTime,
     shift,
   } = req.body;
@@ -74,11 +90,9 @@ export const addLptDefect = async (req, res) => {
 
     const query = `
       INSERT INTO LPTReport
-      (DateTime, Shift, ModelName, AssemblyNo, Defect, Remark,
-       SetTemp, ActualTemp, SetCurrent, ActualCurrent, SetPower, ActualPower)
+      (DateTime, Shift, ModelName, AssemblyNo, Defect, Remark, MinTemp, MaxTemp, ActualTemp, MinCurrent, MaxCurrent, ActualCurrent, MinPower, MaxPower, ActualPower, Performance)
       VALUES 
-      (@DateTime, @Shift, @ModelName, @AssemblyNo, @Defect, @Remark,
-       @SetTemp, @ActualTemp, @SetCurrent, @ActualCurrent, @SetPower, @ActualPower)
+      (@DateTime, @Shift, @ModelName, @AssemblyNo, @Defect, @Remark, @MinTemp, @MaxTemp, @ActualTemp, @MinCurrent, @MaxCurrent, @ActualCurrent, @MinPower, @MaxPower, @ActualPower, @Performance)
     `;
 
     const pool = await new sql.ConnectionPool(dbConfig1).connect();
@@ -88,15 +102,19 @@ export const addLptDefect = async (req, res) => {
     request.input("Shift", sql.NVarChar, shift?.trim() || null);
     request.input("ModelName", sql.NVarChar, ModelName?.trim() || null);
     request.input("AssemblyNo", sql.NVarChar, AssemblyNo?.trim() || null);
-    request.input("Category", sql.NVarChar, Category?.trim() || null);
     request.input("Defect", sql.NVarChar, AddDefect?.trim() || null);
     request.input("Remark", sql.NVarChar, Remark?.trim() || null);
-    request.input("SetTemp", sql.NVarChar, SetTemp ?? null);
+    request.input("MinTemp", sql.NVarChar, MinTemp ?? null);
+    request.input("MaxTemp", sql.NVarChar, MaxTemp ?? null);
     request.input("ActualTemp", sql.NVarChar, ActualTemp ?? null);
-    request.input("SetCurrent", sql.NVarChar, SetCurrent ?? null);
+    request.input("MinCurrent", sql.NVarChar, MinCurrent ?? null);
+    request.input("MaxCurrent", sql.NVarChar, MaxCurrent ?? null);
     request.input("ActualCurrent", sql.NVarChar, ActualCurrent ?? null);
-    request.input("SetPower", sql.NVarChar, SetPower ?? null);
+    request.input("MinPower", sql.NVarChar, MinPower ?? null);
+    request.input("MaxPower", sql.NVarChar, MaxPower ?? null);
     request.input("ActualPower", sql.NVarChar, ActualPower ?? null);
+    request.input("Performance", sql.NVarChar, Performance ?? null);
+    request.input("Category", sql.NVarChar, Category?.trim() || null);
 
     await request.query(query);
 
