@@ -36,6 +36,8 @@ import NotFound from "../pages/NotFound";
 import ComponentDetails from "../pages/Production/ComponentDetails";
 import TagUpdate from "../pages/Quality/TagUpdate";
 import LPTRecipe from "../pages/Quality/LPTRecipe";
+import UploadBISReport from "../pages/Quality/UploadBISReport";
+import BISReports from "../pages/Quality/BISReports";
 
 function MainContent() {
   const userRole = useSelector((state) => state.auth.user?.role || "");
@@ -112,7 +114,6 @@ function MainContent() {
         {canAccess(["line quality engineer"]) && (
           <Route path="/quality/lpt-recipe" element={<LPTRecipe />} />
         )}
-
         {/* 🚫 Restricted Route: Only Line Quality Engineer, Quality Manager and Admin */}
         {canAccess(["line quality engineer", "fpa", "quality manager"]) && (
           <Route path="/quality/dispatch-hold" element={<DispatchHold />} />
@@ -124,6 +125,17 @@ function MainContent() {
         {/* 🚫 Restricted Route: Only Line Quality Engineer, Quality Manager and Admin */}
         {canAccess(["line quality engineer", "quality manager"]) && (
           <Route path="/quality/tag-update" element={<TagUpdate />} />
+        )}
+        {/* 🚫 Restricted Route: Only BIS Engineer, Quality Manager and Admin */}
+        {canAccess(["bis engineer", "quality manager"]) && (
+          <Route
+            path="/quality/upload-bis-report"
+            element={<UploadBISReport />}
+          />
+        )}{" "}
+        {/* 🚫 Restricted Route: Only Line Quality Engineer, FPA, Quality Manager and Admin */}
+        {canAccess(["line quality engineer", "fpa", "quality manager"]) && (
+          <Route path="/quality/bis-reports" element={<BISReports />} />
         )}
         {/* Dispatch */}
         <Route

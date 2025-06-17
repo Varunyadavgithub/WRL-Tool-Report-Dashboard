@@ -34,6 +34,7 @@ import tagUpdateRoutes from "./routes/quality/tagUpdate.js";
 import lptRoutes from "./routes/quality/lpt.js";
 import lptReportRoutes from "./routes/quality/lptReport.js";
 import lptRecipeRoutes from "./routes/quality/lptRecipe.js";
+import UploadBISReportRoutes from "./routes/quality/UploadBISReport.js";
 
 // <----- Dispatch Routes ----->
 import dispatchPerformanceReportRoute from "./routes/dispatch/performanceReport.js";
@@ -97,6 +98,7 @@ app.use("/api/v1/quality", tagUpdateRoutes);
 app.use("/api/v1/quality", lptRoutes);
 app.use("/api/v1/quality", lptReportRoutes);
 app.use("/api/v1/quality", lptRecipeRoutes);
+app.use("/api/v1/quality", UploadBISReportRoutes);
 
 // <----- Dispatch Routes ----->
 app.use("/api/v1/dispatch", dispatchPerformanceReportRoute);

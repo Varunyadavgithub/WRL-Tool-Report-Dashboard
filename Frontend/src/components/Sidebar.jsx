@@ -93,6 +93,17 @@ const MENU_CONFIG = [
         label: "Tag Update",
         roles: ["line quality engineer", "quality manager"],
       },
+
+      {
+        path: "/quality/upload-bis-report",
+        label: "Upload BIS Report",
+        roles: ["bis engineer", "quality manager"],
+      },
+      {
+        path: "/quality/bis-reports",
+        label: "BIS Reports",
+        roles: ["line quality engineer", "fpa", "quality manager"],
+      },
     ],
   },
   {
@@ -164,7 +175,7 @@ const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
 
   const renderMenuItems = (menu) => {
     return (
-      <ul className="ml-6 mt-2 space-y-2">
+      <ul className="ml-6 mt-2 space-y-2 max-h-80 overflow-y-auto">
         {menu.items.map((item, index) => {
           if (item.roles && !canAccess(item.roles)) return null; // Hide restricted items
 
@@ -211,11 +222,11 @@ const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
 
   return (
     <aside
-      className={`fixed h-screen bg-gray-900 text-white transition-all duration-300 ease-in-out ${
+      className={`fixed min-h-screen bg-gray-900 text-white transition-all duration-300 ease-in-out ${
         isSidebarExpanded ? "w-64" : "w-16"
-      } p-4 shadow-xl flex flex-col justify-between`}
+      } p-4 shadow-xl flex flex-col`}
     >
-      <div>
+      <div className="flex-shrink-0">
         {/* Title */}
         <div className="flex justify-between mb-4">
           {isSidebarExpanded ? (

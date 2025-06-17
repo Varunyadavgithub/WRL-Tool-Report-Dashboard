@@ -6,6 +6,8 @@ import Loader from "../../components/common/Loader";
 import toast from "react-hot-toast";
 import { BsEye, BsDownload, BsTrash } from "react-icons/bs";
 import { useSelector } from "react-redux";
+import PopupModal from "../../components/common/PopupModal";
+import { MdDeleteForever } from "react-icons/md";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
@@ -15,6 +17,8 @@ const FiveDaysPlanning = () => {
   const [loading, setLoading] = useState(false);
   const [previewData, setPreviewData] = useState(null);
   const [activePreviewId, setActivePreviewId] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
 
   useEffect(() => {
     fetchFilesFromServer();
@@ -39,7 +43,7 @@ const FiveDaysPlanning = () => {
 
     try {
       setLoading(true);
-      const res = await axios.post(`${baseURL}planing/upload`, formData, {
+      const res = await axios.post(`${baseURL}planing/upload-excel`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -122,21 +126,22 @@ const FiveDaysPlanning = () => {
   };
 
   const handleDeleteFile = async (file) => {
-    if (
-      !window.confirm(`Are you sure you want to delete "${file.filename}"?`)
-    ) {
-      return;
-    }
+    setItemToDelete(file);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
     try {
       setLoading(true);
-
-      const filename = file.url.split("/").pop();
+      const filename = itemToDelete.url.split("/").pop();
 
       await axios.delete(`${baseURL}planing/delete/${filename}`);
 
-      setFiles((prevFiles) => prevFiles.filter((f) => f.id !== file.id));
+      setFiles((prevFiles) =>
+        prevFiles.filter((f) => f.id !== itemToDelete.id)
+      );
 
-      if (activePreviewId === file.id) {
+      if (activePreviewId === itemToDelete.id) {
         setActivePreviewId(null);
         setPreviewData(null);
       }
@@ -220,6 +225,21 @@ const FiveDaysPlanning = () => {
                     >
                       <BsTrash size={18} />
                     </button>
+                  )}
+                  {/* Delete Confirmation Modal */}
+                  {showDeleteModal && (
+                    <PopupModal
+                      title="Delete Confirmation"
+                      description="Are you sure you want to delete this File?"
+                      confirmText="Yes, Delete"
+                      cancelText="Cancel"
+                      modalId="delete-modal"
+                      onConfirm={confirmDelete}
+                      onCancel={() => setShowDeleteModal(false)}
+                      icon={
+                        <MdDeleteForever className="text-red-500 w-12 h-12 mx-auto" />
+                      }
+                    />
                   )}
                 </div>
               </div>
