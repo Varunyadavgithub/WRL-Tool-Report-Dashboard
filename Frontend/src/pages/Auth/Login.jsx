@@ -10,7 +10,11 @@ import { assets } from "../../assets/assets.js";
 import { FaEye, FaEyeSlash, FaUser, FaLock } from "react-icons/fa";
 
 // Array of industrial background images from assets
-const industrialBackgrounds = [assets.industrialBg1, assets.industrialBg2];
+const industrialBackgrounds = [
+  assets.industrialBg1,
+  assets.industrialBg2,
+  assets.industrialBg3,
+];
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
