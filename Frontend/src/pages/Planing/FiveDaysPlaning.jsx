@@ -186,7 +186,7 @@ const FiveDaysPlanning = () => {
                 className="bg-white rounded-lg shadow-md p-4 border border-purple-300"
               >
                 <h4 className="font-semibold text-gray-800 truncate mb-3">
-                  {file.filename}
+                  {file.filename || "N/A"}
                 </h4>
 
                 <div className="mt-2 flex flex-wrap gap-2">
