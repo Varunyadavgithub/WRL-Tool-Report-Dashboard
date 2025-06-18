@@ -24,7 +24,7 @@ export const getFiles = (_, res) => {
     const files = fs.readdirSync(uploadDir);
     const fileList = files.map((file, index) => ({
       id: index + 1,
-      filename: file.split("-").slice(1).join("-"), // original name only
+      filename: file.trim(), // original name only
       url: `/uploads/${file}`,
     }));
     res.status(200).json({ success: true, files: fileList });
