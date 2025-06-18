@@ -200,20 +200,28 @@ export const getLptDefectCount = async (req, res) => {
   const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
   const query = `
-   WITH FPA_COMPUTED AS (
+WITH FPA_COMPUTED AS (
     SELECT 
         c.Name AS ModelName,
-        COUNT(*) AS ModelCount,
-        CEILING(COUNT(*) * 1.0 / 100) AS LPT
-    FROM ProcessActivity a
-    INNER JOIN MaterialBarcode b ON a.PSNo = b.DocNo
-    INNER JOIN Material c ON b.Material = c.MatCode
-    WHERE 
-        a.StationCode IN (1220010, 1230017)
-        AND a.ActivityType = 5
-        AND a.ActivityOn BETWEEN @StartDate AND @EndDate
-        AND b.Type NOT IN (0, 200)
-    GROUP BY c.Name
+        cnt.ModelCount,
+        CASE 
+            WHEN cnt.ModelCount <= 10 THEN 0
+            ELSE CEILING((cnt.ModelCount - 10) / 10.0)
+        END AS LPT
+    FROM (
+        SELECT 
+            b.Material,
+            COUNT(*) AS ModelCount
+        FROM ProcessActivity a
+        INNER JOIN MaterialBarcode b ON a.PSNo = b.DocNo
+        WHERE 
+            a.StationCode IN (1220010, 1230017)
+            AND a.ActivityType = 5
+            AND a.ActivityOn BETWEEN @StartDate AND @EndDate
+            AND b.Type NOT IN (0, 200)
+        GROUP BY b.Material
+    ) AS cnt
+    INNER JOIN Material c ON cnt.Material = c.MatCode
 ),
 SAMPLE_INSPECTED AS (
     SELECT 
