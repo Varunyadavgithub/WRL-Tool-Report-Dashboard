@@ -6,10 +6,10 @@ const uploadDir = path.resolve("uploads");
 
 // Upload file controller
 export const uploadBisPdfFile = async (req, res) => {
-  const { modelName, description } = req.body;
+  const { modelName, year, description } = req.body;
   const fileName = req.file?.filename;
 
-  if (!modelName || !description || !fileName) {
+  if (!modelName || !year || !description || !fileName) {
     return res.status(400).json({ success: false, message: "Missing fields" });
   }
 
@@ -20,12 +20,13 @@ export const uploadBisPdfFile = async (req, res) => {
     const pool = await sql.connect(dbConfig1);
 
     const query = `
-      INSERT INTO BISUpload (ModelName, Description, FileName, UploadAT)
-      VALUES (@ModelName, @Description, @FileName, @UploadAT)
+      INSERT INTO BISUpload (ModelName, Year, Description, FileName, UploadAT)
+      VALUES (@ModelName, @Year, @Description, @FileName, @UploadAT)
     `;
     const result = await pool
       .request()
       .input("ModelName", sql.VarChar, modelName)
+      .input("Year", sql.VarChar, year)
       .input("Description", sql.VarChar, description)
       .input("FileName", sql.VarChar, fileName)
       .input("UploadAT", sql.DateTime, uploadedAt)
@@ -56,6 +57,7 @@ export const getBisReportFiles = async (_, res) => {
     const files = result.recordset.map((file) => ({
       id: file.Id,
       modelName: file.ModelName,
+      year: file.Year,
       description: file.Description,
       fileName: file.FileName,
       url: `/uploads-bis-pdf/${file.FileName}`,
@@ -163,10 +165,10 @@ export const deleteBisFile = async (req, res) => {
 // Update BIS File Controller
 export const updateBisFile = async (req, res) => {
   const { filename } = req.params;
-  const { modelName, description } = req.body;
+  const { modelName, year, description } = req.body;
   const newFileName = req.file?.filename;
 
-  if (!modelName || !description) {
+  if (!modelName || !year || !description) {
     return res.status(400).json({ success: false, message: "Missing fields" });
   }
 
@@ -185,6 +187,7 @@ export const updateBisFile = async (req, res) => {
     const query = `
       UPDATE BISUpload 
       SET ModelName = @ModelName, 
+          Year = @Year,
           Description = @Description, 
           FileName = @FileName 
       WHERE FileName = @OldFileName
@@ -193,6 +196,7 @@ export const updateBisFile = async (req, res) => {
     const result = await pool
       .request()
       .input("ModelName", sql.VarChar, modelName)
+      .input("Year", sql.VarChar, year)
       .input("Description", sql.VarChar, description)
       .input("FileName", sql.VarChar, newFileName || filename)
       .input("OldFileName", sql.VarChar, filename)

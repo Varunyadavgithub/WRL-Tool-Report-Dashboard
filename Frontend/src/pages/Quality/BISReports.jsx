@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { FaFilePdf, FaDownload, FaEye, FaTrash } from "react-icons/fa";
@@ -109,6 +109,7 @@ const BISReports = () => {
               <tr>
                 <th className="px-4 py-3 text-left">Sr. No.</th>
                 <th className="px-4 py-3 text-left">Model Name</th>
+                <th className="px-4 py-3 text-left">Year</th>
                 <th className="px-4 py-3 text-left">Description</th>
                 <th className="px-4 py-3 text-left">File Name</th>
                 <th className="px-4 py-3 text-left">Uploaded At</th>
@@ -123,6 +124,7 @@ const BISReports = () => {
                 >
                   <td className="px-4 py-3">{index + 1}</td>
                   <td className="px-4 py-3 font-semibold">{file.modelName}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{file.year}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {file.description}
                   </td>

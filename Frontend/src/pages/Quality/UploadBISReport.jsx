@@ -21,6 +21,7 @@ const baseURL = import.meta.env.VITE_API_BASE_URL;
 const UploadBISReport = () => {
   const [loading, setLoading] = useState(false);
   const [modelName, setModelName] = useState("");
+  const [year, setYear] = useState("");
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -30,6 +31,7 @@ const UploadBISReport = () => {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [updateFields, setUpdateFields] = useState({
     modelName: "",
+    year: "",
     description: "",
     selectedFile: "",
   });
@@ -47,6 +49,9 @@ const UploadBISReport = () => {
       case "modelName":
         return file.modelName.toLowerCase().includes(term.toLowerCase());
 
+      case "year":
+        return file.year.toLowerCase().includes(term.toLowerCase());
+
       case "description":
         return file.description.toLowerCase().includes(term.toLowerCase());
 
@@ -56,6 +61,7 @@ const UploadBISReport = () => {
       default:
         return (
           file.modelName.toLowerCase().includes(term.toLowerCase()) ||
+          file.year.toLowerCase().includes(term.toLowerCase()) ||
           file.description.toLowerCase().includes(term.toLowerCase()) ||
           file.fileName.toLowerCase().includes(term.toLowerCase())
         );
@@ -99,6 +105,11 @@ const UploadBISReport = () => {
       return;
     }
 
+    if (!year.trim()) {
+      toast.error("Year is required");
+      return;
+    }
+
     if (!description.trim()) {
       toast.error("Description is required");
       return;
@@ -111,6 +122,7 @@ const UploadBISReport = () => {
 
     const formData = new FormData();
     formData.append("modelName", modelName.trim());
+    formData.append("year", year.trim());
     formData.append("description", description.trim());
     formData.append("file", selectedFile);
 
@@ -131,6 +143,7 @@ const UploadBISReport = () => {
       }
 
       setModelName("");
+      setYear("");
       setDescription("");
       setSelectedFile(null);
       fetchUploadedFiles();
@@ -147,6 +160,7 @@ const UploadBISReport = () => {
     setItemToUpdate(item);
     setUpdateFields({
       modelName: item.modelName || "",
+      year: item.year || "",
       description: item.description || "",
       selectedFile: null,
     });
@@ -159,6 +173,11 @@ const UploadBISReport = () => {
       return;
     }
 
+    if (!updateFields.year.trim()) {
+      toast.error("Year is required");
+      return;
+    }
+
     if (!updateFields.description.trim()) {
       toast.error("Description is required");
       return;
@@ -166,6 +185,7 @@ const UploadBISReport = () => {
 
     const formData = new FormData();
     formData.append("modelName", updateFields.modelName.trim());
+    formData.append("year", updateFields.year.trim());
     formData.append("description", updateFields.description.trim());
 
     if (selectedFile) {
@@ -192,6 +212,7 @@ const UploadBISReport = () => {
         setSelectedFile(null);
         setUpdateFields({
           modelName: "",
+          year: "",
           description: "",
           selectedFile: null,
         });
@@ -272,22 +293,49 @@ const UploadBISReport = () => {
               Model Details
             </h2>
             <div className="space-y-4">
-              <div>
-                <label
-                  htmlFor="modelName"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Model Name
-                </label>
-                <InputField
-                  id="modelName"
-                  type="text"
-                  placeholder="Enter Model Name"
-                  className="w-full"
-                  name="modelName"
-                  value={modelName}
-                  onChange={(e) => setModelName(e.target.value)}
-                />
+              <div className="flex gap-4">
+                <div>
+                  <label
+                    htmlFor="modelName"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
+                    Model Name
+                  </label>
+                  <InputField
+                    id="modelName"
+                    type="text"
+                    placeholder="Enter Model Name"
+                    className="w-full"
+                    name="modelName"
+                    value={modelName}
+                    onChange={(e) => setModelName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="year"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
+                    Year
+                  </label>
+                  <select
+                    id="year"
+                    className="w-full border border-black rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    name="year"
+                    value={year}
+                    onChange={(e) => setYear(e.target.value)}
+                  >
+                    <option value="">Select Year</option>
+                    {Array.from(
+                      { length: new Date().getFullYear() - 2021 + 1 },
+                      (_, index) => 2021 + index
+                    ).map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -397,11 +445,9 @@ const UploadBISReport = () => {
               }
             >
               <option value="all">All Fields</option>
-
               <option value="modelName">Model Name</option>
-
+              <option value="year">Year</option>
               <option value="description">Description</option>
-
               <option value="fileName">File Name</option>
             </select>
           </div>
@@ -456,13 +502,19 @@ const UploadBISReport = () => {
                 </div>
 
                 <div className="p-4">
-                  <div className="mb-2">
-                    <label className="text-xs text-gray-500 block mb-1">
-                      Description
-                    </label>
-                    <p className="text-sm text-gray-700 line-clamp-2">
-                      {file.description || "No description provided"}
-                    </p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                    <div className="mb-2">
+                      <label className="text-xs text-gray-500 block mb-1">
+                        Description
+                      </label>
+                      <p className="text-sm text-gray-700 line-clamp-2">
+                        {file.description || "No description provided"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Year</span>
+                      <p className="truncate">{file.year}</p>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
@@ -470,6 +522,7 @@ const UploadBISReport = () => {
                       <span className="font-medium">File Name:</span>
                       <p className="truncate">{file.fileName}</p>
                     </div>
+
                     <div>
                       <span className="font-medium">Uploaded At:</span>
                       <p>{new Date(file.uploadAt).toLocaleDateString()}</p>
@@ -535,36 +588,54 @@ const UploadBISReport = () => {
                   <p>Size: {(selectedFile.size / 1024).toFixed(2)} KB</p>
                 </div>
               )}
-
-              <div className="mt-6 flex justify-center">
-                <Button
-                  bgColor={loading ? "bg-gray-400" : "bg-purple-600"}
-                  textColor="text-white"
-                  className={`px-8 py-3 rounded-lg hover:shadow-lg transition duration-300 ${
-                    loading
-                      ? "cursor-not-allowed opacity-50"
-                      : "hover:bg-purple-700"
-                  }`}
-                  onClick={handleUpload}
-                  disabled={loading || !selectedFile}
-                >
-                  {loading ? "Uploading..." : "Upload Report"}
-                </Button>
-              </div>
             </div>
 
-            <InputField
-              label="Model Name"
-              type="text"
-              value={updateFields.modelName}
-              onChange={(e) =>
-                setUpdateFields({
-                  ...updateFields,
-                  modelName: e.target.value,
-                })
-              }
-              className="text-black dark:text-white"
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <InputField
+                label="Model Name"
+                type="text"
+                value={updateFields.modelName}
+                onChange={(e) =>
+                  setUpdateFields({
+                    ...updateFields,
+                    modelName: e.target.value,
+                  })
+                }
+                className="text-black dark:text-white"
+              />
+              <div>
+                <label
+                  htmlFor="update-year"
+                  className="block text-sm font-medium text-black dark:text-white mb-2"
+                >
+                  Year
+                </label>
+
+                <select
+                  id="update-year"
+                  className="w-fit text-black dark:text-white bg-white dark:bg-gray-800 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  name="year"
+                  value={updateFields.year}
+                  onChange={(e) =>
+                    setUpdateFields({
+                      ...updateFields,
+                      year: e.target.value,
+                    })
+                  }
+                >
+                  <option value="">Select Year</option>
+
+                  {Array.from(
+                    { length: new Date().getFullYear() - 2021 + 1 },
+                    (_, index) => 2021 + index
+                  ).map((yearOption) => (
+                    <option key={yearOption} value={yearOption}>
+                      {yearOption}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <label className="text-md text-black dark:text-white block mb-1">
               Description
             </label>
@@ -575,7 +646,6 @@ const UploadBISReport = () => {
               onChange={(e) =>
                 setUpdateFields({
                   ...updateFields,
-
                   description: e.target.value,
                 })
               }
