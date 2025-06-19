@@ -3,24 +3,37 @@ import path from "path";
 import fs from "fs";
 
 // Create uploads directory if not exists
-const uploadDir = path.resolve("uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
+const uploadsDir = path.resolve("uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
+
+// Ensure subdirectories exist
+const fiveDaysPlanDir = path.resolve(uploadsDir, "FiveDaysPlan");
+const bisReportDir = path.resolve(uploadsDir, "BISReport");
+
+if (!fs.existsSync(fiveDaysPlanDir)) {
+  fs.mkdirSync(fiveDaysPlanDir);
+}
+
+if (!fs.existsSync(bisReportDir)) {
+  fs.mkdirSync(bisReportDir);
 }
 
 // Generic storage configuration
-const createStorage = (prefix = "file") => {
+const createStorage = (folder) => {
   return multer.diskStorage({
     destination: (req, file, cb) => {
-      cb(null, uploadDir);
+      const uploadPath = path.resolve(uploadsDir, folder);
+      cb(null, uploadPath);
     },
-    filename: (req, file, cb) => {
+    filename: (_, file, cb) => {
       cb(null, file.originalname);
     },
   });
 };
 
-// File type configurations
+// File type configurations (keep existing)
 const fileTypes = {
   excel: {
     allowedTypes: [
@@ -37,10 +50,11 @@ const fileTypes = {
   },
 };
 
-// Generic file filter
+// Generic file filter (keep existing)
 const createFileFilter = (fileType) => {
   return (_, file, cb) => {
     const config = fileTypes[fileType];
+
     if (config.allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -50,32 +64,30 @@ const createFileFilter = (fileType) => {
 };
 
 // Create upload middlewares
-export const uploadExcel = multer({
-  storage: createStorage("excel"),
+export const uploadFiveDaysPlanExcel = multer({
+  storage: createStorage("FiveDaysPlan"),
   fileFilter: createFileFilter("excel"),
   limits: {
     fileSize: fileTypes.excel.maxSize,
   },
 });
 
-export const uploadPDF = multer({
-  storage: createStorage("pdf"),
+export const uploadBISReportPDF = multer({
+  storage: createStorage("BISReport"),
   fileFilter: createFileFilter("pdf"),
   limits: {
     fileSize: fileTypes.pdf.maxSize,
   },
 });
 
-// Utility function for error handling
+// Existing error handling middleware
 export const handleMulterError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    // A Multer error occurred when uploading.
     return res.status(400).json({
       success: false,
       message: err.message || "File upload error",
     });
   } else if (err) {
-    // An unknown error occurred when uploading.
     return res.status(400).json({
       success: false,
       message: err.message || "File upload failed",

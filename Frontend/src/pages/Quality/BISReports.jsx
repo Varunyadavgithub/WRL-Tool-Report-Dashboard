@@ -9,7 +9,10 @@ const baseURL = import.meta.env.VITE_API_BASE_URL;
 const BISReports = () => {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchParams, setSearchParams] = useState({
+    term: "",
+    field: "all",
+  });
 
   // Fetch uploaded files
   const fetchUploadedFiles = async () => {
@@ -55,11 +58,33 @@ const BISReports = () => {
   };
 
   // Search functionality
-  const filteredFiles = uploadedFiles.filter(
-    (file) =>
-      file.modelName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      file.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredFiles = uploadedFiles.filter((file) => {
+    const { term, field } = searchParams;
+
+    if (!term) return true;
+
+    switch (field) {
+      case "modelName":
+        return file.modelName.toLowerCase().includes(term.toLowerCase());
+
+      case "year":
+        return file.year.toLowerCase().includes(term.toLowerCase());
+
+      case "description":
+        return file.description.toLowerCase().includes(term.toLowerCase());
+
+      case "fileName":
+        return file.fileName.toLowerCase().includes(term.toLowerCase());
+
+      default:
+        return (
+          file.modelName.toLowerCase().includes(term.toLowerCase()) ||
+          file.year.toLowerCase().includes(term.toLowerCase()) ||
+          file.description.toLowerCase().includes(term.toLowerCase()) ||
+          file.fileName.toLowerCase().includes(term.toLowerCase())
+        );
+    }
+  });
 
   // Fetch files on component mount
   useEffect(() => {
@@ -79,13 +104,39 @@ const BISReports = () => {
           <FaFilePdf className="mr-3 text-red-500" />
           BIS Reports
         </h1>
-        <input
-          type="text"
-          placeholder="Search reports..."
-          className="px-3 py-2 border rounded-md w-64"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+        <div className="flex items-center space-x-2">
+          <input
+            type="text"
+            placeholder="Search files..."
+            className="px-3 py-2 border rounded-md w-64"
+            value={searchParams.term}
+            onChange={(e) =>
+              setSearchParams((prev) => ({
+                ...prev,
+
+                term: e.target.value,
+              }))
+            }
+          />
+
+          <select
+            className="px-3 py-2 border rounded-md"
+            value={searchParams.field}
+            onChange={(e) =>
+              setSearchParams((prev) => ({
+                ...prev,
+
+                field: e.target.value,
+              }))
+            }
+          >
+            <option value="all">All Fields</option>
+            <option value="modelName">Model Name</option>
+            <option value="year">Year</option>
+            <option value="description">Description</option>
+            <option value="fileName">File Name</option>
+          </select>
+        </div>
         {/* Pagination (Optional) could be added here */}
         <div className="p-4 bg-gray-100 text-right">
           <p className="text-sm text-gray-600">
@@ -124,7 +175,9 @@ const BISReports = () => {
                 >
                   <td className="px-4 py-3">{index + 1}</td>
                   <td className="px-4 py-3 font-semibold">{file.modelName}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{file.year}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {file.year}
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {file.description}
                   </td>

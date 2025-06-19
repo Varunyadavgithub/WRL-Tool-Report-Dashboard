@@ -1,25 +1,25 @@
 import express from "express";
 import {
-  uploadFile,
-  getFiles,
-  downloadFile,
-  deleteFile,
+  uploadPlanningExcelFile,
+  getPlanningExcelFiles,
+  downloadPlanningExcelFile,
+  deletePlanningExcelFile,
 } from "../../controllers/planing/fiveDaysPlaning.js";
 import {
   handleMulterError,
-  uploadExcel,
+  uploadFiveDaysPlanExcel,
 } from "../../middlewares/uploadMiddleware.js";
 
 const router = express.Router();
 
 router.post(
   "/upload-excel",
-  uploadExcel.single("file"),
+  uploadFiveDaysPlanExcel.single("file"),
   handleMulterError,
-  uploadFile
+  uploadPlanningExcelFile
 );
-router.get("/files", getFiles);
-router.get("/download/:filename", downloadFile);
-router.delete("/delete/:filename", deleteFile);
+router.get("/files", getPlanningExcelFiles);
+router.get("/download/:filename", downloadPlanningExcelFile);
+router.delete("/delete/:filename", deletePlanningExcelFile);
 
 export default router;

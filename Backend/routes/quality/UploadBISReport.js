@@ -1,32 +1,32 @@
 import express from "express";
 import {
   handleMulterError,
-  uploadPDF,
+  uploadBISReportPDF,
 } from "../../middlewares/uploadMiddleware.js";
 import {
-  deleteBisFile,
-  downloadBisFile,
-  getBisReportFiles,
-  updateBisFile,
   uploadBisPdfFile,
+  getBisPdfFiles,
+  downloadBisPdfFile,
+  deleteBisPdfFile,
+  updateBisPdfFile,
 } from "../../controllers/quality/UploadBISReport.js";
 
 const router = express.Router();
 
 router.post(
   "/upload-bis-pdf",
-  uploadPDF.single("file"),
+  uploadBISReportPDF.single("file"),
   handleMulterError,
   uploadBisPdfFile
 );
-router.get("/bis-files", getBisReportFiles);
-router.get("/download-bis-file/:filename", downloadBisFile);
-router.delete("/delete-bis-file/:filename", deleteBisFile);
+router.get("/bis-files", getBisPdfFiles);
+router.get("/download-bis-file/:filename", downloadBisPdfFile);
+router.delete("/delete-bis-file/:filename", deleteBisPdfFile);
 router.put(
   "/update-bis-file/:filename",
-  uploadPDF.single("file"),
+  uploadBISReportPDF.single("file"),
   handleMulterError,
-  updateBisFile
+  updateBisPdfFile
 );
 
 export default router;

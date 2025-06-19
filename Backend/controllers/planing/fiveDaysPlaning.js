@@ -1,10 +1,10 @@
 import path from "path";
 import fs from "fs";
 
-const uploadDir = path.resolve("uploads");
+const uploadDir = path.resolve("uploads", "FiveDaysPlan");
 
 // Upload file controller
-export const uploadFile = (req, res) => {
+export const uploadPlanningExcelFile = (req, res) => {
   if (!req.file) {
     return res
       .status(400)
@@ -14,18 +14,18 @@ export const uploadFile = (req, res) => {
   return res.status(200).json({
     success: true,
     filename: req.file.originalname,
-    fileUrl: `/uploads/${req.file.filename}`,
+    fileUrl: `/uploads/FiveDaysPlan/${req.file.filename}`,
   });
 };
 
 // Get files list controller
-export const getFiles = (_, res) => {
+export const getPlanningExcelFiles = (_, res) => {
   try {
     const files = fs.readdirSync(uploadDir);
     const fileList = files.map((file, index) => ({
       id: index + 1,
-      filename: file.trim(), // original name only
-      url: `/uploads/${file}`,
+      filename: file.trim(),
+      url: `/uploads/FiveDaysPlan/${file}`,
     }));
     res.status(200).json({ success: true, files: fileList });
   } catch (error) {
@@ -35,7 +35,7 @@ export const getFiles = (_, res) => {
 };
 
 // Download file controller
-export const downloadFile = (req, res) => {
+export const downloadPlanningExcelFile = (req, res) => {
   const { filename } = req.params;
   const filePath = path.join(uploadDir, filename);
 
@@ -54,7 +54,7 @@ export const downloadFile = (req, res) => {
 };
 
 // Delete file controller
-export const deleteFile = (req, res) => {
+export const deletePlanningExcelFile = (req, res) => {
   const { filename } = req.params;
   const filePath = path.join(uploadDir, filename);
 

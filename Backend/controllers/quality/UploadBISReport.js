@@ -1,8 +1,8 @@
-import sql, { dbConfig1 } from "../../config/db.js";
 import path from "path";
 import fs from "fs";
+import sql, { dbConfig1 } from "../../config/db.js";
 
-const uploadDir = path.resolve("uploads");
+const uploadDir = path.resolve("uploads", "BISReport");
 
 // Upload file controller
 export const uploadBisPdfFile = async (req, res) => {
@@ -13,7 +13,6 @@ export const uploadBisPdfFile = async (req, res) => {
     return res.status(400).json({ success: false, message: "Missing fields" });
   }
 
-  // const originalFileName = fileName.split("-").slice(3).join("-");
   const uploadedAt = new Date().toISOString().split("T")[0]; // "yyyy-mm-dd"
 
   try {
@@ -35,7 +34,7 @@ export const uploadBisPdfFile = async (req, res) => {
     res.status(200).json({
       success: true,
       filename: req.file.originalname,
-      fileUrl: `/uploads-bis-pdf/${req.file.filename}`,
+      fileUrl: `/uploads/BISReport/${req.file.filename}`,
       message: "Uploaded successfully",
     });
   } catch (error) {
@@ -45,7 +44,7 @@ export const uploadBisPdfFile = async (req, res) => {
 };
 
 // Get files list controller
-export const getBisReportFiles = async (_, res) => {
+export const getBisPdfFiles = async (_, res) => {
   try {
     const pool = await sql.connect(dbConfig1);
     const query = `
@@ -73,7 +72,7 @@ export const getBisReportFiles = async (_, res) => {
 };
 
 // Download file controller
-export const downloadBisFile = async (req, res) => {
+export const downloadBisPdfFile = async (req, res) => {
   const { filename } = req.params;
   const filePath = path.join(uploadDir, filename);
 
@@ -132,7 +131,7 @@ export const downloadBisFile = async (req, res) => {
 };
 
 // Delete file controller
-export const deleteBisFile = async (req, res) => {
+export const deleteBisPdfFile = async (req, res) => {
   const { filename } = req.params;
   const filePath = path.join(uploadDir, filename);
 
@@ -163,7 +162,7 @@ export const deleteBisFile = async (req, res) => {
 };
 
 // Update BIS File Controller
-export const updateBisFile = async (req, res) => {
+export const updateBisPdfFile = async (req, res) => {
   const { filename } = req.params;
   const { modelName, year, description } = req.body;
   const newFileName = req.file?.filename;
