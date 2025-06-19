@@ -51,14 +51,12 @@ export const holdCabinet = async (req, res) => {
 
   try {
     for (const hold of holds) {
-      const {
-        modelName,
-        fgNo,
-        userName,
-        dispatchStatus,
-        defect,
-        formattedDate,
-      } = hold;
+      const { modelName, fgNo, userName, defect, formattedDate } = hold;
+
+      // Convert to IST (UTC+5:30)
+      const currDate = new Date(
+        new Date(formattedDate).getTime() + 330 * 60000
+      );
 
       // 1. Check Hold Status in Garuda DB
       const HoldStatusPool = await getNewConnection(dbConfig1);
@@ -111,8 +109,7 @@ export const holdCabinet = async (req, res) => {
                 .input("UserCode", sql.Int, userName)
                 .input("Defect", sql.VarChar, defect)
                 .input("FGNo", sql.VarChar, fgNo)
-                .input("HoldDateTime", sql.DateTime, new Date(formattedDate))
-                .query(`
+                .input("HoldDateTime", sql.DateTime, currDate).query(`
                 BEGIN TRANSACTION;
 
                 INSERT INTO DispatchHold (material, HoldUserCode, DefectCode, serial, HoldDateTime) 
@@ -175,14 +172,13 @@ export const releaseCabinet = async (req, res) => {
 
   try {
     for (const release of releases) {
-      const {
-        modelName,
-        fgNo,
-        releaseUserCode,
-        dispatchStatus,
-        action,
-        formattedDate,
-      } = release;
+      const { modelName, fgNo, releaseUserCode, action, formattedDate } =
+        release;
+
+      // Convert to IST (UTC+5:30)
+      const currDate = new Date(
+        new Date(formattedDate).getTime() + 330 * 60000
+      );
 
       // 1. Check Release Status in Garuda DB
       const ReleaseStatusPool = await getNewConnection(dbConfig1);
@@ -208,8 +204,7 @@ export const releaseCabinet = async (req, res) => {
             .input("UserCode", sql.Int, releaseUserCode)
             .input("Action", sql.VarChar, action)
             .input("FGNo", sql.VarChar, fgNo)
-            .input("ReleaseDateTime", sql.DateTime, new Date(formattedDate))
-            .query(`
+            .input("ReleaseDateTime", sql.DateTime, currDate).query(`
                 BEGIN TRANSACTION;
 
                 UPDATE DispatchHold

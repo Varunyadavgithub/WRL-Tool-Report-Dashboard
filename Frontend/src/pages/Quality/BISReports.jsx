@@ -13,6 +13,7 @@ const BISReports = () => {
     term: "",
     field: "all",
   });
+  const [selectedPDF, setSelectedPDF] = useState(null);
 
   // Fetch uploaded files
   const fetchUploadedFiles = async () => {
@@ -54,7 +55,18 @@ const BISReports = () => {
 
   // View PDF in new tab
   const handleViewPDF = (file) => {
-    window.open(`${baseURL}uploads-bis-pdf/${file.fileName}`, "_blank");
+    try {
+      if (!file || !file.url) {
+        toast.error("Invalid file or file URL");
+        return;
+      }
+
+      setSelectedPDF(file);
+      console.log(selectedPDF)
+    } catch (error) {
+      console.error("Error viewing PDF:", error);
+      toast.error("Failed to open PDF");
+    }
   };
 
   // Search functionality
@@ -98,7 +110,6 @@ const BISReports = () => {
         align="center"
         className="mb-8 text-3xl font-bold text-gray-800"
       />
-
       <div className="p-4 bg-gray-100 flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center">
           <FaFilePdf className="mr-3 text-red-500" />
@@ -144,7 +155,6 @@ const BISReports = () => {
           </p>
         </div>
       </div>
-
       {loading ? (
         <div className="text-center py-8">
           <p>Loading reports...</p>
@@ -188,14 +198,14 @@ const BISReports = () => {
                   <td className="px-4 py-3 flex justify-center space-x-2">
                     <button
                       onClick={() => handleViewPDF(file)}
-                      className="text-blue-500 hover:text-blue-700"
+                      className="text-blue-500 hover:text-blue-700 cursor-pointer"
                       title="View PDF"
                     >
                       <FaEye />
                     </button>
                     <button
                       onClick={() => handleDownload(file)}
-                      className="text-green-500 hover:text-green-700"
+                      className="text-green-500 hover:text-green-700 cursor-pointer"
                       title="Download"
                     >
                       <FaDownload />

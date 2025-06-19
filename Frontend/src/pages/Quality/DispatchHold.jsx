@@ -8,6 +8,7 @@ import Loader from "../../components/common/Loader";
 import toast from "react-hot-toast";
 import ExcelJS from "exceljs";
 import { useSelector } from "react-redux";
+import { getFormattedISTDate } from "../../utils/dateUtils";
 // import { getFormattedISTDate } from "../../utils/dateUtils";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
@@ -144,11 +145,7 @@ const DispatchHold = () => {
         userName: user.usercode || "defaultUser",
         dispatchStatus: status.value,
         defect: defectName,
-        // formattedDate: getFormattedISTDate(),
-        formattedDate: new Date()
-          .toISOString()
-          .replace("T", " ")
-          .replace("Z", ""),
+        formattedDate: getFormattedISTDate(),
       }));
 
       const res = await axios.post(`${baseURL}quality/hold`, payload);
@@ -190,11 +187,7 @@ const DispatchHold = () => {
         releaseUserCode: user.usercode || "defaultUser",
         dispatchStatus: status.value,
         action: actionPlan,
-        // formattedDate: getFormattedISTDate(),
-        formattedDate: new Date()
-          .toISOString()
-          .replace("T", " ")
-          .replace("Z", ""),
+        formattedDate: getFormattedISTDate(),
       }));
 
       // Send batch release request
