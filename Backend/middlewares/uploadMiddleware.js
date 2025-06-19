@@ -46,7 +46,7 @@ const fileTypes = {
   pdf: {
     allowedTypes: ["application/pdf", "application/x-pdf"],
     errorMessage: "Only PDF files are allowed",
-    maxSize: 5 * 1024 * 1024, // 5MB
+    maxSize: 10 * 1024 * 1024, // 10MB
   },
 };
 

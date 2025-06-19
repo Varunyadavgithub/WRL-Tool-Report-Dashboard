@@ -84,7 +84,7 @@ const UploadBISReport = () => {
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 10 * 1024 * 1024; // 10MB
 
     if (file) {
       if (file.type !== "application/pdf") {
