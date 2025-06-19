@@ -18,15 +18,12 @@ export const getDispatchHoldDetails = async (req, res) => {
         "dh.HoldDatetime BETWEEN @startDate AND @endDate AND mb.Status = 11 AND dh.ReleasedDateTime IS NULL ORDER BY dh.HoldDatetime DESC";
     } else if (lowerStatus === "release") {
       statusCondition =
-        "dh.ReleasedDateTime BETWEEN @startDate AND @endDate  AND mb.Status = 1 AND dh.ReleasedDateTime IS NOT NULL ORDER BY dh.ReleasedDateTime DESC";
+        "dh.ReleasedDateTime BETWEEN @startDate AND @endDate AND dh.ReleasedDateTime IS NOT NULL ORDER BY dh.ReleasedDateTime DESC";
     } else {
-      statusCondition = `    (
-        (mb.Status = 11 AND dh.ReleasedDateTime IS NULL AND dh.HoldDatetime BETWEEN '2025-05-08 08:00:00.000' AND '2025-06-08 08:00:00.000')
-        OR
-        (mb.Status = 1 AND dh.ReleasedDateTime IS NOT NULL AND dh.ReleasedDateTime BETWEEN '2025-05-08 08:00:00.000' AND '2025-06-08 08:00:00.000')
-    )
+      statusCondition = `    	mb.Status IN (1, 11)
+	AND dh.HoldDatetime BETWEEN @startDate AND @endDate
     ORDER BY
-      ISNULL(dh.ReleasedDateTime, dh.HoldDatetime) DESC;`;
+      dh.HoldDatetime DESC`;
     }
   }
 
