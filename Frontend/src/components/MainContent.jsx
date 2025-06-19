@@ -134,7 +134,7 @@ function MainContent() {
           />
         )}{" "}
         {/* 🚫 Restricted Route: Only Line Quality Engineer, FPA, Quality Manager and Admin */}
-        {canAccess(["line quality engineer", "fpa", "quality manager"]) && (
+        {canAccess(["line quality engineer","bis engineer", "fpa", "quality manager"]) && (
           <Route path="/quality/bis-reports" element={<BISReports />} />
         )}
         {/* Dispatch */}
