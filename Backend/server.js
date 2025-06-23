@@ -46,6 +46,9 @@ import errorLogRoute from "./routes/dispatch/errorLog.js";
 import productionPlaningRoutes from "./routes/planing/productionPlaning.js";
 import fiveDaysPlaningRoutes from "./routes/planing/fiveDaysPlaning.js";
 
+// <----- Reminder Routes ----->
+import reminderTasksRoutes from "./routes/reminder/task.js";
+
 const app = express();
 app.use(
   cors({
@@ -109,6 +112,9 @@ app.use("/api/v1/dispatch", errorLogRoute);
 // Planing API
 app.use("/api/v1/planing", productionPlaningRoutes);
 app.use("/api/v1/planing", fiveDaysPlaningRoutes);
+
+// Reminder API
+app.use("/api/v1/reminder", reminderTasksRoutes);
 
 // <------------------------------------------------------------- Serve Frontend from Backend ------------------------------------------------------------->
 // app.use(express.static(path.join(_dirname, "Frontend", "dist")));

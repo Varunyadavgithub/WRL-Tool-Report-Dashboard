@@ -10,6 +10,8 @@ import {
   FaTimes,
   FaClipboardList,
 } from "react-icons/fa";
+import { MdNotificationsActive } from "react-icons/md";
+
 import { useSelector } from "react-redux";
 
 // Define menu configurations
@@ -142,6 +144,28 @@ const MENU_CONFIG = [
         roles: ["production manager", "planning team"],
       },
       { path: "/planing/5-days-planing", label: "5 Days Planing" },
+    ],
+  },
+  {
+    key: "reminder",
+    icon: MdNotificationsActive,
+    label: "Reminder",
+    items: [
+      {
+        path: "/reminder/dashboard",
+        label: "Dashboard",
+        roles: ["admin"],
+      },
+      {
+        path: "/reminder/tasks",
+        label: "Tasks",
+        roles: ["admin"],
+      },
+      {
+        path: "/reminder/users",
+        label: "Users",
+        roles: ["admin"],
+      },
     ],
   },
 ];

@@ -37,3 +37,22 @@ export const getStageNames = async (_, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+export const getDepartments = async (_, res) => {
+  try {
+    const query = `
+    SELECT  DeptCode, Name FROM Department;
+  `;
+
+    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+    const result = await pool.request().query(query);
+    res.json(result.recordset);
+    await pool.close();
+  } catch (error) {
+    console.error("SQL error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};

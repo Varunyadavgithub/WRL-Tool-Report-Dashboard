@@ -39,6 +39,11 @@ import LPTRecipe from "../pages/Quality/LPTRecipe";
 import UploadBISReport from "../pages/Quality/UploadBISReport";
 import BISReports from "../pages/Quality/BISReports";
 
+import ReminderDashboard from "../pages/Reminder/Dashboard";
+import Dashboard from "../pages/Reminder/Dashboard";
+import Tasks from "../pages/Reminder/Tasks";
+import Users from "../pages/Reminder/Users";
+
 function MainContent() {
   const userRole = useSelector((state) => state.auth.user?.role || "");
 
@@ -134,9 +139,12 @@ function MainContent() {
           />
         )}{" "}
         {/* 🚫 Restricted Route: Only Line Quality Engineer, FPA, Quality Manager and Admin */}
-        {canAccess(["line quality engineer","bis engineer", "fpa", "quality manager"]) && (
-          <Route path="/quality/bis-reports" element={<BISReports />} />
-        )}
+        {canAccess([
+          "line quality engineer",
+          "bis engineer",
+          "fpa",
+          "quality manager",
+        ]) && <Route path="/quality/bis-reports" element={<BISReports />} />}
         {/* Dispatch */}
         <Route
           path="/dispatch/dispatch-performance-report"
@@ -165,6 +173,16 @@ function MainContent() {
           />
         )}
         <Route path="/planing/5-days-planing" element={<FiveDaysPlaning />} />
+        {/* Reminder */}
+        {canAccess(["admin"]) && (
+          <Route path="/reminder/dashboard" element={<Dashboard />} />
+        )}
+        {canAccess(["admin"]) && (
+          <Route path="/reminder/tasks" element={<Tasks />} />
+        )}
+        {canAccess(["admin"]) && (
+          <Route path="/reminder/users" element={<Users />} />
+        )}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
