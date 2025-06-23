@@ -233,3 +233,94 @@ export const updateBisPdfFile = async (req, res) => {
     });
   }
 };
+
+//Get BIS Status
+export const getBisReportStatus = async (_, res) => {
+  try {
+    const pool = await sql.connect(dbConfig1);
+
+    const istDate = new Date(Date.now() + 330 * 60000);
+    const formattedDate = istDate.toISOString().slice(0, 19).replace("T", " ");
+
+    const query = `
+     WITH Psno AS (
+    SELECT DocNo, Material 
+    FROM MaterialBarcode 
+    WHERE PrintStatus = 1 AND Status <> 99
+),
+FilteredData AS (
+    SELECT 
+        m.Name AS FullModel,
+        LEFT(m.Name, 9) AS Model_Prefix,
+        b.ActivityOn,
+        CASE WHEN RIGHT(m.Name, 1) = 'R' THEN 'R' ELSE '' END AS HasRT
+    FROM Psno
+    JOIN ProcessActivity b ON b.PSNo = Psno.DocNo
+    JOIN WorkCenter c ON b.StationCode = c.StationCode
+    JOIN Material m ON m.MatCode = Psno.Material
+    WHERE m.CertificateControl <> 0
+      AND b.ActivityType = 5
+      AND c.StationCode IN (1220010)
+      AND b.ActivityOn BETWEEN '2022-01-01 00:00:01' AND @CurrentDate
+),
+ProductionSummary AS (
+    SELECT 
+        Model_Prefix,
+        YEAR(ActivityOn) AS Activity_Year,
+        MAX(HasRT) AS LastChar, -- Will be 'R' if any model ends with 'R'
+        COUNT(*) AS Model_Count
+    FROM FilteredData
+    GROUP BY Model_Prefix, YEAR(ActivityOn)
+),
+-- Deduplicate BISUpload table
+DedupedBIS AS (
+    SELECT *
+    FROM (
+        SELECT *,
+               ROW_NUMBER() OVER (
+                   PARTITION BY LEFT(ModelName, 9), Year
+                   ORDER BY ModelName
+               ) AS rn
+        FROM BISUpload
+    ) AS sub
+    WHERE rn = 1
+),
+FinalResult AS (
+    SELECT 
+        COALESCE(b.ModelName, 
+                 CONCAT(p.Model_Prefix, CASE WHEN p.LastChar = 'R' THEN ' RT' ELSE '' END)
+        ) AS ModelName,
+        p.Activity_Year AS Year,
+        p.Model_Count AS Prod_Count,
+        CASE 
+            WHEN b.ModelName IS NOT NULL THEN 'Tested'
+            ELSE 'Test Pending'
+        END AS Status
+    FROM ProductionSummary p
+    LEFT JOIN DedupedBIS b
+      ON LEFT(b.ModelName, 9) = p.Model_Prefix
+     AND b.Year = p.Activity_Year
+     AND (
+         RIGHT(b.ModelName, 2) != 'RT' -- normal model
+         OR (RIGHT(b.ModelName, 2) = 'RT' AND p.LastChar = 'R') -- RT logic
+     )
+)
+SELECT * 
+FROM FinalResult
+ORDER BY ModelName, Year;
+    `;
+
+    const result = await pool
+      .request()
+      .input("CurrentDate", sql.DateTime, new Date(formattedDate))
+      .query(query);
+
+    const data = result.recordset;
+
+    res.status(200).json({ success: true, data });
+    await pool.close();
+  } catch (error) {
+    console.error("Error reading files:", error.message);
+    res.status(500).json({ success: false, message: "Error reading files" });
+  }
+};

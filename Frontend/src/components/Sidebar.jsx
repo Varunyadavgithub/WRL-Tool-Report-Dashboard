@@ -109,6 +109,16 @@ const MENU_CONFIG = [
           "quality manager",
         ],
       },
+      {
+        path: "/quality/bis-status",
+        label: "BIS Status",
+        roles: [
+          "line quality engineer",
+          "bis engineer",
+          "fpa",
+          "quality manager",
+        ],
+      },
     ],
   },
   {

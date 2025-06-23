@@ -38,6 +38,7 @@ import TagUpdate from "../pages/Quality/TagUpdate";
 import LPTRecipe from "../pages/Quality/LPTRecipe";
 import UploadBISReport from "../pages/Quality/UploadBISReport";
 import BISReports from "../pages/Quality/BISReports";
+import BISStatus from "../pages/Quality/BISStatus";
 
 function MainContent() {
   const userRole = useSelector((state) => state.auth.user?.role || "");
@@ -134,9 +135,19 @@ function MainContent() {
           />
         )}{" "}
         {/* 🚫 Restricted Route: Only Line Quality Engineer, FPA, Quality Manager and Admin */}
-        {canAccess(["line quality engineer","bis engineer", "fpa", "quality manager"]) && (
-          <Route path="/quality/bis-reports" element={<BISReports />} />
-        )}
+        {canAccess([
+          "line quality engineer",
+          "bis engineer",
+          "fpa",
+          "quality manager",
+        ]) && <Route path="/quality/bis-reports" element={<BISReports />} />}
+        {/* ?? Restricted Route: Only Line Quality Engineer, FPA, Quality Manager and Admin */}
+        {canAccess([
+          "line quality engineer",
+          "bis engineer",
+          "fpa",
+          "quality manager",
+        ]) && <Route path="/quality/bis-status" element={<BISStatus />} />}
         {/* Dispatch */}
         <Route
           path="/dispatch/dispatch-performance-report"

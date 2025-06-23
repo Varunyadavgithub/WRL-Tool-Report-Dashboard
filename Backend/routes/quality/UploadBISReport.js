@@ -9,6 +9,7 @@ import {
   downloadBisPdfFile,
   deleteBisPdfFile,
   updateBisPdfFile,
+  getBisReportStatus,
 } from "../../controllers/quality/UploadBISReport.js";
 
 const router = express.Router();
@@ -28,5 +29,6 @@ router.put(
   handleMulterError,
   updateBisPdfFile
 );
+router.get("/bis-status", getBisReportStatus);
 
 export default router;
