@@ -21,10 +21,10 @@ router.post(
   uploadBisPdfFile
 );
 router.get("/bis-files", getBisPdfFiles);
-router.get("/download-bis-file/:filename", downloadBisPdfFile);
-router.delete("/delete-bis-file/:filename", deleteBisPdfFile);
+router.get("/download-bis-file/:srNo", downloadBisPdfFile);
+router.delete("/delete-bis-file/:srNo", deleteBisPdfFile);
 router.put(
-  "/update-bis-file/:filename",
+  "/update-bis-file/:srNo",
   uploadBISReportPDF.single("file"),
   handleMulterError,
   updateBisPdfFile

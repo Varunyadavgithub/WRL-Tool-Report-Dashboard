@@ -13,7 +13,7 @@ export const uploadBisPdfFile = async (req, res) => {
     return res.status(400).json({ success: false, message: "Missing fields" });
   }
 
-  const uploadedAt = new Date().toISOString().split("T")[0]; // "yyyy-mm-dd"
+  const uploadedAt = new Date(Date.now() + 330 * 60000);
 
   try {
     const pool = await sql.connect(dbConfig1);
@@ -54,7 +54,7 @@ export const getBisPdfFiles = async (_, res) => {
     const result = await pool.request().query(query);
 
     const files = result.recordset.map((file) => ({
-      id: file.Id,
+      srNo: file.SrNo,
       modelName: file.ModelName,
       year: file.Year,
       description: file.Description,
@@ -73,7 +73,15 @@ export const getBisPdfFiles = async (_, res) => {
 
 // Download file controller
 export const downloadBisPdfFile = async (req, res) => {
-  const { filename } = req.params;
+  const { srNo } = req.params;
+  const { filename } = req.query;
+  if (!srNo) {
+    return res.status(400).json({
+      success: false,
+      message: "SrNo is required",
+    });
+  }
+
   const filePath = path.join(uploadDir, filename);
 
   try {
@@ -88,13 +96,14 @@ export const downloadBisPdfFile = async (req, res) => {
     // Verify file in database
     const pool = await sql.connect(dbConfig1);
     const query = `
-      SELECT * FROM BISUpload 
-      WHERE FileName = @FileName
+      SELECT FileName, ModelName, Year 
+      FROM BISUpload 
+      WHERE SrNo = @SrNo
     `;
 
     const result = await pool
       .request()
-      .input("FileName", sql.VarChar, filename)
+      .input("SrNo", sql.Int, parseInt(srNo))
       .query(query);
 
     if (result.recordset.length === 0) {
@@ -132,7 +141,15 @@ export const downloadBisPdfFile = async (req, res) => {
 
 // Delete file controller
 export const deleteBisPdfFile = async (req, res) => {
-  const { filename } = req.params;
+  const { srNo } = req.params;
+  const { filename } = req.query;
+
+  if (!srNo) {
+    return res
+      .status(400)
+      .json({ success: false, message: "SrNo is required" });
+  }
+
   const filePath = path.join(uploadDir, filename);
 
   if (!fs.existsSync(filePath)) {
@@ -140,16 +157,19 @@ export const deleteBisPdfFile = async (req, res) => {
   }
 
   try {
+    // Delete the physical file
     fs.unlinkSync(filePath);
 
+    // Connect to DB and delete the record based on filename and year
     const pool = await sql.connect(dbConfig1);
     const query = `
-      DELETE FROM BISUpload WHERE FileName = @FileName
+      DELETE FROM BISUpload 
+      WHERE SrNo = @SrNo
     `;
 
     const result = await pool
       .request()
-      .input("FileName", sql.VarChar, filename)
+      .input("SrNo", sql.Int, parseInt(srNo))
       .query(query);
 
     res
@@ -163,7 +183,7 @@ export const deleteBisPdfFile = async (req, res) => {
 
 // Update BIS File Controller
 export const updateBisPdfFile = async (req, res) => {
-  const { filename } = req.params;
+  const { srNo } = req.params;
   const { modelName, year, description } = req.body;
   const newFileName = req.file?.filename;
 
@@ -175,21 +195,32 @@ export const updateBisPdfFile = async (req, res) => {
     const pool = await sql.connect(dbConfig1);
 
     // If a new file is uploaded, delete the old file
-    if (newFileName && newFileName !== filename) {
-      const oldFilePath = path.join(uploadDir, filename);
-      if (fs.existsSync(oldFilePath)) {
-        fs.unlinkSync(oldFilePath);
+    if (newFileName) {
+      // First, get the old filename to delete
+      const oldFileQuery = `SELECT FileName FROM BISUpload WHERE SrNo = @SrNo`;
+      const oldFileResult = await pool
+        .request()
+        .input("SrNo", sql.Int, parseInt(srNo))
+        .query(oldFileQuery);
+
+      const oldFileName = oldFileResult.recordset[0]?.FileName;
+
+      if (oldFileName) {
+        const oldFilePath = path.join(uploadDir, oldFileName);
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+        }
       }
     }
 
-    // Prepare the update query
+    // Prepare the update query using SrNo
     const query = `
       UPDATE BISUpload 
       SET ModelName = @ModelName, 
           Year = @Year,
           Description = @Description, 
           FileName = @FileName 
-      WHERE FileName = @OldFileName
+      WHERE SrNo = @SrNo
     `;
 
     const result = await pool
@@ -197,22 +228,23 @@ export const updateBisPdfFile = async (req, res) => {
       .input("ModelName", sql.VarChar, modelName)
       .input("Year", sql.VarChar, year)
       .input("Description", sql.VarChar, description)
-      .input("FileName", sql.VarChar, newFileName || filename)
-      .input("OldFileName", sql.VarChar, filename)
+      .input("FileName", sql.VarChar, newFileName || null)
+      .input("SrNo", sql.Int, parseInt(srNo))
       .query(query);
 
     // Check if the update was successful
     if (result.rowsAffected[0] === 0) {
       return res.status(404).json({
         success: false,
-        message: "File not found or no changes made",
+        message: "Record not found or no changes made",
       });
     }
 
     res.status(200).json({
       success: true,
-      filename: newFileName || filename,
-      fileUrl: `/uploads-bis-pdf/${newFileName || filename}`,
+      srNo: srNo,
+      filename: newFileName,
+      fileUrl: newFileName ? `/uploads-bis-pdf/${newFileName}` : null,
       message: "Updated successfully",
     });
   } catch (error) {
@@ -293,7 +325,7 @@ FinalResult AS (
         p.Activity_Year AS Year,
         p.Model_Count AS Prod_Count,
         CASE 
-            WHEN b.ModelName IS NOT NULL THEN 'Tested'
+            WHEN b.ModelName IS NOT NULL THEN 'Test Completed'
             ELSE 'Test Pending'
         END AS Status
     FROM ProductionSummary p

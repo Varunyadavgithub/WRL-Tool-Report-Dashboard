@@ -27,8 +27,17 @@ const createStorage = (folder) => {
       const uploadPath = path.resolve(uploadsDir, folder);
       cb(null, uploadPath);
     },
-    filename: (_, file, cb) => {
-      cb(null, file.originalname);
+    filename: (req, file, cb) => {
+      const uniqueValue = Math.floor(
+        100000 + Math.random() * 900000
+      ).toString();
+
+      const ext = path.extname(file.originalname);
+      const baseFileName = path.basename(file.originalname, ext);
+
+      // Create unique filename
+      const uniqueFilename = `${baseFileName}-${uniqueValue}${ext}`;
+      cb(null, uniqueFilename);
     },
   });
 };

@@ -159,9 +159,10 @@ const UploadBISReport = () => {
   const handleUpdate = (item) => {
     setItemToUpdate(item);
     setUpdateFields({
-      modelName: item.modelName || "",
-      year: item.year || "",
-      description: item.description || "",
+      srNo: item.srNo,
+      modelName: item.modelName,
+      year: item.year,
+      description: item.description,
       selectedFile: null,
     });
     setShowUpdateModal(true);
@@ -184,6 +185,7 @@ const UploadBISReport = () => {
     }
 
     const formData = new FormData();
+    formData.append("srNo", updateFields.srNo);
     formData.append("modelName", updateFields.modelName.trim());
     formData.append("year", updateFields.year.trim());
     formData.append("description", updateFields.description.trim());
@@ -194,8 +196,9 @@ const UploadBISReport = () => {
 
     try {
       setLoading(true);
+      const { srNo } = itemToUpdate;
       const res = await axios.put(
-        `${baseURL}quality/update-bis-file/${itemToUpdate.fileName}`,
+        `${baseURL}quality/update-bis-file/${srNo}`,
         formData,
         {
           headers: {
@@ -211,6 +214,7 @@ const UploadBISReport = () => {
 
         setSelectedFile(null);
         setUpdateFields({
+          srNo: "",
           modelName: "",
           year: "",
           description: "",
@@ -228,9 +232,12 @@ const UploadBISReport = () => {
   const handleDownload = async (file) => {
     try {
       const response = await axios({
-        url: `${baseURL}quality/download-bis-file/${file.fileName}`,
+        url: `${baseURL}quality/download-bis-file/${file.srNo}`,
         method: "GET",
         responseType: "blob",
+        params: {
+          filename: file.fileName,
+        },
       });
       // Create a blob link to download
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -258,15 +265,22 @@ const UploadBISReport = () => {
   const confirmDelete = async () => {
     try {
       setLoading(true);
+
+      const { srNo, fileName } = itemToDelete;
       const res = await axios.delete(
-        `${baseURL}quality/delete-bis-file/${itemToDelete.fileName}`
+        `${baseURL}quality/delete-bis-file/${srNo}`,
+        {
+          params: {
+            filename: fileName,
+          },
+        }
       );
 
       if (res?.data?.success) {
         toast.success("File deleted successfully");
-
         fetchUploadedFiles();
       }
+
       setShowDeleteModal(false);
     } catch (error) {
       console.error(error);
@@ -467,10 +481,15 @@ const UploadBISReport = () => {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredFiles.map((file) => (
               <div
-                key={file.id}
+                key={file.srNo}
                 className="bg-white border border-purple-100 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-2"
               >
                 <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+                  <div className="flex items-center">
+                    <h3 className="font-semibold text-gray-800 truncate max-w-[200px]">
+                      {file.srNo}
+                    </h3>
+                  </div>
                   <div className="flex items-center">
                     <FaFilePdf className="text-red-500 mr-2 text-2xl" />
                     <h3 className="font-semibold text-gray-800 truncate max-w-[200px]">
@@ -590,7 +609,7 @@ const UploadBISReport = () => {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-wrap gap-4">
               <InputField
                 label="Model Name"
                 type="text"
@@ -601,7 +620,7 @@ const UploadBISReport = () => {
                     modelName: e.target.value,
                   })
                 }
-                className="text-black dark:text-white"
+                className="text-black dark:text-white max-w-2xl"
               />
               <div>
                 <label
@@ -616,12 +635,12 @@ const UploadBISReport = () => {
                   className="w-fit text-black dark:text-white bg-white dark:bg-gray-800 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   name="year"
                   value={updateFields.year}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setUpdateFields({
                       ...updateFields,
-                      year: e.target.value,
-                    })
-                  }
+                      year: String(e.target.value), // Convert to string explicitly
+                    });
+                  }}
                 >
                   <option value="">Select Year</option>
 
@@ -629,11 +648,23 @@ const UploadBISReport = () => {
                     { length: new Date().getFullYear() - 2021 + 1 },
                     (_, index) => 2021 + index
                   ).map((yearOption) => (
-                    <option key={yearOption} value={yearOption}>
+                    <option key={yearOption} value={String(yearOption)}>
                       {yearOption}
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="SrNo"
+                  className="block text-sm font-medium text-black dark:text-white mb-2"
+                >
+                  SrNo
+                </label>
+                <h3 className="font-semibold text-black dark:text-white">
+                  {updateFields.srNo}
+                </h3>
               </div>
             </div>
             <label className="text-md text-black dark:text-white block mb-1">

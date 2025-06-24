@@ -32,18 +32,22 @@ const BISReports = () => {
   const handleDownload = async (file) => {
     try {
       const response = await axios({
-        url: `${baseURL}quality/download-bis-file/${file.fileName}`,
+        url: `${baseURL}quality/download-bis-file/${file.srNo}`,
         method: "GET",
         responseType: "blob",
+        params: {
+          filename: file.fileName,
+        },
       });
-
+      // Create a blob link to download
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", file.fileName);
+      link.setAttribute("download", file.fileName); // or use the original filename
       document.body.appendChild(link);
       link.click();
 
+      // Clean up
       link.remove();
       window.URL.revokeObjectURL(url);
       toast.success("File download started");
@@ -52,7 +56,6 @@ const BISReports = () => {
       toast.error("Failed to download file");
     }
   };
-
   // View PDF in new tab
   const handleViewPDF = (file) => {
     try {
@@ -62,7 +65,7 @@ const BISReports = () => {
       }
 
       setSelectedPDF(file);
-      console.log(selectedPDF)
+      console.log(selectedPDF);
     } catch (error) {
       console.error("Error viewing PDF:", error);
       toast.error("Failed to open PDF");
@@ -195,14 +198,7 @@ const BISReports = () => {
                   <td className="px-4 py-3 text-sm">
                     {new Date(file.uploadAt).toLocaleDateString()}
                   </td>
-                  <td className="px-4 py-3 flex justify-center space-x-2">
-                    <button
-                      onClick={() => handleViewPDF(file)}
-                      className="text-blue-500 hover:text-blue-700 cursor-pointer"
-                      title="View PDF"
-                    >
-                      <FaEye />
-                    </button>
+                  <td className="px-4 py-3 flex items-center justify-center">
                     <button
                       onClick={() => handleDownload(file)}
                       className="text-green-500 hover:text-green-700 cursor-pointer"
