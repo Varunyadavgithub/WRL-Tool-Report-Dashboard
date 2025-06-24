@@ -18,12 +18,13 @@ const NewReminderModal = ({
   const [department, setDepartment] = useState("");
   const [priority, setPriority] = useState("medium");
   const [scheduledDate, setScheduledDate] = useState("");
+  const [loading, setLoading] = useState(false);
 
   // Form Submission Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     try {
+      setLoading(true);
       // Prepare reminder data for API
       const reminderData = {
         Title: title,
@@ -58,6 +59,8 @@ const NewReminderModal = ({
     } catch (error) {
       console.error("Reminder creation error:", error);
       toast.error(error.response?.data?.message || "Failed to create reminder");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -149,11 +152,12 @@ const NewReminderModal = ({
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Select Department</option>
-              {departments.map((dept) => (
-                <option key={dept.value} value={dept.value}>
-                  {dept.label}
-                </option>
-              ))}
+              {departments &&
+                departments.map((dept) => (
+                  <option key={dept.value} value={dept.label}>
+                    {dept.label}
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -200,11 +204,13 @@ const NewReminderModal = ({
             >
               Cancel
             </button>
+
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              disabled={loading}
             >
-              Create Reminder
+              {loading ? "Please Wait..." : "Create Reminder"}
             </button>
           </div>
         </form>

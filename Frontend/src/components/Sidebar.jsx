@@ -171,11 +171,6 @@ const MENU_CONFIG = [
         label: "Tasks",
         roles: ["admin"],
       },
-      {
-        path: "/reminder/users",
-        label: "Users",
-        roles: ["admin"],
-      },
     ],
   },
 ];

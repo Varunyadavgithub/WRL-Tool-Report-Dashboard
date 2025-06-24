@@ -10,6 +10,7 @@ import { HiOutlineOfficeBuilding } from "react-icons/hi";
 import NewReminderModal from "../../components/common/NewReminderModal";
 import axios from "axios";
 import toast from "react-hot-toast";
+import TaskModal from "../../components/common/TaskModal";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
@@ -34,6 +35,7 @@ const Tasks = () => {
   const [isNewReminderModalOpen, setIsNewReminderModalOpen] = useState(false);
   const [reminders, setReminders] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [selectedTask, setSelectedTask] = useState(null);
 
   const filteredAndSortedReminders = useMemo(() => {
     let filtered = reminders.filter((reminder) => {
@@ -83,19 +85,13 @@ const Tasks = () => {
           );
       }
     });
-
     return filtered;
   }, [
     reminders,
-
     searchTerm,
-
     selectedDepartment,
-
     selectedStatus,
-
     selectedPriority,
-
     sortBy,
   ]);
 
@@ -154,6 +150,30 @@ const Tasks = () => {
     fetchDepartments();
     fetchReminders();
   }, []);
+
+  const onTaskComplete = async () => {
+    try {
+      const res = await axios.patch(
+        `${baseURL}reminder/${selectedTask.Id}/complete`,
+        {
+          status: "Sent", // Or whatever status indicates completion
+        }
+      );
+
+      if (res.data.success) {
+        // Refresh reminders after completion
+        fetchReminders();
+
+        // Close the task modal
+        setSelectedTask(null);
+
+        toast.success("Reminder marked as completed");
+      }
+    } catch (error) {
+      console.error("Failed to complete reminder:", error);
+      toast.error("Failed to complete reminder");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
@@ -337,6 +357,7 @@ const Tasks = () => {
               {filteredAndSortedReminders.map((reminder) => (
                 <div
                   key={reminder.Id}
+                  onClick={() => setSelectedTask(reminder)}
                   className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-blue-200 transition-all duration-200 cursor-pointer group"
                 >
                   <div className="flex items-start justify-between">
@@ -431,6 +452,15 @@ const Tasks = () => {
         departments={departments}
         priorities={priorities}
       />
+
+      {selectedTask && (
+        <TaskModal
+          task={selectedTask}
+          isOpen={true}
+          onClose={() => setSelectedTask(null)}
+          onMarkComplete={onTaskComplete}
+        />
+      )}
     </div>
   );
 };

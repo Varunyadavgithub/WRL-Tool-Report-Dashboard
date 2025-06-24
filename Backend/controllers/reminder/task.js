@@ -13,8 +13,10 @@ export const createReminder = async (req, res) => {
     const { Title, Department, Description, SchldDate, RecptMail, Priority } =
       req.body;
 
-    const currentDate = new Date();
-    const scheduleDateTime = new Date(SchldDate);
+    const currentDate = new Date(new Date().getTime() + 330 * 60000);
+    const scheduleDateTime = new Date(
+      new Date(SchldDate).getTime() + 330 * 60000
+    );
 
     const insertQuery = `
       INSERT INTO Reminders 
