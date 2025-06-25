@@ -320,7 +320,9 @@ const DispatchReport = () => {
                 >
                   Query
                 </Button>
-                <ExportButton />
+                {fgDispatchData && fgDispatchData.length > 0 && (
+                  <ExportButton data={fgDispatchData} />
+                )}
               </div>
               <div className="text-left font-bold text-lg">
                 COUNT: <span className="text-blue-700">{totalCount}</span>

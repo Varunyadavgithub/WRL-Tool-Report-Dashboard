@@ -311,7 +311,9 @@ const DispatchUnloading = () => {
                 >
                   Query
                 </Button>
-                <ExportButton data={fgUnloadingData} />
+                {fgUnloadingData && fgUnloadingData.length > 0 && (
+                  <ExportButton data={fgUnloadingData} />
+                )}
               </div>
               <div className="text-left font-bold text-lg">
                 COUNT: <span className="text-blue-700">{totalCount}</span>
