@@ -137,7 +137,6 @@ const HourlyReport = () => {
 
   const fetchHourlyModelCount = async () => {
     if (!stationCode || !startTime || !endTime) {
-      toast.error("Please select Station Code and Time Range.");
       return;
     }
     try {
@@ -154,7 +153,7 @@ const HourlyReport = () => {
       if (lineType) {
         params.line = lineType;
       }
-      
+
       const res = await axios.get(`${baseURL}prod/hourly-model-count`, {
         params,
       });
@@ -253,7 +252,6 @@ const HourlyReport = () => {
 
   const fetchYesterdayHourlyModelCount = async () => {
     if (!stationCode) {
-      toast.error("Please select Station Code and Time Range.");
       return;
     }
 
@@ -305,7 +303,7 @@ const HourlyReport = () => {
 
   const getYesterdayHourlyCategoryCount = async () => {
     if (!stationCode) {
-      toast.error("Please select Station Code and Time Range.");
+      toast.error("Please select Station Code.");
       return;
     }
 
@@ -410,7 +408,6 @@ const HourlyReport = () => {
 
   const fetchTodayHourlyModelCount = async () => {
     if (!stationCode) {
-      toast.error("Please select Station Code and Time Range.");
       return;
     }
 
@@ -459,7 +456,7 @@ const HourlyReport = () => {
 
   const getTodayHourlyCategoryCount = async () => {
     if (!stationCode) {
-      toast.error("Please select Station Code and Time Range.");
+      toast.error("Please select Station Code.");
       return;
     }
 
