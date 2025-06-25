@@ -15,6 +15,7 @@ const TotalProduction = () => {
   const [ydayLoading, setYdayLoading] = useState(false);
   const [todayLoading, setTodayLoading] = useState(false);
   const [monthLoading, setMonthLoading] = useState(false);
+
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [variants, setVariants] = useState([]);
@@ -24,6 +25,7 @@ const TotalProduction = () => {
   const [limit] = useState(1000);
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [selectedModelName, setSelectedModelName] = useState(null);
 
   const departmentOption = [
     { label: "Final", value: "final" },
@@ -302,6 +304,18 @@ const TotalProduction = () => {
     return counts;
   };
 
+  const filteredTotalProductionData = selectedModelName
+    ? totalProductionData.filter(
+        (item) => item.Model_Name === selectedModelName
+      )
+    : totalProductionData;
+
+  const handleModelRowClick = (modelName) => {
+    setSelectedModelName((prevSelectedModel) =>
+      prevSelectedModel === modelName ? null : modelName
+    );
+  };
+
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="Total Production" align="center" />
@@ -443,8 +457,9 @@ const TotalProduction = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {totalProductionData.map((item, index) => {
-                    const isLast = index === totalProductionData.length - 1;
+                  {filteredTotalProductionData.map((item, index) => {
+                    const isLast =
+                      index === filteredTotalProductionData.length - 1;
                     return (
                       <tr
                         key={index}
@@ -458,7 +473,7 @@ const TotalProduction = () => {
                       </tr>
                     );
                   })}
-                  {!loading && totalProductionData.length === 0 && (
+                  {!loading && filteredTotalProductionData.length === 0 && (
                     <tr>
                       <td colSpan={4} className="text-center py-4">
                         No data found.
@@ -487,7 +502,17 @@ const TotalProduction = () => {
                 <tbody>
                   {Object.entries(getModelNameCount(totalProductionData)).map(
                     ([modelName, count], index) => (
-                      <tr key={index} className="hover:bg-gray-100 text-center">
+                      <tr
+                        key={index}
+                        className={`hover:bg-gray-100 text-center cursor-pointer ${
+                          selectedModelName === modelName
+                            ? "bg-blue-100"
+                            : "bg-white"
+                        }`}
+                        onClick={() => {
+                          handleModelRowClick(modelName);
+                        }}
+                      >
                         <td className="px-1 py-1 border">{modelName}</td>
                         <td className="px-1 py-1 border">{count}</td>
                       </tr>

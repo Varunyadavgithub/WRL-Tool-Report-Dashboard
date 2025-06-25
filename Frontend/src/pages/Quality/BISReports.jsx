@@ -20,6 +20,7 @@ const BISReports = () => {
     try {
       setLoading(true);
       const res = await axios.get(`${baseURL}quality/bis-files`);
+      console.log(res)
       setUploadedFiles(res?.data?.files || []);
     } catch (error) {
       toast.error("Failed to fetch uploaded files");

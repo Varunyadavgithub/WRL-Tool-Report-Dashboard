@@ -266,15 +266,32 @@ export const updateBisPdfFile = async (req, res) => {
   }
 };
 
-//Get BIS Status
 export const getBisReportStatus = async (_, res) => {
   try {
     const pool = await sql.connect(dbConfig1);
 
+    // First, fetch the BIS Upload files
+    const filesQuery = `
+      SELECT * FROM BISUpload
+      ORDER BY SrNo DESC
+    `;
+    const filesResult = await pool.request().query(filesQuery);
+
+    const files = filesResult.recordset.map((file) => ({
+      srNo: file.SrNo,
+      modelName: file.ModelName,
+      year: file.Year,
+      description: file.Description,
+      fileName: file.FileName,
+      url: `/uploads-bis-pdf/${file.FileName}`,
+      uploadAt: file.UploadAT,
+    }));
+
+    // Then, fetch the BIS Report Status
     const istDate = new Date(Date.now() + 330 * 60000);
     const formattedDate = istDate.toISOString().slice(0, 19).replace("T", " ");
 
-    const query = `
+    const statusQuery = `
      WITH Psno AS (
     SELECT DocNo, Material 
     FROM MaterialBarcode 
@@ -327,7 +344,9 @@ FinalResult AS (
         CASE 
             WHEN b.ModelName IS NOT NULL THEN 'Test Completed'
             ELSE 'Test Pending'
-        END AS Status
+        END AS Status,
+        b.FileName,
+        b.Description
     FROM ProductionSummary p
     LEFT JOIN DedupedBIS b
       ON LEFT(b.ModelName, 9) = p.Model_Prefix
@@ -342,17 +361,34 @@ FROM FinalResult
 ORDER BY ModelName, Year;
     `;
 
-    const result = await pool
+    const statusResult = await pool
       .request()
       .input("CurrentDate", sql.DateTime, new Date(formattedDate))
-      .query(query);
+      .query(statusQuery);
 
-    const data = result.recordset;
+    const status = statusResult.recordset.map((item) => ({
+      ...item,
+      fileUrl: item.FileName ? `/uploads-bis-pdf/${item.FileName}` : null,
+    }));
 
-    res.status(200).json({ success: true, data });
+    // Combine files and status
+    const combinedResult = {
+      files: files,
+      status: status,
+    };
+
+    res.status(200).json({
+      success: true,
+      ...combinedResult,
+    });
+
     await pool.close();
   } catch (error) {
-    console.error("Error reading files:", error.message);
-    res.status(500).json({ success: false, message: "Error reading files" });
+    console.error("Error reading files and status:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Error reading files and status",
+      error: error.message,
+    });
   }
 };

@@ -2,68 +2,130 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Title from "../../components/common/Title";
-import { FaClockRotateLeft } from "react-icons/fa6";
+import { FaClockRotateLeft, FaDownload } from "react-icons/fa6";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const BISStatus = () => {
-  const [bisStatus, setBisStatus] = useState([]);
+  const [bisStatus, setBisStatus] = useState({
+    status: [],
+    files: [],
+  });
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useState({
     term: "",
     field: "all",
   });
 
-  // Fetch uploaded files
+  // Fetch BIS Status and Files
   const fetchBisStatus = async () => {
     try {
       setLoading(true);
       const res = await axios.get(`${baseURL}quality/bis-status`);
 
+      console.log("Full Response:", res);
+
       if (res?.data?.success) {
-        setBisStatus(res?.data?.data || []);
+        const statusData = res.data.status || [];
+        console.log("Status Data:", statusData);
+        setBisStatus({
+          status: statusData,
+          files: res.data.files || [],
+        });
+      } else {
+        toast.error("Failed to fetch BIS Status");
       }
     } catch (error) {
-      toast.error("Failed to fetch BIS Status.");
+      console.error("Error fetching BIS status:", error);
+      toast.error("Failed to fetch BIS Status");
     } finally {
       setLoading(false);
     }
   };
 
   // Search functionality
-  const filteredReport = bisStatus.filter((report) => {
-    const { term, field } = searchParams;
-
-    if (!term) return true;
-
-    switch (field) {
-      case "modelName":
-        return report.ModelName.toLowerCase().includes(term.toLowerCase());
-
-      case "year":
-        return report.Year.toString()
-          .toLowerCase()
-          .includes(term.toLowerCase());
-
-      case "productionCount":
-        return report.Prod_Count.toString()
-          .toLowerCase()
-          .includes(term.toLowerCase());
-
-      case "status":
-        return report.Status.toLowerCase().includes(term.toLowerCase());
-
-      default:
-        return (
-          report.ModelName.toLowerCase().includes(term.toLowerCase()) ||
-          report.Year.toString().toLowerCase().includes(term.toLowerCase()) ||
-          report.Prod_Count.toString()
-            .toLowerCase()
-            .includes(term.toLowerCase()) ||
-          report.Status.toLowerCase().includes(term.toLowerCase())
-        );
+  const filteredReport = (() => {
+    if (!bisStatus.status || bisStatus.status.length === 0) {
+      return [];
     }
-  });
+
+    return bisStatus.status.filter((report) => {
+      const { term, field } = searchParams;
+
+      if (!term) return true;
+
+      const lowercaseTerm = term.toLowerCase();
+      const modelName = (report.ModelName || "").toLowerCase();
+      const year = report.Year ? report.Year.toString().toLowerCase() : "";
+      const prodCount = report.Prod_Count
+        ? report.Prod_Count.toString().toLowerCase()
+        : "";
+      const status = (report.Status || "").toLowerCase();
+
+      switch (field) {
+        case "modelName":
+          return modelName.includes(lowercaseTerm);
+
+        case "year":
+          return year.includes(lowercaseTerm);
+
+        case "productionCount":
+          return prodCount.includes(lowercaseTerm);
+
+        case "status":
+          return status.includes(lowercaseTerm);
+
+        default:
+          return (
+            modelName.includes(lowercaseTerm) ||
+            year.includes(lowercaseTerm) ||
+            prodCount.includes(lowercaseTerm) ||
+            status.includes(lowercaseTerm)
+          );
+      }
+    });
+  })();
+
+  // Download file handler
+  const handleDownload = async (report) => {
+    // Find the corresponding file for the report
+    const matchedFile = bisStatus.files.find(
+      (file) =>
+        file.modelName === report.ModelName &&
+        file.year === report.Year.toString()
+    );
+
+    if (!matchedFile) {
+      toast.error("No file found for this report");
+      return;
+    }
+
+    try {
+      const response = await axios({
+        url: `${baseURL}quality/download-bis-file/${matchedFile.srNo}`,
+        method: "GET",
+        responseType: "blob",
+        params: {
+          filename: matchedFile.fileName,
+        },
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", matchedFile.fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("File download started");
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download file");
+    }
+  };
+
+  console.log("Fitered Data", filteredReport);
 
   // Fetch files on component mount
   useEffect(() => {
@@ -140,32 +202,49 @@ const BISStatus = () => {
               </tr>
             </thead>
             <tbody className="text-center">
-              {filteredReport.map((report, index) => (
-                <tr
-                  key={index}
-                  className="border-b hover:bg-gray-50 transition-colors"
-                >
-                  <td className="px-4 py-3">{index + 1}</td>
-                  <td className="px-4 py-3 font-semibold">
-                    {report.ModelName}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {report.Year}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {report.Prod_Count}
-                  </td>
-                  <td
-                    className={`px-4 py-3 text-sm ${
-                      report.Status === "Tested"
-                        ? "bg-green-500"
-                        : "bg-yellow-300"
-                    }`}
+              {filteredReport.map((report, index) => {
+                // Find the corresponding file for this report
+                const matchedFile = bisStatus.files.find(
+                  (file) =>
+                    file.modelName === report.ModelName &&
+                    file.year === report.Year.toString()
+                );
+                return (
+                  <tr
+                    key={index}
+                    className="border-b hover:bg-gray-50 transition-colors"
                   >
-                    {report.Status}
-                  </td>
-                </tr>
-              ))}
+                    <td className="px-4 py-3">{index + 1}</td>
+                    <td className="px-4 py-3 font-semibold">
+                      {report.ModelName}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {report.Year}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {report.Prod_Count}
+                    </td>
+                    <td
+                      className={`px-4 py-3 text-sm flex items-center justify-between ${
+                        report.Status === "Test Completed"
+                          ? "bg-green-50 text-green-800 border-l-4 border-green-500"
+                          : "bg-yellow-50 text-yellow-800 border-l-4 border-yellow-500"
+                      }`}
+                    >
+                      <span className="font-medium">{report.Status}</span>
+                      {report.Status === "Test Completed" && matchedFile && (
+                        <button
+                          onClick={() => handleDownload(report)}
+                          className="text-green-600 hover:bg-green-100 p-2 rounded-full transition-all duration-300 ease-in-out hover:scale-110"
+                          title="Download"
+                        >
+                          <FaDownload className="w-5 h-5 cursor-pointer" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
