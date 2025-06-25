@@ -4,7 +4,6 @@ import Button from "../../components/common/Button";
 import DateTimePicker from "../../components/common/DateTimePicker";
 import axios from "axios";
 import Loader from "../../components/common/Loader";
-import ExportButton from "../../components/common/ExportButton";
 import toast from "react-hot-toast";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
@@ -320,14 +319,6 @@ const DispatchPerformanceReport = () => {
     setDispatchSummaryData([]);
   }, [dispatchType]);
 
-  const handleClearFilters = () => {
-    setStartTime("");
-    setEndTime("");
-    setDispatchType("vehicleUph");
-    setDispatchData([]);
-    setDispatchSummaryData([]);
-  };
-
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="Performance Report" align="center" />
@@ -398,7 +389,6 @@ const DispatchPerformanceReport = () => {
                 >
                   Query
                 </Button>
-                <ExportButton />
               </div>
             </div>
             {/* Count */}
@@ -477,25 +467,12 @@ const DispatchPerformanceReport = () => {
 
             {/* Right Side - Controls and Summary */}
             <div className="w-full md:w-[30%] flex flex-col gap-2 overflow-x-hidden">
-              {/* Filter + Export Buttons */}
-              <div className="flex flex-wrap gap-2 items-center justify-center my-4">
-                <Button
-                  bgColor="bg-white"
-                  textColor="text-black"
-                  className="border border-gray-400 hover:bg-gray-100 px-3 py-1"
-                  onClick={handleClearFilters}
-                >
-                  Clear Filter
-                </Button>
-                <ExportButton />
-              </div>
-
               {/* Summary Table */}
               <div className="w-full max-h-[500px] overflow-x-auto">
                 {loading ? (
                   <Loader />
                 ) : (
-                  <>
+                  <div className="mt-6">
                     {dispatchType === "vehicleUph" && (
                       <DispatchSummaryVehicleUph data={dispatchSummaryData} />
                     )}
@@ -505,7 +482,7 @@ const DispatchPerformanceReport = () => {
                     {dispatchType === "categoryUph" && (
                       <DispatchSummaryCategoryUph data={dispatchSummaryData} />
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </div>
