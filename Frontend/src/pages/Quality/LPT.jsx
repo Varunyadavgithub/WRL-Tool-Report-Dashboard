@@ -28,6 +28,7 @@ const LPT = () => {
   const [remark, setRemark] = useState("");
   const [lptDefectReport, setLptDefectReport] = useState([]);
   const [lptDefectCount, setLptDefectCount] = useState([]);
+  const [performanceRes, setPerformanceRes] = useState("");
 
   const getLptDefectReport = async () => {
     try {
@@ -127,16 +128,16 @@ const LPT = () => {
     actualCurrent,
     actualPower
   ) => {
-    const minTemp = Number(assetDetails.MinTemp);
-    const maxTemp = Number(assetDetails.MaxTemp);
+    const minTemp = Number(assetDetails?.MinTemp);
+    const maxTemp = Number(assetDetails?.MaxTemp);
     const actTemp = Number(actualTemp);
 
-    const minCurrent = Number(assetDetails.MinCurrent);
-    const maxCurrent = Number(assetDetails.MaxCurrent);
+    const minCurrent = Number(assetDetails?.MinCurrent);
+    const maxCurrent = Number(assetDetails?.MaxCurrent);
     const actCurrent = Number(actualCurrent);
 
-    const minPower = Number(assetDetails.MinPower);
-    const maxPower = Number(assetDetails.MaxPower);
+    const minPower = Number(assetDetails?.MinPower);
+    const maxPower = Number(assetDetails?.MaxPower);
     const actPower = Number(actualPower);
 
     const tempCheck = actTemp >= minTemp && actTemp <= maxTemp;
@@ -155,11 +156,6 @@ const LPT = () => {
       return;
     }
 
-    // if (!selectedLptDefectCategory?.value) {
-    //   toast.error("Please select a defect category.");
-    //   return;
-    // }
-
     const performanceStatus = calculatePerformance(
       assetDetails,
       actualTemp,
@@ -167,9 +163,15 @@ const LPT = () => {
       actualPower
     );
 
-    const defectToAdd = addManually
-      ? manualCategory?.trim()
-      : selectedLptDefectCategory.label;
+    let defectToAdd = "";
+
+    if (performanceStatus === "Pass") {
+      defectToAdd = "N/A";
+    } else {
+      defectToAdd = addManually
+        ? manualCategory?.trim()
+        : selectedLptDefectCategory?.label;
+    }
 
     if (!defectToAdd || defectToAdd.length === 0) {
       toast.error("Please select or enter a defect.");
@@ -204,13 +206,19 @@ const LPT = () => {
 
       if (res?.data?.success) {
         toast.success(res?.data?.message || "Defect added successfully!");
-        setRemark("");
-        setManualCategory("");
-        setSelectedLptDefectCategory(null);
-        setAddManually(false);
+        setBarcodeNumber("");
+        setAssetDetails([]);
         setActualTemp("");
         setActualCurrent("");
         setActualPower("");
+        setAddManually(false);
+        setManualCategory("");
+        setLptDefectCategory([]);
+        setSelectedLptDefectCategory(null);
+        setRemark("");
+        setLptDefectReport([]);
+        setLptDefectCount([]);
+        setPerformanceRes("");
         getLptDefectReport();
       }
     } catch (error) {
@@ -386,57 +394,102 @@ const LPT = () => {
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 w-72">
-              {/* Radio Button Toggle */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="addManually"
-                  checked={addManually}
-                  onChange={() => setAddManually(!addManually)}
-                  className="cursor-pointer"
-                />
-                <label
-                  htmlFor="addManually"
-                  className="cursor-pointer font-medium"
-                >
-                  Add Defect Manually
-                </label>
-              </div>
-
-              {/* Conditional Rendering */}
-              {addManually ? (
-                <InputField
-                  label="Manual Defect Category"
-                  type="text"
-                  placeholder="Enter defect category"
-                  value={manualCategory}
-                  onChange={(e) => setManualCategory(e.target.value)}
-                />
-              ) : (
-                <SelectField
-                  label="Select Defect Category"
-                  options={lptDefectCategory}
-                  value={selectedLptDefectCategory?.value || ""}
-                  onChange={(e) => {
-                    const selected = lptDefectCategory.find(
-                      (option) => option.value === e.target.value
+            <div className="flex flex-col gap-4">
+              <Button
+                onClick={() => {
+                  if (
+                    !actualTemp ||
+                    !actualCurrent ||
+                    !actualPower ||
+                    !assetDetails
+                  ) {
+                    toast.error(
+                      "Please enter all actual values and fetch asset details."
                     );
-                    setSelectedLptDefectCategory(selected);
-                  }}
-                />
-              )}
+                    return;
+                  }
+
+                  const res = calculatePerformance(
+                    assetDetails,
+                    actualTemp,
+                    actualCurrent,
+                    actualPower
+                  );
+                  setPerformanceRes(res);
+                }}
+              >
+                Check
+              </Button>
+              <h1 className="font-semibold text-md">
+                Result:{" "}
+                <span
+                  className={`${
+                    performanceRes === "Pass"
+                      ? "text-green-500"
+                      : "text-red-500"
+                  } text-sm`}
+                >
+                  {performanceRes || "N/A"}
+                </span>
+              </h1>
             </div>
 
-            <InputField
-              label="Remark"
-              type="text"
-              placeholder="Enter Remark"
-              className="w-64"
-              name="remark"
-              value={remark}
-              onChange={(e) => setRemark(e.target.value)}
-            />
+            <div className="flex flex-col gap-2 items-center justify-center">
+              <InputField
+                label="Remark"
+                type="text"
+                placeholder="Enter Remark"
+                className="w-64"
+                name="remark"
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+              />
+              {performanceRes === "Fail" && (
+                <div className="flex flex-col gap-2 w-72">
+                  {/* Radio Button Toggle */}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="addManually"
+                      checked={addManually}
+                      onChange={() => setAddManually(!addManually)}
+                      className="cursor-pointer"
+                    />
+                    <label
+                      htmlFor="addManually"
+                      className="cursor-pointer font-medium"
+                    >
+                      Add Defect Manually
+                    </label>
+                  </div>
+
+                  {/* Conditional Rendering */}
+                  {addManually ? (
+                    <InputField
+                      label="Manual Defect Category"
+                      type="text"
+                      placeholder="Enter defect category"
+                      value={manualCategory}
+                      onChange={(e) => setManualCategory(e.target.value)}
+                      className="w-64"
+                    />
+                  ) : (
+                    <SelectField
+                      label="Select Defect Category"
+                      options={lptDefectCategory}
+                      value={selectedLptDefectCategory?.value || ""}
+                      onChange={(e) => {
+                        const selected = lptDefectCategory.find(
+                          (option) => option.value === e.target.value
+                        );
+                        setSelectedLptDefectCategory(selected);
+                      }}
+                      className="w-64"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="flex flex-col gap-2 items-center justify-center">
               <InputField
