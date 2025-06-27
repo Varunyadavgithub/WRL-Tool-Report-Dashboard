@@ -329,12 +329,7 @@ const ComponentTraceabilityReport = () => {
               )}
             </div>
             <div className="mt-4 text-left font-bold text-lg">
-              COUNT:{" "}
-              <span className="text-blue-700">
-                {totalCount || searchTerm
-                  ? filteredTraceabilityData.length
-                  : 0 || 0}
-              </span>
+              COUNT: <span className="text-blue-700">{totalCount || 0}</span>
             </div>
           </div>
         </div>

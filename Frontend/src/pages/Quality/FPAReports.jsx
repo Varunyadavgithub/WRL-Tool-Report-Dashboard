@@ -239,7 +239,7 @@ const FPAReports = () => {
           };
         }
 
-         const res = await axios.get(`${baseURL}quality/fpa-daily-report`, {
+        const res = await axios.get(`${baseURL}quality/fpa-daily-report`, {
           params,
         });
         setReportData(res.data);
@@ -383,12 +383,14 @@ const FPAReports = () => {
                   <ExportButton data={reportData} filename="FPA_Report" />
                 )}
               </div>
-              <div className="text-left font-bold text-lg">
-                COUNT:{" "}
-                <span className="text-blue-700">
-                  {uniqueFGSRNoCount || "0"}
-                </span>
-              </div>
+              {reportType === "fpaReport" && (
+                <div className="text-left font-bold text-lg">
+                  COUNT:{" "}
+                  <span className="text-blue-700">
+                    {uniqueFGSRNoCount || "0"}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -556,7 +558,9 @@ const DailyFpaReportTable = ({ data }) => {
           {data && data.length > 0 ? (
             data.map((row, index) => (
               <tr key={index} className="hover:bg-gray-100 text-center">
-                <td className="px-1 py-1 border">{row.ShiftDate.slice(0, 10)}</td>
+                <td className="px-1 py-1 border">
+                  {row.ShiftDate.slice(0, 10)}
+                </td>
                 <td className="px-1 py-1 border">{row.Month}</td>
                 <td className="px-1 py-1 border">{row.NoOfCritical}</td>
                 <td className="px-1 py-1 border">{row.NoOfMajor}</td>
