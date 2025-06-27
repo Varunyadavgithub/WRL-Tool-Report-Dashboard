@@ -82,7 +82,7 @@ HourlySummary AS (
     JOIN Material m ON Psno.Material = m.MatCode
     JOIN Users u ON b.Operator = u.UserCode
     WHERE
-        c.StationCode = 1220010 
+        c.StationCode IN (1220010, 1230017)
         AND u.UserRole = '224007' 
         AND b.ActivityType = 5 
         AND b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}' 
@@ -132,7 +132,8 @@ HourlySummary AS (
     JOIN Material m ON Psno.Material = m.MatCode
     JOIN Users u ON b.Operator = u.UserCode
     WHERE
-        c.StationCode = 1230017 
+        c.StationCode IN (1220010, 1230017)
+        AND u.UserRole = '225005' 
         AND b.ActivityType = 5 
         AND b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}' 
     GROUP BY 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Title from "../../components/common/Title";
 import Button from "../../components/common/Button";
 import SelectField from "../../components/common/SelectField";
@@ -7,6 +7,7 @@ import ExportButton from "../../components/common/ExportButton";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Loader from "../../components/common/Loader";
+import { FaCaretUp, FaCaretDown } from "react-icons/fa";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
@@ -32,6 +33,7 @@ const TotalProduction = () => {
     { label: "Post Foaming", value: "postFoaming" },
   ];
   const [selecedDep, setSelectedDep] = useState(departmentOption[0]);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
 
   const observer = useRef();
   const lastRowRef = useCallback(
@@ -316,6 +318,28 @@ const TotalProduction = () => {
     );
   };
 
+  const sortedData = useMemo(() => {
+    let sortableItems = [...filteredTotalProductionData];
+    if (sortConfig.key !== null) {
+      sortableItems.sort((a, b) => {
+        const aVal = a[sortConfig.key] || "";
+        const bVal = b[sortConfig.key] || "";
+        if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [filteredTotalProductionData, sortConfig]);
+
+  const requestSort = (key) => {
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
+  };
+
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="Total Production" align="center" />
@@ -442,24 +466,50 @@ const TotalProduction = () => {
               <table className="w-full border bg-white text-xs text-left rounded-lg table-auto">
                 <thead className="bg-gray-200 sticky top-0 z-10 text-center">
                   <tr>
-                    <th className="px-1 py-1 border min-w-[120px]">
-                      Model_Name
+                    <th
+                      className="px-1 py-1 border min-w-[120px] cursor-pointer"
+                      onClick={() => requestSort("Model_Name")}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Model_Name</span>
+                        <div className="flex flex-col ml-1">
+                          {sortConfig.key === "Model_Name" ? (
+                            sortConfig.direction === "asc" ? (
+                              <FaCaretUp className="text-xs" />
+                            ) : (
+                              <FaCaretDown className="text-xs" />
+                            )
+                          ) : (
+                            // Show up arrow by default before any sort is applied
+                            <FaCaretUp className="text-xs" />
+                          )}
+                        </div>
+                      </div>
                     </th>
-                    <th className="px-1 py-1 border min-w-[120px]">
+
+                    <th
+                      className="px-1 py-1 border min-w-[120px] cursor-pointer"
+                      onClick={() => requestSort("Model_Name")}
+                    >
                       FG Serial_No.
                     </th>
-                    <th className="px-1 py-1 border min-w-[120px]">
+                    <th
+                      className="px-1 py-1 border min-w-[120px] cursor-pointer"
+                      onClick={() => requestSort("Model_Name")}
+                    >
                       Asset tag
                     </th>
-                    <th className="px-1 py-1 border min-w-[120px]">
+                    <th
+                      className="px-1 py-1 border min-w-[120px] cursor-pointer"
+                      onClick={() => requestSort("Model_Name")}
+                    >
                       Customer QR
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTotalProductionData.map((item, index) => {
-                    const isLast =
-                      index === filteredTotalProductionData.length - 1;
+                  {sortedData.map((item, index) => {
+                    const isLast = index === sortedData.length - 1;
                     return (
                       <tr
                         key={index}
@@ -473,7 +523,7 @@ const TotalProduction = () => {
                       </tr>
                     );
                   })}
-                  {!loading && filteredTotalProductionData.length === 0 && (
+                  {!loading && sortedData.length === 0 && (
                     <tr>
                       <td colSpan={4} className="text-center py-4">
                         No data found.
