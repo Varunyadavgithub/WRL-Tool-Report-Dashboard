@@ -42,6 +42,7 @@ import BISStatus from "../pages/Quality/BISStatus";
 
 import Dashboard from "../pages/Reminder/Dashboard";
 import Tasks from "../pages/Reminder/Tasks";
+import DailyPlan from "../pages/Planing/DailyPlan";
 
 function MainContent() {
   const userRole = useSelector((state) => state.auth.user?.role || "");
@@ -178,6 +179,7 @@ function MainContent() {
           />
         )}
         <Route path="/planing/5-days-planing" element={<FiveDaysPlaning />} />
+        <Route path="/planing/daily-planing" element={<DailyPlan />} />
         {/* Reminder */}
         {canAccess(["admin"]) && (
           <Route path="/reminder/dashboard" element={<Dashboard />} />

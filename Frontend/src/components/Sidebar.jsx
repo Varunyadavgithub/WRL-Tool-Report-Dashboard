@@ -154,6 +154,7 @@ const MENU_CONFIG = [
         roles: ["production manager", "planning team"],
       },
       { path: "/planing/5-days-planing", label: "5 Days Planing" },
+      { path: "/planing/daily-planing", label: "Daily Plan" },
     ],
   },
   {
