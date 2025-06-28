@@ -41,29 +41,37 @@ const UploadBISReport = () => {
   });
 
   const filteredFiles = uploadedFiles.filter((file) => {
-    const { term, field } = searchParams;
-
+    const { term = "", field = "" } = searchParams || {};
     if (!term) return true;
+
+    const lowerTerm = term.toLowerCase();
+
+    const safeLower = (value) => (value ? value.toString().toLowerCase() : "");
+
+    const modelName = safeLower(file.modelName);
+    const year = safeLower(file.year);
+    const description = safeLower(file.description);
+    const fileName = safeLower(file.fileName);
 
     switch (field) {
       case "modelName":
-        return file.modelName.toLowerCase().includes(term.toLowerCase());
+        return modelName.includes(lowerTerm);
 
       case "year":
-        return file.year.toLowerCase().includes(term.toLowerCase());
+        return year.includes(lowerTerm);
 
       case "description":
-        return file.description.toLowerCase().includes(term.toLowerCase());
+        return description.includes(lowerTerm);
 
       case "fileName":
-        return file.fileName.toLowerCase().includes(term.toLowerCase());
+        return fileName.includes(lowerTerm);
 
       default:
         return (
-          file.modelName.toLowerCase().includes(term.toLowerCase()) ||
-          file.year.toLowerCase().includes(term.toLowerCase()) ||
-          file.description.toLowerCase().includes(term.toLowerCase()) ||
-          file.fileName.toLowerCase().includes(term.toLowerCase())
+          modelName.includes(lowerTerm) ||
+          year.includes(lowerTerm) ||
+          description.includes(lowerTerm) ||
+          fileName.includes(lowerTerm)
         );
     }
   });

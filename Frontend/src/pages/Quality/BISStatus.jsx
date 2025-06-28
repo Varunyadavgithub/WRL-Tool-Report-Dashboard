@@ -23,11 +23,8 @@ const BISStatus = () => {
       setLoading(true);
       const res = await axios.get(`${baseURL}quality/bis-status`);
 
-      console.log("Full Response:", res);
-
       if (res?.data?.success) {
         const statusData = res.data.status || [];
-        console.log("Status Data:", statusData);
         setBisStatus({
           status: statusData,
           files: res.data.files || [],
@@ -125,12 +122,11 @@ const BISStatus = () => {
     }
   };
 
-  console.log("Fitered Data", filteredReport);
-
   // Fetch files on component mount
   useEffect(() => {
     fetchBisStatus();
   }, []);
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
       <Title

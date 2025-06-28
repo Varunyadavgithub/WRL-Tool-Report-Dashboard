@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { FaFilePdf, FaDownload, FaEye, FaTrash } from "react-icons/fa";
+import { FaFilePdf, FaDownload } from "react-icons/fa";
 import Title from "../../components/common/Title";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
@@ -20,7 +20,6 @@ const BISReports = () => {
     try {
       setLoading(true);
       const res = await axios.get(`${baseURL}quality/bis-files`);
-      console.log(res)
       setUploadedFiles(res?.data?.files || []);
     } catch (error) {
       toast.error("Failed to fetch uploaded files");
@@ -57,21 +56,21 @@ const BISReports = () => {
       toast.error("Failed to download file");
     }
   };
-  // View PDF in new tab
-  const handleViewPDF = (file) => {
-    try {
-      if (!file || !file.url) {
-        toast.error("Invalid file or file URL");
-        return;
-      }
 
-      setSelectedPDF(file);
-      console.log(selectedPDF);
-    } catch (error) {
-      console.error("Error viewing PDF:", error);
-      toast.error("Failed to open PDF");
-    }
-  };
+  // View PDF in new tab
+  // const handleViewPDF = (file) => {
+  //   try {
+  //     if (!file || !file.url) {
+  //       toast.error("Invalid file or file URL");
+  //       return;
+  //     }
+
+  //     setSelectedPDF(file);
+  //   } catch (error) {
+  //     console.error("Error viewing PDF:", error);
+  //     toast.error("Failed to open PDF");
+  //   }
+  // };
 
   // Search functionality
   const filteredFiles = uploadedFiles.filter((file) => {
@@ -79,25 +78,28 @@ const BISReports = () => {
 
     if (!term) return true;
 
+    const lowerTerm = term.toLowerCase();
+    const safeLower = (value) => (value ? value.toLowerCase() : "");
+
     switch (field) {
       case "modelName":
-        return file.modelName.toLowerCase().includes(term.toLowerCase());
+        return safeLower(file.modelName).includes(lowerTerm);
 
       case "year":
-        return file.year.toLowerCase().includes(term.toLowerCase());
+        return safeLower(file.year).includes(lowerTerm);
 
       case "description":
-        return file.description.toLowerCase().includes(term.toLowerCase());
+        return safeLower(file.description).includes(lowerTerm);
 
       case "fileName":
-        return file.fileName.toLowerCase().includes(term.toLowerCase());
+        return safeLower(file.fileName).includes(lowerTerm);
 
       default:
         return (
-          file.modelName.toLowerCase().includes(term.toLowerCase()) ||
-          file.year.toLowerCase().includes(term.toLowerCase()) ||
-          file.description.toLowerCase().includes(term.toLowerCase()) ||
-          file.fileName.toLowerCase().includes(term.toLowerCase())
+          safeLower(file.modelName).includes(lowerTerm) ||
+          safeLower(file.year).includes(lowerTerm) ||
+          safeLower(file.description).includes(lowerTerm) ||
+          safeLower(file.fileName).includes(lowerTerm)
         );
     }
   });
@@ -184,7 +186,7 @@ const BISReports = () => {
             <tbody>
               {filteredFiles.map((file, index) => (
                 <tr
-                  key={file.id}
+                  key={index}
                   className="border-b hover:bg-gray-50 transition-colors"
                 >
                   <td className="px-4 py-3">{index + 1}</td>
