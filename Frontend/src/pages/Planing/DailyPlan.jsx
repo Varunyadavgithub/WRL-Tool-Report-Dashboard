@@ -89,49 +89,18 @@ const DailyPlan = () => {
     setLoading(true);
 
     try {
-      // Batch upload of daily plans
-      const uploadPromises = dailyPlanData.map(async (plan) => {
-        const payload = {
-          srNo: parseInt(plan.srNo),
-          shift: plan.shiftName,
-          planQty: plan.planQty,
-          department: plan.departmentName,
-          station: plan.workCenterAlias,
-        };
+      const payload = dailyPlanData.map((plan) => ({
+        shift: plan.shiftName,
+        planQty: plan.planQty,
+        department: plan.departmentName,
+        station: plan.workCenterAlias,
+      }));
 
-        try {
-          const response = await axios.post(
-            `${baseURL}planing/upload-daily-plan`,
-            payload
-          );
-          return response.data;
-        } catch (error) {
-          console.error(`Error uploading plan for Sr No ${plan.srNo}:`, error);
-          return null;
-        }
-      });
-
-      const results = await Promise.allSettled(uploadPromises);
-
-      // Analyze upload results
-      const successfulUploads = results.filter(
-        (result) => result.status === "fulfilled" && result.value !== null
-      );
-      const failedUploads = results.filter(
-        (result) => result.status === "rejected" || result.value === null
+      const res = await axios.post(
+        `${baseURL}planing/upload-daily-plan`,
+        payload
       );
 
-      if (successfulUploads.length > 0) {
-        toast.success(
-          `Successfully uploaded ${successfulUploads.length} plans`
-        );
-      }
-
-      if (failedUploads.length > 0) {
-        toast.error(`Failed to upload ${failedUploads.length} plans`);
-      }
-
-      // Clear data after upload
       setDailyPlan([]);
       setDailyPlanFile("");
     } catch (error) {

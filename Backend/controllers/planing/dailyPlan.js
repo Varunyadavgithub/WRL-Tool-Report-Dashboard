@@ -6,64 +6,136 @@ export const addDailyPlans = async (req, res) => {
   if (!Array.isArray(planData) || planData.length === 0) {
     return res.status(400).json({ error: "Empty or invalid holds array." });
   }
-  console.log(planData);
 
-  // RefDate = "2025-06-28 08:27:26.000",
-  // PlanDate = "2025-06-28",
+  let pool;
+  try {
+    // Connect to the database
+    pool = await sql.connect(dbConfig1);
 
-  // try {
-  //   const pool = await sql.connect(dbConfig1);
+    // Store results of each plan upload
+    const uploadResults = [];
 
-  //   const query = `
-  //     INSERT INTO DailyPlan (
-  //       RefNo,
-  //       RefDate,
-  //       PlanDate,
-  //       Shift,
-  //       PlanQty,
-  //       Department,
-  //       Station,
-  //       Status,
-  //       BusinessUnit
-  //     )
-  //     SELECT
-  //       @RefNo,
-  //       @RefDate,
-  //       @PlanDate,
-  //       (SELECT ShiftCode FROM Shift WHERE Name = @Shift),
-  //       @PlanQty,
-  //       (SELECT DeptCode FROM Department WHERE Name = @Department),
-  //       (SELECT StationCode FROM WorkCenter WHERE Alias = @Station),
-  //       @Status,
-  //       @BusinessUnit
-  //   `;
+    // Process each plan
+    for (const plan of planData) {
+      // Validate required fields
+      const {
+        shift: Shift,
+        planQty: PlanQty,
+        department: Department,
+        station: Station,
+      } = plan;
 
-  //   const result = await pool
-  //     .request()
-  //     .input("RefNo", sql.Int, RefNo)
-  //     .input("RefDate", sql.DateTime, RefDate)
-  //     .input("PlanDate", sql.Date, PlanDate)
-  //     .input("Shift", sql.VarChar, Shift)
-  //     .input("PlanQty", sql.Int, PlanQty)
-  //     .input("Department", sql.VarChar, Department)
-  //     .input("Station", sql.VarChar, Station)
-  //     .input("Status", sql.Int, Status)
-  //     .input("BusinessUnit", sql.Int, BusinessUnit)
-  //     .query(query);
+      // Validate input
+      if (!Shift || !PlanQty || !Department || !Station) {
+        uploadResults.push({
+          status: "failed",
+          reason: "Missing required fields",
+          plan: plan,
+        });
+        continue;
+      }
 
-  //   // Check if the insert was successful
-  //   if (result.rowsAffected[0] > 0) {
-  //     res.status(201).json({
-  //       message: "Daily Plan added successfully",
-  //       insertedRows: result.rowsAffected[0],
-  //     });
-  //   } else {
-  //     res.status(400).json({ error: "Failed to insert Daily Plan" });
-  //   }
+      // Set default values
+      const RefDate = new Date(); // Current date/time
+      const PlanDate = new Date(RefDate).toISOString().split("T")[0];
+      const Status = 1; // Default status
+      const BusinessUnit = 12201; // Default business unit
 
-  //   await pool.close();
-  // } catch (err) {
-  //   console.error("SQL Error:", err.message);
-  //   res.status(500).json({ error: err.message });
-  // }
+      const query = `
+        INSERT INTO DailyPlan (
+          RefNo,
+          RefDate,
+          PlanDate,
+          Shift,
+          PlanQty,
+          Department,
+          Station,
+          Status,
+          BusinessUnit
+        )
+        SELECT
+          (SELECT TOP 1 RefNo+1 FROM DailyPlan ORDER BY RefDate DESC),
+          @RefDate,
+          @PlanDate,
+          (SELECT ShiftCode FROM Shift WHERE Name = @Shift),
+          @PlanQty,
+          (SELECT DeptCode FROM Department WHERE Name = @Department),
+          (SELECT StationCode FROM WorkCenter WHERE Alias = @Station),
+          @Status,
+          @BusinessUnit
+      `;
+
+      try {
+        const result = await pool
+          .request()
+          .input("RefDate", sql.DateTime, RefDate)
+          .input("PlanDate", sql.Date, PlanDate)
+          .input("Shift", sql.VarChar, Shift)
+          .input("PlanQty", sql.Int, PlanQty)
+          .input("Department", sql.VarChar, Department)
+          .input("Station", sql.VarChar, Station)
+          .input("Status", sql.Int, Status)
+          .input("BusinessUnit", sql.Int, BusinessUnit)
+          .query(query);
+
+        // Check if the insert was successful
+        if (result.rowsAffected[0] > 0) {
+          uploadResults.push({
+            status: "success",
+            insertedRows: result.rowsAffected[0],
+          });
+        } else {
+          uploadResults.push({
+            status: "failed",
+            reason: "No rows inserted",
+            plan: plan,
+          });
+        }
+      } catch (insertErr) {
+        console.error(`Error inserting plan:`, insertErr);
+        uploadResults.push({
+          status: "failed",
+          reason: insertErr.message,
+          plan: plan,
+        });
+      }
+    }
+
+    // Analyze upload results
+    const successfulUploads = uploadResults.filter(
+      (r) => r.status === "success"
+    );
+    const failedUploads = uploadResults.filter((r) => r.status === "failed");
+
+    // Prepare response
+    if (successfulUploads.length > 0) {
+      return res.status(201).json({
+        message: "Daily Plans processed",
+        successCount: successfulUploads.length,
+        failedCount: failedUploads.length,
+        successfulUploads,
+        failedUploads,
+      });
+    } else {
+      return res.status(400).json({
+        error: "Failed to insert any Daily Plans",
+        failedUploads,
+      });
+    }
+  } catch (err) {
+    console.error("Overall Process Error:", err);
+    return res.status(500).json({
+      error: "Internal server error",
+      details: err.message,
+    });
+  } finally {
+    // Ensure pool is closed
+    if (pool) {
+      try {
+        await pool.close();
+      } catch (closeErr) {
+        console.error("Error closing database connection:", closeErr);
+      }
+    }
+  }
 };
