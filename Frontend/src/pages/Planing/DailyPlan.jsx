@@ -1,6 +1,6 @@
 import axios from "axios";
 import Title from "../../components/common/Title";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import InputField from "../../components/common/InputField";
 import Button from "../../components/common/Button";
 import Loader from "../../components/common/Loader";
@@ -13,6 +13,11 @@ const DailyPlan = () => {
   const [loading, setLoading] = useState(false);
   const [dailyPlanFile, setDailyPlanFile] = useState("");
   const [dailyPlanData, setDailyPlan] = useState([]);
+  const [existingPlans, setExistingPlans] = useState([]);
+
+  useEffect(() => {
+    fetchDailyPlans();
+  }, []);
 
   const handleUpload = async () => {
     if (!dailyPlanFile) {
@@ -80,6 +85,21 @@ const DailyPlan = () => {
     }
   };
 
+  const fetchDailyPlans = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${baseURL}planing/daily-plans`);
+      if (res?.data?.success) {
+        setExistingPlans(res?.data?.data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching daily plans:", error);
+      toast.error("Failed to fetch daily plans");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAddPlan = async () => {
     if (dailyPlanData.length === 0) {
       toast.error("No daily plan data to upload.");
@@ -101,8 +121,14 @@ const DailyPlan = () => {
         payload
       );
 
-      setDailyPlan([]);
-      setDailyPlanFile("");
+      if (res?.data?.success) {
+        toast.success("Plan Uploaded Successfully.");
+        await fetchDailyPlans();
+        fetchDailyPlans();
+
+        setDailyPlan([]);
+        setDailyPlanFile("");
+      }
     } catch (error) {
       console.error("Error uploading daily plans:", error);
       toast.error("Failed to upload daily plans");
@@ -110,6 +136,8 @@ const DailyPlan = () => {
       setLoading(false);
     }
   };
+
+  console.log(existingPlans);
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
@@ -165,46 +193,51 @@ const DailyPlan = () => {
       {/* Summary Section */}
       <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
         <div className="bg-white border border-gray-300 rounded-md p-2">
-          <div className="w-full flex flex-col gap-2 overflow-x-hidden">
-            {/* Summary Table */}
-            <div className="w-full max-h-[500px] overflow-x-auto">
+          <div className="flex gap-4 overflow-x-hidden">
+            {/* Left Table - Uploaded Plan Data */}
+            <div className="w-1/2 max-h-[500px] overflow-x-auto">
+              <h3 className="text-center font-semibold mb-2">
+                Uploaded Plan Data
+              </h3>
               {loading ? (
                 <Loader />
               ) : (
-                <table className="min-w-2xl border bg-white text-xs text-left rounded-lg table-auto">
-                  <thead className="bg-gray-200 sticky top-0 z-10 text-center">
+                <table className="w-full border bg-white text-xs text-left rounded-lg table-fixed">
+                  <thead className="bg-gray-200 sticky top-0 z-10">
                     <tr>
-                      <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                        Sr No.
-                      </th>
-                      <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                        Shift Name
-                      </th>
-                      <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                        Plan Qty
-                      </th>
-                      <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                        Department Name
-                      </th>
-                      <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                        Work Center Alias
-                      </th>
+                      {[
+                        "Sr No.",
+                        "Shift Name",
+                        "Plan Qty",
+                        "Department Name",
+                        "Work Center Alias",
+                      ].map((header) => (
+                        <th
+                          key={header}
+                          className="px-2 py-1 border text-center w-1/5"
+                        >
+                          {header}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {dailyPlanData.length > 0 ? (
                       dailyPlanData.map((item, index) => (
-                        <tr
-                          key={index}
-                          className="hover:bg-gray-100 text-center"
-                        >
-                          <td className="px-1 py-1 border">{item.srNo}</td>
-                          <td className="px-1 py-1 border">{item.shiftName}</td>
-                          <td className="px-1 py-1 border">{item.planQty}</td>
-                          <td className="px-1 py-1 border">
+                        <tr key={index} className="hover:bg-gray-100">
+                          <td className="px-2 py-1 border text-center">
+                            {item.srNo}
+                          </td>
+                          <td className="px-2 py-1 border text-center">
+                            {item.shiftName}
+                          </td>
+                          <td className="px-2 py-1 border text-center">
+                            {item.planQty}
+                          </td>
+                          <td className="px-2 py-1 border text-center">
                             {item.departmentName}
                           </td>
-                          <td className="px-1 py-1 border">
+                          <td className="px-2 py-1 border text-center">
                             {item.workCenterAlias}
                           </td>
                         </tr>
@@ -212,6 +245,78 @@ const DailyPlan = () => {
                     ) : (
                       <tr>
                         <td colSpan={5} className="text-center py-4">
+                          No data found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Right Table - Existing Plans */}
+            <div className="w-1/2 max-h-[500px] overflow-x-auto">
+              <h3 className="text-center font-semibold mb-2">
+                Existing Daily Plans
+              </h3>
+              {loading ? (
+                <Loader />
+              ) : (
+                <table className="w-full border bg-white text-xs text-left rounded-lg table-fixed">
+                  <thead className="bg-gray-200 sticky top-0 z-10">
+                    <tr>
+                      {[
+                        "Sr No.",
+                        "Ref No.",
+                        "Ref Date",
+                        "Plan Date",
+                        "Shift",
+                        "Plan Qty",
+                        "Department",
+                        "Alias",
+                      ].map((header) => (
+                        <th
+                          key={header}
+                          className="px-2 py-1 border text-center w-1/8"
+                        >
+                          {header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {existingPlans.length > 0 ? (
+                      existingPlans.map((item, index) => (
+                        <tr key={index} className="hover:bg-gray-100">
+                          <td className="px-2 py-1 border text-center">
+                            {index + 1}
+                          </td>
+                          <td className="px-2 py-1 border text-center">
+                            {item.RefNo}
+                          </td>
+                          <td className="px-2 py-1 border text-center">
+                            {item.RefDate.replace("T", " ").replace("Z", "")}
+                          </td>
+                          <td className="px-2 py-1 border text-center">
+                            {item.PlanDate.split("T")[0]}
+                          </td>
+                          <td className="px-2 py-1 border text-center">
+                            {item.Shift}
+                          </td>
+                          <td className="px-2 py-1 border text-center">
+                            {item.PlanQty}
+                          </td>
+                          <td className="px-2 py-1 border text-center">
+                            {item.Department}
+                          </td>
+                          <td className="px-2 py-1 border text-center">
+                            {item.Alias}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={8} className="text-center py-4">
                           No data found.
                         </td>
                       </tr>
