@@ -11,6 +11,7 @@ import {
   FaClipboardList,
 } from "react-icons/fa";
 import { MdNotificationsActive } from "react-icons/md";
+import { FaUserShield } from "react-icons/fa6";
 
 import { useSelector } from "react-redux";
 
@@ -170,6 +171,18 @@ const MENU_CONFIG = [
       {
         path: "/reminder/tasks",
         label: "Tasks",
+        roles: ["admin"],
+      },
+    ],
+  },
+  {
+    key: "visitor",
+    icon: FaUserShield,
+    label: "Visitor",
+    items: [
+      {
+        path: "/visitor/pass",
+        label: "Visitor Pass",
         roles: ["admin"],
       },
     ],

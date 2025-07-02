@@ -43,6 +43,7 @@ import BISStatus from "../pages/Quality/BISStatus";
 import Dashboard from "../pages/Reminder/Dashboard";
 import Tasks from "../pages/Reminder/Tasks";
 import DailyPlan from "../pages/Planing/DailyPlan";
+import VisitorPass from "../pages/Visitor/VisitorPass";
 
 function MainContent() {
   const userRole = useSelector((state) => state.auth.user?.role || "");
@@ -186,6 +187,10 @@ function MainContent() {
         )}
         {canAccess(["admin"]) && (
           <Route path="/reminder/tasks" element={<Tasks />} />
+        )}
+        {/* Visitor */}
+        {canAccess(["admin"]) && (
+          <Route path="/visitor/pass" element={<VisitorPass />} />
         )}
         <Route path="*" element={<NotFound />} />
       </Routes>
