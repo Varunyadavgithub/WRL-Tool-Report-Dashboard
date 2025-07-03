@@ -75,8 +75,8 @@ const VisitorPass = () => {
   // Render photo capture section
   const renderPhotoCaptureSection = () => {
     return (
-      <div className="photo-capture-section">
-        {error && <div className="error">{error}</div>}
+      <div className="photo-capture-section flex flex-col gap-2 items-center justify-center">
+        {error && <div className="error text-red-500">{error}</div>}
 
         <div className="camera-preview flex flex-col items-center justify-center">
           {!capturedPhoto ? (
@@ -126,7 +126,6 @@ const VisitorPass = () => {
         </div>
 
         {/* Hidden canvas for photo capture */}
-
         <canvas ref={canvasRef} style={{ display: "none" }} />
       </div>
     );
@@ -148,7 +147,6 @@ const VisitorPass = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
     console.log("Visitor Pass Data:", visitorData);
   };
 
