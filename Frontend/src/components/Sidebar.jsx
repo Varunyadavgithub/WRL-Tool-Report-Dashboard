@@ -83,7 +83,7 @@ const MENU_CONFIG = [
       {
         path: "/quality/lpt-recipe",
         label: "LPT Recipe",
-        roles: ["line quality engineer"],
+        roles: ["line quality engineer", "quality manager", "lpt"],
       },
       {
         path: "/quality/dispatch-hold",

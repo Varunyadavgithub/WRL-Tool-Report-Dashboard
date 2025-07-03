@@ -28,12 +28,12 @@ WHERE
         OR mb.Alias = @AssemblySerial;
     `;
     const pool = await new sql.ConnectionPool(dbConfig1).connect();
-    
+
     const result = await pool
-    .request()
-    .input("AssemblySerial", sql.VarChar, AssemblySerial)
-    .query(query);
-    
+      .request()
+      .input("AssemblySerial", sql.VarChar, AssemblySerial)
+      .query(query);
+
     const data = result?.recordset[0] || null;
 
     res.json({ success: true, data });
@@ -215,7 +215,7 @@ WITH FPA_COMPUTED AS (
         FROM ProcessActivity a
         INNER JOIN MaterialBarcode b ON a.PSNo = b.DocNo
         WHERE 
-            a.StationCode IN (1220010, 1230017)
+            a.StationCode IN (1220014)
             AND a.ActivityType = 5
             AND a.ActivityOn BETWEEN @StartDate AND @EndDate
             AND b.Type NOT IN (0, 200)

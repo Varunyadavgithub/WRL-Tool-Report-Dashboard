@@ -300,7 +300,7 @@ const LPT = () => {
                       Min
                     </span>
                     <span className="text-base font-semibold text-blue-600">
-                      {assetDetails?.MinTemp || "0"}{" "}°C
+                      {assetDetails?.MinTemp || "0"} °C
                     </span>
                   </div>
                   <div className="flex flex-col items-center">
@@ -308,7 +308,7 @@ const LPT = () => {
                       Max
                     </span>
                     <span className="text-base font-semibold text-red-600">
-                      {assetDetails?.MaxTemp || "0"}{" "}°C
+                      {assetDetails?.MaxTemp || "0"} °C
                     </span>
                   </div>
                 </div>
@@ -336,7 +336,7 @@ const LPT = () => {
                       Min
                     </span>
                     <span className="text-base font-semibold text-blue-600">
-                      {assetDetails?.MinCurrent || "0"}{" "}A
+                      {assetDetails?.MinCurrent || "0"} A
                     </span>
                   </div>
                   <div className="flex flex-col items-center">
@@ -344,7 +344,7 @@ const LPT = () => {
                       Max
                     </span>
                     <span className="text-base font-semibold text-red-600">
-                      {assetDetails?.MaxCurrent || "0"}{" "}A
+                      {assetDetails?.MaxCurrent || "0"} A
                     </span>
                   </div>
                 </div>
@@ -372,7 +372,7 @@ const LPT = () => {
                       Min
                     </span>
                     <span className="text-base font-semibold text-blue-600">
-                      {assetDetails?.MinPower || "0"}{" "}V
+                      {assetDetails?.MinPower || "0"} V
                     </span>
                   </div>
                   <div className="flex flex-col items-center">
@@ -380,7 +380,7 @@ const LPT = () => {
                       Max
                     </span>
                     <span className="text-base font-semibold text-red-600">
-                      {assetDetails?.MaxPower || "0"}{" "}V
+                      {assetDetails?.MaxPower || "0"} V
                     </span>
                   </div>
                 </div>
@@ -671,10 +671,12 @@ const LPT = () => {
                               {item.SampleInspected}
                             </td>
                             <td className="px-1 py-1 border">
-                              {item.PendingSample}
+                              {item.PendingSample < 0
+                                ? `( ${Math.abs(item.PendingSample)} )`
+                                : item.PendingSample}
                             </td>
                             <td className="px-1 py-1 border">
-                              {item.LPT_Percentage}
+                              {item.LPT_Percentage} %
                             </td>
                           </tr>
                         ))

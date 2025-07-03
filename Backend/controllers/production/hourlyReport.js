@@ -27,6 +27,8 @@ export const getHourlySummary = async (req, res) => {
       } else if (line == "2") {
         userRoleCondition = " AND u.UserRole = '225001' ";
       }
+    } else if (stationCode == 1230017) {
+      userRoleCondition = " AND u.UserRole = '225005' ";
     }
 
     const query = `
@@ -114,6 +116,8 @@ export const getHourlyModelCount = async (req, res) => {
       } else if (line == "2") {
         userRoleCondition = " AND u.UserRole = '225001' ";
       }
+    } else if (stationCode == 1230017) {
+      userRoleCondition = " AND u.UserRole = '225005' ";
     }
 
     const query = `
@@ -205,6 +209,8 @@ export const getHourlyCategoryCount = async (req, res) => {
       } else if (line == "2") {
         userRoleCondition = " AND u.UserRole = '225001' ";
       }
+    } else if (stationCode == 1230017) {
+      userRoleCondition = " AND u.UserRole = '225005' ";
     }
 
     const query = `

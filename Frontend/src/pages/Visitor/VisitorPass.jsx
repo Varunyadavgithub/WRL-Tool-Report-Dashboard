@@ -1,11 +1,9 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import Title from "../../components/common/Title";
 import InputField from "../../components/common/InputField";
 import SelectField from "../../components/common/SelectField";
-import { usePhotoCapture } from "../../hooks/usePhotoCapture";
 
 const VisitorPass = () => {
-  // State to manage visitor pass data
   const [visitorData, setVisitorData] = useState({
     visitorPhoto: null,
     name: "",
@@ -30,117 +28,127 @@ const VisitorPass = () => {
     specialInstruction: "",
   });
 
-  const {
-    capturedPhoto,
-    isCapturing,
-    videoRef,
-    canvasRef,
-    startCamera,
-    capturePhoto,
-    retakePhoto,
-    errorMessage,
-  } = usePhotoCapture();
+  const [capturedPhoto, setCapturedPhoto] = useState(null);
+  const [error, setError] = useState(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
 
-  // Update visitor data when photo is captured
-  useEffect(() => {
-    if (capturedPhoto) {
-      setVisitorData((prev) => ({
-        ...prev,
-        visitorPhoto: capturedPhoto,
-      }));
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      videoRef.current.srcObject = stream;
+    } catch (err) {
+      setError("Could not access camera");
+      console.error(err);
     }
-  }, [capturedPhoto]);
+  };
 
-  // Render method for photo capture
+  // Capture photo
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext("2d");
+
+    // Set canvas dimensions
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // Draw video frame to canvas
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Convert to image
+    const photoDataUrl = canvas.toDataURL("image/jpeg");
+
+    // Update states
+    setCapturedPhoto(photoDataUrl);
+    setVisitorData((prev) => ({
+      ...prev,
+      visitorPhoto: photoDataUrl,
+    }));
+
+    // Stop video stream
+    const stream = video.srcObject;
+    const tracks = stream.getTracks();
+    tracks.forEach((track) => track.stop());
+  };
+
+  // Render photo capture section
   const renderPhotoCaptureSection = () => {
     return (
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 my-4 rounded-xl">
-        <h2 className="text-xl font-semibold mb-4 text-center">
-          Visitor Photo
-        </h2>
+      <div className="photo-capture-section">
+        {error && <div className="error">{error}</div>}
 
-        {/* Error Handling */}
-        {errorMessage && (
-          <div
-            className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4"
-            role="alert"
-          >
-            {errorMessage}
-          </div>
-        )}
-
-        <div className="flex flex-col items-center">
-          {/* Camera Not Started */}
-          {!capturedPhoto && !isCapturing && (
-            <button
-              type="button"
-              onClick={startCamera}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mb-4"
-            >
-              Open Camera
-            </button>
-          )}
-
-          {/* Camera Active */}
-          {isCapturing && (
-            <div className="flex flex-col items-center">
+        <div className="camera-preview flex flex-col items-center justify-center">
+          {!capturedPhoto ? (
+            <>
               <video
                 ref={videoRef}
                 autoPlay
-                className="w-full max-w-xs mb-4 border-2 border-gray-300"
+                style={{
+                  display: capturedPhoto ? "none" : "block",
+                  transform: "scaleX(-1)",
+                }}
+                className="bg-white border border-dashed border-purple-400 rounded-xl"
               />
+              <div className="flex gap-4 my-4">
+                <button
+                  onClick={startCamera}
+                  className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 mr-2 cursor-pointer"
+                >
+                  Open Camera
+                </button>
 
-              <button
-                type="button"
-                onClick={capturePhoto}
-                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 mb-4"
-              >
-                Capture Photo
-              </button>
-            </div>
-          )}
-
-          {/* Photo Captured */}
-          {capturedPhoto && (
-            <div className="flex flex-col items-center">
+                <button
+                  onClick={capturePhoto}
+                  className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75 cursor-pointer"
+                >
+                  Capture Photo
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
               <img
                 src={capturedPhoto}
                 alt="Captured"
-                className="w-full max-w-xs mb-4 border-2 border-gray-300"
+                className="captured-photo"
               />
-
-              <div className="flex gap-4">
+              <div className="flex my-4">
                 <button
-                  type="button"
-                  onClick={retakePhoto}
-                  className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+                  onClick={() => setCapturedPhoto(null)}
+                  className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75 cursor-pointer"
                 >
                   Retake
                 </button>
               </div>
-            </div>
+            </>
           )}
-
-          {/* Hidden canvas for photo capture */}
-          <canvas ref={canvasRef} style={{ display: "none" }} />
         </div>
+
+        {/* Hidden canvas for photo capture */}
+
+        <canvas ref={canvasRef} style={{ display: "none" }} />
       </div>
     );
   };
 
   // Handler to update form data
+
   const handleInputChange = (e) => {
-    const { name, value, type, files } = e.target;
-    setVisitorData((prevState) => ({
-      ...prevState,
-      [name]: type === "file" ? files[0] : value,
+    const { name, value } = e.target;
+
+    setVisitorData((prev) => ({
+      ...prev,
+
+      [name]: value,
     }));
   };
 
   // Submit handler
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Implement submission logic
+
     console.log("Visitor Pass Data:", visitorData);
   };
 

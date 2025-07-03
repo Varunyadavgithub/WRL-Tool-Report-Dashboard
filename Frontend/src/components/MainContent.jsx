@@ -117,7 +117,7 @@ function MainContent() {
           <Route path="/quality/lpt-report" element={<LPTReport />} />
         )}
         {/* 🚫 Restricted Route: Only Line Quality Engineer and Admin */}
-        {canAccess(["line quality engineer"]) && (
+        {canAccess(["line quality engineer", "quality manager", "lpt"]) && (
           <Route path="/quality/lpt-recipe" element={<LPTRecipe />} />
         )}
         {/* 🚫 Restricted Route: Only Line Quality Engineer, Quality Manager and Admin */}

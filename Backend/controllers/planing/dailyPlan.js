@@ -40,7 +40,7 @@ export const addDailyPlans = async (req, res) => {
       const PlanDate = new Date(RefDate).toISOString().split("T")[0];
       const Status = 1; // Default status
       const BusinessUnit = 12201; // Default business unit
-
+      console.log(PlanDate);
       const query = `
         INSERT INTO DailyPlan (
           RefNo,
@@ -54,7 +54,7 @@ export const addDailyPlans = async (req, res) => {
           BusinessUnit
         )
         SELECT
-          (SELECT TOP 1 RefNo+1 FROM DailyPlan ORDER BY RefDate DESC),
+          (SELECT TOP 1 RefNo+1 FROM DailyPlan ORDER BY RefNo DESC),
           @RefDate,
           @PlanDate,
           (SELECT ShiftCode FROM Shift WHERE Name = @Shift),
