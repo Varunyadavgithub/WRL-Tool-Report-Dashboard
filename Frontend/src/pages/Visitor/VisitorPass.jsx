@@ -237,9 +237,9 @@ const VisitorPass = () => {
                   name="identityType"
                   options={[
                     { value: "", label: "Select Identity Type" },
-                    { value: "passport", label: "Passport" },
-                    { value: "driving_license", label: "Driving License" },
-                    { value: "national_id", label: "National ID" },
+                    { value: "adhaar_card", label: "Adhaar Card" },
+                    { value: "pan_card", label: "Pan Card" },
+                    { value: "Others", label: "Others" },
                   ]}
                   value={visitorData.identityType}
                   onChange={handleInputChange}
