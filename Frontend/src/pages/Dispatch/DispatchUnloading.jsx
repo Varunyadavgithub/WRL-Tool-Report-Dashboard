@@ -92,22 +92,22 @@ const DispatchUnloading = () => {
           aggregatedData[modelName].endSerial = serial;
         }
 
-        // Update start serial if current serial is smaller
         if (serial < aggregatedData[modelName].startSerial) {
           aggregatedData[modelName].startSerial = serial;
         }
 
-        // Increment count
         aggregatedData[modelName].count += 1;
       }
     });
 
-    return Object.entries(aggregatedData).map(([modelName, data]) => ({
-      ModelName: modelName,
-      StartSerial: data.startSerial,
-      EndSerial: data.endSerial,
-      TotalCount: data.count,
-    }));
+    return Object.entries(aggregatedData)
+      .map(([modelName, data]) => ({
+        ModelName: modelName,
+        StartSerial: data.startSerial,
+        EndSerial: data.endSerial,
+        TotalCount: data.count,
+      }))
+      .sort((a, b) => a.ModelName.localeCompare(b.ModelName)); // DESC by ModelName
   };
 
   useEffect(() => {
@@ -264,8 +264,10 @@ const DispatchUnloading = () => {
   };
 
   const filteredFgUnloadingData = selectedModelName
-    ? fgUnloadingData.filter((item) => item.ModelName === selectedModelName)
-    : fgUnloadingData;
+    ? fgUnloadingData
+        .filter((item) => item.ModelName === selectedModelName)
+        .sort((a, b) => b.FGSerialNo.localeCompare(a.FGSerialNo)) // Descending for alphanumeric
+    : fgUnloadingData.sort((a, b) => b.FGSerialNo.localeCompare(a.FGSerialNo));
 
   const handleModelRowClick = (modelName) => {
     setSelectedModelName(modelName === selectedModelName ? null : modelName);

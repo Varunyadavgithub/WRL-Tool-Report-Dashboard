@@ -40,7 +40,7 @@ export const addDailyPlans = async (req, res) => {
       const PlanDate = new Date(RefDate).toISOString().split("T")[0];
       const Status = 1; // Default status
       const BusinessUnit = 12201; // Default business unit
-      console.log(PlanDate);
+
       const query = `
         INSERT INTO DailyPlan (
           RefNo,

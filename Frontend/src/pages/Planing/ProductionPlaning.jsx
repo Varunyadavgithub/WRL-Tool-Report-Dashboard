@@ -33,8 +33,8 @@ const ProductionPlaning = () => {
 
       const formatted = data.map((item) => {
         return {
-          label: item.Alias.toString(),
-          value: item.matcode.toString(),
+          label: item?.Alias?.toString() || "N/A",
+          value: item?.matCode?.toString() || "N/A",
         };
       });
 
@@ -126,7 +126,7 @@ const ProductionPlaning = () => {
       };
 
       const res = await axios.put(
-        `${baseURL}planing/add-production-plan`,
+        `${baseURL}planing/update-production-plan`,
         payload
       );
 
@@ -160,6 +160,54 @@ const ProductionPlaning = () => {
     }
   };
 
+  const handleAddPlan = async () => {
+    if (
+      !selectedModelName ||
+      !selectedPlanMonth ||
+      !planQuentity ||
+      !remark ||
+      !selectedPlan
+    ) {
+      toast.error("Please fill all required fields.");
+      return;
+    }
+    try {
+      setLoading(true);
+
+      const payload = {
+        planQty: planQuentity,
+        userCode: user?.usercode,
+        remark,
+        matcode: selectedModelName.value,
+        planMonthYear: selectedPlanMonth.value,
+        planType: selectedPlan,
+      };
+
+      const res = await axios.put(
+        `${baseURL}planing/add-production-plan`,
+        payload
+      );
+
+      if (res?.data?.success) {
+        toast.success(res?.data?.message || "Plan added successfully");
+
+        await fetchProductionPlaningData();
+
+        setSelectedModelName(null);
+        setSelectedPlanMonth(null);
+        setPlanQuentity(0);
+        setRemark("");
+      }
+    } catch (error) {
+      console.error("Failed to add plan:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to add production plan"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   useEffect(() => {
     fetchPlanMonthYear();
   }, []);
@@ -292,6 +340,15 @@ const ProductionPlaning = () => {
               onClick={handleUpdate}
             >
               Update
+            </Button>
+            <Button
+              bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
+              textColor={loading ? "text-white" : "text-black"}
+              className={`font-semibold ${loading ? "cursor-not-allowed" : ""}`}
+              // onClick={handleAddPlan}
+              disabled={loading}
+            >
+              Add Plan
             </Button>
           </div>
         </div>

@@ -24,7 +24,8 @@ export const getFgUnloading = async (req, res) => {
         (SELECT COUNT(*) FROM UnloadingData) AS totalCount,
         * 
       FROM UnloadingData
-      WHERE RowNum > @offset AND RowNum <= (@offset + @limit);
+      WHERE RowNum > @offset AND RowNum <= (@offset + @limit)
+    ;
     `;
 
     const pool = await new sql.ConnectionPool(dbConfig2).connect();

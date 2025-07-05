@@ -50,6 +50,9 @@ import dailyPlaningRoute from "./routes/planing/dailyPlan.js";
 // <----- Reminder Routes ----->
 import reminderTasksRoutes from "./routes/reminder/task.js";
 
+// <----- Visitor Routes ----->
+import visitorPassRoutes from "./routes/visitor/visitorPass.js";
+
 const app = express();
 app.use(
   cors({
@@ -104,7 +107,7 @@ app.use("/api/v1/quality", lptReportRoutes);
 app.use("/api/v1/quality", lptRecipeRoutes);
 app.use("/api/v1/quality", UploadBISReportRoutes);
 
-// <----- Dispatch Routes ----->
+// Dispatch API
 app.use("/api/v1/dispatch", dispatchPerformanceReportRoute);
 app.use("/api/v1/dispatch", dispatchReportRoute);
 app.use("/api/v1/dispatch", fgCastingRoute);
@@ -117,6 +120,9 @@ app.use("/api/v1/planing", dailyPlaningRoute);
 
 // Reminder API
 app.use("/api/v1/reminder", reminderTasksRoutes);
+
+// Visitor API
+app.use("/api/v1/visitor", visitorPassRoutes);
 
 // <------------------------------------------------------------- Serve Frontend from Backend ------------------------------------------------------------->
 // app.use(express.static(path.join(_dirname, "Frontend", "dist")));

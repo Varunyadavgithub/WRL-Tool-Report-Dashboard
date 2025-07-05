@@ -83,6 +83,14 @@ const BISStatus = () => {
     });
   })();
 
+  const testCompletedCount = filteredReport.filter(
+    (report) => report.Status === "Test Completed"
+  ).length;
+
+  const testPendingCount = filteredReport.filter(
+    (report) => report.Status !== "Test Completed"
+  ).length;
+
   // Download file handler
   const handleDownload = async (report) => {
     // Find the corresponding file for the report
@@ -126,7 +134,7 @@ const BISStatus = () => {
   useEffect(() => {
     fetchBisStatus();
   }, []);
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
       <Title
@@ -171,10 +179,18 @@ const BISStatus = () => {
           </select>
         </div>
         {/* Pagination (Optional) could be added here */}
-        <div className="p-4 bg-gray-100 text-right">
+        <div className="flex flex-col p-4 bg-gray-100 text-right">
           <p className="text-sm text-gray-600">
             Total Reports: {filteredReport.length}
           </p>
+          <div className="flex gap-4">
+            <p className="text-sm text-green-600">
+              Test Completed: {testCompletedCount}
+            </p>
+            <p className="text-sm text-yellow-600">
+              Test Pending: {testPendingCount}
+            </p>
+          </div>
         </div>
       </div>
       {loading ? (

@@ -69,7 +69,7 @@ const SelectField = ({
               return (
                 <li
                   key={idx}
-                  className="p-2 hover:bg-gray-100 cursor-pointer"
+                  className="p-2 hover:bg-gray-100 cursor-pointer text-sm"
                   onClick={() => handleSelect(opt)}
                 >
                   {optionLabel}

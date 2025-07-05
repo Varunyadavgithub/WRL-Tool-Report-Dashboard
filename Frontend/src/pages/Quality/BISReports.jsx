@@ -178,6 +178,7 @@ const BISReports = () => {
                 <th className="px-4 py-3 text-left">Model Name</th>
                 <th className="px-4 py-3 text-left">Year</th>
                 <th className="px-4 py-3 text-left">Description</th>
+                <th className="px-4 py-3">Test Frequency</th>
                 <th className="px-4 py-3 text-left">File Name</th>
                 <th className="px-4 py-3 text-left">Uploaded At</th>
                 <th className="px-4 py-3 text-center">Actions</th>
@@ -196,6 +197,9 @@ const BISReports = () => {
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {file.description}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    "Coming Soon..."
                   </td>
                   <td className="px-4 py-3 text-sm">{file.fileName}</td>
                   <td className="px-4 py-3 text-sm">
