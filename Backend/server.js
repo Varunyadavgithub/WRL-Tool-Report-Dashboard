@@ -52,6 +52,7 @@ import reminderTasksRoutes from "./routes/reminder/task.js";
 
 // <----- Visitor Routes ----->
 import visitorPassRoutes from "./routes/visitor/visitorPass.js";
+import ManageVisitorRoutes from "./routes/visitor/ManageVisitor.js";
 
 const app = express();
 app.use(
@@ -123,6 +124,7 @@ app.use("/api/v1/reminder", reminderTasksRoutes);
 
 // Visitor API
 app.use("/api/v1/visitor", visitorPassRoutes);
+app.use("/api/v1/visitor", ManageVisitorRoutes);
 
 // <------------------------------------------------------------- Serve Frontend from Backend ------------------------------------------------------------->
 // app.use(express.static(path.join(_dirname, "Frontend", "dist")));

@@ -1,29 +1,5 @@
 import sql, { dbConfig1 } from "../../config/db.js";
 
-// {
-// visitorPhoto: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD…GGkg78ZEiDSEJc2ZJhVSVppSrtADJTtjCvIH+dJNLstKno//Z',
-// name: 'Varun Yadav',
-// contactNo: '9106547391',
-// email: 'varun@gmail.com',
-// company: 'WRL',
-// noOfPeople: 1
-// nationality: "Indian"
-// identityType: "adhaar_card"
-// identityNo: "56462658458"
-// address: "Valsad Gujarat"
-// country:"India"
-// state:"Gujarat"
-// city: "ahmedabad"
-// postalCode : "214563"
-// vehicleDetails: "GJ152534"
-// allowOn: "2025-07-03"
-// allowTill: "2025-07-07"
-// departmentTo: "MFG"
-// employeeTo: "Vikash"
-// visitType: "tourism"
-// specialInstruction: "Developer"
-// }
-
 export const generateVisitorPass = async (req, res) => {
   const {
     visitorPhoto,
@@ -44,12 +20,10 @@ export const generateVisitorPass = async (req, res) => {
     allowOn,
     allowTill,
     departmentTo,
-    employeeTo,
+    employeeTo, // this is a name, we’ll resolve to user ID
     visitType,
     specialInstruction,
   } = req.body;
-
-  console.log("Req:", req.body);
 
   if (!name || !contactNo || !email) {
     return res.status(400).json({
@@ -59,14 +33,33 @@ export const generateVisitorPass = async (req, res) => {
   }
 
   try {
-    const passDate = new Date(); // creation timestamp
+    const passDate = new Date();
+    const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
-    const query = `
+    // 🔍 Step 1: Resolve employeeTo (host name) to user ID
+    const employeeResult = await pool
+      .request()
+      .input("EmployeeName", sql.VarChar(255), employeeTo).query(`
+        SELECT TOP 1 id FROM users 
+        WHERE first_name = @EmployeeName OR last_name = @EmployeeName
+      `);
+
+    if (employeeResult.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Host employee not found",
+      });
+    }
+
+    const hostEmployeeId = employeeResult.recordset[0].id;
+
+    // ✅ Step 2: Insert into visitor_passes with correct snapshot fields
+    const insertQuery = `
       INSERT INTO visitor_passes (
         visitor_photo,
-        name,
-        contact_no,
-        email,
+        visitor_name,
+        visitor_contact_no,
+        visitor_email,
         company,
         no_of_people,
         nationality,
@@ -80,13 +73,14 @@ export const generateVisitorPass = async (req, res) => {
         vehicle_details,
         allow_on,
         allow_till,
-        department_to,
-        employee_to,
+        department_to_visit,
+        host_employee_id,
         visit_type,
-        special_instruction,
+        special_instructions,
+        created_by,
         created_at
       )
-      OUTPUT INSERTED.pass_id
+      OUTPUT INSERTED.id
       VALUES (
         @VisitorPhoto,
         @Name,
@@ -105,19 +99,18 @@ export const generateVisitorPass = async (req, res) => {
         @VehicleDetails,
         @AllowOn,
         @AllowTill,
-        @DepartmentTo,
-        @EmployeeTo,
+        @DepartmentToVisit,
+        @HostEmployeeId,
         @VisitType,
         @SpecialInstruction,
+        @CreatedBy,
         @CreatedAt
       );
     `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
-
     const request = pool
       .request()
-      .input("VisitorPhoto", sql.NVarChar(sql.MAX), visitorPhoto || null) // store as base64 string
+      .input("VisitorPhoto", sql.NVarChar(sql.MAX), visitorPhoto || null)
       .input("Name", sql.NVarChar(255), name)
       .input("ContactNo", sql.VarChar(20), contactNo)
       .input("Email", sql.VarChar(255), email)
@@ -134,18 +127,19 @@ export const generateVisitorPass = async (req, res) => {
       .input("VehicleDetails", sql.VarChar(100), vehicleDetails || null)
       .input("AllowOn", sql.Date, allowOn ? new Date(allowOn) : null)
       .input("AllowTill", sql.Date, allowTill ? new Date(allowTill) : null)
-      .input("DepartmentTo", sql.VarChar(100), departmentTo || null)
-      .input("EmployeeTo", sql.VarChar(255), employeeTo || null)
+      .input("DepartmentToVisit", sql.VarChar(100), departmentTo || null)
+      .input("HostEmployeeId", sql.Int, hostEmployeeId)
       .input("VisitType", sql.VarChar(50), visitType || null)
       .input(
         "SpecialInstruction",
         sql.NVarChar(sql.MAX),
         specialInstruction || null
       )
+      .input("CreatedBy", sql.Int, hostEmployeeId) // assuming creator is same as host
       .input("CreatedAt", sql.DateTime, passDate);
 
-    const result = await request.query(query);
-    const visitorPassId = result.recordset[0].pass_id;
+    const result = await request.query(insertQuery);
+    const visitorPassId = result.recordset[0].id;
 
     res.status(201).json({
       success: true,

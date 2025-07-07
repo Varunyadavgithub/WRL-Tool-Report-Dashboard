@@ -181,8 +181,23 @@ const MENU_CONFIG = [
     label: "Visitor",
     items: [
       {
-        path: "/visitor/pass",
+        path: "/visitor/generate-pass",
         label: "Visitor Pass",
+        roles: ["admin"],
+      },
+      {
+        path: "/visitor/manage-employee",
+        label: "Manage Employee",
+        roles: ["admin"],
+      },
+      {
+        path: "/visitor/dashboard",
+        label: "Dashboard",
+        roles: ["admin"],
+      },
+      {
+        path: "/visitor/reports",
+        label: "Reports",
         roles: ["admin"],
       },
     ],
