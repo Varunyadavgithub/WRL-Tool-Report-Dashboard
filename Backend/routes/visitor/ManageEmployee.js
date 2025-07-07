@@ -8,7 +8,7 @@ import {
   fetchUsers,
   updateDepartment,
   updateUser,
-} from "../../controllers/visitor/ManageVisitor.js";
+} from "../../controllers/visitor/manageEmployee.js";
 
 const router = express.Router();
 

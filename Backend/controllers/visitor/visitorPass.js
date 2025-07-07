@@ -20,9 +20,12 @@ export const generateVisitorPass = async (req, res) => {
     allowOn,
     allowTill,
     departmentTo,
-    employeeTo, // this is a name, we’ll resolve to user ID
+    employeeTo,
     visitType,
     specialInstruction,
+    checkInTime,
+    checkOutTime,
+    createdBy,
   } = req.body;
 
   if (!name || !contactNo || !email) {
@@ -78,6 +81,9 @@ export const generateVisitorPass = async (req, res) => {
         visit_type,
         special_instructions,
         created_by,
+        created_at,
+        checkInTime,
+        checkOutTime,
         created_at
       )
       OUTPUT INSERTED.id
@@ -105,6 +111,8 @@ export const generateVisitorPass = async (req, res) => {
         @SpecialInstruction,
         @CreatedBy,
         @CreatedAt
+        @checkInTime,
+        @checkOutTime
       );
     `;
 
@@ -135,8 +143,10 @@ export const generateVisitorPass = async (req, res) => {
         sql.NVarChar(sql.MAX),
         specialInstruction || null
       )
-      .input("CreatedBy", sql.Int, hostEmployeeId) // assuming creator is same as host
-      .input("CreatedAt", sql.DateTime, passDate);
+      .input("CreatedBy", sql.Int, createdBy)
+      .input("CreatedAt", sql.DateTime, passDate)
+      .input("checkInTime", sql.DateTime, checkInTime)
+      .input("checkOutTime", sql.DateTime, checkOutTime);
 
     const result = await request.query(insertQuery);
     const visitorPassId = result.recordset[0].id;
