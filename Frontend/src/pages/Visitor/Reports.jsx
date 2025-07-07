@@ -101,6 +101,12 @@ const Reports = () => {
                         <th className="px-2 py-2 text-center border-b min-w-[100px]">
                           Vehicle Details
                         </th>
+                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
+                          Check In Time
+                        </th>
+                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
+                          Check Out Time
+                        </th>
                         <th className="px-2 py-2 text-center border-b w-[120px]">
                           photo_url
                         </th>
@@ -135,7 +141,6 @@ const Reports = () => {
                             <td className="px-2 py-2 text-center border-b">
                               {visitor.identity_type}
                             </td>
-
                             <td className="px-2 py-2 text-center border-b">
                               {visitor.identity_no}
                             </td>
@@ -158,6 +163,16 @@ const Reports = () => {
                               {visitor.vehicle_details}
                             </td>
                             <td className="px-2 py-2 text-center border-b">
+                              {visitor.check_in_time
+                                .replace("T", " ")
+                                .replace("Z", "")}
+                            </td>
+                            <td className="px-2 py-2 text-center border-b">
+                              {visitor.check_out_time
+                                .replace("T", " ")
+                                .replace("Z", "")}
+                            </td>
+                            <td className="px-2 py-2 text-center border-b">
                               {visitor.photo_url}
                             </td>
                           </tr>
@@ -165,7 +180,7 @@ const Reports = () => {
                       ) : (
                         <tr>
                           <td
-                            colSpan={15}
+                            colSpan={17}
                             className="text-center py-4 text-gray-500"
                           >
                             No visitors found. Add a new visitor to get started.
