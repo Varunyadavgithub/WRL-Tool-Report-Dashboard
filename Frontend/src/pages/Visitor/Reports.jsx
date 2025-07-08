@@ -107,9 +107,6 @@ const Reports = () => {
                         <th className="px-2 py-2 text-center border-b min-w-[100px]">
                           Check Out Time
                         </th>
-                        <th className="px-2 py-2 text-center border-b w-[120px]">
-                          photo_url
-                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -171,9 +168,6 @@ const Reports = () => {
                               {visitor.check_out_time
                                 .replace("T", " ")
                                 .replace("Z", "")}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.photo_url}
                             </td>
                           </tr>
                         ))

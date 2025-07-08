@@ -58,7 +58,6 @@ export const generateVisitorPass = async (req, res) => {
     createdBy,
   } = req.body;
 
-  console.log(req.body);
 
   if (!name || !contactNo || !email) {
     return res.status(400).json({
@@ -217,9 +216,6 @@ export const generateVisitorPass = async (req, res) => {
 
     const insertResult = await passRequest.query(query);
 
-    console.log("Insert result:", insertResult);
-    console.log("Working till here...");
-    console.log(insertResult);
 
     await pool.close();
     // Send Response

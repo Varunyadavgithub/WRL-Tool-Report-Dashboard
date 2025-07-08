@@ -509,15 +509,22 @@ const VisitorPass = () => {
                 <div className="w-full">
                   <SelectField
                     label="Department To Visit"
-                    name="departmentId"
+                    name="departmentTo" // Changed from departmentId to departmentTo
                     options={departments}
-                    value={selectedDepartment?.value || ""}
+                    value={visitorData.departmentTo} // Use visitorData state
                     onChange={(e) => {
-                      setSelectedDepartment(
-                        departments.find(
-                          (opt) => opt.value === e.target.value
-                        ) || 0
+                      const selectedDept = departments.find(
+                        (opt) => opt.value === e.target.value
                       );
+
+                      // Update both selectedDepartment and visitorData
+                      setSelectedDepartment(selectedDept);
+
+                      // Update visitorData with selected department
+                      setVisitorData((prev) => ({
+                        ...prev,
+                        departmentTo: e.target.value,
+                      }));
                     }}
                     required
                     className="w-full"
@@ -528,25 +535,24 @@ const VisitorPass = () => {
                     label="Employee To Visit"
                     name="employeeTo"
                     options={employees}
-                    value={selectedEmployees?.value || ""}
+                    value={visitorData.employeeTo} // Use visitorData state
                     onChange={(e) => {
-                      setSelectedEmployees(
-                        employees.find((opt) => opt.value === e.target.value) ||
-                          0
+                      const selectedEmp = employees.find(
+                        (opt) => opt.value === e.target.value
                       );
+
+                      // Update both selectedEmployees and visitorData
+                      setSelectedEmployees(selectedEmp);
+
+                      // Update visitorData with selected employee
+                      setVisitorData((prev) => ({
+                        ...prev,
+                        employeeTo: e.target.value,
+                      }));
                     }}
                     required
                     className="w-full"
                   />
-                  {/* <SelectField
-                    label="Employee To Visit"
-                    name="employeeTo"
-                    options={employeeOptions}
-                    value={visitorData.employeeTo}
-                    onChange={handleInputChange}
-                    className="w-full"
-                    disabled={loading}
-                  /> */}
                 </div>
 
                 <div className="w-full">
