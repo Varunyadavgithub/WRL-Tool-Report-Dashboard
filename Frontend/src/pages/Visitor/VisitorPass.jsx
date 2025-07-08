@@ -4,10 +4,14 @@ import InputField from "../../components/common/InputField";
 import SelectField from "../../components/common/SelectField";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { useSelector } from "react-redux";
+import { useEffect } from "react";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const VisitorPass = () => {
+  const { user } = useSelector((store) => store.auth);
+
   const [visitorData, setVisitorData] = useState({
     visitorPhoto: null,
     name: "",
@@ -30,7 +34,55 @@ const VisitorPass = () => {
     employeeTo: "",
     visitType: "",
     specialInstruction: "",
+    createdBy: user?.id,
   });
+
+  const [departments, setDepartments] = useState([]);
+  const [selectedDepartment, setSelectedDepartment] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [selectedEmployees, setSelectedEmployees] = useState([]);
+
+  const fetchEmployees = async () => {
+    try {
+      const params = {
+        deptId: selectedDepartment.value,
+      };
+      const res = await axios.get(`${baseURL}visitor/employees`, { params });
+      if (res?.data?.success) {
+        const data = res?.data.data;
+        const formatted = data.map((item) => ({
+          label: item.emp_name,
+          value: item.emp_id.toString(),
+        }));
+        setEmployees(formatted);
+      }
+    } catch (error) {
+      console.error("Failed to fetch employees:", error);
+      toast.error("Failed to fetch employees.");
+    }
+  };
+
+  useEffect(() => {
+    fetchEmployees();
+  }, [selectedDepartment]);
+
+  const fetchDepartments = async () => {
+    try {
+      const res = await axios.get(`${baseURL}visitor/departments`);
+      const formatted = res?.data.map((item) => ({
+        label: item.department_name,
+        value: item.deptCode.toString(),
+      }));
+      setDepartments(formatted);
+    } catch (error) {
+      console.error("Failed to fetch departments:", error);
+      toast.error("Failed to fetch departments.");
+    }
+  };
+
+  useEffect(() => {
+    fetchDepartments();
+  }, []);
 
   const [capturedPhoto, setCapturedPhoto] = useState(null);
   const [error, setError] = useState(null);
@@ -148,7 +200,6 @@ const VisitorPass = () => {
   // Submit handler
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     // Basic validation
     const requiredFields = [
       "name",
@@ -161,28 +212,22 @@ const VisitorPass = () => {
       "departmentTo",
       "employeeTo",
     ];
-
     for (let field of requiredFields) {
       if (!visitorData[field]) {
         toast.error(`Please fill the "${field}" field.`);
         return;
       }
     }
-
     try {
       setLoading(true);
-
       const payload = {
         ...visitorData,
       };
-
       const res = await axios.post(`${baseURL}visitor/generate-pass`, payload);
-
       if (res?.data?.success) {
         toast.success(
           res?.data?.message || "Visitor Pass generated successfully"
         );
-        // Optionally clear form or redirect
       }
     } catch (error) {
       console.error("Failed to generate visitor pass:", error);
@@ -462,27 +507,48 @@ const VisitorPass = () => {
                   />
                 </div>
                 <div className="w-full">
-                  <InputField
-                    label="Department To"
-                    type="text"
-                    name="departmentTo"
-                    placeholder="Enter the department to visit"
-                    value={visitorData.departmentTo}
-                    onChange={handleInputChange}
+                  <SelectField
+                    label="Department To Visit"
+                    name="departmentId"
+                    options={departments}
+                    value={selectedDepartment?.value || ""}
+                    onChange={(e) => {
+                      setSelectedDepartment(
+                        departments.find(
+                          (opt) => opt.value === e.target.value
+                        ) || 0
+                      );
+                    }}
+                    required
                     className="w-full"
                   />
                 </div>
                 <div className="w-full">
-                  <InputField
-                    label="Employee To"
-                    type="text"
+                  <SelectField
+                    label="Employee To Visit"
                     name="employeeTo"
-                    placeholder="Enter the employee to visit"
+                    options={employees}
+                    value={selectedEmployees?.value || ""}
+                    onChange={(e) => {
+                      setSelectedEmployees(
+                        employees.find((opt) => opt.value === e.target.value) ||
+                          0
+                      );
+                    }}
+                    required
+                    className="w-full"
+                  />
+                  {/* <SelectField
+                    label="Employee To Visit"
+                    name="employeeTo"
+                    options={employeeOptions}
                     value={visitorData.employeeTo}
                     onChange={handleInputChange}
                     className="w-full"
-                  />
+                    disabled={loading}
+                  /> */}
                 </div>
+
                 <div className="w-full">
                   <SelectField
                     label="Visit Type"
