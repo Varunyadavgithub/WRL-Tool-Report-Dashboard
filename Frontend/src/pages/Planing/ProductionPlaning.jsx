@@ -207,7 +207,7 @@ const ProductionPlaning = () => {
       setLoading(false);
     }
   };
-  
+
   useEffect(() => {
     fetchPlanMonthYear();
   }, []);
@@ -279,9 +279,7 @@ const ProductionPlaning = () => {
           <div>
             <label className="block font-semibold mb-2">Select Plan</label>
             <div className="flex gap-6">
-              {(user.role === "admin" ||
-                user.role === "production manager" ||
-                user.role === "planning team") && (
+              {(user.role === "admin" || user.role === "planning team") && (
                 <>
                   <label className="inline-flex items-center gap-2 cursor-pointer">
                     <input
