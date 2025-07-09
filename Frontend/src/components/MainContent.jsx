@@ -1,55 +1,78 @@
 import { Routes, Route } from "react-router-dom";
 import { useSelector } from "react-redux";
+import { lazy, Suspense } from "react";
 
-import Home from "../pages/Home";
+const Home = lazy(() => import("../pages/Home"));
 
-import ProductionOverview from "../pages/Production/Overview";
-import ComponentTraceabilityReport from "../pages/Production/ComponentTraceabilityReport";
-import HourlyReport from "../pages/Production/HourlyReport";
-import LineHourlyReport from "../pages/Production/LineHourlyReport";
-import StageHistoryReport from "../pages/Production/StageHistoryReport";
-import ModelNameUpdate from "../pages/Production/ModelNameUpdate";
-import TotalProduction from "../pages/Production/TotalProduction";
-import ComponentDetails from "../pages/Production/ComponentDetails";
+const ProductionOverview = lazy(() => import("../pages/Production/Overview"));
+const ComponentTraceabilityReport = lazy(() =>
+  import("../pages/Production/ComponentTraceabilityReport")
+);
+const HourlyReport = lazy(() => import("../pages/Production/HourlyReport"));
+const LineHourlyReport = lazy(() =>
+  import("../pages/Production/LineHourlyReport")
+);
+const StageHistoryReport = lazy(() =>
+  import("../pages/Production/StageHistoryReport")
+);
+const ModelNameUpdate = lazy(() =>
+  import("../pages/Production/ModelNameUpdate")
+);
+const TotalProduction = lazy(() =>
+  import("../pages/Production/TotalProduction")
+);
+const ComponentDetails = lazy(() =>
+  import("../pages/Production/ComponentDetails")
+);
 
-import ReworkReport from "../pages/Quality/ReworkReport";
-import BrazingReport from "../pages/Quality/BrazingReport";
-import GasChargingReport from "../pages/Quality/GasChargingReport";
-import ESTReport from "../pages/Quality/ESTReport";
-import MFTReport from "../pages/Quality/MFTReport";
-import FPA from "../pages/Quality/FPA";
-import FPAReports from "../pages/Quality/FPAReports";
-import LPT from "../pages/Quality/LPT";
-import LPTReport from "../pages/Quality/LPTReport";
-import DispatchHold from "../pages/Quality/DispatchHold";
-import HoldCabinateDetails from "../pages/Quality/HoldCabinateDetails";
+const ReworkReport = lazy(() => import("../pages/Quality/ReworkReport"));
+const BrazingReport = lazy(() => import("../pages/Quality/BrazingReport"));
+const GasChargingReport = lazy(() =>
+  import("../pages/Quality/GasChargingReport")
+);
+const ESTReport = lazy(() => import("../pages/Quality/ESTReport"));
+const MFTReport = lazy(() => import("../pages/Quality/MFTReport"));
+const FPA = lazy(() => import("../pages/Quality/FPA"));
+const FPAReports = lazy(() => import("../pages/Quality/FPAReports"));
+const LPT = lazy(() => import("../pages/Quality/LPT"));
+const LPTReport = lazy(() => import("../pages/Quality/LPTReport"));
+const DispatchHold = lazy(() => import("../pages/Quality/DispatchHold"));
+const HoldCabinateDetails = lazy(() =>
+  import("../pages/Quality/HoldCabinateDetails")
+);
 
-import DispatchPerformanceReport from "../pages/Dispatch/DispatchPerformanceReport";
-import DispatchReport from "../pages/Dispatch/DispatchReport";
-import DispatchUnloading from "../pages/Dispatch/DispatchUnloading";
-import FGCasting from "../pages/Dispatch/FGCasting";
-import GateEntry from "../pages/Dispatch/GateEntry";
-import ErrorLog from "../pages/Dispatch/ErrorLog";
+const DispatchPerformanceReport = lazy(() =>
+  import("../pages/Dispatch/DispatchPerformanceReport")
+);
+const DispatchReport = lazy(() => import("../pages/Dispatch/DispatchReport"));
+const DispatchUnloading = lazy(() =>
+  import("../pages/Dispatch/DispatchUnloading")
+);
+const FGCasting = lazy(() => import("../pages/Dispatch/FGCasting"));
+const GateEntry = lazy(() => import("../pages/Dispatch/GateEntry"));
+const ErrorLog = lazy(() => import("../pages/Dispatch/ErrorLog"));
 
-import FiveDaysPlaning from "../pages/Planing/FiveDaysPlaning";
-import ProductionPlaning from "../pages/Planing/ProductionPlaning";
-import DailyPlan from "../pages/Planing/DailyPlan";
+const FiveDaysPlaning = lazy(() => import("../pages/Planing/FiveDaysPlaning"));
+const ProductionPlaning = lazy(() =>
+  import("../pages/Planing/ProductionPlaning")
+);
+const DailyPlan = lazy(() => import("../pages/Planing/DailyPlan"));
 
-import TagUpdate from "../pages/Quality/TagUpdate";
-import LPTRecipe from "../pages/Quality/LPTRecipe";
-import UploadBISReport from "../pages/Quality/UploadBISReport";
-import BISReports from "../pages/Quality/BISReports";
-import BISStatus from "../pages/Quality/BISStatus";
+const TagUpdate = lazy(() => import("../pages/Quality/TagUpdate"));
+const LPTRecipe = lazy(() => import("../pages/Quality/LPTRecipe"));
+const UploadBISReport = lazy(() => import("../pages/Quality/UploadBISReport"));
+const BISReports = lazy(() => import("../pages/Quality/BISReports"));
+const BISStatus = lazy(() => import("../pages/Quality/BISStatus"));
 
-import Dashboard from "../pages/Reminder/Dashboard";
-import Tasks from "../pages/Reminder/Tasks";
+const Dashboard = lazy(() => import("../pages/Reminder/Dashboard"));
+const Tasks = lazy(() => import("../pages/Reminder/Tasks"));
 
-import VisitorPass from "../pages/Visitor/VisitorPass";
-import ManageEmployee from "../pages/Visitor/ManageEmployee";
-import VisitorDashboard from "../pages/Visitor/Dashboard";
-import VisitorReports from "../pages/Visitor/Reports";
+const VisitorPass = lazy(() => import("../pages/Visitor/VisitorPass"));
+const ManageEmployee = lazy(() => import("../pages/Visitor/ManageEmployee"));
+const VisitorDashboard = lazy(() => import("../pages/Visitor/Dashboard"));
+const VisitorReports = lazy(() => import("../pages/Visitor/Reports"));
 
-import NotFound from "../pages/NotFound";
+const NotFound = lazy(() => import("../pages/NotFound"));
 
 function MainContent() {
   const userRole = useSelector((state) => state.auth.user?.role || "");
@@ -59,146 +82,160 @@ function MainContent() {
 
   return (
     <div className="flex-1 p-4 min-h-screen overflow-auto">
-      <Routes>
-        <Route path="/" index element={<Home />} />
-        {/*-------------------------------------------------------------- Production --------------------------------------------------------------*/}
-        <Route path="/production/overview" element={<ProductionOverview />} />
-        <Route
-          path="/production/component-traceability-report"
-          element={<ComponentTraceabilityReport />}
-        />
-        <Route path="/production/hourly-report" element={<HourlyReport />} />
-        <Route
-          path="/production/line-hourly-report"
-          element={<LineHourlyReport />}
-        />
-        <Route
-          path="/production/stage-history-report"
-          element={<StageHistoryReport />}
-        />
-        {canAccess(["logistic"]) && (
+      <Suspense
+        fallback={
+          <div className="flex justify-center items-center min-h-screen">
+            <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        }
+      >
+        <Routes>
+          <Route path="/" index element={<Home />} />
+          {/*-------------------------------------------------------------- Production --------------------------------------------------------------*/}
+          <Route path="/production/overview" element={<ProductionOverview />} />
           <Route
-            path="/production/model-name-update"
-            element={<ModelNameUpdate />}
+            path="/production/component-traceability-report"
+            element={<ComponentTraceabilityReport />}
           />
-        )}
-        <Route
-          path="/production/component-details"
-          element={<ComponentDetails />}
-        />
-        <Route
-          path="/production/total-production"
-          element={<TotalProduction />}
-        />
-        {/*-------------------------------------------------------------- Quality --------------------------------------------------------------*/}
-        {canAccess([]) && (
-          <Route path="/quality/rework-report" element={<ReworkReport />} />
-        )}
-        {canAccess([]) && (
-          <Route path="/quality/brazing-report" element={<BrazingReport />} />
-        )}
-        {canAccess([]) && (
+          <Route path="/production/hourly-report" element={<HourlyReport />} />
           <Route
-            path="/quality/gas-charging-report"
-            element={<GasChargingReport />}
+            path="/production/line-hourly-report"
+            element={<LineHourlyReport />}
           />
-        )}
-        {canAccess([]) && (
-          <Route path="/quality/est-report" element={<ESTReport />} />
-        )}
-        {canAccess([]) && (
-          <Route path="/quality/mft-report" element={<MFTReport />} />
-        )}
-        {canAccess(["fpa", "quality manager"]) && (
-          <Route path="/quality/fpa" element={<FPA />} />
-        )}
-        <Route path="/quality/fpa-report" element={<FPAReports />} />
-        {canAccess(["line quality engineer", "quality manager", "lpt"]) && (
-          <Route path="/quality/lpt" element={<LPT />} />
-        )}
-        {canAccess(["line quality engineer", "quality manager", "lpt"]) && (
-          <Route path="/quality/lpt-report" element={<LPTReport />} />
-        )}
-        {canAccess(["line quality engineer", "quality manager", "lpt"]) && (
-          <Route path="/quality/lpt-recipe" element={<LPTRecipe />} />
-        )}
-        {canAccess(["line quality engineer", "fpa", "quality manager"]) && (
-          <Route path="/quality/dispatch-hold" element={<DispatchHold />} />
-        )}
-        <Route
-          path="/quality/hold-cabinate-details"
-          element={<HoldCabinateDetails />}
-        />
-        {canAccess(["line quality engineer", "quality manager"]) && (
-          <Route path="/quality/tag-update" element={<TagUpdate />} />
-        )}
-        {canAccess(["bis engineer", "quality manager"]) && (
           <Route
-            path="/quality/upload-bis-report"
-            element={<UploadBISReport />}
+            path="/production/stage-history-report"
+            element={<StageHistoryReport />}
           />
-        )}{" "}
-        {canAccess([
-          "line quality engineer",
-          "bis engineer",
-          "fpa",
-          "quality manager",
-        ]) && <Route path="/quality/bis-reports" element={<BISReports />} />}
-        {canAccess([
-          "line quality engineer",
-          "bis engineer",
-          "fpa",
-          "quality manager",
-        ]) && <Route path="/quality/bis-status" element={<BISStatus />} />}
-        {/*-------------------------------------------------------------- Dispatch --------------------------------------------------------------*/}
-        <Route
-          path="/dispatch/dispatch-performance-report"
-          element={<DispatchPerformanceReport />}
-        />
-        <Route path="/dispatch/dispatch-report" element={<DispatchReport />} />
-        <Route
-          path="/dispatch/dispatch-unloading"
-          element={<DispatchUnloading />}
-        />
-        {canAccess(["logistic"]) && (
-          <Route path="/dispatch/fg-casting" element={<FGCasting />} />
-        )}
-        <Route path="/dispatch/gate-entry" element={<GateEntry />} />
-        {canAccess(["logistic"]) && (
-          <Route path="/dispatch/error-log" element={<ErrorLog />} />
-        )}
-        {/*-------------------------------------------------------------- Planing --------------------------------------------------------------*/}
-        {canAccess(["production manager", "planning team"]) && (
+          {canAccess(["logistic"]) && (
+            <Route
+              path="/production/model-name-update"
+              element={<ModelNameUpdate />}
+            />
+          )}
           <Route
-            path="/planing/production-planing"
-            element={<ProductionPlaning />}
+            path="/production/component-details"
+            element={<ComponentDetails />}
           />
-        )}
-        <Route path="/planing/5-days-planing" element={<FiveDaysPlaning />} />
-        <Route path="/planing/daily-planing" element={<DailyPlan />} />
-        {/*-------------------------------------------------------------- Reminder --------------------------------------------------------------*/}
-        {canAccess(["admin"]) && (
-          <Route path="/reminder/dashboard" element={<Dashboard />} />
-        )}
-        {canAccess(["admin"]) && (
-          <Route path="/reminder/tasks" element={<Tasks />} />
-        )}
-        {/*-------------------------------------------------------------- Visitor --------------------------------------------------------------*/}
-        {canAccess(["admin"]) && (
-          <Route path="/visitor/generate-pass" element={<VisitorPass />} />
-        )}
-        {canAccess(["admin"]) && (
-          <Route path="/visitor/manage-employee" element={<ManageEmployee />} />
-        )}
-        {canAccess(["admin"]) && (
-          <Route path="/visitor/dashboard" element={<VisitorDashboard />} />
-        )}
-        {canAccess(["admin"]) && (
-          <Route path="/visitor/reports" element={<VisitorReports />} />
-        )}
-        {/*-------------------------------------------------------------- Catch All --------------------------------------------------------------*/}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+          <Route
+            path="/production/total-production"
+            element={<TotalProduction />}
+          />
+          {/*-------------------------------------------------------------- Quality --------------------------------------------------------------*/}
+          {canAccess([]) && (
+            <Route path="/quality/rework-report" element={<ReworkReport />} />
+          )}
+          {canAccess([]) && (
+            <Route path="/quality/brazing-report" element={<BrazingReport />} />
+          )}
+          {canAccess([]) && (
+            <Route
+              path="/quality/gas-charging-report"
+              element={<GasChargingReport />}
+            />
+          )}
+          {canAccess([]) && (
+            <Route path="/quality/est-report" element={<ESTReport />} />
+          )}
+          {canAccess([]) && (
+            <Route path="/quality/mft-report" element={<MFTReport />} />
+          )}
+          {canAccess(["fpa", "quality manager"]) && (
+            <Route path="/quality/fpa" element={<FPA />} />
+          )}
+          <Route path="/quality/fpa-report" element={<FPAReports />} />
+          {canAccess(["line quality engineer", "quality manager", "lpt"]) && (
+            <Route path="/quality/lpt" element={<LPT />} />
+          )}
+          {canAccess(["line quality engineer", "quality manager", "lpt"]) && (
+            <Route path="/quality/lpt-report" element={<LPTReport />} />
+          )}
+          {canAccess(["line quality engineer", "quality manager", "lpt"]) && (
+            <Route path="/quality/lpt-recipe" element={<LPTRecipe />} />
+          )}
+          {canAccess(["line quality engineer", "fpa", "quality manager"]) && (
+            <Route path="/quality/dispatch-hold" element={<DispatchHold />} />
+          )}
+          <Route
+            path="/quality/hold-cabinate-details"
+            element={<HoldCabinateDetails />}
+          />
+          {canAccess(["line quality engineer", "quality manager"]) && (
+            <Route path="/quality/tag-update" element={<TagUpdate />} />
+          )}
+          {canAccess(["bis engineer", "quality manager"]) && (
+            <Route
+              path="/quality/upload-bis-report"
+              element={<UploadBISReport />}
+            />
+          )}{" "}
+          {canAccess([
+            "line quality engineer",
+            "bis engineer",
+            "fpa",
+            "quality manager",
+          ]) && <Route path="/quality/bis-reports" element={<BISReports />} />}
+          {canAccess([
+            "line quality engineer",
+            "bis engineer",
+            "fpa",
+            "quality manager",
+          ]) && <Route path="/quality/bis-status" element={<BISStatus />} />}
+          {/*-------------------------------------------------------------- Dispatch --------------------------------------------------------------*/}
+          <Route
+            path="/dispatch/dispatch-performance-report"
+            element={<DispatchPerformanceReport />}
+          />
+          <Route
+            path="/dispatch/dispatch-report"
+            element={<DispatchReport />}
+          />
+          <Route
+            path="/dispatch/dispatch-unloading"
+            element={<DispatchUnloading />}
+          />
+          {canAccess(["logistic"]) && (
+            <Route path="/dispatch/fg-casting" element={<FGCasting />} />
+          )}
+          <Route path="/dispatch/gate-entry" element={<GateEntry />} />
+          {canAccess(["logistic"]) && (
+            <Route path="/dispatch/error-log" element={<ErrorLog />} />
+          )}
+          {/*-------------------------------------------------------------- Planing --------------------------------------------------------------*/}
+          {canAccess(["production manager", "planning team"]) && (
+            <Route
+              path="/planing/production-planing"
+              element={<ProductionPlaning />}
+            />
+          )}
+          <Route path="/planing/5-days-planing" element={<FiveDaysPlaning />} />
+          <Route path="/planing/daily-planing" element={<DailyPlan />} />
+          {/*-------------------------------------------------------------- Reminder --------------------------------------------------------------*/}
+          {canAccess(["admin"]) && (
+            <Route path="/reminder/dashboard" element={<Dashboard />} />
+          )}
+          {canAccess(["admin"]) && (
+            <Route path="/reminder/tasks" element={<Tasks />} />
+          )}
+          {/*-------------------------------------------------------------- Visitor --------------------------------------------------------------*/}
+          {canAccess(["admin"]) && (
+            <Route path="/visitor/generate-pass" element={<VisitorPass />} />
+          )}
+          {canAccess(["admin"]) && (
+            <Route
+              path="/visitor/manage-employee"
+              element={<ManageEmployee />}
+            />
+          )}
+          {canAccess(["admin"]) && (
+            <Route path="/visitor/dashboard" element={<VisitorDashboard />} />
+          )}
+          {canAccess(["admin"]) && (
+            <Route path="/visitor/reports" element={<VisitorReports />} />
+          )}
+          {/*-------------------------------------------------------------- Catch All --------------------------------------------------------------*/}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </div>
   );
 }
