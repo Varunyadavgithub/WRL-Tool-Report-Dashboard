@@ -1,12 +1,82 @@
 import { lazy, Suspense, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
+import ProtectedRoute from "./components/ProtectedRoute";
+import { useSelector } from "react-redux";
 
 // Lazy loaded components
+const Layout = lazy(() => import("./components/Layout"));
 const Login = lazy(() => import("./pages/Auth/Login"));
-const NavBar = lazy(() => import("./components/Navbar"));
-const Sidebar = lazy(() => import("./components/Sidebar"));
-const MainContent = lazy(() => import("./components/MainContent"));
-const ProtectedRoute = lazy(() => import("./components/ProtectedRoute"));
+const Home = lazy(() => import("./pages/Home"));
+
+const ProductionOverview = lazy(() => import("./pages/Production/Overview"));
+const ComponentTraceabilityReport = lazy(() =>
+  import("./pages/Production/ComponentTraceabilityReport")
+);
+const HourlyReport = lazy(() => import("./pages/Production/HourlyReport"));
+const LineHourlyReport = lazy(() =>
+  import("./pages/Production/LineHourlyReport")
+);
+const StageHistoryReport = lazy(() =>
+  import("./pages/Production/StageHistoryReport")
+);
+const ModelNameUpdate = lazy(() =>
+  import("./pages/Production/ModelNameUpdate")
+);
+const TotalProduction = lazy(() =>
+  import("./pages/Production/TotalProduction")
+);
+const ComponentDetails = lazy(() =>
+  import("./pages/Production/ComponentDetails")
+);
+
+const ReworkReport = lazy(() => import("./pages/Quality/ReworkReport"));
+const BrazingReport = lazy(() => import("./pages/Quality/BrazingReport"));
+const GasChargingReport = lazy(() =>
+  import("./pages/Quality/GasChargingReport")
+);
+const ESTReport = lazy(() => import("./pages/Quality/ESTReport"));
+const MFTReport = lazy(() => import("./pages/Quality/MFTReport"));
+const FPA = lazy(() => import("./pages/Quality/FPA"));
+const FPAReports = lazy(() => import("./pages/Quality/FPAReports"));
+const LPT = lazy(() => import("./pages/Quality/LPT"));
+const LPTReport = lazy(() => import("./pages/Quality/LPTReport"));
+const DispatchHold = lazy(() => import("./pages/Quality/DispatchHold"));
+const HoldCabinateDetails = lazy(() =>
+  import("./pages/Quality/HoldCabinateDetails")
+);
+
+const DispatchPerformanceReport = lazy(() =>
+  import("./pages/Dispatch/DispatchPerformanceReport")
+);
+const DispatchReport = lazy(() => import("./pages/Dispatch/DispatchReport"));
+const DispatchUnloading = lazy(() =>
+  import("./pages/Dispatch/DispatchUnloading")
+);
+const FGCasting = lazy(() => import("./pages/Dispatch/FGCasting"));
+const GateEntry = lazy(() => import("./pages/Dispatch/GateEntry"));
+const ErrorLog = lazy(() => import("./pages/Dispatch/ErrorLog"));
+
+const FiveDaysPlaning = lazy(() => import("./pages/Planing/FiveDaysPlaning"));
+const ProductionPlaning = lazy(() =>
+  import("./pages/Planing/ProductionPlaning")
+);
+const DailyPlan = lazy(() => import("./pages/Planing/DailyPlan"));
+
+const TagUpdate = lazy(() => import("./pages/Quality/TagUpdate"));
+const LPTRecipe = lazy(() => import("./pages/Quality/LPTRecipe"));
+const UploadBISReport = lazy(() => import("./pages/Quality/UploadBISReport"));
+const BISReports = lazy(() => import("./pages/Quality/BISReports"));
+const BISStatus = lazy(() => import("./pages/Quality/BISStatus"));
+
+const Dashboard = lazy(() => import("./pages/Reminder/Dashboard"));
+const Tasks = lazy(() => import("./pages/Reminder/Tasks"));
+
+const VisitorPass = lazy(() => import("./pages/Visitor/VisitorPass"));
+const ManageEmployee = lazy(() => import("./pages/Visitor/ManageEmployee"));
+const VisitorDashboard = lazy(() => import("./pages/Visitor/Dashboard"));
+const VisitorReports = lazy(() => import("./pages/Visitor/Reports"));
+
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 function App() {
   const [isSidebarExpanded, setSidebarExpanded] = useState(false);
@@ -15,6 +85,10 @@ function App() {
     setSidebarExpanded((prev) => !prev);
   };
 
+  const userRole = useSelector((state) => state.auth.user?.role || "");
+
+  const canAccess = (allowedRoles) =>
+    allowedRoles.includes(userRole) || userRole === "admin";
   return (
     <Suspense
       fallback={
@@ -27,33 +101,175 @@ function App() {
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
 
-        {/* Protected Routes */}
+        {/* Protected Layout Route */}
         <Route element={<ProtectedRoute />}>
           <Route
-            path="/*"
             element={
-              true ? (
-                <div className="flex flex-col h-screen">
-                  <NavBar />
-                  <div className="flex flex-1 overflow-hidden">
-                    <Sidebar
-                      isSidebarExpanded={isSidebarExpanded}
-                      toggleSidebar={toggleSidebar}
-                    />
-                    <div
-                      className={`flex-1 transition-all duration-300 ease-in-out overflow-auto ${
-                        isSidebarExpanded ? "ml-64" : "ml-16"
-                      }`}
-                    >
-                      <MainContent />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <Navigate to="/login" />
-              )
+              <Layout
+                isSidebarExpanded={isSidebarExpanded}
+                toggleSidebar={toggleSidebar}
+              />
             }
-          />
+          >
+            <Route path="/" index element={<Home />} />
+            {/*-------------------------------------------------------------- Production --------------------------------------------------------------*/}
+            <Route
+              path="/production/overview"
+              element={<ProductionOverview />}
+            />
+            <Route
+              path="/production/component-traceability-report"
+              element={<ComponentTraceabilityReport />}
+            />
+            <Route
+              path="/production/hourly-report"
+              element={<HourlyReport />}
+            />
+            <Route
+              path="/production/line-hourly-report"
+              element={<LineHourlyReport />}
+            />
+            <Route
+              path="/production/stage-history-report"
+              element={<StageHistoryReport />}
+            />
+            {canAccess(["logistic"]) && (
+              <Route
+                path="/production/model-name-update"
+                element={<ModelNameUpdate />}
+              />
+            )}
+            <Route
+              path="/production/component-details"
+              element={<ComponentDetails />}
+            />
+            <Route
+              path="/production/total-production"
+              element={<TotalProduction />}
+            />
+            {/*-------------------------------------------------------------- Quality --------------------------------------------------------------*/}
+            {canAccess([]) && (
+              <Route path="/quality/rework-report" element={<ReworkReport />} />
+            )}
+            {canAccess([]) && (
+              <Route
+                path="/quality/brazing-report"
+                element={<BrazingReport />}
+              />
+            )}
+            {canAccess([]) && (
+              <Route
+                path="/quality/gas-charging-report"
+                element={<GasChargingReport />}
+              />
+            )}
+            {canAccess([]) && (
+              <Route path="/quality/est-report" element={<ESTReport />} />
+            )}
+            {canAccess([]) && (
+              <Route path="/quality/mft-report" element={<MFTReport />} />
+            )}
+            {canAccess(["fpa", "quality manager"]) && (
+              <Route path="/quality/fpa" element={<FPA />} />
+            )}
+            <Route path="/quality/fpa-report" element={<FPAReports />} />
+            {canAccess(["line quality engineer", "quality manager", "lpt"]) && (
+              <Route path="/quality/lpt" element={<LPT />} />
+            )}
+            {canAccess(["line quality engineer", "quality manager", "lpt"]) && (
+              <Route path="/quality/lpt-report" element={<LPTReport />} />
+            )}
+            {canAccess(["line quality engineer", "quality manager", "lpt"]) && (
+              <Route path="/quality/lpt-recipe" element={<LPTRecipe />} />
+            )}
+            {canAccess(["line quality engineer", "fpa", "quality manager"]) && (
+              <Route path="/quality/dispatch-hold" element={<DispatchHold />} />
+            )}
+            <Route
+              path="/quality/hold-cabinate-details"
+              element={<HoldCabinateDetails />}
+            />
+            {canAccess(["line quality engineer", "quality manager"]) && (
+              <Route path="/quality/tag-update" element={<TagUpdate />} />
+            )}
+            {canAccess(["bis engineer", "quality manager"]) && (
+              <Route
+                path="/quality/upload-bis-report"
+                element={<UploadBISReport />}
+              />
+            )}{" "}
+            {canAccess([
+              "line quality engineer",
+              "bis engineer",
+              "fpa",
+              "quality manager",
+            ]) && (
+              <Route path="/quality/bis-reports" element={<BISReports />} />
+            )}
+            {canAccess([
+              "line quality engineer",
+              "bis engineer",
+              "fpa",
+              "quality manager",
+            ]) && <Route path="/quality/bis-status" element={<BISStatus />} />}
+            {/*-------------------------------------------------------------- Dispatch --------------------------------------------------------------*/}
+            <Route
+              path="/dispatch/dispatch-performance-report"
+              element={<DispatchPerformanceReport />}
+            />
+            <Route
+              path="/dispatch/dispatch-report"
+              element={<DispatchReport />}
+            />
+            <Route
+              path="/dispatch/dispatch-unloading"
+              element={<DispatchUnloading />}
+            />
+            {canAccess(["logistic"]) && (
+              <Route path="/dispatch/fg-casting" element={<FGCasting />} />
+            )}
+            <Route path="/dispatch/gate-entry" element={<GateEntry />} />
+            {canAccess(["logistic"]) && (
+              <Route path="/dispatch/error-log" element={<ErrorLog />} />
+            )}
+            {/*-------------------------------------------------------------- Planing --------------------------------------------------------------*/}
+            {canAccess(["production manager", "planning team"]) && (
+              <Route
+                path="/planing/production-planing"
+                element={<ProductionPlaning />}
+              />
+            )}
+            <Route
+              path="/planing/5-days-planing"
+              element={<FiveDaysPlaning />}
+            />
+            <Route path="/planing/daily-planing" element={<DailyPlan />} />
+            {/*-------------------------------------------------------------- Reminder --------------------------------------------------------------*/}
+            {canAccess(["admin"]) && (
+              <Route path="/reminder/dashboard" element={<Dashboard />} />
+            )}
+            {canAccess(["admin"]) && (
+              <Route path="/reminder/tasks" element={<Tasks />} />
+            )}
+            {/*-------------------------------------------------------------- Visitor --------------------------------------------------------------*/}
+            {canAccess(["admin"]) && (
+              <Route path="/visitor/generate-pass" element={<VisitorPass />} />
+            )}
+            {canAccess(["admin"]) && (
+              <Route
+                path="/visitor/manage-employee"
+                element={<ManageEmployee />}
+              />
+            )}
+            {canAccess(["admin"]) && (
+              <Route path="/visitor/dashboard" element={<VisitorDashboard />} />
+            )}
+            {canAccess(["admin"]) && (
+              <Route path="/visitor/reports" element={<VisitorReports />} />
+            )}
+            {/*-------------------------------------------------------------- Catch All --------------------------------------------------------------*/}
+            <Route path="*" element={<NotFound />} />
+          </Route>
         </Route>
       </Routes>
     </Suspense>
