@@ -91,7 +91,6 @@ const Dashboard = () => {
     try {
       setLoading(true);
       const res = await axios.get(`${baseURL}visitor/dashboard-stats`);
-      console.log(res);
       if (res?.data?.success) {
         // Validate and set data
         const data = res?.data?.dashboardStats;
@@ -118,6 +117,7 @@ const Dashboard = () => {
     getDashboardStats();
   }, []);
 
+  // Bar Chart Configuration
   const barChartData = {
     labels: dashboardData.visitorTrend.map((item) => item.month),
     datasets: [
@@ -363,7 +363,10 @@ const Dashboard = () => {
                 <tr key={visitor.id} className="border-b">
                   <td className="p-3">{visitor.name}</td>
                   <td className="p-3">{visitor.department}</td>
-                  <td className="p-3">{visitor.checkIn}</td>
+                  <td className="p-3">
+                    {visitor.check_in_time &&
+                      visitor.check_in_time.replace("T", " ").replace("Z", "")}
+                  </td>
                   <td className="p-3">
                     <button className="text-blue-500 hover:underline">
                       <FaIdBadge />
