@@ -75,6 +75,7 @@ const VisitorPass = lazy(() => import("./pages/Visitor/VisitorPass"));
 const ManageEmployee = lazy(() => import("./pages/Visitor/ManageEmployee"));
 const VisitorDashboard = lazy(() => import("./pages/Visitor/Dashboard"));
 const VisitorReports = lazy(() => import("./pages/Visitor/Reports"));
+const VisitorInOut = lazy(() => import("./pages/Visitor/VisitorInOut"));
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -266,6 +267,9 @@ function App() {
             )}
             {canAccess(["admin"]) && (
               <Route path="/visitor/reports" element={<VisitorReports />} />
+            )}
+            {canAccess(["admin"]) && (
+              <Route path="/visitor/in-out" element={<VisitorInOut />} />
             )}
             {/*-------------------------------------------------------------- Catch All --------------------------------------------------------------*/}
             <Route path="*" element={<NotFound />} />

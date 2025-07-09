@@ -200,6 +200,11 @@ const MENU_CONFIG = [
         label: "Reports",
         roles: ["admin"],
       },
+      {
+        path: "/visitor/in-out",
+        label: "Visitor In Out",
+        roles: ["admin"],
+      },
     ],
   },
 ];
