@@ -5,45 +5,47 @@ export const getDashboardStats = async (req, res) => {
   try {
     // Total Visitors
     const totalVisitorsQuery = `
-        SELECT COUNT(*) as total_visitors 
-        FROM visitors	
+        SELECT COUNT(*) as total_visitors
+        FROM visitors
     `;
 
     // Active Visitors
     const activeVisitorsQuery = `
-        SELECT COUNT(*) as active_visitors 
-        FROM visit_logs 
+        SELECT COUNT(*) as active_visitors
+        FROM visit_logs
         WHERE check_out_time IS NULL
     `;
 
     // Today's Visits
     const todayVisitsQuery = `
-        SELECT COUNT(*) AS today_visits 
-        FROM visit_logs 
+        SELECT COUNT(*) AS today_visits
+        FROM visit_logs
         WHERE CAST(check_in_time AS DATE) = CAST(GETDATE() AS DATE);
     `;
 
     // Department Breakdown
     const departmentBreakdownQuery = `
-        SELECT 
+        SELECT
             d.id,
             d.department_name,
             COUNT(vp.id) AS visitor_count
         FROM departments d
-        LEFT JOIN visitor_passes vp 
+        LEFT JOIN visitor_passes vp
             ON d.deptCode = vp.department_to_visit
         GROUP BY d.id, d.department_name;
     `;
 
-    // Monthly Visitor Trend
+    // Daily Visitor Trend
     const visitorTrendQuery = `
-        SELECT 
-            DATENAME(month, check_in_time) AS [month],
-            COUNT(*) AS visitors
+        SELECT
+          CAST(check_in_time AS DATE) AS [date],
+          COUNT(*) AS visitors
         FROM visit_logs
-        WHERE YEAR(check_in_time) = YEAR(GETDATE())
-        GROUP BY DATENAME(month, check_in_time), MONTH(check_in_time)
-        ORDER BY MONTH(check_in_time);
+        WHERE 
+          YEAR(check_in_time) = YEAR(GETDATE()) 
+          AND MONTH(check_in_time) = MONTH(GETDATE())
+        GROUP BY CAST(check_in_time AS DATE)
+        ORDER BY [date];
     `;
 
     // Recent Visitors

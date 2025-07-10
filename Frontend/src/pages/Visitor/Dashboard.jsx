@@ -84,12 +84,9 @@ const Dashboard = () => {
     recentVisitors: [],
     visitorTrend: [],
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   const getDashboardStats = async () => {
     try {
-      setLoading(true);
       const res = await axios.get(`${baseURL}visitor/dashboard-stats`);
       if (res?.data?.success) {
         // Validate and set data
@@ -103,11 +100,7 @@ const Dashboard = () => {
           visitorTrend: data.visitorTrend || [],
         });
       }
-
-      setLoading(false);
     } catch (error) {
-      setError(error);
-      setLoading(false);
       console.error("Failed to fetch dashboard stats", error);
       toast.error("Failed to load dashboard data");
     }
@@ -119,10 +112,14 @@ const Dashboard = () => {
 
   // Bar Chart Configuration
   const barChartData = {
-    labels: dashboardData.visitorTrend.map((item) => item.month),
+    labels: dashboardData.visitorTrend.map((item) => {
+      // Extract day from the date
+      const date = new Date(item.date);
+      return date.getDate(); // This will show just the day of the month
+    }),
     datasets: [
       {
-        label: "Visitors",
+        label: "Daily Visitors",
         data: dashboardData.visitorTrend.map((item) => item.visitors),
         backgroundColor: "rgba(75, 192, 192, 0.6)",
         borderColor: "rgba(75, 192, 192, 1)",
@@ -137,13 +134,15 @@ const Dashboard = () => {
     height: 250, // Specify a fixed height
     plugins: {
       legend: {
-        display: false, // Hide legend to save space
+        display: false,
       },
       title: {
         display: true,
-        text: "Monthly Visitor Trend",
+        text: `Daily Visitors - ${new Date().toLocaleString("default", {
+          month: "long",
+        })} ${new Date().getFullYear()}`,
         font: {
-          size: 14, // Reduced font size
+          size: 14,
         },
       },
     },
@@ -207,43 +206,6 @@ const Dashboard = () => {
     },
     cutout: "50%", // Increased cut-out for a more compact look
   };
-
-  // Retry function
-  const handleRetry = () => {
-    setError(null);
-    getDashboardStats();
-  };
-
-  // Loading state
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="flex justify-center items-center min-h-screen bg-red-100">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-red-600">
-            Failed to Load Dashboard
-          </h2>
-          <p className="text-red-500 mt-2">
-            {error.message || "An unexpected error occurred"}
-          </p>
-          <button
-            onClick={handleRetry}
-            className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
