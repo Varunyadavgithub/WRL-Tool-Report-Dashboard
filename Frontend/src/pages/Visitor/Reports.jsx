@@ -43,7 +43,7 @@ const Reports = () => {
           <div className="flex flex-wrap gap-4">
             {/* Users Table Section */}
             <div className="w-full overflow-x-auto">
-              <div className="flex justify-between items-center mb-2">
+              <div className="flex justify-between items-center mb-2 px-6">
                 <h3 className="text-xl font-semibold text-purple-700">
                   Visitors
                 </h3>
@@ -95,17 +95,8 @@ const Reports = () => {
                         <th className="px-2 py-2 text-center border-b min-w-[120px]">
                           City
                         </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[120px]">
-                          Postal Code
-                        </th>
                         <th className="px-2 py-2 text-center border-b min-w-[100px]">
                           Vehicle Details
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          Check In Time
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          Check Out Time
                         </th>
                       </tr>
                     </thead>
@@ -154,20 +145,7 @@ const Reports = () => {
                               {visitor.city}
                             </td>
                             <td className="px-2 py-2 text-center border-b">
-                              {visitor.postal_code}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
                               {visitor.vehicle_details}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.check_in_time
-                                .replace("T", " ")
-                                .replace("Z", "")}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.check_out_time
-                                .replace("T", " ")
-                                .replace("Z", "")}
                             </td>
                           </tr>
                         ))

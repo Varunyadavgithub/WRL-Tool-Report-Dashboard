@@ -502,7 +502,7 @@ const ManageEmployee = () => {
                             <td className="px-2 py-2 text-center border-b">
                               <div className="flex justify-center space-x-2">
                                 <button
-                                  className="text-green-500 hover:text-green-700 transition-colors"
+                                  className="text-green-500 hover:text-green-700 transition-colors cursor-pointer"
                                   onClick={() => {
                                     setUserDetails({
                                       name: user.name,
@@ -520,7 +520,7 @@ const ManageEmployee = () => {
                                   <FaEdit size={18} />
                                 </button>
                                 <button
-                                  className="text-red-500 hover:text-red-700 transition-colors"
+                                  className="text-red-500 hover:text-red-700 transition-colors cursor-pointer"
                                   onClick={() => {
                                     handleDeleteUser(user.id);
                                   }}
@@ -599,7 +599,7 @@ const ManageEmployee = () => {
                             <td className="px-2 py-2 text-center border-b">
                               <div className="flex justify-center space-x-2">
                                 <button
-                                  className="text-green-500 hover:text-green-700 transition-colors"
+                                  className="text-green-500 hover:text-green-700 transition-colors cursor-pointer"
                                   onClick={() => {
                                     setDepartmentDetails({
                                       name: dept.label,

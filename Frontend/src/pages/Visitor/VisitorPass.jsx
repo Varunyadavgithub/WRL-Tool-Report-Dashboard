@@ -485,27 +485,38 @@ const VisitorPass = () => {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-4 w-full">
                 <div className="w-full">
-                  <InputField
-                    label="Allow On"
-                    type="text"
+                  <label className="block font-semibold mb-1" htmlFor="allowOn">
+                    Allow On
+                  </label>
+                  <input
+                    type="datetime-local"
+                    id="allowOn"
                     name="allowOn"
-                    placeholder="Enter the allowed time"
                     value={visitorData.allowOn}
                     onChange={handleInputChange}
-                    className="w-full"
+                    className="w-full p-2 border rounded"
+                    required
                   />
                 </div>
+
                 <div className="w-full">
-                  <InputField
-                    label="Allow Till"
-                    type="text"
+                  <label
+                    className="block font-semibold mb-1"
+                    htmlFor="allowTill"
+                  >
+                    Allow Till
+                  </label>
+                  <input
+                    type="datetime-local"
+                    id="allowTill"
                     name="allowTill"
-                    placeholder="Enter the allowed time"
                     value={visitorData.allowTill}
                     onChange={handleInputChange}
-                    className="w-full"
+                    className="w-full p-2 border rounded"
+                    required
                   />
                 </div>
+
                 <div className="w-full">
                   <SelectField
                     label="Department To Visit"

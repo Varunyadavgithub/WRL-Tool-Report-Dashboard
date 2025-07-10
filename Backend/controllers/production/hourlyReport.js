@@ -11,24 +11,24 @@ export const getHourlySummary = async (req, res) => {
     const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
     const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    let userRoleCondition = "";
+    let categoryCondition = "";
     let stationCodeCondition = "= @stationCode"; // default single station
 
     if (stationCode == 1220010) {
       if (line == "1") {
-        userRoleCondition = " AND u.UserRole = '224006' ";
+        categoryCondition = " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
       } else if (line == "2") {
-        userRoleCondition = " AND u.UserRole = '224007' ";
+        categoryCondition = " AND m.Category in (1240001, 1250004) ";
         stationCodeCondition = "IN (1220010, 1230017)"; // multiple stations for this case
       }
     } else if (stationCode == 1220005) {
       if (line == "1") {
-        userRoleCondition = " AND u.UserRole = '225002' ";
+        categoryCondition = " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
       } else if (line == "2") {
-        userRoleCondition = " AND u.UserRole = '225001' ";
+        categoryCondition = " AND m.Category in (1240001, 1250004) ";
       }
     } else if (stationCode == 1230017) {
-      userRoleCondition = " AND u.UserRole = '225005' ";
+      categoryCondition = " AND m.Category in (1230003, 1230004, 1230009, 1230010) ";
     }
 
     const query = `
@@ -54,7 +54,7 @@ export const getHourlySummary = async (req, res) => {
           AND b.ActivityType = 5
           AND b.ActivityOn BETWEEN @startDate AND @endDate
           ${model && model !== "0" ? "AND Psno.Material = @model" : ""}
-          ${userRoleCondition}
+          ${categoryCondition}
         GROUP BY 
           DATEPART(DAY, b.ActivityOn), 
           DATEPART(HOUR, b.ActivityOn),
@@ -100,24 +100,23 @@ export const getHourlyModelCount = async (req, res) => {
     const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
     let stationCodesCondition = `= @stationCode`; // default single station code filter
-    let userRoleCondition = "";
+    let categoryCondition = "";
 
     if (stationCode == 1220010) {
       if (line == "1") {
-        userRoleCondition = " AND u.UserRole = '224006' ";
+        categoryCondition = " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
       } else if (line == "2") {
-        // multiple station codes here
-        stationCodesCondition = "IN (1220010, 1230017)";
-        userRoleCondition = " AND u.UserRole = '224007' ";
+        categoryCondition = " AND m.Category in (1240001, 1250004) ";
+        stationCodesCondition = "IN (1220010, 1230017)"; // multiple stations for this case
       }
     } else if (stationCode == 1220005) {
       if (line == "1") {
-        userRoleCondition = " AND u.UserRole = '225002' ";
+        categoryCondition = " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
       } else if (line == "2") {
-        userRoleCondition = " AND u.UserRole = '225001' ";
+        categoryCondition = " AND m.Category in (1240001, 1250004) ";
       }
     } else if (stationCode == 1230017) {
-      userRoleCondition = " AND u.UserRole = '225005' ";
+      categoryCondition = " AND m.Category in (1230003, 1230004, 1230009, 1230010) ";
     }
 
     const query = `
@@ -150,7 +149,7 @@ export const getHourlyModelCount = async (req, res) => {
           b.ActivityType = 5 AND
           b.ActivityOn BETWEEN @startDate AND @endDate
            ${model && model !== "0" ? "AND Psno.Material = @model" : ""}
-           ${userRoleCondition}
+           ${categoryCondition}
       ),
       HourlyCount AS (
         SELECT TIMEHOUR, Material_Name, COUNT(*) AS Loading_Count
@@ -193,24 +192,24 @@ export const getHourlyCategoryCount = async (req, res) => {
     const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
     const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    let userRoleCondition = "";
+    let categoryCondition = "";
     let stationCodeCondition = "= @stationCode"; // default single code
 
     if (stationCode == 1220010) {
       if (line == "1") {
-        userRoleCondition = " AND u.UserRole = '224006' ";
+        categoryCondition = " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
       } else if (line == "2") {
-        userRoleCondition = " AND u.UserRole = '224007' ";
+        categoryCondition = " AND m.Category in (1240001, 1250004) ";
         stationCodeCondition = "IN (1220010, 1230017)"; // multiple stations for this case
       }
     } else if (stationCode == 1220005) {
       if (line == "1") {
-        userRoleCondition = " AND u.UserRole = '225002' ";
+        categoryCondition = " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
       } else if (line == "2") {
-        userRoleCondition = " AND u.UserRole = '225001' ";
+        categoryCondition = " AND m.Category in (1240001, 1250004) ";
       }
     } else if (stationCode == 1230017) {
-      userRoleCondition = " AND u.UserRole = '225005' ";
+      categoryCondition = " AND m.Category in (1230003, 1230004, 1230009, 1230010) ";
     }
 
     const query = `
@@ -239,13 +238,13 @@ export const getHourlyCategoryCount = async (req, res) => {
         JOIN WorkCenter c ON b.StationCode = c.StationCode
         JOIN Material m ON Psno.Material = m.MatCode
         JOIN Users u ON b.Operator = u.UserCode
-        LEFT JOIN MaterialCategory mc ON mc.CategoryCode = m.Category
+        JOIN MaterialCategory mc ON mc.CategoryCode = m.Category
         WHERE 
           c.StationCode ${stationCodeCondition}
           AND b.ActivityType = 5
           AND b.ActivityOn BETWEEN @startDate AND @endDate
           ${model && model !== "0" ? "AND Psno.Material = @model" : ""}
-          ${userRoleCondition}
+          ${categoryCondition}
       ),
       HourlyCount AS (
         SELECT TIMEHOUR, category, COUNT(*) AS Loading_Count

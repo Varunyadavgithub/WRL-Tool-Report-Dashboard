@@ -28,10 +28,10 @@ HourlySummary AS (
     JOIN ProcessActivity b ON b.PSNo = Psno.DocNo
     JOIN WorkCenter c ON b.StationCode = c.StationCode
     JOIN Material m ON Psno.Material = m.MatCode
-    JOIN Users u ON b.Operator = u.UserCode
+    JOIN MaterialCategory mc ON mc.CategoryCode = m.Category
     WHERE
         c.StationCode = 1220010 
-        AND u.UserRole = '224006' 
+        AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005)
         AND b.ActivityType = 5 
         AND b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}' 
     GROUP BY 
@@ -80,10 +80,10 @@ HourlySummary AS (
     JOIN ProcessActivity b ON b.PSNo = Psno.DocNo
     JOIN WorkCenter c ON b.StationCode = c.StationCode
     JOIN Material m ON Psno.Material = m.MatCode
-    JOIN Users u ON b.Operator = u.UserCode
+    JOIN MaterialCategory mc ON mc.CategoryCode = m.Category
     WHERE
         c.StationCode IN (1220010, 1230017)
-        AND u.UserRole = '224007' 
+        AND m.Category in (1240001, 1250004)
         AND b.ActivityType = 5 
         AND b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}' 
     GROUP BY 
@@ -130,10 +130,10 @@ HourlySummary AS (
     JOIN ProcessActivity b ON b.PSNo = Psno.DocNo
     JOIN WorkCenter c ON b.StationCode = c.StationCode
     JOIN Material m ON Psno.Material = m.MatCode
-    JOIN Users u ON b.Operator = u.UserCode
+    JOIN MaterialCategory mc ON mc.CategoryCode = m.Category
     WHERE
         c.StationCode IN (1230017)
-        AND u.UserRole = '225005' 
+        AND m.Category in (1230003, 1230004, 1230009, 1230010)
         AND b.ActivityType = 5 
         AND b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}' 
     GROUP BY 

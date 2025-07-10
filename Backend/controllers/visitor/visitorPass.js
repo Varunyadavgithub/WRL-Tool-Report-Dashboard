@@ -47,7 +47,6 @@ export const generateVisitorPass = async (req, res) => {
     country,
     state,
     city,
-    postalCode,
     vehicleDetails,
     allowOn,
     allowTill,
@@ -57,7 +56,6 @@ export const generateVisitorPass = async (req, res) => {
     specialInstruction,
     createdBy,
   } = req.body;
-
 
   if (!name || !contactNo || !email) {
     return res.status(400).json({
@@ -77,8 +75,24 @@ export const generateVisitorPass = async (req, res) => {
       photoPath = visitorPhoto;
     }
 
+    const generateVisitorId = (plantCode = 4) => {
+      const now = new Date();
+
+      const year = now.getFullYear().toString().slice(-2);
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const hours = String(now.getHours()).padStart(2, "0");
+      const minutes = String(now.getMinutes()).padStart(2, "0");
+      const seconds = String(now.getSeconds()).padStart(2, "0");
+
+      const visitorId = `WRLV${year}${month}${hours}${minutes}${seconds}`;
+      return visitorId;
+    };
+
+    const uniqueVisitorId = generateVisitorId();
+
     // Insert visitor into `visitors` table and get inserted ID
     const insertVisitorResult = await visitorRequest
+      .input("VisitorId", sql.VarChar(50), uniqueVisitorId)
       .input("Name", sql.NVarChar(255), name)
       .input("ContactNo", sql.VarChar(20), contactNo)
       .input("Email", sql.VarChar(255), email)
@@ -90,38 +104,15 @@ export const generateVisitorPass = async (req, res) => {
       .input("Country", sql.VarChar(100), country)
       .input("State", sql.VarChar(100), state)
       .input("City", sql.VarChar(100), city)
-      .input("PostalCode", sql.VarChar(20), postalCode)
       .input("VehicleDetails", sql.VarChar(100), vehicleDetails)
       .input("VisitorPhoto", sql.NVarChar(sql.MAX), photoPath)
-      .input("AllowOn", sql.DateTime, allowOn ? new Date(allowOn) : new Date())
-      .input("AllowTill", sql.DateTime, allowTill ? new Date(allowTill) : null)
       .query(`
         INSERT INTO visitors (
-          name, contact_no, email, company, nationality, identity_type, identity_no, address, country, state, city, postal_code, vehicle_details, photo_url, check_in_time, check_out_time 
-        )
-        OUTPUT inserted.id
-        VALUES (
-          @Name, @ContactNo, @Email, @Company, @Nationality, @IdentityType, @IdentityNo, @Address, @Country, @State, @City, @PostalCode, @VehicleDetails, @VisitorPhoto, @AllowOn, @AllowTill
-        )
-      `);
-
-    const visitorId = insertVisitorResult.recordset[0].id;
-
-    // Generate Unique Pass ID
-    const uniquePassId = `VP-${Math.random()
-      .toString(36)
-      .substr(2, 4)
-      .toUpperCase()}${Date.now().toString().slice(-4)}`;
-
-    const query = `
-      INSERT INTO visitor_passes (
-          unique_pass_id,
-          visitor_photo,
-          visitor_name,
-          visitor_contact_no,
-          visitor_email,
+          visitor_id,
+          name,
+          contact_no,
+          email,
           company,
-          no_of_people,
           nationality,
           identity_type,
           identity_no,
@@ -129,27 +120,16 @@ export const generateVisitorPass = async (req, res) => {
           country,
           state,
           city,
-          postal_code,
           vehicle_details,
-          allow_on,
-          allow_till,
-          department_to_visit,
-          employee_to_visit,
-          visit_type,
-          special_instructions,
-          status,
-          created_by,
-          created_at,
-          visitor_id
-        ) 
+          photo_url
+        )
+        OUTPUT inserted.visitor_id
         VALUES (
-          @UniquePassId,
-          @VisitorPhoto,
+          @VisitorId,
           @Name,
           @ContactNo,
           @Email,
           @Company,
-          @NoOfPeople,
           @Nationality,
           @IdentityType,
           @IdentityNo,
@@ -157,40 +137,91 @@ export const generateVisitorPass = async (req, res) => {
           @Country,
           @State,
           @City,
-          @PostalCode,
           @VehicleDetails,
-          @AllowOn,
-          @AllowTill,
-          @DepartmentToVisit,
-          @EmployeeToVisit,
-          @VisitType,
-          @SpecialInstructions,
-          @Status,
-          @CreatedBy,
-          @CreatedAt,
-          @visitor_id
+          @VisitorPhoto
         )
+      `);
+
+    const visitorId = insertVisitorResult.recordset[0].visitor_id;
+
+    // Generate Unique Pass ID
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    const seconds = String(now.getSeconds()).padStart(2, "0");
+
+    const uniquePassId = `WRLVP${year}${month}${hours}${minutes}${seconds}`;
+
+    const query = `
+      INSERT INTO visitor_passes (
+        pass_id,
+        visitor_id,
+        visitor_photo,
+        visitor_name,
+        visitor_contact_no,
+        visitor_email,
+        department_to_visit,
+        employee_to_visit,
+        visit_type,
+        no_of_people,
+        allow_on,
+        allow_till,
+        special_instructions,
+        created_by,
+        company,
+        nationality,
+        identity_type,
+        identity_no, 
+        address,
+        country,
+        state,
+        city,
+        vehicle_details,
+        status
+      ) 
+      VALUES (
+        @PassId,
+        @Visitor_id,
+        @VisitorPhoto,
+        @Name,
+        @ContactNo,
+        @Email,
+        @DepartmentToVisit,
+        @EmployeeToVisit,
+        @VisitType,
+        @NoOfPeople,
+        @AllowOn,
+        @AllowTill,
+        @SpecialInstructions,
+        @CreatedBy,
+        @Company,
+        @Nationality,
+        @IdentityType,
+        @IdentityNo,
+        @Address,
+        @Country,
+        @State,
+        @City,
+        @VehicleDetails,
+        @Status
+      )
     `;
 
     // Prepare Visitor Pass Insert
     const passRequest = pool.request();
 
-    passRequest.input("UniquePassId", sql.VarChar(50), uniquePassId);
+    passRequest.input("passId", sql.VarChar(50), uniquePassId);
+    passRequest.input("Visitor_id", sql.VarChar(50), visitorId); // FK reference
     passRequest.input("VisitorPhoto", sql.NVarChar(sql.MAX), photoPath);
     passRequest.input("Name", sql.NVarChar(255), name);
     passRequest.input("ContactNo", sql.VarChar(20), contactNo);
     passRequest.input("Email", sql.VarChar(255), email);
-    passRequest.input("Company", sql.VarChar(255), company);
+    passRequest.input("DepartmentToVisit", sql.VarChar(100), departmentTo);
+    passRequest.input("EmployeeToVisit", sql.VarChar(50), employeeTo || null);
+    passRequest.input("VisitType", sql.VarChar(50), visitType);
     passRequest.input("NoOfPeople", sql.Int, noOfPeople || 1);
-    passRequest.input("Nationality", sql.VarChar(100), nationality);
-    passRequest.input("IdentityType", sql.VarChar(50), identityType);
-    passRequest.input("IdentityNo", sql.VarChar(100), identityNo);
-    passRequest.input("Address", sql.NVarChar(sql.MAX), address);
-    passRequest.input("Country", sql.VarChar(100), country);
-    passRequest.input("State", sql.VarChar(100), state);
-    passRequest.input("City", sql.VarChar(100), city);
-    passRequest.input("PostalCode", sql.VarChar(20), postalCode);
-    passRequest.input("VehicleDetails", sql.VarChar(100), vehicleDetails);
     passRequest.input(
       "AllowOn",
       sql.DateTime,
@@ -201,21 +232,24 @@ export const generateVisitorPass = async (req, res) => {
       sql.DateTime,
       allowTill ? new Date(allowTill) : null
     );
-    passRequest.input("DepartmentToVisit", sql.VarChar(100), departmentTo);
-    passRequest.input("EmployeeToVisit", sql.VarChar(50), employeeTo || null);
-    passRequest.input("VisitType", sql.VarChar(50), visitType);
     passRequest.input(
       "SpecialInstructions",
       sql.NVarChar(sql.MAX),
       specialInstruction
     );
-    passRequest.input("Status", sql.Int, 0); // Active status
     passRequest.input("CreatedBy", sql.VarChar(50), createdBy || null);
-    passRequest.input("CreatedAt", sql.DateTime, new Date());
-    passRequest.input("visitor_id", sql.Int, visitorId); // FK reference
+    passRequest.input("Company", sql.VarChar(255), company);
+    passRequest.input("Nationality", sql.VarChar(100), nationality);
+    passRequest.input("IdentityType", sql.VarChar(50), identityType);
+    passRequest.input("IdentityNo", sql.VarChar(100), identityNo);
+    passRequest.input("Address", sql.NVarChar(sql.MAX), address);
+    passRequest.input("Country", sql.VarChar(100), country);
+    passRequest.input("State", sql.VarChar(100), state);
+    passRequest.input("City", sql.VarChar(100), city);
+    passRequest.input("VehicleDetails", sql.VarChar(100), vehicleDetails);
+    passRequest.input("Status", sql.Int, 0); // Active status
 
     const insertResult = await passRequest.query(query);
-
 
     await pool.close();
     // Send Response
