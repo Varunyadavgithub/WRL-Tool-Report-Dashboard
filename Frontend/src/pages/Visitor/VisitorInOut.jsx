@@ -8,20 +8,18 @@ import axios from "axios";
 import { useEffect } from "react";
 import toast from "react-hot-toast";
 
+const baseURL = import.meta.env.VITE_API_BASE_URL;
+
 const VisitorInOut = () => {
   const [loading, setLoading] = useState(false);
   const [passIdIn, setPassIdIn] = useState("");
   const [passIdOut, setPassIdOut] = useState("");
   const [visitorLogs, setVisitorLogs] = useState([]);
 
-  useEffect(() => {
-    fetchVisitorLogs();
-  }, []);
-
   const fetchVisitorLogs = async () => {
     try {
-      const res = await axios.get("/api/v1/visitor/logs");
-      if (res.data?.success) {
+      const res = await axios.get(`${baseURL}visitor/logs`);
+      if (res?.data?.success) {
         setVisitorLogs(res?.data?.data);
       }
     } catch (error) {
@@ -29,7 +27,7 @@ const VisitorInOut = () => {
       toast.error("Failed to fetch visitor logs");
     }
   };
-  
+
   const handleVisitorAction = async (type) => {
     const passId = type === "in" ? passIdIn : passIdOut;
 
@@ -41,7 +39,7 @@ const VisitorInOut = () => {
     setLoading(true);
 
     try {
-      const res = await axios.post(`/api/v1/visitor/${type}`, {
+      const res = await axios.post(`${baseURL}visitor/${type}`, {
         passId,
       });
       fetchVisitorLogs();
@@ -56,6 +54,9 @@ const VisitorInOut = () => {
     }
   };
 
+  useEffect(() => {
+    fetchVisitorLogs();
+  }, []);
   const commonBoxStyles =
     "bg-white border border-purple-300 shadow-md rounded-xl p-6 w-full md:w-1/2";
 
