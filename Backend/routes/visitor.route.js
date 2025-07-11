@@ -8,19 +8,19 @@ import {
   addUser,
   updateUser,
   deleteUser,
-} from "../../controllers/visitor/manageEmployee.js";
+} from "../controllers/visitor/manageEmployee.js";
 import {
   getEmployee,
   generateVisitorPass,
   fetchPreviousPass,
-} from "../../controllers/visitor/visitorPass.js";
+} from "../controllers/visitor/visitorPass.js";
 import {
   visitorIn,
   visitorOut,
   getVisitorLogs,
-} from "../../controllers/visitor/visitorInOut.js";
-import { fetchVisitors } from "../../controllers/visitor/reports.js";
-import { getDashboardStats } from "../../controllers/visitor/dashboard.js";
+} from "../controllers/visitor/visitorInOut.js";
+import { fetchVisitors } from "../controllers/visitor/reports.js";
+import { getDashboardStats } from "../controllers/visitor/dashboard.js";
 
 const router = express.Router();
 

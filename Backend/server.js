@@ -9,9 +9,9 @@ import cookieParser from "cookie-parser";
 
 // <------------------------------------------------------------- All API Routes ------------------------------------------------------------->
 // <----- Auth Routes ----->
-import authRoutes from "./routes/auth.js";
+import authRoutes from "./routes/auth.route.js";
 // <----- Shared Routes ----->
-import sharedRoutes from "./routes/sharedRoutes.js";
+import sharedRoutes from "./routes/shared.route.js";
 
 // <----- Production Routes ----->
 import ProductionReportRoutes from "./routes/production/ProductionReport.js";
@@ -37,19 +37,16 @@ import lptRecipeRoutes from "./routes/quality/lptRecipe.js";
 import UploadBISReportRoutes from "./routes/quality/UploadBISReport.js";
 
 // <----- Dispatch Routes ----->
-import dispatchPerformanceReportRoute from "./routes/dispatch/performanceReport.js";
-import dispatchReportRoute from "./routes/dispatch/dispatchReport.js";
-import fgCastingRoute from "./routes/dispatch/fgCasting.js";
-import errorLogRoute from "./routes/dispatch/errorLog.js";
+import dispatchRoute from "./routes/dispatch.route.js";
 
 // <----- Planing Routes ----->
-import productionPlaningRoutes from "./routes/planing/planing.route.js";
+import productionPlaningRoutes from "./routes/planing.route.js";
 
 // <----- Reminder Routes ----->
-import reminderTasksRoutes from "./routes/reminder/task.js";
+import reminderTasksRoutes from "./routes/task.route.js";
 
 // <----- Visitor Routes ----->
-import visitorRoutes from "./routes/visitor/visitor.route.js";
+import visitorRoutes from "./routes/visitor.route.js";
 
 const app = express();
 app.use(
@@ -106,10 +103,7 @@ app.use("/api/v1/quality", lptRecipeRoutes);
 app.use("/api/v1/quality", UploadBISReportRoutes);
 
 // Dispatch API
-app.use("/api/v1/dispatch", dispatchPerformanceReportRoute);
-app.use("/api/v1/dispatch", dispatchReportRoute);
-app.use("/api/v1/dispatch", fgCastingRoute);
-app.use("/api/v1/dispatch", errorLogRoute);
+app.use("/api/v1/dispatch", dispatchRoute);
 
 // Planing API
 app.use("/api/v1/planing", productionPlaningRoutes);
