@@ -13,26 +13,59 @@ export const visitorIn = async (req, res) => {
   try {
     const pool = await sql.connect(dbConfig3);
     const request = pool.request();
+    request.input("PassId", sql.VarChar(50), passId);
 
-    await request.input("PassId", sql.VarChar(50), passId).query(`
-        INSERT INTO visit_logs (unique_pass_id, check_in_time, check_out_time)
-        VALUES (@PassId, GETDATE(), NULL)
-      `);
+    // Get current status of the visitor
+    const result = await request.query(`
+      SELECT status FROM visitor_passes WHERE pass_id = @PassId
+    `);
+
+    // If passId not found
+    if (result.recordset.length === 0) {
+      await pool.close();
+      return res.status(404).json({
+        success: false,
+        message: "Pass ID not found",
+      });
+    }
+
+    const currentStatus = result.recordset[0].status;
+
+    // Reject if already checked in (status = 100)
+    if (currentStatus === 100) {
+      await pool.close();
+      return res.status(409).json({
+        success: false,
+        message: "Visitor already checked in. Please check out first.",
+      });
+    }
+
+    // Otherwise, allow check-in
+    await request.query(`
+      BEGIN TRANSACTION;
+
+      INSERT INTO visit_logs (unique_pass_id, check_in_time, check_out_time)
+      VALUES (@PassId, GETUTCDATE(), NULL);
+
+      UPDATE visitor_passes
+      SET status = 100
+      WHERE pass_id = @PassId;
+
+      COMMIT;
+    `);
 
     await pool.close();
 
     res.status(201).json({
       success: true,
-      message: "Visitor allowed in",
-      data: {
-        passId,
-      },
+      message: "Visitor checked in successfully",
+      data: { passId },
     });
   } catch (error) {
-    console.error("SQL Insert error:", error);
+    console.error("Error on check-in:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to log visitor entry",
+      message: "Server error while checking in visitor",
     });
   }
 };
@@ -50,35 +83,49 @@ export const visitorOut = async (req, res) => {
   try {
     const pool = await sql.connect(dbConfig3);
     const request = pool.request();
+    request.input("PassId", sql.VarChar(50), passId);
 
-    const updateResult = await request.input("PassId", sql.VarChar(50), passId)
-      .query(`
-        UPDATE visit_logs
-        SET check_out_time = GETDATE()
-        WHERE unique_pass_id = @PassId AND check_out_time IS NULL
-      `);
+    // Step 1: Check if visitor is currently checked in
+    const check = await request.query(`
+      SELECT * FROM visit_logs
+      WHERE unique_pass_id = @PassId AND check_out_time IS NULL
+    `);
 
-    await pool.close();
-
-    if (updateResult.rowsAffected[0] === 0) {
+    if (check.recordset.length === 0) {
+      await pool.close();
       return res.status(404).json({
         success: false,
-        message: "Visitor not found or already checked out",
+        message: "Visitor is not currently checked in or already checked out.",
       });
     }
+
+    // Step 2: Perform checkout and update status
+    await request.query(`
+      BEGIN TRANSACTION;
+
+      UPDATE visit_logs
+      SET check_out_time = GETUTCDATE()
+      WHERE unique_pass_id = @PassId AND check_out_time IS NULL;
+
+      UPDATE visitor_passes
+      SET status = 103
+      WHERE pass_id = @PassId;
+
+      COMMIT;
+    `);
+
+    await pool.close();
 
     res.status(200).json({
       success: true,
       message: "Visitor checked out successfully",
-      data: {
-        passId,
-      },
+      data: { passId },
     });
   } catch (error) {
-    console.error("SQL Update error:", error);
+    console.error("Error on check-out:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to log visitor exit",
+      message: "Server error while checking out visitor",
     });
   }
 };
@@ -89,7 +136,7 @@ export const getVisitorLogs = async (req, res) => {
     const request = pool.request();
 
     const result = await request.query(`
-      SELECT 
+    SELECT 
         vp.pass_id,
         vp.visitor_name,
         vp.visitor_contact_no,
@@ -101,8 +148,8 @@ export const getVisitorLogs = async (req, res) => {
         vp.purpose_of_visit,
         vl.check_in_time,
         vl.check_out_time
-      FROM visitor_passes vp
-      LEFT JOIN visit_logs vl ON vp.pass_id = vl.unique_pass_id
+      FROM visit_logs vl
+      LEFT JOIN visitor_passes vp ON vp.pass_id = vl.unique_pass_id
       ORDER BY vl.check_in_time DESC
     `);
 

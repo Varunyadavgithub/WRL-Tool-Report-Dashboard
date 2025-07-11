@@ -254,7 +254,7 @@ export const generateVisitorPass = async (req, res) => {
     passRequest.input("State", sql.VarChar(100), state);
     passRequest.input("City", sql.VarChar(100), city);
     passRequest.input("VehicleDetails", sql.VarChar(100), vehicleDetails);
-    passRequest.input("Status", sql.Int, 0); // Active status
+    passRequest.input("Status", sql.Int, 1); // Active status
 
     const insertResult = await passRequest.query(query);
 
@@ -278,77 +278,3 @@ export const generateVisitorPass = async (req, res) => {
     });
   }
 };
-
-/**
- * Get Visitor Pass Details
- */
-// export const getVisitorPassDetails = async (req, res) => {
-//   try {
-//     const { passId } = req.params;
-
-//     const pool = await new sql.ConnectionPool(dbConfig3).connect();
-//     const result = await pool
-//       .request()
-//       .input('PassId', sql.VarChar(50), passId)
-//       .query(`
-//         SELECT * FROM visitor_passes
-//         WHERE unique_pass_id = @PassId
-//       `);
-
-//     await pool.close();
-
-//     if (result.recordset.length === 0) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Visitor pass not found"
-//       });
-//     }
-
-//     res.status(200).json({
-//       success: true,
-//       data: result.recordset[0]
-//     });
-
-//   } catch (error) {
-//     logger.error("Get Visitor Pass Error", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Error retrieving visitor pass"
-//     });
-//   }
-// };
-
-/**
- * Update Visitor Pass Status
- */
-// export const updateVisitorPassStatus = async (req, res) => {
-//   try {
-//     const { passId } = req.params;
-//     const { status } = req.body;
-
-//     const pool = await new sql.ConnectionPool(dbConfig3).connect();
-//     const result = await pool
-//       .request()
-//       .input('PassId', sql.VarChar(50), passId)
-//       .input('Status', sql.Int, status)
-//       .query(`
-//         UPDATE visitor_passes
-//         SET status = @Status
-//         WHERE unique_pass_id = @PassId
-//       `);
-
-//     await pool.close();
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Visitor pass status updated successfully"
-//     });
-
-//   } catch (error) {
-//     logger.error("Update Visitor Pass Status Error", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Error updating visitor pass status"
-//     });
-//   }
-// };

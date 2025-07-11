@@ -14,48 +14,6 @@ const VisitorInOut = () => {
   const [passIdOut, setPassIdOut] = useState("");
   const [visitorLogs, setVisitorLogs] = useState([]);
 
-  const handleVisitorAction = async (type) => {
-    const passId = type === "in" ? passIdIn : passIdOut;
-
-    if (!passId.trim()) {
-      alert("Please scan or enter a Pass ID.");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const response = await axios.post(`/api/v1/visitor/${type}`, {
-        passId,
-      });
-
-      // Optionally update visitor logs (you might want to fetch from backend instead)
-      const now = new Date();
-      const formattedTime = now.toLocaleString("en-US", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
-
-      setVisitorLogs((prevLogs) => [
-        {
-          name: response.data?.data?.visitorName || "Unknown",
-          action: type === "in" ? "In" : "Out",
-          time: formattedTime,
-        },
-        ...prevLogs,
-      ]);
-
-      // Clear the relevant input
-      if (type === "in") setPassIdIn("");
-      else setPassIdOut("");
-    } catch (error) {
-      console.error("Visitor action error:", error);
-      toast.error(error.response?.data?.message || "Something went wrong.");
-    }
-
-    setLoading(false);
-  };
-
   useEffect(() => {
     fetchVisitorLogs();
   }, []);
@@ -69,6 +27,32 @@ const VisitorInOut = () => {
     } catch (error) {
       console.error("Failed to fetch visitor logs", error);
       toast.error("Failed to fetch visitor logs");
+    }
+  };
+  
+  const handleVisitorAction = async (type) => {
+    const passId = type === "in" ? passIdIn : passIdOut;
+
+    if (!passId.trim()) {
+      alert("Please scan or enter a Pass ID.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await axios.post(`/api/v1/visitor/${type}`, {
+        passId,
+      });
+      fetchVisitorLogs();
+      // Clear the relevant input
+      if (type === "in") setPassIdIn("");
+      else setPassIdOut("");
+    } catch (error) {
+      console.error("Visitor action error:", error);
+      toast.error(error.response?.data?.message || "Something went wrong.");
+    } finally {
+      setLoading(false);
     }
   };
 
