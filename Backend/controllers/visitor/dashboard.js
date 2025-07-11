@@ -40,20 +40,20 @@ export const getDashboardStats = async (req, res) => {
     const recentVisitorsQuery = `
       SELECT TOP 10
         v.visitor_id,
-        v.name,
+        v.name AS visitor_name,
         d.department_name,
+        u.name AS employee_name,
         vl.check_in_time,
-        vl.check_out_time,
-        vl.purpose_of_visit,
-        vl.remark
+        vl.check_out_time
       FROM visit_logs vl
       JOIN visitor_passes vp ON vl.unique_pass_id = vp.pass_id
       JOIN visitors v ON vp.visitor_id = v.visitor_id
       JOIN departments d ON vp.department_to_visit = d.deptCode
+      JOIN users u ON vp.employee_to_visit = u.employee_id
       ORDER BY vl.check_in_time DESC;
     `;
 
-    pool = await sql.connect(dbConfig3);
+    pool = await new sql.ConnectionPool(dbConfig3).connect();
     const [
       visitorsStatsResult,
       departmentBreakdownResult,

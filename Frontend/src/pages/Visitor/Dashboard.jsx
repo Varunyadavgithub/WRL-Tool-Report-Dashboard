@@ -314,25 +314,31 @@ const Dashboard = () => {
           <table className="w-full">
             <thead>
               <tr className="bg-gray-100 text-left">
-                <th className="p-3">Name</th>
-                <th className="p-3">Department</th>
+                <th className="p-3">Visitor Name</th>
+                <th className="p-3">Department to Visit</th>
+                <th className="p-3">Employee to Visit</th>
                 <th className="p-3">Check-In Time</th>
-                <th className="p-3">Actions</th>
+                <th className="p-3">Check-Out Time</th>
               </tr>
             </thead>
             <tbody>
               {dashboardData.recentVisitors.map((visitor) => (
                 <tr key={visitor.id} className="border-b">
-                  <td className="p-3">{visitor.name}</td>
-                  <td className="p-3">{visitor.department}</td>
+                  <td className="p-3">{visitor.visitor_name}</td>
+                  <td className="p-3">{visitor.department_name}</td>
+                  <td className="p-3">{visitor.employee_name}</td>
                   <td className="p-3">
                     {visitor.check_in_time &&
                       visitor.check_in_time.replace("T", " ").replace("Z", "")}
                   </td>
                   <td className="p-3">
-                    <button className="text-blue-500 hover:underline">
-                      <FaIdBadge />
-                    </button>
+                    {visitor.check_out_time === null ? (
+                      <span className="text-green-600 font-bold">
+                        Currently In
+                      </span>
+                    ) : (
+                      visitor.check_out_time.replace("T", " ").replace("Z", "")
+                    )}
                   </td>
                 </tr>
               ))}
