@@ -53,7 +53,9 @@ export const generateVisitorPass = async (req, res) => {
     departmentTo,
     employeeTo,
     visitType,
+    remark,
     specialInstruction,
+    purposeOfVisit,
     createdBy,
   } = req.body;
 
@@ -105,8 +107,7 @@ export const generateVisitorPass = async (req, res) => {
       .input("State", sql.VarChar(100), state)
       .input("City", sql.VarChar(100), city)
       .input("VehicleDetails", sql.VarChar(100), vehicleDetails)
-      .input("VisitorPhoto", sql.NVarChar(sql.MAX), photoPath)
-      .query(`
+      .input("VisitorPhoto", sql.NVarChar(sql.MAX), photoPath).query(`
         INSERT INTO visitors (
           visitor_id,
           name,
@@ -165,10 +166,12 @@ export const generateVisitorPass = async (req, res) => {
         department_to_visit,
         employee_to_visit,
         visit_type,
+        remark,
         no_of_people,
         allow_on,
         allow_till,
         special_instructions,
+        purpose_of_visit,
         created_by,
         company,
         nationality,
@@ -191,10 +194,12 @@ export const generateVisitorPass = async (req, res) => {
         @DepartmentToVisit,
         @EmployeeToVisit,
         @VisitType,
+        @Remark,
         @NoOfPeople,
         @AllowOn,
         @AllowTill,
         @SpecialInstructions,
+        @PurposeOfVisit,
         @CreatedBy,
         @Company,
         @Nationality,
@@ -221,6 +226,7 @@ export const generateVisitorPass = async (req, res) => {
     passRequest.input("DepartmentToVisit", sql.VarChar(100), departmentTo);
     passRequest.input("EmployeeToVisit", sql.VarChar(50), employeeTo || null);
     passRequest.input("VisitType", sql.VarChar(50), visitType);
+    passRequest.input("Remark", sql.VarChar(50), remark);
     passRequest.input("NoOfPeople", sql.Int, noOfPeople || 1);
     passRequest.input(
       "AllowOn",
@@ -237,6 +243,7 @@ export const generateVisitorPass = async (req, res) => {
       sql.NVarChar(sql.MAX),
       specialInstruction
     );
+    passRequest.input("PurposeOfVisit", sql.VarChar(50), purposeOfVisit);
     passRequest.input("CreatedBy", sql.VarChar(50), createdBy || null);
     passRequest.input("Company", sql.VarChar(255), company);
     passRequest.input("Nationality", sql.VarChar(100), nationality);

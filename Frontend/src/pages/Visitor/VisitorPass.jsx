@@ -26,14 +26,15 @@ const VisitorPass = () => {
     country: "",
     state: "",
     city: "",
-    postalCode: "",
     vehicleDetails: "",
     allowOn: "",
     allowTill: "",
     departmentTo: "",
     employeeTo: "",
     visitType: "",
+    remark: "",
     specialInstruction: "",
+    purposeOfVisit: "",
     createdBy: user?.id,
   });
 
@@ -211,6 +212,7 @@ const VisitorPass = () => {
       "allowTill",
       "departmentTo",
       "employeeTo",
+      "purposeOfVisit",
     ];
     for (let field of requiredFields) {
       if (!visitorData[field]) {
@@ -450,17 +452,7 @@ const VisitorPass = () => {
                     className="w-full"
                   />
                 </div>
-                <div className="w-full">
-                  <InputField
-                    label="Postal Code"
-                    type="text"
-                    name="postalCode"
-                    placeholder="Enter the postal code"
-                    value={visitorData.postalCode}
-                    onChange={handleInputChange}
-                    className="w-full"
-                  />
-                </div>
+              
 
                 <div className="w-full">
                   <InputField
@@ -541,6 +533,7 @@ const VisitorPass = () => {
                     className="w-full"
                   />
                 </div>
+
                 <div className="w-full">
                   <SelectField
                     label="Employee To Visit"
@@ -581,7 +574,20 @@ const VisitorPass = () => {
                     className="w-full"
                   />
                 </div>
+
+                <div className="w-full">
+                  <InputField
+                    label="Remark"
+                    type="text"
+                    name="remark"
+                    placeholder="Enter the remark"
+                    value={visitorData.remark}
+                    onChange={handleInputChange}
+                    className="w-full"
+                  />
+                </div>
               </div>
+
               <label className="block font-semibold mb-1">
                 Special Instruction
               </label>
@@ -590,6 +596,18 @@ const VisitorPass = () => {
                 value={visitorData.specialInstruction}
                 onChange={handleInputChange}
                 placeholder="Enter Some Special Instruction"
+                className="w-full p-2 border rounded"
+                required
+              />
+
+              <label className="block font-semibold mb-1">
+                Purpose of Visit
+              </label>
+              <textarea
+                name="purposeOfVisit"
+                value={visitorData.purposeOfVisit}
+                onChange={handleInputChange}
+                placeholder="Enter the Purpose of Visit"
                 className="w-full p-2 border rounded"
                 required
               />

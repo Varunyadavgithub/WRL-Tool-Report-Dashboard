@@ -55,6 +55,7 @@ import visitorPassRoutes from "./routes/visitor/visitorPass.js";
 import ManageEmployeeRoutes from "./routes/visitor/ManageEmployee.js";
 import ReportRoutes from "./routes/visitor/reports.js";
 import VisitorDashboardRoutes from "./routes/visitor/dashboard.js";
+import VisitorInOutRoutes from "./routes/visitor/visitorInOut.js";
 
 const app = express();
 app.use(
@@ -129,6 +130,7 @@ app.use("/api/v1/visitor", visitorPassRoutes);
 app.use("/api/v1/visitor", ManageEmployeeRoutes);
 app.use("/api/v1/visitor", ReportRoutes);
 app.use("/api/v1/visitor", VisitorDashboardRoutes);
+app.use("/api/v1/visitor", VisitorInOutRoutes);
 
 // <------------------------------------------------------------- Serve Frontend from Backend ------------------------------------------------------------->
 // app.use(express.static(path.join(_dirname, "Frontend", "dist")));

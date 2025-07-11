@@ -4,19 +4,76 @@ import Title from "../../components/common/Title";
 import Button from "../../components/common/Button";
 import { FaSignInAlt, FaSignOutAlt } from "react-icons/fa";
 import { MdExitToApp, MdInput } from "react-icons/md";
+import axios from "axios";
+import { useEffect } from "react";
+import toast from "react-hot-toast";
 
 const VisitorInOut = () => {
   const [loading, setLoading] = useState(false);
+  const [passIdIn, setPassIdIn] = useState("");
+  const [passIdOut, setPassIdOut] = useState("");
+  const [visitorLogs, setVisitorLogs] = useState([]);
+
+  const handleVisitorAction = async (type) => {
+    const passId = type === "in" ? passIdIn : passIdOut;
+
+    if (!passId.trim()) {
+      alert("Please scan or enter a Pass ID.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await axios.post(`/api/v1/visitor/${type}`, {
+        passId,
+      });
+
+      // Optionally update visitor logs (you might want to fetch from backend instead)
+      const now = new Date();
+      const formattedTime = now.toLocaleString("en-US", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
+
+      setVisitorLogs((prevLogs) => [
+        {
+          name: response.data?.data?.visitorName || "Unknown",
+          action: type === "in" ? "In" : "Out",
+          time: formattedTime,
+        },
+        ...prevLogs,
+      ]);
+
+      // Clear the relevant input
+      if (type === "in") setPassIdIn("");
+      else setPassIdOut("");
+    } catch (error) {
+      console.error("Visitor action error:", error);
+      toast.error(error.response?.data?.message || "Something went wrong.");
+    }
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchVisitorLogs();
+  }, []);
+
+  const fetchVisitorLogs = async () => {
+    try {
+      const res = await axios.get("/api/v1/visitor/logs");
+      if (res.data?.success) {
+        setVisitorLogs(res?.data?.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch visitor logs", error);
+      toast.error("Failed to fetch visitor logs");
+    }
+  };
 
   const commonBoxStyles =
     "bg-white border border-purple-300 shadow-md rounded-xl p-6 w-full md:w-1/2";
-
-  // Sample data (replace with actual fetched data later)
-  const [visitorLogs, setVisitorLogs] = useState([
-    { name: "John Doe", action: "In", time: "2025-07-09 at 04:00 PM" },
-    { name: "Jane Smith", action: "Out", time: "2025-07-09 at 06:30 PM" },
-    { name: "Alex Johnson", action: "In", time: "2025-07-09 at 07:00 PM" },
-  ]);
 
   return (
     <div className="min-h-screen bg-gray-100 py-10 px-4 md:px-8">
@@ -31,14 +88,17 @@ const VisitorInOut = () => {
           </h2>
           <div className="flex flex-col md:flex-row items-center gap-4">
             <InputField
-              name="Scan QR Code"
+              name="passIdIn"
               label="Scan QR Code"
               type="text"
               placeholder="Scan the QR Code"
+              value={passIdIn}
+              onChange={(e) => setPassIdIn(e.target.value)}
               required
               className="w-full md:w-64"
             />
             <Button
+              onClick={() => handleVisitorAction("in")}
               bgColor={loading ? "bg-gray-400" : "bg-blue-600"}
               textColor="text-white"
               className={`w-full md:w-auto px-6 py-2 rounded-md font-semibold shadow transition-all duration-200 flex items-center justify-center gap-2 ${
@@ -58,14 +118,17 @@ const VisitorInOut = () => {
           </h2>
           <div className="flex flex-col md:flex-row items-center gap-4">
             <InputField
-              name="Scan QR Code"
+              name="passIdOut"
               label="Scan QR Code"
               type="text"
               placeholder="Scan the QR Code"
+              value={passIdOut}
+              onChange={(e) => setPassIdOut(e.target.value)}
               required
               className="w-full md:w-64"
             />
             <Button
+              onClick={() => handleVisitorAction("out")}
               bgColor={loading ? "bg-gray-400" : "bg-red-600"}
               textColor="text-white"
               className={`w-full md:w-auto px-6 py-2 rounded-md font-semibold shadow transition-all duration-200 flex items-center justify-center gap-2 ${
@@ -81,23 +144,37 @@ const VisitorInOut = () => {
 
       {/* Visitor Logs Table */}
       <div className="mt-16 bg-white shadow-md rounded-xl p-6 overflow-x-auto">
-        <h3 className="text-xl font-semibold text-gray-700 mb-4">Visitor Logs</h3>
+        <h3 className="text-xl font-semibold text-gray-700 mb-4">
+          Visitor Logs
+        </h3>
         <table className="min-w-full table-auto border border-gray-200">
           <thead>
             <tr className="bg-gray-100 text-left">
-              <th className="px-4 py-2 border">Name</th>
-              <th className="px-4 py-2 border">Action</th>
-              <th className="px-4 py-2 border">Time</th>
+              <th className="px-4 py-2 border">Visitor</th>
+              <th className="px-4 py-2 border">Contact</th>
+              <th className="px-4 py-2 border">Department</th>
+              <th className="px-4 py-2 border">Visit Type</th>
+              <th className="px-4 py-2 border">Check-In</th>
+              <th className="px-4 py-2 border">Check-Out</th>
             </tr>
           </thead>
           <tbody>
             {visitorLogs.map((log, index) => (
               <tr key={index} className="hover:bg-gray-50">
-                <td className="px-4 py-2 border">{log.name}</td>
-                <td className={`px-4 py-2 border font-medium ${log.action === "In" ? "text-green-600" : "text-red-600"}`}>
-                  {log.action}
+                <td className="px-4 py-2 border">{log.visitor_name}</td>
+                <td className="px-4 py-2 border">{log.visitor_contact_no}</td>
+                <td className="px-4 py-2 border">{log.department_to_visit}</td>
+                <td className="px-4 py-2 border">{log.visit_type}</td>
+                <td className="px-4 py-2 border">
+                  {log.check_in_time
+                    ? new Date(log.check_in_time).toLocaleString()
+                    : "—"}
                 </td>
-                <td className="px-4 py-2 border">{log.time}</td>
+                <td className="px-4 py-2 border">
+                  {log.check_out_time
+                    ? new Date(log.check_out_time).toLocaleString()
+                    : "—"}
+                </td>
               </tr>
             ))}
           </tbody>
