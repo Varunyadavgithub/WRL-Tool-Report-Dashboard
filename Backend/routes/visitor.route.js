@@ -41,6 +41,7 @@ router.delete("/users/:id", deleteUser);
 router.get("/employees", getEmployee);
 router.post("/generate-pass", generateVisitorPass);
 router.get("/fetch-previous-pass", fetchPreviousPass);
+
 // -----------------> Visitor In Out Routes
 router.post("/in", visitorIn);
 router.post("/out", visitorOut);

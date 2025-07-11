@@ -8,9 +8,7 @@ import cookieParser from "cookie-parser";
 // const _dirname = path.resolve();
 
 // <------------------------------------------------------------- All API Routes ------------------------------------------------------------->
-// <----- Auth Routes ----->
 import authRoutes from "./routes/auth.route.js";
-// <----- Shared Routes ----->
 import sharedRoutes from "./routes/shared.route.js";
 
 // <----- Production Routes ----->
@@ -26,26 +24,10 @@ import componentDetailsRoutes from "./routes/production/componentDetails.js";
 import totalProductionRoutes from "./routes/production/totalProduction.js";
 
 // <----- Quality Routes ----->
-import fpaRoutes from "./routes/quality/fpa.js";
-import fpaReportRoutes from "./routes/quality/fpaReport.js";
-import dispatchHoldRoutes from "./routes/quality/dispatchHold.js";
-import holdCabinetDetailsRoutes from "./routes/quality/holdCabinetDetails.js";
-import tagUpdateRoutes from "./routes/quality/tagUpdate.js";
-import lptRoutes from "./routes/quality/lpt.js";
-import lptReportRoutes from "./routes/quality/lptReport.js";
-import lptRecipeRoutes from "./routes/quality/lptRecipe.js";
-import UploadBISReportRoutes from "./routes/quality/UploadBISReport.js";
-
-// <----- Dispatch Routes ----->
+import qualityRoutes from "./routes/quality.route.js";
 import dispatchRoute from "./routes/dispatch.route.js";
-
-// <----- Planing Routes ----->
 import productionPlaningRoutes from "./routes/planing.route.js";
-
-// <----- Reminder Routes ----->
 import reminderTasksRoutes from "./routes/task.route.js";
-
-// <----- Visitor Routes ----->
 import visitorRoutes from "./routes/visitor.route.js";
 
 const app = express();
@@ -68,15 +50,8 @@ app.use("/uploads", express.static(path.resolve("uploads"))); // Static files
   } catch (error) {}
 })();
 
-// <------------------------------------------------------------- Test API ------------------------------------------------------------->
-// app.get("/", (_, res) => {
-//   res.status(200).json({ message: "Backend is working correctly!" });
-// });
-
 // <------------------------------------------------------------- APIs ------------------------------------------------------------->
-// Auth API
 app.use("/api/v1/auth", authRoutes);
-// Shared API
 app.use("/api/v1/shared", sharedRoutes);
 
 // Production API
@@ -92,26 +67,10 @@ app.use("/api/v1/prod", componentDetailsRoutes);
 app.use("/api/v1/prod", totalProductionRoutes);
 
 // Quality API
-app.use("/api/v1/quality", fpaRoutes);
-app.use("/api/v1/quality", fpaReportRoutes);
-app.use("/api/v1/quality", dispatchHoldRoutes);
-app.use("/api/v1/quality", holdCabinetDetailsRoutes);
-app.use("/api/v1/quality", tagUpdateRoutes);
-app.use("/api/v1/quality", lptRoutes);
-app.use("/api/v1/quality", lptReportRoutes);
-app.use("/api/v1/quality", lptRecipeRoutes);
-app.use("/api/v1/quality", UploadBISReportRoutes);
-
-// Dispatch API
+app.use("/api/v1/quality", qualityRoutes);
 app.use("/api/v1/dispatch", dispatchRoute);
-
-// Planing API
 app.use("/api/v1/planing", productionPlaningRoutes);
-
-// Reminder API
 app.use("/api/v1/reminder", reminderTasksRoutes);
-
-// Visitor API
 app.use("/api/v1/visitor", visitorRoutes);
 
 // <------------------------------------------------------------- Serve Frontend from Backend ------------------------------------------------------------->
