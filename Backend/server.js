@@ -43,9 +43,7 @@ import fgCastingRoute from "./routes/dispatch/fgCasting.js";
 import errorLogRoute from "./routes/dispatch/errorLog.js";
 
 // <----- Planing Routes ----->
-import productionPlaningRoutes from "./routes/planing/productionPlaning.js";
-import fiveDaysPlaningRoutes from "./routes/planing/fiveDaysPlaning.js";
-import dailyPlaningRoute from "./routes/planing/dailyPlan.js";
+import productionPlaningRoutes from "./routes/planing/planing.route.js";
 
 // <----- Reminder Routes ----->
 import reminderTasksRoutes from "./routes/reminder/task.js";
@@ -115,8 +113,6 @@ app.use("/api/v1/dispatch", errorLogRoute);
 
 // Planing API
 app.use("/api/v1/planing", productionPlaningRoutes);
-app.use("/api/v1/planing", fiveDaysPlaningRoutes);
-app.use("/api/v1/planing", dailyPlaningRoute);
 
 // Reminder API
 app.use("/api/v1/reminder", reminderTasksRoutes);
