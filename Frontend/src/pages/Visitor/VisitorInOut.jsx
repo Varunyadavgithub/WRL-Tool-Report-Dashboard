@@ -156,9 +156,13 @@ const VisitorInOut = () => {
                     : "—"}
                 </td>
                 <td className="px-4 py-2 border">
-                  {log.check_out_time
-                    ? new Date(log.check_out_time).toLocaleString()
-                    : "—"}
+                  {log.check_out_time === null ? (
+                    <span className="text-green-600 font-bold">
+                      Currently In
+                    </span>
+                  ) : (
+                    new Date(log.check_out_time).toLocaleString()
+                  )}
                 </td>
               </tr>
             ))}

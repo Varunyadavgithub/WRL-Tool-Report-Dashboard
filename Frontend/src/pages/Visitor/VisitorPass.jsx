@@ -37,7 +37,7 @@ const VisitorPass = () => {
     purposeOfVisit: "",
     createdBy: user?.id,
   });
-
+  const [fetchLoading, setFetchLoading] = useState(false);
   const [departments, setDepartments] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -241,6 +241,54 @@ const VisitorPass = () => {
     }
   };
 
+  const handleFetchPreviousData = async () => {
+    if (!visitorData.contactNo) {
+      toast.error("Please enter a contact number");
+      return;
+    }
+
+    const contactNoRegex = /^[0-9]{10}$/; // Assumes 10-digit phone number
+    if (!contactNoRegex.test(visitorData.contactNo)) {
+      toast.error("Please enter a valid 10-digit contact number");
+      return;
+    }
+    try {
+      setFetchLoading(true);
+      const res = await axios.get(`${baseURL}visitor/fetch-previous-pass`, {
+        params: { contactNo: visitorData.contactNo },
+      });
+
+      if (res?.data?.success) {
+        const fetchedData = res?.data?.data;
+
+        // Update visitor data with fetched information
+        setVisitorData((prevData) => ({
+          ...prevData,
+          name: fetchedData.visitor_name || prevData.name,
+          email: fetchedData.visitor_email || prevData.email,
+          address: fetchedData.address || prevData.address,
+          company: fetchedData.company || prevData.company,
+          identityType: fetchedData.identity_type || prevData.identityType,
+          identityNo: fetchedData.identity_no || prevData.identityNo,
+          country: fetchedData.country || prevData.country,
+          state: fetchedData.state || prevData.state,
+          city: fetchedData.city || prevData.city,
+          nationality: fetchedData.nationality || prevData.nationality,
+        }));
+
+        toast.success("Previous visitor data fetched successfully");
+      } else {
+        toast.error("No previous data found for this contact number");
+      }
+    } catch (error) {
+      console.error("Failed to fetch visitor data:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch visitor data"
+      );
+    } finally {
+      setFetchLoading(false);
+    }
+  };
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
       <Title title="Visitor Pass" align="center" />
@@ -267,7 +315,7 @@ const VisitorPass = () => {
                   className="w-full"
                 />
               </div>
-              <div className="w-full">
+              <div className="flex items-center  justify-center gap-2 w-full">
                 <InputField
                   label="Contact No."
                   type="text"
@@ -277,6 +325,20 @@ const VisitorPass = () => {
                   onChange={handleInputChange}
                   className="w-full"
                 />
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleFetchPreviousData}
+                    disabled={fetchLoading}
+                    className={`px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition ${
+                      fetchLoading
+                        ? "opacity-50 cursor-not-allowed"
+                        : "cursor-pointer"
+                    }`}
+                  >
+                    {fetchLoading ? "Fetching..." : "Fetch"}
+                  </button>
+                </div>
               </div>
               <div className="w-full">
                 <InputField
@@ -452,7 +514,6 @@ const VisitorPass = () => {
                     className="w-full"
                   />
                 </div>
-              
 
                 <div className="w-full">
                   <InputField

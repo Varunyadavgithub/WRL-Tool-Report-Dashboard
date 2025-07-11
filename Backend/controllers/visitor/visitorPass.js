@@ -278,3 +278,63 @@ export const generateVisitorPass = async (req, res) => {
     });
   }
 };
+
+// Fetch Previous Pass
+export const fetchPreviousPass = async (req, res) => {
+  const { contactNo } = req.query;
+
+  if (!contactNo) {
+    return res.status(400).json({
+      success: false,
+      message: "Contact number is required",
+    });
+  }
+
+  try {
+    const pool = await new sql.ConnectionPool(dbConfig3).connect();
+    const request = pool.request();
+
+    // Query to fetch the most recent visitor pass for the given contact number
+    const query = `
+      SELECT TOP 1 
+        visitor_name,
+        visitor_email,
+        address,
+        company,
+        identity_type,
+        identity_no,
+        country,
+        state,
+        city,
+        nationality
+      FROM 
+        visitor_passes 
+      WHERE 
+        visitor_contact_no = @ContactNo
+    `;
+
+    const result = await request
+      .input("ContactNo", sql.VarChar(20), contactNo)
+      .query(query);
+
+    await pool.close();
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No previous visitor pass found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: result.recordset[0],
+    });
+  } catch (error) {
+    console.error("Fetch Previous Pass Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch previous visitor pass",
+    });
+  }
+};
