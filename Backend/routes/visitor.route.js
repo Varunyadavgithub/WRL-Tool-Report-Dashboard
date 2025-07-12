@@ -19,7 +19,10 @@ import {
   visitorOut,
   getVisitorLogs,
 } from "../controllers/visitor/visitorInOut.js";
-import { fetchVisitors } from "../controllers/visitor/reports.js";
+import {
+  fetchVisitors,
+  sendVisitorReport,
+} from "../controllers/visitor/reports.js";
 import { getDashboardStats } from "../controllers/visitor/dashboard.js";
 
 const router = express.Router();
@@ -49,6 +52,7 @@ router.get("/logs", getVisitorLogs);
 
 // -----------------> Visitor Reports Routes
 router.get("/repot", fetchVisitors);
+router.post("/send-report", sendVisitorReport);
 
 // -----------------> Visitor Dashboard Routes
 router.get("/dashboard-stats", getDashboardStats);

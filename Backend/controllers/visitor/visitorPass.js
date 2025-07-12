@@ -262,50 +262,45 @@ export const generateVisitorPass = async (req, res) => {
 
     const insertResult = await passRequest.query(query);
 
-    let departmentHeadEmail = null;
-    let employeeEmail = null;
+    const templateData = await pool
+      .request()
+      .input("employeeTo", sql.VarChar(100), employeeTo).query(`
+    SELECT TOP 1
+      v.visitor_id,
+      v.company,
+      v.city,
+      d.department_name,
+      u.name AS employee_name,
+      u.employee_email,
+      u.manager_email
+    FROM visitors v
+    INNER JOIN visitor_passes vp ON v.visitor_id = vp.visitor_id
+    INNER JOIN visit_logs vl ON vl.unique_pass_id = vp.pass_id
+    INNER JOIN users u ON u.employee_id = vp.employee_to_visit
+    INNER JOIN departments d ON d.deptCode = vp.department_to_visit
+    WHERE u.employee_id = @employeeTo
+    ORDER BY vp.created_at DESC;
+  `);
 
-    // Fetch department head email by departmentTo
-    if (departmentTo) {
-      const deptHeadResult = await pool
-        .request()
-        .input("employee", sql.VarChar(100), employeeTo)
-        .input("department", sql.VarChar(100), departmentTo).query(`
-        Select manager_email 
-        from users 
-        where department_id=@department AND employee_id=@employee
-      `);
-      departmentHeadEmail =
-        deptHeadResult.recordset.length > 0
-          ? deptHeadResult.recordset[0].manager_email
-          : null;
-    }
-    // Fetch employee email by employeeTo (assuming employeeTo is employee ID)
-    if (employeeTo) {
-      const empResult = await pool
-        .request()
-        .input("employeeId", sql.VarChar(50), employeeTo).query(`
-          Select employee_email 
-          from users 
-          where employee_id=@employeeId
-        `);
+    // Get the first row of the result
+    const data = templateData?.recordset[0];
 
-      employeeEmail =
-        empResult.recordset.length > 0
-          ? empResult.recordset[0].employee_email
-          : null;
+    if (!data) {
+      console.warn("No data found for email template.");
+      return;
     }
-    // Send emails concurrently, ignore if emails are null
+
+    // Send the visitor pass email
     await sendVisitorPassEmail({
-      to: employeeEmail,
-      cc:
-        departmentHeadEmail !== employeeEmail ? departmentHeadEmail : undefined,
+      to: data.employee_email,
+      cc: data.manager_email,
       visitorName: name,
+      visitorId: data.visitor_id,
       passId: uniquePassId,
       allowOn,
       allowTill,
-      departmentToVisit: departmentTo,
-      employeeToVisit: employeeTo,
+      departmentToVisit: data.department_name,
+      employeeToVisit: data.employee_name,
       visitorContact: contactNo,
       visitorEmail: email,
       purposeOfVisit,
