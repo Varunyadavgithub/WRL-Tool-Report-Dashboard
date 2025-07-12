@@ -4,12 +4,12 @@ dotenv.config();
 
 // Create transporter with your custom SMTP settings
 const transporter = nodemailer.createTransport({
-  host: "202.162.229.102",
-  port: 587,
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
   secure: false, // use TLS
   auth: {
-    user: "vikash.kumar@westernequipments.com",
-    pass: "@Bombom12@",
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
   },
   tls: {
     ciphers: "SSLv3",
