@@ -1,4 +1,8 @@
 import sql, { dbConfig3 } from "../../config/db.js";
+import {
+  sendReminderEmail,
+  sendVisitorPassEmail,
+} from "../../config/emailConfig.js";
 
 export const getEmployee = async (req, res) => {
   const { deptId } = req.query;
@@ -258,20 +262,70 @@ export const generateVisitorPass = async (req, res) => {
 
     const insertResult = await passRequest.query(query);
 
+    let departmentHeadEmail = null;
+    let employeeEmail = null;
+
+    // Fetch department head email by departmentTo
+    if (departmentTo) {
+      const deptHeadResult = await pool
+        .request()
+        .input("employee", sql.VarChar(100), employeeTo)
+        .input("department", sql.VarChar(100), departmentTo).query(`
+        Select manager_email 
+        from users 
+        where department_id=@department AND employee_id=@employee
+      `);
+      departmentHeadEmail =
+        deptHeadResult.recordset.length > 0
+          ? deptHeadResult.recordset[0].manager_email
+          : null;
+    }
+    // Fetch employee email by employeeTo (assuming employeeTo is employee ID)
+    if (employeeTo) {
+      const empResult = await pool
+        .request()
+        .input("employeeId", sql.VarChar(50), employeeTo).query(`
+          Select employee_email 
+          from users 
+          where employee_id=@employeeId
+        `);
+
+      employeeEmail =
+        empResult.recordset.length > 0
+          ? empResult.recordset[0].employee_email
+          : null;
+    }
+    // Send emails concurrently, ignore if emails are null
+    await sendVisitorPassEmail({
+      to: employeeEmail,
+      cc:
+        departmentHeadEmail !== employeeEmail ? departmentHeadEmail : undefined,
+      visitorName: name,
+      passId: uniquePassId,
+      allowOn,
+      allowTill,
+      departmentToVisit: departmentTo,
+      employeeToVisit: employeeTo,
+      visitorContact: contactNo,
+      visitorEmail: email,
+      purposeOfVisit,
+    });
+
     await pool.close();
-    // Send Response
+
     res.status(201).json({
       success: true,
-      message: "Visitor pass generated successfully",
+      message:
+        "Visitor pass generated successfully and notification emails sent",
       data: {
         passId: uniquePassId,
         visitorName: name,
-        allowOn: allowOn,
+        allowOn,
         departmentToVisit: departmentTo,
       },
     });
   } catch (error) {
-    console.error("SQL Insert error:", error);
+    console.error("SQL Insert or Email sending error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to generate visitor pass",

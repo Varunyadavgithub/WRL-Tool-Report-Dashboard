@@ -4,11 +4,16 @@ dotenv.config();
 
 // Create transporter with your custom SMTP settings
 const transporter = nodemailer.createTransport({
-  host: "smtp.ethereal.email",
+  host: "202.162.229.102",
   port: 587,
+  secure: false, // use TLS
   auth: {
-    user: "maximillia.zboncak85@ethereal.email",
-    pass: "2pnjdPYRSacABDtwjU",
+    user: "vikash.kumar@westernequipments.com",
+    pass: "@Bombom12@",
+  },
+  tls: {
+    ciphers: "SSLv3",
+    rejectUnauthorized: false, // avoid cert errors (optional; test carefully)
   },
 });
 
@@ -26,8 +31,8 @@ export const sendReminderEmail = async (reminderData) => {
 
     const mailOptions = {
       from: {
-        name: "Varun Yadav",
-        address: "varun@gmail.com",
+        name: "Vikash Kumar",
+        address: "vikash.kumar@westernequipments.com",
       },
       to: emailToSend,
       subject: `Reminder: ${reminderData.title}`,
@@ -96,6 +101,77 @@ export const sendReminderEmail = async (reminderData) => {
       message: error.message,
       stack: error.stack,
     });
+    return false;
+  }
+};
+
+export const sendVisitorPassEmail = async ({
+  to,
+  cc,
+  visitorName,
+  passId,
+  allowOn,
+  allowTill,
+  departmentToVisit,
+  employeeToVisit,
+  visitorContact,
+  visitorEmail,
+  purposeOfVisit,
+}) => {
+  try {
+    if (!to) {
+      console.warn("No recipient email provided");
+      return false;
+    }
+
+    const currentYear = new Date().getFullYear();
+
+    const mailOptions = {
+      from: {
+        name: "WRL Security Team",
+        address: "vikash.kumar@westernequipments.com",
+      },
+      to,
+      cc, // ? Add CC field here
+      subject: `Visitor Pass Generated for ${visitorName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; background: #fff; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+          <div style="background-color: #2575fc; color: #fff; padding: 20px; text-align: center;">
+            <h2 style="margin: 0;">Visitor Pass Notification</h2>
+          </div>
+          <div style="padding: 20px;">
+            <p><strong>Visitor Name:</strong> ${visitorName}</p>
+            <p><strong>Contact:</strong> ${visitorContact}</p>
+            <p><strong>Email:</strong> ${visitorEmail}</p>
+            <p><strong>Department:</strong> ${departmentToVisit}</p>
+            <p><strong>Employee to Visit:</strong> ${
+              employeeToVisit || "N/A"
+            }</p>
+            <p><strong>Purpose:</strong> ${purposeOfVisit}</p>
+            <p><strong>Pass ID:</strong> ${passId}</p>
+            <p><strong>Allow On:</strong> ${new Date(
+              allowOn
+            ).toLocaleString()}</p>
+            <p><strong>Allow Till:</strong> ${
+              allowTill ? new Date(allowTill).toLocaleString() : "N/A"
+            }</p>
+          </div>
+          <div style="background-color: #f9f9f9; text-align: center; padding: 10px; font-size: 12px; color: #666;">
+            © ${currentYear} WRL Tool Report — This is an automated message.
+          </div>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(
+      `Visitor pass email sent to ${to} (cc: ${cc || "none"}) — Message ID: ${
+        info.messageId
+      }`
+    );
+    return true;
+  } catch (error) {
+    console.error("Failed to send visitor pass email:", error);
     return false;
   }
 };
