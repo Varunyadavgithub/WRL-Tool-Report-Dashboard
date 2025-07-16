@@ -6,8 +6,7 @@ import axios from "axios";
 import Loader from "../../components/common/Loader";
 import ExportButton from "../../components/common/ExportButton";
 import toast from "react-hot-toast";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 function StageHistoryReport() {
   const [loading, setLoading] = useState(false);

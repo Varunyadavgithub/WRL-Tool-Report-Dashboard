@@ -7,8 +7,7 @@ import { useState } from "react";
 import DateTimePicker from "../../components/common/DateTimePicker";
 import axios from "axios";
 import toast from "react-hot-toast";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const ErrorLog = () => {
   const groupingOptions = [

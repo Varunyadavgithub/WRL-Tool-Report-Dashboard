@@ -7,8 +7,7 @@ import DateTimePicker from "../../components/common/DateTimePicker";
 import axios from "axios";
 import Loader from "../../components/common/Loader";
 import toast from "react-hot-toast";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const FGCasting = () => {
   const [loading, setLoading] = useState(false);

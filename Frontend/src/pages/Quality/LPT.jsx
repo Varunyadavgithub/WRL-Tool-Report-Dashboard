@@ -10,8 +10,7 @@ import { MdPowerSettingsNew } from "react-icons/md";
 import toast from "react-hot-toast";
 import axios from "axios";
 import { getFormattedISTDate } from "../../utils/dateUtils.js";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets.js";
 
 const LPT = () => {
   const [loading, setLoading] = useState(false);

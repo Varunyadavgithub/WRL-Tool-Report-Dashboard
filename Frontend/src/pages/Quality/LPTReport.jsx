@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import Button from "../../components/common/Button";
-import Loader from "../../components/common/Loader";
 import Title from "../../components/common/Title";
 import DateTimePicker from "../../components/common/DateTimePicker";
 import SelectField from "../../components/common/SelectField";
@@ -8,8 +7,7 @@ import InputField from "../../components/common/InputField";
 import axios from "axios";
 import toast from "react-hot-toast";
 import ExportButton from "../../components/common/ExportButton";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const LPTReport = () => {
   const [loading, setLoading] = useState(false);

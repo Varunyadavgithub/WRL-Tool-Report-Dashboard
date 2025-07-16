@@ -4,7 +4,6 @@ import {
   FaDoorOpen,
   FaCalendarAlt,
   FaChartBar,
-  FaIdBadge,
 } from "react-icons/fa";
 import { Bar, Pie } from "react-chartjs-2";
 import {
@@ -19,6 +18,7 @@ import {
 } from "chart.js";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { baseURL } from "../../assets/assets";
 
 // Register Chart.js components
 Chart.register(
@@ -72,8 +72,6 @@ const DashboardCard = ({ icon: Icon, title, value, color }) => (
     </div>
   </div>
 );
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const Dashboard = () => {
   const [dashboardData, setDashboardData] = useState({

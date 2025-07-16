@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Title from "../../components/common/Title";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Button from "../../components/common/Button";
 import DateTimePicker from "../../components/common/DateTimePicker";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const Reports = () => {
   const [loading, setLoading] = useState(false);

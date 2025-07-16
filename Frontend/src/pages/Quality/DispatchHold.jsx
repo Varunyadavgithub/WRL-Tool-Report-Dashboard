@@ -9,9 +9,8 @@ import toast from "react-hot-toast";
 import ExcelJS from "exceljs";
 import { useSelector } from "react-redux";
 import { getFormattedISTDate } from "../../utils/dateUtils";
+import { baseURL } from "../../assets/assets";
 // import { getFormattedISTDate } from "../../utils/dateUtils";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const DispatchHold = () => {
   const { user } = useSelector((store) => store.auth);

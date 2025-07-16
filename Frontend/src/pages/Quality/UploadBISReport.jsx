@@ -15,8 +15,7 @@ import axios from "axios";
 import { Link } from "react-router-dom";
 import PopupModal from "../../components/common/PopupModal";
 import { MdDeleteForever } from "react-icons/md";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const UploadBISReport = () => {
   const [loading, setLoading] = useState(false);

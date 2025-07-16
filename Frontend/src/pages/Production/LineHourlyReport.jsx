@@ -25,8 +25,7 @@ import FoamingB from "../../components/lineHourly/Foaming/FoamingB";
 import FoamingCategoryCount from "../../components/lineHourly/Foaming/FoamingCategoryCount";
 import { CATEGORY_MAPPINGS } from "../../utils/mapCategories.js";
 import ManualPostFoaming from "../../components/lineHourly/PostFoaming/ManualPostFoaming.jsx";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets.js";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 // Map Categories

@@ -3,8 +3,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import Title from "../../components/common/Title";
 import { FaClockRotateLeft, FaDownload } from "react-icons/fa6";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const BISStatus = () => {
   const [bisStatus, setBisStatus] = useState({

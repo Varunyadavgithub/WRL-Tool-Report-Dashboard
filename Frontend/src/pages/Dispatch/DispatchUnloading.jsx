@@ -6,8 +6,7 @@ import Button from "../../components/common/Button";
 import Loader from "../../components/common/Loader";
 import toast from "react-hot-toast";
 import ExportButton from "../../components/common/ExportButton";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const DispatchUnloading = () => {
   const [loading, setLoading] = useState(false);

@@ -6,8 +6,7 @@ import InputField from "../../components/common/InputField";
 import Button from "../../components/common/Button";
 import ExportButton from "../../components/common/ExportButton";
 import Loader from "../../components/common/Loader";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const ComponentDetails = () => {
   const [loading, setLoading] = useState(false);

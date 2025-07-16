@@ -5,8 +5,7 @@ import { useState } from "react";
 import ExcelJS from "exceljs";
 import toast from "react-hot-toast";
 import axios from "axios";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const ModelNameUpdate = () => {
   const [loading, setLoading] = useState(false);

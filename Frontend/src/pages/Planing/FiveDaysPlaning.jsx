@@ -8,8 +8,7 @@ import { BsEye, BsDownload, BsTrash } from "react-icons/bs";
 import { useSelector } from "react-redux";
 import PopupModal from "../../components/common/PopupModal";
 import { MdDeleteForever } from "react-icons/md";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const FiveDaysPlanning = () => {
   const { user } = useSelector((store) => store.auth);

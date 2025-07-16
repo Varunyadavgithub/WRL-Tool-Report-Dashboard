@@ -7,8 +7,7 @@ import DateTimePicker from "../../components/common/DateTimePicker";
 import Loader from "../../components/common/Loader";
 import ExportButton from "../../components/common/ExportButton";
 import toast from "react-hot-toast";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const Overview = () => {
   const [loading, setLoading] = useState(false);

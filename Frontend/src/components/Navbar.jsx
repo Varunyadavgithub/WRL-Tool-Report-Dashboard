@@ -1,12 +1,10 @@
 import { useSelector, useDispatch } from "react-redux";
-import { assets } from "../assets/assets";
+import { assets, baseURL } from "../assets/assets";
 import { Link, useNavigate } from "react-router-dom";
 import { FiLogOut } from "react-icons/fi";
 import axios from "axios";
 import { logoutUser } from "../redux/authSlice";
 import toast from "react-hot-toast";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const NavBar = () => {
   const { user } = useSelector((store) => store.auth);

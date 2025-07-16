@@ -7,8 +7,7 @@ import toast from "react-hot-toast";
 import axios from "axios";
 import { FaEdit } from "react-icons/fa";
 import { MdDeleteForever } from "react-icons/md";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const ManageEmployee = () => {
   const [loading, setLoading] = useState(false);

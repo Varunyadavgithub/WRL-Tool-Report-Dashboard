@@ -3,8 +3,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { FaFilePdf, FaDownload } from "react-icons/fa";
 import Title from "../../components/common/Title";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const BISReports = () => {
   const [uploadedFiles, setUploadedFiles] = useState([]);

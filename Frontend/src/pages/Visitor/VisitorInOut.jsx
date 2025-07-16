@@ -7,8 +7,7 @@ import { MdExitToApp, MdInput } from "react-icons/md";
 import axios from "axios";
 import { useEffect } from "react";
 import toast from "react-hot-toast";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const VisitorInOut = () => {
   const [loading, setLoading] = useState(false);

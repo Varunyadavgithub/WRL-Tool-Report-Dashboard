@@ -8,8 +8,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import Loader from "../../components/common/Loader";
 import { FaCaretUp, FaCaretDown } from "react-icons/fa";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const TotalProduction = () => {
   const [loading, setLoading] = useState(false);

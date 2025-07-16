@@ -16,8 +16,7 @@ import axios from "axios";
 import Loader from "../../components/common/Loader";
 import toast from "react-hot-toast";
 import { CATEGORY_MAPPINGS } from "../../utils/mapCategories.js";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets.js";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 // Map Categories with TIMEHOUR grouping

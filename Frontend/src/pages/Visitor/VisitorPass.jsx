@@ -6,8 +6,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { useSelector } from "react-redux";
 import { useEffect } from "react";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const VisitorPass = () => {
   const { user } = useSelector((store) => store.auth);

@@ -11,8 +11,7 @@ import NewReminderModal from "../../components/common/NewReminderModal";
 import axios from "axios";
 import toast from "react-hot-toast";
 import TaskModal from "../../components/common/TaskModal";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const statuses = [
   "all",

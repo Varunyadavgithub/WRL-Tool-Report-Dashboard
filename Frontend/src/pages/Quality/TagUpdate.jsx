@@ -5,8 +5,7 @@ import Button from "../../components/common/Button";
 import axios from "axios";
 import toast from "react-hot-toast";
 import SelectField from "../../components/common/SelectField";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const TagUpdate = () => {
   const [loading, setLoading] = useState(false);

@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useDispatch } from "react-redux";
 import { setAuthUser } from "../../redux/authSlice.js";
-import { assets } from "../../assets/assets.js";
+import { assets, baseURL } from "../../assets/assets.js";
 import { FaEye, FaEyeSlash, FaUser, FaLock } from "react-icons/fa";
 
 // Array of industrial background images from assets
@@ -15,8 +15,6 @@ const industrialBackgrounds = [
   assets.industrialBg2,
   assets.industrialBg3,
 ];
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const Login = () => {
   const navigate = useNavigate();

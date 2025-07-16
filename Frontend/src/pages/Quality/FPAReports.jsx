@@ -8,8 +8,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { useMemo } from "react";
 import ExportButton from "../../components/common/ExportButton";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const FPAReports = () => {
   const [loading, setLoading] = useState(false);

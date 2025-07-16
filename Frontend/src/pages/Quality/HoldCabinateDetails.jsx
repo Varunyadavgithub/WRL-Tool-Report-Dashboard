@@ -8,8 +8,7 @@ import SelectField from "../../components/common/SelectField";
 import Loader from "../../components/common/Loader";
 import axios from "axios";
 import toast from "react-hot-toast";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const HoldCabinateDetails = () => {
   const groupingOptions = [

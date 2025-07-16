@@ -11,8 +11,7 @@ import PopupModal from "../../components/common/PopupModal";
 import { WiThermometer } from "react-icons/wi";
 import { FaBolt } from "react-icons/fa";
 import { MdPowerSettingsNew } from "react-icons/md";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const LPTRecipe = () => {
   const [loading, setLoading] = useState(false);

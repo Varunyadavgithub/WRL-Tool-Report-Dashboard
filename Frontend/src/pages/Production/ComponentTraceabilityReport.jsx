@@ -8,8 +8,7 @@ import Loader from "../../components/common/Loader";
 import ExportButton from "../../components/common/ExportButton";
 import toast from "react-hot-toast";
 import InputField from "../../components/common/InputField";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import { baseURL } from "../../assets/assets";
 
 const ComponentTraceabilityReport = () => {
   const [loading, setLoading] = useState(false);
