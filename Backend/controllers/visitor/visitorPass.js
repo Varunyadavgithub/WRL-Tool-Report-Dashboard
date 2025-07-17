@@ -295,6 +295,7 @@ export const generateVisitorPass = async (req, res) => {
       to: data.employee_email,
       cc: data.manager_email,
       visitorName: name,
+      photoPath,
       visitorId: data.visitor_id,
       passId: uniquePassId,
       allowOn,
