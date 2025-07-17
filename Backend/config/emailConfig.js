@@ -109,6 +109,7 @@ export const sendVisitorPassEmail = async ({
   to,
   cc,
   visitorName,
+  photoPath,
   visitorId,
   passId,
   allowOn,
@@ -164,7 +165,7 @@ export const sendVisitorPassEmail = async ({
                           <td width="50%" align="center" valign="middle" style="padding-right: 10px;">
                             <div style="width: 150px; height: 150px; border-radius: 50%; overflow: hidden; display: inline-block;">
                               <img
-                                src="https://www.shutterstock.com/image-vector/vector-flat-illustration-grayscale-avatar-600nw-2264922221.jpg"
+                                src="${photoPath}"
                                 alt="Visitor Image"
                                 width="150"
                                 height="150"
