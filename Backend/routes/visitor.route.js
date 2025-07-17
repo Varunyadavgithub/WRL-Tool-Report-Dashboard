@@ -13,6 +13,7 @@ import {
   getEmployee,
   generateVisitorPass,
   fetchPreviousPass,
+  getVisitorPassDetails,
 } from "../controllers/visitor/visitorPass.js";
 import {
   visitorIn,
@@ -44,6 +45,7 @@ router.delete("/users/:id", deleteUser);
 router.get("/employees", getEmployee);
 router.post("/generate-pass", generateVisitorPass);
 router.get("/fetch-previous-pass", fetchPreviousPass);
+router.get("/pass-details/:passId", getVisitorPassDetails);
 
 // -----------------> Visitor In Out Routes
 router.post("/in", visitorIn);

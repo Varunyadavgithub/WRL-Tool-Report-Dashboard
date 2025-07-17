@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from "react";
 import { Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useSelector } from "react-redux";
+import VisitorPassDisplay from "./pages/Visitor/VisitorPassDisplay";
 
 // Lazy loaded components
 const Layout = lazy(() => import("./components/Layout"));
@@ -270,6 +271,12 @@ function App() {
             )}
             {canAccess(["admin"]) && (
               <Route path="/visitor/in-out" element={<VisitorInOut />} />
+            )}
+            {canAccess(["admin"]) && (
+              <Route
+                path="/visitor-pass-display/:passId"
+                element={<VisitorPassDisplay />}
+              />
             )}
             {/*-------------------------------------------------------------- Catch All --------------------------------------------------------------*/}
             <Route path="*" element={<NotFound />} />

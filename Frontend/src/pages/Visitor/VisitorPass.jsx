@@ -7,9 +7,11 @@ import toast from "react-hot-toast";
 import { useSelector } from "react-redux";
 import { useEffect } from "react";
 import { baseURL } from "../../assets/assets";
+import { useNavigate } from "react-router-dom";
 
 const VisitorPass = () => {
   const { user } = useSelector((store) => store.auth);
+  const navigate = useNavigate();
 
   const [visitorData, setVisitorData] = useState({
     visitorPhoto: null,
@@ -230,6 +232,7 @@ const VisitorPass = () => {
           res?.data?.message || "Visitor Pass generated successfully"
         );
       }
+      navigate(`/visitor-pass-display/${res?.data?.data?.passId}`);
     } catch (error) {
       console.error("Failed to generate visitor pass:", error);
       toast.error(

@@ -388,3 +388,78 @@ export const fetchPreviousPass = async (req, res) => {
     });
   }
 };
+
+export const getVisitorPassDetails = async (req, res) => {
+  const { passId } = req.params;
+
+  if (!passId) {
+    return res.status(400).json({
+      success: false,
+      message: "Pass ID is required",
+    });
+  }
+
+  try {
+    const pool = await new sql.ConnectionPool(dbConfig3).connect();
+    const request = pool.request();
+
+    const query = `
+      SELECT 
+        vp.pass_id,
+        vp.visitor_name,
+        vp.visitor_contact_no,
+        vp.visitor_email,
+        vp.visitor_photo,
+        v.company,
+        v.address,
+        v.city,
+        v.state,
+        d.department_name,
+        u.name AS employee_name,
+        vp.allow_on,
+        vp.allow_till,
+        vp.purpose_of_visit,
+        vp.company,
+        vp.no_of_people,
+        d.department_name,
+        u.name AS employee_name,
+        vp.purpose_of_visit
+      FROM 
+        visitor_passes vp
+      INNER JOIN
+        visitors v ON v.visitor_id = vp.visitor_id
+      LEFT JOIN 
+        departments d ON vp.department_to_visit = d.deptCode
+      LEFT JOIN 
+        users u ON vp.employee_to_visit = u.employee_id
+      INNER JOIN
+      visit_logs vl ON vl.unique_pass_id = vp.pass_id
+      WHERE 
+        vp.pass_id = @PassId
+    `;
+
+    const result = await request
+      .input("PassId", sql.VarChar(50), passId)
+      .query(query);
+console.log(result)
+    await pool.close();
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Visitor pass not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: result.recordset[0],
+    });
+  } catch (error) {
+    console.error("Fetch Visitor Pass Details Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch visitor pass details",
+    });
+  }
+};

@@ -205,6 +205,11 @@ const MENU_CONFIG = [
         label: "Visitor In Out",
         roles: ["admin"],
       },
+      {
+        path: "/visitor-pass-display",
+        label: "Visitor Pass Display",
+        roles: ["admin"],
+      },
     ],
   },
 ];
