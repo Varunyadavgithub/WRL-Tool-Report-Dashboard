@@ -432,8 +432,6 @@ export const getVisitorPassDetails = async (req, res) => {
         departments d ON vp.department_to_visit = d.deptCode
       LEFT JOIN 
         users u ON vp.employee_to_visit = u.employee_id
-      INNER JOIN
-      visit_logs vl ON vl.unique_pass_id = vp.pass_id
       WHERE 
         vp.pass_id = @PassId
     `;
