@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { baseURL } from "../../assets/assets";
 import toast from "react-hot-toast";
+import QRCode from "qrcode";
 
 const VisitorPassDisplay = () => {
   const { passId } = useParams();
@@ -13,10 +14,14 @@ const VisitorPassDisplay = () => {
     const fetchPassDetails = async () => {
       try {
         const res = await axios.get(`${baseURL}visitor/pass-details/${passId}`);
-        
-        console.log(res);
         if (res?.data?.success) {
-          setPassDetails(res.data.data);
+          const data = res.data.data;
+
+          // Generate QR Code from passId (or any data)
+          const qrDataUrl = await QRCode.toDataURL(passId);
+
+          // Add the generated QR code to the passDetails object
+          setPassDetails({ ...data, qrCode: qrDataUrl });
         } else {
           toast.error("Failed to fetch pass details");
         }
