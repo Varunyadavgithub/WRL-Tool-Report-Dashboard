@@ -108,16 +108,17 @@ export const sendReminderEmail = async (reminderData) => {
 export const sendVisitorPassEmail = async ({
   to,
   cc,
-  visitorName,
   photoPath,
+  visitorName,
+  visitorContact,
+  visitorEmail,
+  company,
+  city,
   visitorId,
-  passId,
   allowOn,
   allowTill,
   departmentToVisit,
   employeeToVisit,
-  visitorContact,
-  visitorEmail,
   purposeOfVisit,
 }) => {
   try {
@@ -179,10 +180,8 @@ export const sendVisitorPassEmail = async ({
                             <p><strong>Name:</strong> ${visitorName}</p>
                             <p><strong>Contact:</strong> ${visitorContact}</p>
                             <p><strong>Email:</strong> ${visitorEmail}</p>
-                            <p><strong>Company:</strong> ${departmentToVisit}</p>
-                            <p><strong>City:</strong> ${
-                              employeeToVisit || "N/A"
-                            }</p>
+                            <p><strong>Company:</strong> ${company}</p>
+                            <p><strong>City:</strong> ${city || "N/A"}</p>
                           </td>
                         </tr>
                       </table>
@@ -199,15 +198,17 @@ export const sendVisitorPassEmail = async ({
                             <p><strong>Allow On:</strong> ${new Date(
                               allowOn
                             ).toLocaleString()}</p>
-                            <p><strong>Purpose of Visit:</strong> ${purposeOfVisit}</p>
+                            <p><strong>Department to Visit:</strong> ${departmentToVisit}</p>
                           </td>
                           <td width="50%" style="vertical-align: top;">
+                          <p><strong>Purpose of Visit:</strong> ${purposeOfVisit}</p>
                             <p><strong>Pass ID:</strong> ${passId}</p>
                             <p><strong>Allow Till:</strong> ${
                               allowTill
                                 ? new Date(allowTill).toLocaleString()
                                 : "N/A"
                             }</p>
+                             <p><strong>Employee to Visit:</strong> ${employeeToVisit}</p>
                           </td>
                         </tr>
                       </table>

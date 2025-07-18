@@ -48,16 +48,16 @@ const VisitorPassDisplay = () => {
       {/* ✅ WRAP ONLY THE PRINT AREA IN A UNIQUE CONTAINER */}
       <div className="visitor-pass-print-area relative w-full max-w-full border-4 border-double border-black p-1 bg-white box-border">
         {/* QR Top Right */}
-        <div className="absolute top-4 right-30">
+        <div className="absolute top-0 right-20">
           <img
             src={passDetails.qrCode || "https://via.placeholder.com/80"}
             alt="QR Code"
-            className="block w-20 h-20 "
+            className="block w-36 h-36"
           />
         </div>
 
         {/* Profile Top Left */}
-        <div className="absolute top-4 left-30">
+        <div className="absolute top-4 left-20">
           <img
             src={passDetails.visitor_photo || "https://via.placeholder.com/80"}
             alt="Profile Pic"

@@ -294,16 +294,17 @@ export const generateVisitorPass = async (req, res) => {
     await sendVisitorPassEmail({
       to: data.employee_email,
       cc: data.manager_email,
-      visitorName: name,
       photoPath,
+      visitorName: name,
+      visitorContact: contactNo,
+      visitorEmail: email,
+      company,
+      city,
       visitorId: data.visitor_id,
-      passId: uniquePassId,
       allowOn,
       allowTill,
       departmentToVisit: data.department_name,
       employeeToVisit: data.employee_name,
-      visitorContact: contactNo,
-      visitorEmail: email,
       purposeOfVisit,
     });
 
@@ -439,7 +440,7 @@ export const getVisitorPassDetails = async (req, res) => {
     const result = await request
       .input("PassId", sql.VarChar(50), passId)
       .query(query);
-console.log(result)
+    console.log(result);
     await pool.close();
 
     if (result.recordset.length === 0) {
