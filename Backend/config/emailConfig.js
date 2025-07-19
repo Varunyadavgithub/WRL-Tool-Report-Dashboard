@@ -202,7 +202,6 @@ export const sendVisitorPassEmail = async ({
                           </td>
                           <td width="50%" style="vertical-align: top;">
                           <p><strong>Purpose of Visit:</strong> ${purposeOfVisit}</p>
-                            <p><strong>Pass ID:</strong> ${passId}</p>
                             <p><strong>Allow Till:</strong> ${
                               allowTill
                                 ? new Date(allowTill).toLocaleString()
