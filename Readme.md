@@ -1,149 +1,171 @@
-# ⚙️ Tool Report Dashboard – MES System for Western Refrigeration Pvt. Ltd.
+# ⚙️ Tool Report Dashboard – MES System
 
-> **A full-stack enterprise-grade Manufacturing Execution System (MES)**  
-> Developed to automate and manage production reports across multiple departments  
-> Built using **MERN Stack**, **Tailwind CSS**, and **Multiple SQL Server Databases**
+**Western Refrigeration Pvt. Ltd.**
+
+> **A full-stack enterprise-grade Manufacturing Execution System (MES)**
+> Built with **MERN Stack**, **Tailwind CSS**, and integrated with **multiple SQL Server Databases**
 
 ---
 
 ## 📌 Overview
 
+This project is a scalable, internal web-based **MES + Visitor Management Dashboard** developed for
+**Western Refrigeration Pvt. Ltd.**, Asia’s largest commercial refrigeration manufacturer.
 
+It automates and centralizes department-wise production reporting and visitor tracking across multiple factories.
 
-This project is a powerful and scalable **internal web-based MES dashboard** developed for  
-**Western Refrigeration Pvt. Ltd.**, Asia’s largest commercial refrigeration company.
-
-It provides real-time, department-wise, and timeline-based reporting, used daily by multiple teams to track production, quality checks, planning, and dispatch activities.
-
-> ✅ Designed for 20+ different user roles across multiple factory departments  
-> 🧩 Connected to **three different Microsoft SQL Server databases**  
-> 🖥️ Replaces legacy desktop reporting tools with a modern React-based dashboard
+> ✅ Designed for 20+ roles across multiple departments
+> 🧩 Connects to **3 Microsoft SQL Server databases**
+> 🧑‍✈️ Manages visitor entries and generates dynamic QR-based passes
 
 ---
 
 ## 🖼️ Screenshots
 
-Here are screenshots from the Tool Report Dashboard:
-
 | ![Screenshot 1](https://github.com/user-attachments/assets/1f084f4d-cb74-41ee-8d02-3116addd459f) | ![Screenshot 2](https://github.com/user-attachments/assets/767895a2-cedf-4ce5-92f9-d6fb03e394c9) |
-| ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
 | ![Screenshot 4](https://github.com/user-attachments/assets/ab1b8d03-ceda-40f3-9f4e-8d676a502e76) | ![Screenshot 3](https://github.com/user-attachments/assets/09f1e360-fd1d-4199-87de-9bf827a913fd) |
 
 ---
 
 ## 🧑‍💼 Key Highlights
 
-- 🎯 **Used by multiple departments:**  
-  - Production  
-  - Quality  
-  - Dispatch  
-  - Planning  
+### 🏭 MES Dashboard
 
-- 🔐 **Role-Based Access Control (20+ roles):**  
-  Every role sees only relevant reports, features, and filters.
+* 🔍 Real-time production data across:
 
-- 🗂 **Connected to multiple SQL Server databases:**  
-  Backend dynamically manages connections to 3 different departmental databases.
+  * Production
+  * Quality
+  * Dispatch
+  * Planning
 
-- 📅 **Advanced Time-Based Reporting:**  
-  View and export reports by **day**, **month**, or **year**.
+* 🔐 **Role-Based Access Control (20+ roles):**
+  Each user role sees only relevant reports, filters, and actions.
 
-- 📈 **Visual Reporting Dashboard:**  
-  KPI cards, interactive charts, and filterable tables.
+* 🗂 **Multi-SQL Server Connectivity:**
+  Backend smartly connects to **three SQL Server databases**.
 
-- 📤 **Excel Import/Export:**  
-  Upload daily reports and download clean summaries.
+* 📅 **Advanced Reporting Options:**
+  Filter by daily, monthly, or yearly periods. Download reports as Excel files.
+
+---
+
+### 🧑‍✈️ Visitor Management System (New)
+
+> A fully integrated module to manage factory visitors securely and efficiently.
+
+* 📇 **QR-based Visitor Passes**
+  On check-in, a dynamic QR code is generated for each visitor.
+
+* 📲 **Gate Entry/Exit Scanning**
+  QR scanned at entry/exit points by guards or gate operators.
+
+* 📊 **Live Visitor Dashboard**
+  Displays currently inside visitors, visit durations, and departmental destinations.
+
+* 📄 **Reports & Exports**
+  Search by date, host, department, or visitor name. Exportable.
+
+* 👮 **Security Role Access**
+  Only security/admin users can create or scan visitor passes.
 
 ---
 
 ## 🧑‍💻 Tech Stack
 
-### 🔧 Backend
-- **Node.js** + **Express.js**
-- **MSSQL** (Microsoft SQL Server – multi-database)
-- **JWT Authentication**
-- **Multer** for file uploads
-- **CORS**, **cookie-parser**, **dotenv**
+### Backend
 
-### 🌐 Frontend
-- **React.js** (Vite-powered)
-- **Redux Toolkit** + **Redux Persist**
-- **Tailwind CSS** (fully responsive)
-- **React Router DOM**, **React Icons**
-- **Chart.js**, **react-chartjs-2**
-- **ExcelJS** + **FileSaver** for Excel operations
-- **react-datepicker**, **react-hot-toast**
+* **Node.js**, **Express.js**
+* **Microsoft SQL Server (MSSQL)**
+* **JWT Auth**
+* **Multer**, **QR Code**, **Cookie-parser**
+
+### Frontend
+
+* **React.js (Vite)**
+* **Redux Toolkit + Redux Persist**
+* **Tailwind CSS (Responsive UI)**
+* **Chart.js**, **React ChartJS 2**
+* **React QR Code**, **ExcelJS**, **FileSaver**
+* **React Hot Toast**, **React Datepicker**
 
 ---
 
 ## 📂 Project Structure
 
-```
-
+```bash
 Tool-Report-Dashboard/
-├── backend/             # Node.js + Express backend
-│   ├── routes/          # API routes
-│   ├── controllers/     # Logic & database handling
-│   ├── config/          # SQL server configurations
+├── backend/
+│   ├── routes/
+│   │   ├── reportRoutes.js
+│   │   └── visitorRoutes.js        # 🆕 Visitor routes
+│   ├── controllers/
+│   │   ├── reportController.js
+│   │   └── visitorController.js    # 🆕 Visitor logic
+│   ├── config/
+│   │   └── db.js
+│   ├── utils/
+│   │   └── generateQR.js           # 🆕 QR generation
 │   └── server.js
 │
-├── frontend/            # React.js dashboard
+├── frontend/
 │   ├── src/
-│   │   ├── pages/       # Department-wise pages
-│   │   ├── components/  # Charts, Forms, Tables
-│   │   ├── redux/       # Role & Auth state
+│   │   ├── pages/
+│   │   │   ├── Production.jsx
+│   │   │   └── VisitorDashboard.jsx   # 🆕 Visitor UI
+│   │   ├── components/
+│   │   │   └── VisitorForm.jsx        # 🆕 Visitor Form
+│   │   ├── redux/
 │   │   └── App.jsx
 │   └── public/
-│
 ├── .env
 ├── README.md
 └── package.json
-
-````
-
----
-
-## 🔐 Authentication & Roles
-
-- Login secured via **JWT**
-- Role data is decoded and persisted via Redux
-- UI and routes are restricted based on role
-- Admins have elevated privileges for user management and data upload
+```
 
 ---
 
-## 🔗 `.env` Sample (Backend)
+## 🔐 Authentication & Authorization
+
+* Secured with **JWT**
+* Role decoded and managed with **Redux Toolkit**
+* Routes and UI components are protected based on role
+* Admins can:
+
+  * Create users
+  * Upload Excel files
+  * Manage visitor records
+
+---
+
+## 🔗 `.env` Example
 
 ```env
 PORT=3000
-JWT_SECRET=your_secret_key
+JWT_SECRET=your_secret
 
-# Server 1 – Production
-DB_USER1=your_user
-DB_PASSWORD1=your_pass
-DB_SERVER1=your_server
+# Database Configurations
+DB_USER1=user1
+DB_PASSWORD1=pass1
+DB_SERVER1=192.168.1.1
 DB_NAME1=production_db
 
-# Server 2 – Quality
-DB_USER2=your_user
-DB_PASSWORD2=your_pass
-DB_SERVER2=your_server
+DB_USER2=user2
+DB_PASSWORD2=pass2
+DB_SERVER2=192.168.1.2
 DB_NAME2=quality_db
 
-# Server 3 – Dispatch/Planning
-DB_USER3=your_user
-DB_PASSWORD3=your_pass
-DB_SERVER3=your_server
+DB_USER3=user3
+DB_PASSWORD3=pass3
+DB_SERVER3=192.168.1.3
 DB_NAME3=dispatch_db
-````
-
-> The backend intelligently switches connections based on route or request parameters.
+```
 
 ---
 
 ## 🚀 Getting Started
 
-### Backend Setup
+### Backend
 
 ```bash
 cd backend
@@ -151,7 +173,7 @@ npm install
 npm run dev
 ```
 
-### Frontend Setup
+### Frontend
 
 ```bash
 cd frontend
@@ -159,30 +181,34 @@ npm install
 npm run dev
 ```
 
-App runs at: [http://localhost:5173](http://localhost:5173)
+Visit: [http://localhost:5173](http://localhost:5173)
 
 ---
 
-## 📈 Features at a Glance
+## 📈 Feature Overview
 
-| Feature                     | Description                                                         |
-| --------------------------- | ------------------------------------------------------------------- |
-| 🔒 Role-Based Access        | 20+ roles with custom UI & permissions                              |
-| 🧩 Multi-SQL Server Support | Fetch data across multiple connected databases                      |
-| 📊 Department Dashboards    | View department-specific KPIs & reports (Production, Quality, etc.) |
-| 📅 Date Filters             | Daily, Monthly, Yearly filters with export features                 |
-| 📤 Excel Upload / Export    | Upload daily reports via Excel; export summaries anytime            |
-| 📉 Chart Visualizations     | Pie, Line, Bar charts with Chart.js                                 |
-| 🔔 Toast Notifications      | Real-time success/error feedback with react-hot-toast               |
-| 🌐 Responsive Design        | Tailwind CSS ensures mobile + desktop support                       |
+| Feature                  | Description                               |
+| ------------------------ | ----------------------------------------- |
+| 🔒 Role-Based Access     | 20+ roles with scoped views               |
+| 🧩 Multi-DB Connection   | Access 3 SQL Server databases dynamically |
+| 📊 Department Dashboards | Production, Quality, Dispatch, Planning   |
+| 📇 Visitor Management    | QR-based passes, check-in/out, tracking   |
+| 📤 Excel Upload/Export   | Daily reports and summaries               |
+| 📉 Chart Visualizations  | Line, Bar, Pie charts with Chart.js       |
+| 🧾 Exportable Reports    | Based on dates, users, departments        |
+| 🔔 Toast Notifications   | Feedback with react-hot-toast             |
+| 🌐 Fully Responsive      | Tailwind CSS design for all screen sizes  |
 
 ---
 
 ## 👨‍💻 Developer
 
 **Varun Yadav**
+<br/>
 Software Developer – MES Team
+<br/>
 Western Refrigeration Pvt. Ltd.
+<br/>
 📍 India
 🔗 [LinkedIn Profile](https://www.linkedin.com/in/thecyberdevvarun)
 
@@ -190,4 +216,5 @@ Western Refrigeration Pvt. Ltd.
 
 ## 📃 License
 
-This project is proprietary and built for internal use at Western Refrigeration Pvt. Ltd.
+This project is proprietary and developed exclusively for internal use at
+**Western Refrigeration Pvt. Ltd.**
