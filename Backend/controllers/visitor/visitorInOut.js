@@ -5,7 +5,34 @@ export const getVisitorLogs = async (_, res) => {
     const pool = await new sql.ConnectionPool(dbConfig3).connect();
     const request = pool.request();
 
-    const result = await request.query(`
+    const now = new Date();
+
+    // Set start date: today at 08:00:00
+    const startDate = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      8,
+      0,
+      0
+    );
+
+    // Set end date: tomorrow at 20:00:00
+    const endDate = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1,
+      20,
+      0,
+      0
+    );
+    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+
+    const result = await pool
+      .request()
+      .input("StartDate", sql.DateTime, istStart)
+      .input("EndDate", sql.DateTime, istEnd).query(`
         SELECT 
             vp.pass_id,
             vp.visitor_name,
@@ -19,6 +46,7 @@ export const getVisitorLogs = async (_, res) => {
             vl.check_out_time
         FROM visit_logs vl
         LEFT JOIN visitor_passes vp ON vp.pass_id = vl.unique_pass_id
+        where check_in_time between @StartDate And @EndDate
         ORDER BY vl.check_in_time DESC
     `);
 

@@ -1,10 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  FaUsers,
-  FaDoorOpen,
-  FaCalendarAlt,
-  FaChartBar,
-} from "react-icons/fa";
+import { FaUsers, FaDoorOpen, FaCalendarAlt, FaChartBar } from "react-icons/fa";
 import { Bar, Pie } from "react-chartjs-2";
 import {
   Chart,
@@ -19,6 +14,7 @@ import {
 import axios from "axios";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets";
+import SelectField from "../../components/common/SelectField";
 
 // Register Chart.js components
 Chart.register(
@@ -82,12 +78,21 @@ const Dashboard = () => {
     recentVisitors: [],
     visitorTrend: [],
   });
+  const Filter = [
+    { label: "Day", value: "day" },
+    { label: "Month", value: "month" },
+  ];
+  const [filter, setFilter] = useState(Filter[0]);
 
   const getDashboardStats = async () => {
     try {
-      const res = await axios.get(`${baseURL}visitor/dashboard-stats`);
+      const res = await axios.get(`${baseURL}visitor/dashboard-stats`, {
+        params: {
+          filter: filter.value,
+        },
+      });
+
       if (res?.data?.success) {
-        // Validate and set data
         const data = res?.data?.dashboardStats;
         setDashboardData({
           activeVisitors: data.activeVisitors || 0,
@@ -106,18 +111,22 @@ const Dashboard = () => {
 
   useEffect(() => {
     getDashboardStats();
-  }, []);
+  }, [filter]);
 
   // Bar Chart Configuration
   const barChartData = {
     labels: dashboardData.visitorTrend.map((item) => {
-      // Extract day from the date
-      const date = new Date(item.date);
-      return date.getDate(); // This will show just the day of the month
+      if (filter.value == "month") {
+        return item.month;
+      } else {
+        // Extract day from the date
+        const date = new Date(item.date);
+        return date.getDate(); // This will show just the day of the month
+      }
     }),
     datasets: [
       {
-        label: "Daily Visitors",
+        label: filter.value === "month" ? "Monthly Visitors" : "Daily Visitors",
         data: dashboardData.visitorTrend.map((item) => item.visitors),
         backgroundColor: "rgba(75, 192, 192, 0.6)",
         borderColor: "rgba(75, 192, 192, 1)",
@@ -136,9 +145,12 @@ const Dashboard = () => {
       },
       title: {
         display: true,
-        text: `Daily Visitors - ${new Date().toLocaleString("default", {
-          month: "long",
-        })} ${new Date().getFullYear()}`,
+        text:
+          filter.value === "month"
+            ? `Monthly Visitors - ${new Date().getFullYear()}`
+            : `Daily Visitors - ${new Date().toLocaleString("default", {
+                month: "long",
+              })} ${new Date().getFullYear()}`,
         font: {
           size: 14,
         },
@@ -210,6 +222,19 @@ const Dashboard = () => {
       <h1 className="text-3xl font-bold text-center mb-6">
         Visitor Management Dashboard
       </h1>
+      <div className="flex items-center justify-end my-4">
+        <SelectField
+          options={Filter}
+          value={filter.value}
+          onChange={(e) => {
+            const selected = Filter.find(
+              (item) => item.value === e.target.value
+            );
+            setFilter(selected);
+          }}
+          className="max-w-24 block"
+        />
+      </div>
 
       {/* Dashboard Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
