@@ -266,8 +266,8 @@ const VisitorPass = () => {
         // Update visitor data with fetched information
         setVisitorData((prevData) => ({
           ...prevData,
-          name: fetchedData.visitor_name || prevData.name,
-          email: fetchedData.visitor_email || prevData.email,
+          name: fetchedData.name || prevData.name,
+          email: fetchedData.email || prevData.email,
           address: fetchedData.address || prevData.address,
           company: fetchedData.company || prevData.company,
           identityType: fetchedData.identity_type || prevData.identityType,
