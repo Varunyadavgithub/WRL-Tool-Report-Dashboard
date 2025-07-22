@@ -224,7 +224,6 @@ export const generateVisitorPass = async (req, res) => {
           u.manager_email
         FROM visitors v
         INNER JOIN visitor_passes vp ON v.visitor_id = vp.visitor_id
-        INNER JOIN visit_logs vl ON vl.unique_pass_id = vp.pass_id
         INNER JOIN users u ON u.employee_id = vp.employee_to_visit
         INNER JOIN departments d ON d.deptCode = vp.department_to_visit
         WHERE u.employee_id = @employeeTo

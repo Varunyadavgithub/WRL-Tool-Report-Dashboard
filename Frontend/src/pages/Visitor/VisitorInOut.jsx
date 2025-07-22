@@ -41,6 +41,13 @@ const VisitorInOut = () => {
       const res = await axios.post(`${baseURL}visitor/${type}`, {
         passId,
       });
+      if (res?.data?.success) {
+        toast.success(
+          `Visitor ${
+            type === "in" ? "checked in" : "checked out"
+          } successfully!`
+        );
+      }
       fetchVisitorLogs();
       // Clear the relevant input
       if (type === "in") setPassIdIn("");

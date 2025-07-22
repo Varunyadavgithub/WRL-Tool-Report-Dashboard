@@ -254,25 +254,25 @@ function App() {
               <Route path="/reminder/tasks" element={<Tasks />} />
             )}
             {/*-------------------------------------------------------------- Visitor --------------------------------------------------------------*/}
-            {canAccess(["admin"]) && (
+            {canAccess(["admin", "security", "hr"]) && (
               <Route path="/visitor/generate-pass" element={<VisitorPass />} />
             )}
-            {canAccess(["admin"]) && (
+            {canAccess(["admin", "hr"]) && (
               <Route
                 path="/visitor/manage-employee"
                 element={<ManageEmployee />}
               />
             )}
-            {canAccess(["admin"]) && (
+            {canAccess(["admin", "security", "hr"]) && (
               <Route path="/visitor/dashboard" element={<VisitorDashboard />} />
             )}
-            {canAccess(["admin"]) && (
+            {canAccess(["admin", "security", "hr"]) && (
               <Route path="/visitor/reports" element={<VisitorReports />} />
             )}
-            {canAccess(["admin"]) && (
+            {canAccess(["admin", "security", "hr"]) && (
               <Route path="/visitor/in-out" element={<VisitorInOut />} />
             )}
-            {canAccess(["admin"]) && (
+            {canAccess(["admin", "security", "hr"]) && (
               <Route
                 path="/visitor-pass-display/:passId"
                 element={<VisitorPassDisplay />}

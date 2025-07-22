@@ -14,10 +14,139 @@ const Reports = () => {
   const [monthLoading, setMonthLoading] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [totalCount, setTotalCount] = useState([]);
   const [searchParams, setSearchParams] = useState({
     term: "",
     field: "all",
   });
+
+  // Quick Filters
+  const fetchYdayVisitorData = async () => {
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0);
+
+    const yesterday8AM = new Date(today8AM);
+    yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(yesterday8AM);
+    const formattedEnd = formatDate(today8AM);
+
+    try {
+      setYdayLoading(true);
+
+      setVisitors([]);
+      setTotalCount(0);
+
+      const params = {
+        startTime: formattedStart,
+        endTime: formattedEnd,
+      };
+
+      const res = await axios.get(`${baseURL}visitor/repot`, { params });
+
+      if (res?.data?.success) {
+        setVisitors(res?.data?.data);
+        setTotalCount(res?.data?.totalCount);
+      }
+    } catch (error) {
+      console.error("Failed to fetch Yesterday visitor data:", error);
+      toast.error("Failed to fetch Yesterday visitor data.");
+    } finally {
+      setYdayLoading(false);
+    }
+  };
+
+  const fetchTdayVisitorData = async () => {
+    const now = new Date();
+    const today8AM = new Date(now);
+    today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
+
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(today8AM);
+    const formattedEnd = formatDate(now); // Now = current time
+
+    try {
+      setTodayLoading(true);
+
+      setVisitors([]);
+      setTotalCount(0);
+
+      const params = {
+        startTime: formattedStart,
+        endTime: formattedEnd,
+      };
+
+      const res = await axios.get(`${baseURL}visitor/repot`, { params });
+      if (res?.data?.success) {
+        setVisitors(res?.data?.data);
+        setTotalCount(res?.data?.totalCount);
+      }
+    } catch (error) {
+      console.error("Failed to fetch Today production data:", error);
+      toast.error("Failed to fetch Today production data.");
+    } finally {
+      setTodayLoading(false);
+    }
+  };
+
+  const fetchMTDVisitorData = async () => {
+      const now = new Date();
+      const startOfMonth = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        1,
+        8,
+        0,
+        0
+      ); // 1st day at 08:00 AM
+
+      const formatDate = (date) => {
+        const pad = (n) => (n < 10 ? "0" + n : n);
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+          date.getDate()
+        )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      };
+
+      const formattedStart = formatDate(startOfMonth);
+      const formattedEnd = formatDate(now);
+      try {
+        setMonthLoading(true);
+
+        setVisitors([]);
+        setTotalCount(0);
+
+        const params = {
+          startTime: formattedStart,
+          endTime: formattedEnd,
+        };
+
+        const res = await axios.get(`${baseURL}visitor/repot`, { params });
+
+        if (res?.data?.success) {
+          setVisitors(res?.data?.data);
+          setTotalCount(res?.data?.totalCount);
+        }
+      } catch (error) {
+        console.error("Failed to fetch this Month production data:", error);
+        toast.error("Failed to fetch this Month production data.");
+      } finally {
+        setMonthLoading(false);
+      }
+  };
 
   const fetchVisitors = async () => {
     if (!startTime && !endTime) {
@@ -31,7 +160,6 @@ const Reports = () => {
       };
 
       const res = await axios.get(`${baseURL}visitor/repot`, { params });
-
       if (res?.data?.success) {
         setVisitors(res?.data?.data);
       }
@@ -185,7 +313,7 @@ const Reports = () => {
                 className={`font-semibold ${
                   ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
                 }`}
-                onClick={() => alert("Pending...")}
+                onClick={() => fetchYdayVisitorData()}
                 disabled={ydayLoading}
               >
                 YDAY
@@ -196,7 +324,7 @@ const Reports = () => {
                 className={`font-semibold ${
                   todayLoading ? "cursor-not-allowed" : "cursor-pointer"
                 }`}
-                onClick={() => alert("Pending...")}
+                onClick={() => fetchTdayVisitorData()}
                 disabled={todayLoading}
               >
                 TDAY
@@ -207,7 +335,7 @@ const Reports = () => {
                 className={`font-semibold ${
                   monthLoading ? "cursor-not-allowed" : "cursor-pointer"
                 }`}
-                onClick={() => alert("Pending...")}
+                onClick={() => fetchMTDVisitorData()}
                 disabled={monthLoading}
               >
                 MTD
@@ -281,10 +409,10 @@ const Reports = () => {
                           Employee Name
                         </th>
                         <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          Allow In
+                          Check In
                         </th>
                         <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          Allow Till
+                          Check Out
                         </th>
                         <th className="px-2 py-2 text-center border-b min-w-[100px]">
                           Purpose
@@ -340,9 +468,9 @@ const Reports = () => {
                             </td>
                             <td className="px-2 py-2 text-center border-b">
                               {visitor.check_in_time &&
-                                new Date(
-                                  visitor.check_in_time
-                                ).toLocaleString()}
+                                visitor.check_in_time
+                                  .replace("T", " ")
+                                  .replace("Z", "")}
                             </td>
                             <td className="px-4 py-2 border-b">
                               {visitor.check_out_time === null ? (
@@ -350,11 +478,12 @@ const Reports = () => {
                                   Currently In
                                 </span>
                               ) : (
-                                new Date(
-                                  visitor.check_out_time
-                                ).toLocaleString()
+                                visitor.check_out_time
+                                  .replace("T", " ")
+                                  .replace("Z", "")
                               )}
                             </td>
+
                             <td className="px-2 py-2 text-center border-b">
                               {visitor.purpose_of_visit}
                             </td>

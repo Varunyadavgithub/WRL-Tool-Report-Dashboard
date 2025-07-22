@@ -183,27 +183,27 @@ const MENU_CONFIG = [
       {
         path: "/visitor/generate-pass",
         label: "Visitor Pass",
-        roles: ["admin"],
+        roles: ["admin", "security", "hr"],
       },
       {
         path: "/visitor/manage-employee",
         label: "Manage Employee",
-        roles: ["admin"],
+        roles: ["admin", "hr"],
       },
       {
         path: "/visitor/dashboard",
         label: "Dashboard",
-        roles: ["admin"],
+        roles: ["admin", "security", "hr"],
       },
       {
         path: "/visitor/reports",
         label: "Reports",
-        roles: ["admin"],
+        roles: ["admin", "security", "hr"],
       },
       {
         path: "/visitor/in-out",
         label: "Visitor In Out",
-        roles: ["admin"],
+        roles: ["admin", "security", "hr"],
       },
     ],
   },

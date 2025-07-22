@@ -102,7 +102,7 @@ export const visitorIn = async (req, res) => {
         BEGIN TRANSACTION;
 
             INSERT INTO visit_logs (unique_pass_id, check_in_time, check_out_time)
-            VALUES (@PassId, GETUTCDATE(), NULL);
+            VALUES (@PassId, SWITCHOFFSET( GETUTCDATE(), '+05:30'), NULL);
 
         UPDATE visitor_passes
         SET status = 100 -- checked in
@@ -168,7 +168,7 @@ export const visitorOut = async (req, res) => {
       BEGIN TRANSACTION;
 
       UPDATE visit_logs
-      SET check_out_time = GETUTCDATE()
+      SET check_out_time = SWITCHOFFSET( GETUTCDATE(), '+05:30')
       WHERE unique_pass_id = @PassId AND check_out_time IS NULL;
 
       UPDATE visitor_passes
