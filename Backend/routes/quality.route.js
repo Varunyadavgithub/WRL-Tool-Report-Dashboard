@@ -26,7 +26,7 @@ import {
   getLptRecipe,
   insertLptRecipe,
   updateLptRecipe,
-} from "../controllers/quality/LPTRecipe.js";
+} from "../controllers/quality/lptRecipe.js";
 import {
   getModlelName,
   holdCabinet,

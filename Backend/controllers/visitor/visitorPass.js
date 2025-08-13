@@ -89,10 +89,10 @@ export const generateVisitorPass = async (req, res) => {
     let visitorId;
 
     if (existingPassResult.recordset.length > 0) {
-      // ✅ Visitor already exists: reuse their ID
+      // ? Visitor already exists: reuse their ID
       visitorId = existingPassResult.recordset[0].visitor_id;
     } else {
-      // ❌ Visitor does not exist: insert new visitor
+      // ? Visitor does not exist: insert new visitor
       const visitorRequest = pool.request();
 
       const generateVisitorId = () => {
@@ -138,7 +138,7 @@ export const generateVisitorPass = async (req, res) => {
       visitorId = insertVisitorResult.recordset[0].visitor_id;
     }
 
-    // ✅ Create the visitor pass using the correct visitor ID
+    // ? Create the visitor pass using the correct visitor ID
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
     const month = String(now.getMonth() + 1).padStart(2, "0");

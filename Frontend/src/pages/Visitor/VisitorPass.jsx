@@ -151,6 +151,7 @@ const VisitorPass = () => {
               />
               <div className="flex gap-4 my-4">
                 <button
+                  type="button"
                   onClick={startCamera}
                   className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 mr-2 cursor-pointer"
                 >
@@ -303,7 +304,6 @@ const VisitorPass = () => {
             <h2 className="text-xl font-semibold mb-4 text-center">
               Personal Information
             </h2>
-            {/* New Photo Capture Section */}
             {renderPhotoCaptureSection()}
             <div className="grid grid-cols-2 gap-4 w-full">
               <div className="w-full">
@@ -414,8 +414,6 @@ const VisitorPass = () => {
               </div>
             </div>
           </div>
-
-          {/* Address and Identity Section */}
           <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl">
             <h2 className="text-xl font-semibold mb-4 text-center">
               Address & Identity
@@ -483,6 +481,24 @@ const VisitorPass = () => {
                       { value: "uttar_pradesh", label: "Uttar Pradesh" },
                       { value: "uttarakhand", label: "Uttarakhand" },
                       { value: "west_bengal", label: "West Bengal" },
+                      {
+                        value: "andaman_and_nicobar_islands",
+                        label: "Andaman and Nicobar Islands",
+                      },
+                      { value: "chandigarh", label: "Chandigarh" },
+                      {
+                        value: "dadra_and_nagar_haveli_and_daman_and_diu",
+                        label: "Dadra and Nagar Haveli and Daman and Diu",
+                      },
+                      { value: "delhi", label: "Delhi" },
+                      {
+                        value: "jammu_and_kashmir",
+                        label: "Jammu and Kashmir",
+                      },
+                      { value: "ladakh", label: "Ladakh" },
+                      { value: "lakshadweep", label: "Lakshadweep" },
+                      { value: "puducherry", label: "Puducherry" },
+                      // All Indian states and union territories included
                     ]}
                     value={visitorData.state}
                     onChange={handleInputChange}
@@ -531,7 +547,7 @@ const VisitorPass = () => {
               </div>
             </div>
           </div>
-
+          
           {/* Visit Details Section */}
           <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl">
             <h2 className="text-xl font-semibold mb-4 text-center">

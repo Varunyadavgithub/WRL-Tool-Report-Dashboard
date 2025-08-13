@@ -43,7 +43,7 @@ export const login = async (req, res) => {
       });
     }
 
-    // ✅ Create JWT token
+    // ? Create JWT token
     const token = jwt.sign(
       {
         id: user.UserID,
@@ -55,14 +55,14 @@ export const login = async (req, res) => {
       { expiresIn: "1d" }
     );
 
-    // ✅ Set token in HTTP-only cookie
+    // ? Set token in HTTP-only cookie
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: 24 * 60 * 60 * 1000, // 1 day
     });
 
-    // ✅ Send response
+    // ? Send response
     res.status(200).json({
       success: true,
       message: "Login successful",

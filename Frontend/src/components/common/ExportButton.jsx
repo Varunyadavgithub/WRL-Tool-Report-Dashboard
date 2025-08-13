@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { exportToCSV } from "../../utils/exportToCSV.js";
+import { exportToXls } from "../../utils/exportToXls.js";
 import toast from "react-hot-toast";
 
 const ExportButton = ({
@@ -34,11 +34,11 @@ const ExportButton = ({
     }
 
     const currentDate = new Date().toISOString().split("T")[0];
-    const finalFilename = filename.endsWith(".csv")
+    const finalFilename = filename.endsWith(".xlsx")
       ? filename
-      : `${filename}_${currentDate}.csv`;
+      : `${filename}_${currentDate}.xlsx`;
 
-    exportToCSV(exportData, finalFilename);
+    exportToXls(exportData, finalFilename);
     setLoading(false);
   };
 

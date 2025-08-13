@@ -24,6 +24,7 @@ import {
   fetchVisitors,
   sendVisitorReport,
 } from "../controllers/visitor/reports.js";
+import { visitors } from "../controllers/visitor/visitors.js";  
 import { getDashboardStats } from "../controllers/visitor/dashboard.js";
 
 const router = express.Router();
@@ -55,7 +56,7 @@ router.get("/logs", getVisitorLogs);
 // -----------------> Visitor Reports Routes
 router.get("/repot", fetchVisitors);
 router.post("/send-report", sendVisitorReport);
-
+router.get("/visitors", visitors);
 // -----------------> Visitor Dashboard Routes
 router.get("/dashboard-stats", getDashboardStats);
 

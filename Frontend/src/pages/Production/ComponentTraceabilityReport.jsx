@@ -12,8 +12,6 @@ import { baseURL } from "../../assets/assets";
 
 const ComponentTraceabilityReport = () => {
   const [loading, setLoading] = useState(false);
-  const [ydayLoading, setYdayLoading] = useState(false);
-  const [todayLoading, setTodayLoading] = useState(false);
   const [variants, setVariants] = useState([]);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [startTime, setStartTime] = useState("");
@@ -84,6 +82,7 @@ const ComponentTraceabilityReport = () => {
         }
         setHasMore(res?.data?.data.length > 0);
       }
+      
     } catch (error) {
       console.error("Failed to fetch component traceability data:", error);
       toast.error("Failed to fetch component traceability data.");
@@ -124,106 +123,6 @@ const ComponentTraceabilityReport = () => {
     }
   };
 
-  // Quick Filters
-  const fetchYesterdayTraceabilityData = async () => {
-    const now = new Date();
-    const today8AM = new Date(now);
-    today8AM.setHours(8, 0, 0, 0);
-
-    const yesterday8AM = new Date(today8AM);
-    yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
-
-    const formatDate = (date) => {
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
-      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
-    const formattedStart = formatDate(yesterday8AM);
-    const formattedEnd = formatDate(today8AM);
-    try {
-      setYdayLoading(true);
-
-      setTraceabilityData([]);
-      setTotalCount(0);
-
-      const params = {
-        startTime: formattedStart,
-        endTime: formattedEnd,
-        model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
-      };
-
-      const res = await axios.get(
-        `${baseURL}prod/yday-component-traceability`,
-        {
-          params,
-        }
-      );
-
-      if (res?.data?.success) {
-        setTraceabilityData(res?.data?.data);
-        setTotalCount(res?.data?.totalCount);
-      }
-    } catch (error) {
-      console.error(
-        "Failed to fetch Yesterday component traceability data:",
-        error
-      );
-      toast.error("Failed to fetch Yesterday component traceability data.");
-    } finally {
-      setYdayLoading(false);
-    }
-  };
-
-  const fetchTodayTraceabilityData = async () => {
-    const now = new Date();
-    const today8AM = new Date(now);
-    today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
-
-    const formatDate = (date) => {
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
-      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
-    const formattedStart = formatDate(today8AM);
-    const formattedEnd = formatDate(now); // Now = current time
-    try {
-      setTodayLoading(true);
-
-      setTraceabilityData([]);
-      setTotalCount(0);
-
-      const params = {
-        startTime: formattedStart,
-        endTime: formattedEnd,
-        model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
-      };
-
-      const res = await axios.get(
-        `${baseURL}prod/today-component-traceability`,
-        {
-          params,
-        }
-      );
-
-      if (res?.data?.success) {
-        setTraceabilityData(res?.data?.data);
-        setTotalCount(res?.data?.totalCount);
-      }
-    } catch (error) {
-      console.error(
-        "Failed to fetch Today component traceability data:",
-        error
-      );
-      toast.error("Failed to fetch Today component traceability data.");
-    } finally {
-      setTodayLoading(false);
-    }
-  };
-
   const filteredTraceabilityData = traceabilityData.filter((item) => {
     if (!details) return true;
 
@@ -258,6 +157,7 @@ const ComponentTraceabilityReport = () => {
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
+  
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="Component Traceability Report" align="center" />
@@ -327,39 +227,6 @@ const ComponentTraceabilityReport = () => {
                 />
               )}
             </div>
-            <div className="mt-4 text-left font-bold text-lg">
-              COUNT: <span className="text-blue-700">{totalCount || 0}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
-            Quick Filters
-          </h2>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <Button
-              bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
-              textColor={ydayLoading ? "text-white" : "text-black"}
-              className={`font-semibold ${
-                ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
-              }`}
-              onClick={() => fetchYesterdayTraceabilityData()}
-              disabled={ydayLoading}
-            >
-              YDAY
-            </Button>
-            <Button
-              bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
-              textColor={todayLoading ? "text-white" : "text-black"}
-              className={`font-semibold ${
-                todayLoading ? "cursor-not-allowed" : "cursor-pointer"
-              }`}
-              onClick={() => fetchTodayTraceabilityData()}
-              disabled={todayLoading}
-            >
-              TDAY
-            </Button>
           </div>
         </div>
       </div>
@@ -386,7 +253,10 @@ const ComponentTraceabilityReport = () => {
                   <th className="px-1 py-1 border min-w-[120px]">
                     Supplier_Name
                   </th>
-                  <th className="px-1 py-1 border min-w-[120px]">Scanned On</th>
+                  <th className="px-1 py-1 border min-w-[120px]">
+                    Comp Scanned On
+                  </th>
+                  <th className="px-1 py-1 border min-w-[120px]">FG On</th>
                   <th className="px-1 py-1 border min-w-[120px]">Fg Sr. No.</th>
                   <th className="px-1 py-1 border min-w-[120px]">Asset tag</th>
                   <th className="px-1 py-1 border min-w-[120px]">
@@ -417,8 +287,12 @@ const ComponentTraceabilityReport = () => {
                       </td>
                       <td className="px-1 py-1 border">{item.Supplier_Name}</td>
                       <td className="px-1 py-1 border">
-                        {item.ScannedOn &&
-                          item.ScannedOn.replace("T", " ").replace("Z", "")}
+                        {item.Comp_ScanedOn &&
+                          item.Comp_ScanedOn.replace("T", " ").replace("Z", "")}
+                      </td>
+                      <td className="px-1 py-1 border">
+                        {item.FG_Date &&
+                          item.FG_Date.replace("T", " ").replace("Z", "")}
                       </td>
                       <td className="px-1 py-1 border">{item.Fg_Sr_No}</td>
                       <td className="px-1 py-1 border">{item.Asset_tag}</td>
@@ -428,7 +302,7 @@ const ComponentTraceabilityReport = () => {
                 })}
                 {!loading && filteredTraceabilityData.length === 0 && (
                   <tr>
-                    <td colSpan={12} className="text-center py-4">
+                    <td colSpan={11} className="text-center py-4">
                       No data found.
                     </td>
                   </tr>
