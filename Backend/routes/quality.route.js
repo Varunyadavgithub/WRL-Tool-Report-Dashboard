@@ -51,11 +51,11 @@ import {
   getBisReportStatus,
 } from "../controllers/quality/UploadBISReport.js";
 import { getDispatchHoldDetails } from "../controllers/quality/holdCabinetDetails.js";
-import { getMftReport } from "../controllers/quality/mftReport.js";
+import { getCPTReport } from "../controllers/quality/cptReport.js";
 const router = express.Router();
 
-// -----------------> MFT Routes
-router.get("/mft-report", getMftReport);
+// -----------------> CPT Routes
+router.get("/cpt-report", getCPTReport);
 
 // -----------------> FPA Routes
 router.get("/fpa-count", getFpaCount);

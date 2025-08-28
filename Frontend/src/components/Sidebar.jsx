@@ -67,8 +67,8 @@ const MENU_CONFIG = [
       },
       { path: "/quality/est-report", label: "EST Report", roles: ["admin"] },
       {
-        path: "/quality/mft-report",
-        label: "MFT Report",
+        path: "/quality/cpt-report",
+        label: "CPT Report",
         roles: ["line quality engineer", "fpa", "quality manager"],
       },
       { path: "/quality/fpa", label: "FPA", roles: ["fpa", "quality manager"] },

@@ -1,6 +1,6 @@
 import sql, { dbConfig1 } from "../../config/db.js";
 
-export const getMftReport = async (req, res) => {
+export const getCPTReport = async (req, res) => {
   const { startDate, endDate } = req.query;
 
   if (!startDate || !endDate) {

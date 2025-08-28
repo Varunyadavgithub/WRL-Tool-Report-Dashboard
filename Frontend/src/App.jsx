@@ -36,7 +36,7 @@ const GasChargingReport = lazy(() =>
   import("./pages/Quality/GasChargingReport")
 );
 const ESTReport = lazy(() => import("./pages/Quality/ESTReport"));
-const MFTReport = lazy(() => import("./pages/Quality/MFTReport"));
+const CPTReport = lazy(() => import("./pages/Quality/CPTReport"));
 const FPA = lazy(() => import("./pages/Quality/FPA"));
 const FPAReports = lazy(() => import("./pages/Quality/FPAReports"));
 const LPT = lazy(() => import("./pages/Quality/LPT"));
@@ -170,7 +170,7 @@ function App() {
               <Route path="/quality/est-report" element={<ESTReport />} />
             )}
             {canAccess([]) && (
-              <Route path="/quality/mft-report" element={<MFTReport />} />
+              <Route path="/quality/cpt-report" element={<CPTReport />} />
             )}
             {canAccess(["fpa", "quality manager"]) && (
               <Route path="/quality/fpa" element={<FPA />} />
@@ -280,10 +280,7 @@ function App() {
               />
             )}
             {canAccess(["admin", "security", "hr"]) && (
-              <Route
-                path="/visitor/visitors"
-                element={<Visitors />}
-              />
+              <Route path="/visitor/visitors" element={<Visitors />} />
             )}
             {/*-------------------------------------------------------------- Catch All --------------------------------------------------------------*/}
             <Route path="*" element={<NotFound />} />

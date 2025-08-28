@@ -7,7 +7,7 @@ import ExportButton from "../../components/common/ExportButton";
 import Loader from "../../components/common/Loader";
 import { baseURL } from "../../assets/assets";
 
-const MFTReport = () => {
+const CPTReport = () => {
   const [loading, setLoading] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -31,7 +31,7 @@ const MFTReport = () => {
         endDate: formattedEndDate,
       };
 
-      const res = await axios.get(`${baseURL}quality/mft-report`, {
+      const res = await axios.get(`${baseURL}quality/cpt-report`, {
         params,
       });
 
@@ -40,8 +40,8 @@ const MFTReport = () => {
         setTotalCount(res?.data?.data?.length);
       }
     } catch (error) {
-      console.error("Failed to fetch MFT Report:", error);
-      toast.error("Failed to fetch MFT Report.");
+      console.error("Failed to fetch CPT Report:", error);
+      toast.error("Failed to fetch CPT Report.");
     } finally {
       setLoading(false);
     }
@@ -49,7 +49,7 @@ const MFTReport = () => {
 
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
-      <Title title="MFT Reports" align="center" />
+      <Title title="CPT Reports" align="center" />
 
       {/* Filters Section */}
       <div className="flex gap-2">
@@ -94,7 +94,7 @@ const MFTReport = () => {
                   Query
                 </Button>
                 {reportData && reportData.length > 0 && (
-                  <ExportButton data={reportData} filename="MFT_Report" />
+                  <ExportButton data={reportData} filename="CPT_Report" />
                 )}
               </div>
               <div className="text-left font-bold text-lg">
@@ -223,4 +223,4 @@ const MFTReport = () => {
   );
 };
 
-export default MFTReport;
+export default CPTReport;
