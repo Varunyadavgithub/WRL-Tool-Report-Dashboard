@@ -28,8 +28,9 @@ const TotalProduction = () => {
   const [selectedModelName, setSelectedModelName] = useState(null);
 
   const departmentOption = [
+    { label: "Post Foaming", value: "post-foaming" },
+    { label: "Final Loading", value: "final-loading" },
     { label: "Final", value: "final" },
-    { label: "Post Foaming", value: "postFoaming" },
   ];
   const [selecedDep, setSelectedDep] = useState(departmentOption[0]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
@@ -538,6 +539,7 @@ const TotalProduction = () => {
               )}
             </div>
 
+            {/* Model Table */}
             <div className="max-h-[500px] overflow-x-auto w-full">
               <table className="w-full border bg-white text-xs text-left rounded-lg table-auto">
                 <thead className="bg-gray-200 sticky top-0 z-10 text-center">
@@ -571,6 +573,7 @@ const TotalProduction = () => {
               </table>
             </div>
 
+            {/* Category Table */}
             <div className="max-h-[500px] overflow-x-auto w-full">
               <table className="w-full border bg-white text-xs text-left rounded-lg table-auto">
                 <thead className="bg-gray-200 sticky top-0 z-10 text-center">

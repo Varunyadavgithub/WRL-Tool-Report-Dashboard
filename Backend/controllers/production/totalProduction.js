@@ -26,9 +26,19 @@ export const getBarcodeDetails = async (req, res) => {
       "1220004",
       "1230012",
     ];
+    const finalLoadingStationCodes = ["1220005", "1230013"];
 
-    const selectedStationCodes =
-      department === "final" ? finalStationCodes : postFoamingStationCodes;
+    let selectedStationCodes = [];
+
+    if (department === "final") {
+      selectedStationCodes = finalStationCodes;
+    } else if (department === "post-foaming") {
+      selectedStationCodes = postFoamingStationCodes;
+    } else if (department === "final-loading") {
+      selectedStationCodes = finalLoadingStationCodes;
+    } else {
+      return res.status(400).send("Invalid department value.");
+    }
 
     const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const request = pool
@@ -274,3 +284,5 @@ export const getQuickFiltersBarcodeDetails = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+
