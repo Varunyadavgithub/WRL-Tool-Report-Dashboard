@@ -132,7 +132,7 @@ export const sendVisitorPassEmail = async ({
     const mailOptions = {
       from: {
         name: "WRL Security Team",
-        address: "vikash.kumar@westernequipments.com",
+        address: "security.tadgam@westernequipments.com",
       },
       to,
       cc,
@@ -307,7 +307,7 @@ export const sendVisitorReportEmail = async (visitors) => {
     const mailOptions = {
       from: {
         name: "WRL Visitor Reports",
-        address: "vikash.kumar@westernequipments.com",
+        address: "security.tadgam@westernequipments.com",
       },
       to: "vikash.kumar@westernequipments.com",
       subject: "Visitor Report - Summary",
