@@ -20,6 +20,7 @@ import { baseURL } from "../../assets/assets";
 const UploadBISReport = () => {
   const [loading, setLoading] = useState(false);
   const [modelName, setModelName] = useState("");
+  const [testFrequency, setTestFrequency] = useState("");
   const [year, setYear] = useState("");
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
@@ -117,6 +118,11 @@ const UploadBISReport = () => {
       return;
     }
 
+    if (!testFrequency.trim()) {
+      toast.error("Test Frequency is required");
+      return;
+    }
+
     if (!description.trim()) {
       toast.error("Description is required");
       return;
@@ -130,6 +136,7 @@ const UploadBISReport = () => {
     const formData = new FormData();
     formData.append("modelName", modelName.trim());
     formData.append("year", year.trim());
+    formData.append("testFrequency", testFrequency.trim());
     formData.append("description", description.trim());
     formData.append("file", selectedFile);
 
@@ -151,6 +158,7 @@ const UploadBISReport = () => {
 
       setModelName("");
       setYear("");
+      setTestFrequency("");
       setDescription("");
       setSelectedFile(null);
       fetchUploadedFiles();
@@ -169,6 +177,7 @@ const UploadBISReport = () => {
       srNo: item.srNo,
       modelName: item.modelName,
       year: item.year,
+      testFrequency: item.testFrequency,
       description: item.description,
       selectedFile: null,
     });
@@ -186,6 +195,11 @@ const UploadBISReport = () => {
       return;
     }
 
+    if (!updateFields.testFrequency.trim()) {
+      toast.error("Test Frequency is required");
+      return;
+    }
+
     if (!updateFields.description.trim()) {
       toast.error("Description is required");
       return;
@@ -195,6 +209,7 @@ const UploadBISReport = () => {
     formData.append("srNo", updateFields.srNo);
     formData.append("modelName", updateFields.modelName.trim());
     formData.append("year", updateFields.year.trim());
+    formData.append("testFrequency", updateFields.testFrequency.trim());
     formData.append("description", updateFields.description.trim());
 
     if (selectedFile) {
@@ -224,6 +239,7 @@ const UploadBISReport = () => {
           srNo: "",
           modelName: "",
           year: "",
+          testFrequency: "",
           description: "",
           selectedFile: null,
         });
@@ -358,7 +374,23 @@ const UploadBISReport = () => {
                   </select>
                 </div>
               </div>
-
+              <div>
+                <label
+                  htmlFor="testFrequency"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Test Frequency
+                </label>
+                <InputField
+                  id="testFrequency"
+                  type="text"
+                  placeholder="Enter Test Frequency"
+                  className="w-full"
+                  name="testFrequency"
+                  value={testFrequency}
+                  onChange={(e) => setTestFrequency(e.target.value)}
+                />
+              </div>
               <div>
                 <label
                   htmlFor="description"
@@ -448,7 +480,6 @@ const UploadBISReport = () => {
               onChange={(e) =>
                 setSearchParams((prev) => ({
                   ...prev,
-
                   term: e.target.value,
                 }))
               }
@@ -460,7 +491,6 @@ const UploadBISReport = () => {
               onChange={(e) =>
                 setSearchParams((prev) => ({
                   ...prev,
-
                   field: e.target.value,
                 }))
               }
@@ -673,6 +703,23 @@ const UploadBISReport = () => {
                   {updateFields.srNo}
                 </h3>
               </div>
+            </div>
+            <div>
+              <label
+                htmlFor="testFrequency"
+                className="block text-sm font-medium text-black dark:text-white mb-2"
+              >
+                Test Frequency
+              </label>
+              <InputField
+                id="testFrequency"
+                type="text"
+                placeholder="Enter Test Frequency"
+                className="text-black dark:text-white max-w-2xl"
+                name="testFrequency"
+                value={testFrequency}
+                onChange={(e) => setTestFrequency(e.target.value)}
+              />
             </div>
             <label className="text-md text-black dark:text-white block mb-1">
               Description
