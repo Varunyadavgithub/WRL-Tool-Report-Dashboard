@@ -58,11 +58,11 @@ export const getBisPdfFiles = async (_, res) => {
       srNo: file.SrNo,
       modelName: file.ModelName,
       year: file.Year,
-      testFrequency: file.testFrequency,
+      testFrequency: file.TestFrequency,
       description: file.Description,
       fileName: file.FileName,
       url: `/uploads-bis-pdf/${file.FileName}`,
-      uploadAt: file.UploadAT,
+      uploadAt: file.UploadAt,
     }));
 
     res.status(200).json({ success: true, files });
@@ -220,7 +220,7 @@ export const updateBisPdfFile = async (req, res) => {
       UPDATE BISUpload 
       SET ModelName = @ModelName, 
           Year = @Year,
-          testFrequency = @testFrequency,
+          testFrequency = @TestFrequency,
           Description = @Description, 
           FileName = @FileName 
       WHERE SrNo = @SrNo

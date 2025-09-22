@@ -32,6 +32,7 @@ const UploadBISReport = () => {
   const [updateFields, setUpdateFields] = useState({
     modelName: "",
     year: "",
+    testFrequency: "",
     description: "",
     selectedFile: "",
   });
@@ -50,6 +51,7 @@ const UploadBISReport = () => {
 
     const modelName = safeLower(file.modelName);
     const year = safeLower(file.year);
+    const testFrequency = safeLower(file.testFrequency);
     const description = safeLower(file.description);
     const fileName = safeLower(file.fileName);
 
@@ -59,6 +61,9 @@ const UploadBISReport = () => {
 
       case "year":
         return year.includes(lowerTerm);
+
+      case "testFrequency":
+        return testFrequency.includes(lowerTerm);
 
       case "description":
         return description.includes(lowerTerm);
@@ -70,6 +75,7 @@ const UploadBISReport = () => {
         return (
           modelName.includes(lowerTerm) ||
           year.includes(lowerTerm) ||
+          testFrequency.includes(lowerTerm) ||
           description.includes(lowerTerm) ||
           fileName.includes(lowerTerm)
         );
@@ -185,22 +191,22 @@ const UploadBISReport = () => {
   };
 
   const confirmUpdate = async () => {
-    if (!updateFields.modelName.trim()) {
+    if (!updateFields.modelName || !updateFields.modelName.trim()) {
       toast.error("Model Name is required");
       return;
     }
 
-    if (!updateFields.year.trim()) {
+    if (!updateFields.year || !updateFields.year.trim()) {
       toast.error("Year is required");
       return;
     }
 
-    if (!updateFields.testFrequency.trim()) {
+    if (!updateFields.testFrequency || !updateFields.testFrequency.trim()) {
       toast.error("Test Frequency is required");
       return;
     }
 
-    if (!updateFields.description.trim()) {
+    if (!updateFields.description || !updateFields.description.trim()) {
       toast.error("Description is required");
       return;
     }
@@ -498,6 +504,7 @@ const UploadBISReport = () => {
               <option value="all">All Fields</option>
               <option value="modelName">Model Name</option>
               <option value="year">Year</option>
+              <option value="testFrequency">Test Frequency</option>
               <option value="description">Description</option>
               <option value="fileName">File Name</option>
             </select>
@@ -558,13 +565,21 @@ const UploadBISReport = () => {
                 </div>
 
                 <div className="p-4">
-                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                  <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
                     <div className="mb-2">
                       <label className="text-xs text-gray-500 block mb-1">
                         Description
                       </label>
                       <p className="text-sm text-gray-700 line-clamp-2">
                         {file.description || "No description provided"}
+                      </p>
+                    </div>
+                    <div className="mb-2">
+                      <label className="text-xs text-gray-500 block mb-1">
+                        Test Frequency
+                      </label>
+                      <p className="text-sm text-gray-700 line-clamp-2">
+                        {file.testFrequency || "No Test Frequency provided"}
                       </p>
                     </div>
                     <div>
@@ -705,20 +720,17 @@ const UploadBISReport = () => {
               </div>
             </div>
             <div>
-              <label
-                htmlFor="testFrequency"
-                className="block text-sm font-medium text-black dark:text-white mb-2"
-              >
-                Test Frequency
-              </label>
               <InputField
-                id="testFrequency"
+                label="Test Frequency"
                 type="text"
-                placeholder="Enter Test Frequency"
+                value={updateFields.testFrequency}
+                onChange={(e) =>
+                  setTestFrequency({
+                    ...updateFields,
+                    testFrequency: e.target.value,
+                  })
+                }
                 className="text-black dark:text-white max-w-2xl"
-                name="testFrequency"
-                value={testFrequency}
-                onChange={(e) => setTestFrequency(e.target.value)}
               />
             </div>
             <label className="text-md text-black dark:text-white block mb-1">
