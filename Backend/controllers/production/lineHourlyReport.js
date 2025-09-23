@@ -139,7 +139,7 @@ HourlySummary AS (
         c.StationCode = 1230017
         AND m.Category in (1230003, 1230004, 1230009, 1230010, 1250004)
         AND b.ActivityType = 5 
-        AND b.ActivityOn BETWEEN '2025-09-04 08:00:00' AND '2025-09-05 08:00:00' 
+        AND b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}'
     GROUP BY 
         DATEPART(DAY, b.ActivityOn), 
         DATEPART(HOUR, b.ActivityOn),

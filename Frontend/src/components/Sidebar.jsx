@@ -10,9 +10,11 @@ import {
   FaTimes,
   FaClipboardList,
 } from "react-icons/fa";
-import { MdNotificationsActive } from "react-icons/md";
+import {
+  MdNotificationsActive,
+  MdOutlineDisplaySettings,
+} from "react-icons/md";
 import { FaUserShield } from "react-icons/fa6";
-
 import { useSelector } from "react-redux";
 
 // Define menu configurations
@@ -209,10 +211,22 @@ const MENU_CONFIG = [
         label: "Manage Visitor",
         roles: ["admin", "security", "hr"],
       },
-       {
+      {
         path: "/visitor/manage-employee",
         label: "Manage Employee",
         roles: ["admin", "hr"],
+      },
+    ],
+  },
+  {
+    key: "Displays",
+    icon: MdOutlineDisplaySettings,
+    label: "Displays",
+    items: [
+      {
+        path: "/displays/logistics",
+        label: "Logistics",
+        roles: ["admin"],
       },
     ],
   },
