@@ -7,7 +7,6 @@ import axios from "axios";
 import Loader from "../../components/common/Loader";
 import ExportButton from "../../components/common/ExportButton";
 import toast from "react-hot-toast";
-import InputField from "../../components/common/InputField";
 import { baseURL } from "../../assets/assets";
 
 const ComponentTraceabilityReport = () => {
@@ -18,11 +17,9 @@ const ComponentTraceabilityReport = () => {
   const [endTime, setEndTime] = useState("");
   const [traceabilityData, setTraceabilityData] = useState([]);
   const [page, setPage] = useState(1);
-  const [limit] = useState(1000);
+  const [limit] = useState(100);
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [details, setDetails] = useState("");
 
   const observer = useRef();
   const lastRowRef = useCallback(
@@ -77,12 +74,12 @@ const ComponentTraceabilityReport = () => {
       if (res?.data?.success) {
         setTraceabilityData((prev) => [...prev, ...res?.data?.data]);
         // Set total count only when it's the first page
+        console.log(res)
         if (pageNumber === 1) {
           setTotalCount(res?.data?.totalCount);
         }
         setHasMore(res?.data?.data.length > 0);
       }
-      
     } catch (error) {
       console.error("Failed to fetch component traceability data:", error);
       toast.error("Failed to fetch component traceability data.");
@@ -123,18 +120,6 @@ const ComponentTraceabilityReport = () => {
     }
   };
 
-  const filteredTraceabilityData = traceabilityData.filter((item) => {
-    if (!details) return true;
-
-    const searchTermLower = details.toLowerCase();
-
-    return (
-      item.Model_Name?.toLowerCase().includes(searchTermLower) ||
-      item.Component_Serial_Number?.toLowerCase().includes(searchTermLower) ||
-      item.Fg_Sr_No?.toLowerCase().includes(searchTermLower)
-    );
-  });
-
   useEffect(() => {
     fetchModelVariants();
   }, []);
@@ -150,14 +135,6 @@ const ComponentTraceabilityReport = () => {
     fetchTraceabilityData(1);
   };
 
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      setDetails(searchTerm);
-    }, 300);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
-  
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="Component Traceability Report" align="center" />
@@ -176,14 +153,6 @@ const ComponentTraceabilityReport = () => {
                 )
               }
               className="max-w-64"
-            />
-            <InputField
-              label="Search"
-              type="text"
-              placeholder="Enter details"
-              className="max-w-64"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
@@ -232,75 +201,57 @@ const ComponentTraceabilityReport = () => {
       </div>
 
       {/* Summary Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
-        <div className="w-full bg-white border border-gray-300 rounded-md p-4">
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-2 mt-4 rounded-xl">
+        <div className="w-full bg-white border border-gray-300 rounded-md p-2">
           <div className="w-full max-h-[600px] overflow-x-auto">
-            <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
+            <table className="min-w-full border bg-white text-xs rounded-lg table-auto">
               <thead className="bg-gray-200 sticky top-0 z-10 text-center">
                 <tr>
-                  <th className="px-1 py-1 border min-w-[120px]">PS_No.</th>
-                  <th className="px-1 py-1 border min-w-[120px]">Model_Name</th>
+                  <th className="p-2 border">PS_No.</th>
+                  <th className="p-2 border">Model_Name</th>
 
-                  <th className="px-1 py-1 border min-w-[120px]">
-                    Component Serial No.
-                  </th>
-                  <th className="px-1 py-1 border min-w-[120px]">
-                    Component Name
-                  </th>
-                  <th className="px-1 py-1 border min-w-[120px]">
-                    Component Type
-                  </th>
-                  <th className="px-1 py-1 border min-w-[120px]">
-                    Supplier_Name
-                  </th>
-                  <th className="px-1 py-1 border min-w-[120px]">
-                    Comp Scanned On
-                  </th>
-                  <th className="px-1 py-1 border min-w-[120px]">FG On</th>
-                  <th className="px-1 py-1 border min-w-[120px]">Fg Sr. No.</th>
-                  <th className="px-1 py-1 border min-w-[120px]">Asset tag</th>
-                  <th className="px-1 py-1 border min-w-[120px]">
-                    SAP Item Code
-                  </th>
+                  <th className="p-2 border">Component Serial No.</th>
+                  <th className="p-2 border">Component Name</th>
+                  <th className="p-2 border">Component Type</th>
+                  <th className="p-2 border">Supplier_Name</th>
+                  <th className="p-2 border">Comp Scanned On</th>
+                  <th className="p-2 border">FG On</th>
+                  <th className="p-2 border">Fg Sr. No.</th>
+                  <th className="p-2 border">Asset tag</th>
+                  <th className="p-2 border">SAP Item Code</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredTraceabilityData.map((item, index) => {
-                  const isLast = index === filteredTraceabilityData.length - 1;
+                {traceabilityData.map((item, index) => {
+                  const isLast = index === traceabilityData.length - 1;
                   return (
                     <tr
                       key={index}
                       ref={isLast ? lastRowRef : null}
                       className="hover:bg-gray-100 text-center"
                     >
-                      <td className="px-1 py-1 border">{item.PSNo}</td>
-                      <td className="px-1 py-1 border">{item.Model_Name}</td>
+                      <td className="border">{item.PSNo}</td>
+                      <td className="border">{item.Model_Name}</td>
 
-                      <td className="px-1 py-1 border">
-                        {item.Component_Serial_Number}
-                      </td>
-                      <td className="px-1 py-1 border">
-                        {item.Component_Name}
-                      </td>
-                      <td className="px-1 py-1 border">
-                        {item.Component_Type}
-                      </td>
-                      <td className="px-1 py-1 border">{item.Supplier_Name}</td>
-                      <td className="px-1 py-1 border">
+                      <td className="border">{item.Component_Serial_Number}</td>
+                      <td className="border">{item.Component_Name}</td>
+                      <td className="border">{item.Component_Type}</td>
+                      <td className="border">{item.Supplier_Name}</td>
+                      <td className="border">
                         {item.Comp_ScanedOn &&
                           item.Comp_ScanedOn.replace("T", " ").replace("Z", "")}
                       </td>
-                      <td className="px-1 py-1 border">
+                      <td className="border">
                         {item.FG_Date &&
                           item.FG_Date.replace("T", " ").replace("Z", "")}
                       </td>
-                      <td className="px-1 py-1 border">{item.Fg_Sr_No}</td>
-                      <td className="px-1 py-1 border">{item.Asset_tag}</td>
-                      <td className="px-1 py-1 border">{item.SAP_Item_Code}</td>
+                      <td className="border">{item.Fg_Sr_No}</td>
+                      <td className="border">{item.Asset_tag}</td>
+                      <td className="border">{item.SAP_Item_Code}</td>
                     </tr>
                   );
                 })}
-                {!loading && filteredTraceabilityData.length === 0 && (
+                {!loading && traceabilityData.length === 0 && (
                   <tr>
                     <td colSpan={11} className="text-center py-4">
                       No data found.

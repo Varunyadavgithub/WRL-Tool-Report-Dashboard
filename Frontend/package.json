@@ -15,6 +15,7 @@
     "axios": "^1.9.0",
     "backend": "file:..",
     "chart.js": "^4.4.9",
+    "chartjs-plugin-datalabels": "^2.2.0",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "qrcode": "^1.5.4",

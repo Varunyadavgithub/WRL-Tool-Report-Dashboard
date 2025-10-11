@@ -1,7 +1,7 @@
 import sql, { dbConfig1 } from "../../config/db.js";
 
 export const generateReport = async (req, res) => {
-  const { startTime, endTime, model, page = 1, limit = 1000 } = req.query;
+  const { startTime, endTime, model, page = 1, limit = 100 } = req.query;
 
   if (!startTime || !endTime) {
     return res.status(400).json({
