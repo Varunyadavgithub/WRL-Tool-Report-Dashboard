@@ -432,6 +432,7 @@ const TotalProduction = () => {
             >
               YDAY
             </Button>
+            {ydayLoading && <Loader />}
             <Button
               bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
               textColor={todayLoading ? "text-white" : "text-black"}
@@ -443,6 +444,7 @@ const TotalProduction = () => {
             >
               TDAY
             </Button>
+            {todayLoading && <Loader />}
             <Button
               bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
               textColor={monthLoading ? "text-white" : "text-black"}
@@ -454,6 +456,7 @@ const TotalProduction = () => {
             >
               MTD
             </Button>
+            {monthLoading && <Loader />}
           </div>
         </div>
       </div>

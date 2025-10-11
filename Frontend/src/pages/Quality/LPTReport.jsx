@@ -8,6 +8,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import ExportButton from "../../components/common/ExportButton";
 import { baseURL } from "../../assets/assets";
+import Loader from "../../components/common/Loader";
 
 const LPTReport = () => {
   const [loading, setLoading] = useState(false);
@@ -309,6 +310,7 @@ const LPTReport = () => {
             >
               YDAY
             </Button>
+            {ydayLoading && <Loader />}
             <Button
               bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
               textColor={todayLoading ? "text-white" : "text-black"}
@@ -320,6 +322,7 @@ const LPTReport = () => {
             >
               TDAY
             </Button>
+            {todayLoading && <Loader />}
             <Button
               bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
               textColor={monthLoading ? "text-white" : "text-black"}
@@ -331,6 +334,7 @@ const LPTReport = () => {
             >
               MTD
             </Button>
+            {monthLoading && <Loader />}
           </div>
         </div>
       </div>

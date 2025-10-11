@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 import { useMemo } from "react";
 import ExportButton from "../../components/common/ExportButton";
 import { baseURL } from "../../assets/assets";
+import Loader from "../../components/common/Loader";
 
 const FPAReports = () => {
   const [loading, setLoading] = useState(false);
@@ -411,6 +412,7 @@ const FPAReports = () => {
               >
                 YDAY
               </Button>
+              {ydayLoading && <Loader />}
               <Button
                 bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
                 textColor={todayLoading ? "text-white" : "text-black"}
@@ -422,6 +424,7 @@ const FPAReports = () => {
               >
                 TDAY
               </Button>
+              {todayLoading && <Loader />}
               <Button
                 bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
                 textColor={monthLoading ? "text-white" : "text-black"}
@@ -433,6 +436,7 @@ const FPAReports = () => {
               >
                 MTD
               </Button>
+              {monthLoading && <Loader />}
             </div>
           </div>
         )}

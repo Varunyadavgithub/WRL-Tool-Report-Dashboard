@@ -15,7 +15,6 @@ export const getFgUnloading = async (req, res) => {
     const query = `
       WITH UnloadingData AS (
         SELECT 
-          ROW_NUMBER() OVER (ORDER BY DateTime DESC) AS RowNum,
           * 
         FROM DispatchUnloading
         WHERE DateTime BETWEEN @startDate AND @endDate
@@ -80,7 +79,6 @@ export const getFgDispatch = async (req, res) => {
     const query = `
       WITH DispatchData AS (
         SELECT 
-          ROW_NUMBER() OVER (ORDER BY DM.AddedOn DESC) AS RowNum,
           DM.ModelName, 
           DM.FGSerialNo, 
           DM.AssetCode, 

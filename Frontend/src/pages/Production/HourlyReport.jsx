@@ -741,6 +741,7 @@ const HourlyReport = () => {
             >
               YDAY
             </Button>
+            {ydayLoading && <Loader />}
             <Button
               bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
               textColor={todayLoading ? "text-white" : "text-black"}
@@ -752,6 +753,7 @@ const HourlyReport = () => {
             >
               TDAY
             </Button>
+            {todayLoading && <Loader />}
           </div>
         </div>
       </div>

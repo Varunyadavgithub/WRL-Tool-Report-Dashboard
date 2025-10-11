@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import Button from "../../components/common/Button";
 import DateTimePicker from "../../components/common/DateTimePicker";
 import { baseURL } from "../../assets/assets";
+import Loader from "../../components/common/Loader";
 
 const Reports = () => {
   const [loading, setLoading] = useState(false);
@@ -104,48 +105,48 @@ const Reports = () => {
   };
 
   const fetchMTDVisitorData = async () => {
-      const now = new Date();
-      const startOfMonth = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        1,
-        8,
-        0,
-        0
-      ); // 1st day at 08:00 AM
+    const now = new Date();
+    const startOfMonth = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1,
+      8,
+      0,
+      0
+    ); // 1st day at 08:00 AM
 
-      const formatDate = (date) => {
-        const pad = (n) => (n < 10 ? "0" + n : n);
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-          date.getDate()
-        )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    const formatDate = (date) => {
+      const pad = (n) => (n < 10 ? "0" + n : n);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+        date.getDate()
+      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const formattedStart = formatDate(startOfMonth);
+    const formattedEnd = formatDate(now);
+    try {
+      setMonthLoading(true);
+
+      setVisitors([]);
+      setTotalCount(0);
+
+      const params = {
+        startTime: formattedStart,
+        endTime: formattedEnd,
       };
 
-      const formattedStart = formatDate(startOfMonth);
-      const formattedEnd = formatDate(now);
-      try {
-        setMonthLoading(true);
+      const res = await axios.get(`${baseURL}visitor/repot`, { params });
 
-        setVisitors([]);
-        setTotalCount(0);
-
-        const params = {
-          startTime: formattedStart,
-          endTime: formattedEnd,
-        };
-
-        const res = await axios.get(`${baseURL}visitor/repot`, { params });
-
-        if (res?.data?.success) {
-          setVisitors(res?.data?.data);
-          setTotalCount(res?.data?.totalCount);
-        }
-      } catch (error) {
-        console.error("Failed to fetch this Month production data:", error);
-        toast.error("Failed to fetch this Month production data.");
-      } finally {
-        setMonthLoading(false);
+      if (res?.data?.success) {
+        setVisitors(res?.data?.data);
+        setTotalCount(res?.data?.totalCount);
       }
+    } catch (error) {
+      console.error("Failed to fetch this Month production data:", error);
+      toast.error("Failed to fetch this Month production data.");
+    } finally {
+      setMonthLoading(false);
+    }
   };
 
   const fetchVisitors = async () => {
@@ -318,6 +319,7 @@ const Reports = () => {
               >
                 YDAY
               </Button>
+              {ydayLoading && <Loader />}
               <Button
                 bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
                 textColor={todayLoading ? "text-white" : "text-black"}
@@ -329,6 +331,7 @@ const Reports = () => {
               >
                 TDAY
               </Button>
+              {todayLoading && <Loader />}
               <Button
                 bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
                 textColor={monthLoading ? "text-white" : "text-black"}
@@ -340,6 +343,7 @@ const Reports = () => {
               >
                 MTD
               </Button>
+              {monthLoading && <Loader />}
             </div>
           </div>
         </div>
