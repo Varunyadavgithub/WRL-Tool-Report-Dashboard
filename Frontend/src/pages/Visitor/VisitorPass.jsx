@@ -94,11 +94,36 @@ const VisitorPass = () => {
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      // Get all media devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(
+        (device) => device.kind === "videoinput"
+      );
+
+      if (videoDevices.length === 0) {
+        setError("No camera found. Please connect an external camera.");
+        return;
+      }
+
+      // Choose the first available camera (or you could let the user choose)
+      const selectedDeviceId = videoDevices[0].deviceId;
+
+      // Start video stream with the selected device
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: selectedDeviceId } },
+      });
+
       videoRef.current.srcObject = stream;
+      setError(null);
     } catch (err) {
-      setError("Could not access camera");
-      console.error(err);
+      console.error("Camera access error:", err);
+      if (err.name === "NotAllowedError") {
+        setError("Camera access denied. Please allow camera permissions.");
+      } else if (err.name === "NotFoundError") {
+        setError("No camera device found. Please connect one.");
+      } else {
+        setError("Could not access camera. Please check device connection.");
+      }
     }
   };
 
@@ -547,7 +572,7 @@ const VisitorPass = () => {
               </div>
             </div>
           </div>
-          
+
           {/* Visit Details Section */}
           <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl">
             <h2 className="text-xl font-semibold mb-4 text-center">

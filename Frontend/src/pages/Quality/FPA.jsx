@@ -273,6 +273,14 @@ const FPA = () => {
                 </span>
               </h1>
             </div>
+            <div className="flex gap-4">
+              <h1 className="font-semibold text-md">
+                Target FPA: <span className="text-blue-700 text-sm">1.4</span>
+              </h1>
+              <h1 className="font-semibold text-md">
+                Actual FPA: <span className="text-blue-700 text-sm">0.8</span>
+              </h1>
+            </div>
             <div className="text-center">
               <h1 className="font-semibold text-lg">
                 FPQI Value:{" "}

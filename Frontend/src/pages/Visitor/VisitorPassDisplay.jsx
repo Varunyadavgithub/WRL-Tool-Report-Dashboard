@@ -149,22 +149,7 @@ const VisitorPassDisplay = () => {
           <p>2. Entry To Prod. Dept. Not Allowed Without Permit.</p>
         </div>
 
-        {/* Instructions */}
-        <div className="border border-dashed border-black p-2 mt-1 text-[10px] leading-tight">
-          <p className="font-bold">Instructions for Visitors:</p>
-          <p>Our aim: "Safety for all"</p>
-          <p>* "Safety is our value not just priority".</p>
-          <p>
-            * Display Visitor ID in plant and return it at security main gate.
-          </p>
-          <p>* No entry under Alcohol/Drugs influence.</p>
-          <p>
-            * Possession/Consumption of Alcohol or illegal Drugs is prohibited.
-          </p>
-          <p>* Mobile use at workplace allowed only with consent.</p>
-          <p>* Photography without permission is prohibited.</p>
-          <p>* Smoking is prohibited inside the plant.</p>
-        </div>
+        
       </div>
 
       {/* Print Button */}
