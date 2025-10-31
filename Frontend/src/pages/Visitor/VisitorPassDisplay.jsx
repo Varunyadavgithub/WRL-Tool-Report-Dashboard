@@ -142,39 +142,61 @@ const VisitorPassDisplay = () => {
           </div>
         </div>
 
-        {/* Note */}
+        {/* Note Section */}
         <div className="border border-dashed border-black p-2 mt-2 text-[10px] leading-tight">
           <p className="font-bold">NOTE:</p>
-          <p>1. Return Pass Duly Signed & Timed By Emp. Visited.</p>
-          <p>2. Entry To Prod. Dept. Not Allowed Without Permit.</p>
+          <ol className="list-decimal ml-4">
+            <li>Return pass duly signed and timed by the employee visited.</li>
+            <li>
+              Entry to production department is not allowed without a valid
+              permit.
+            </li>
+          </ol>
         </div>
 
-        <div class="border border-dashed border-black p-2 mt-1 text-[10px] leading-tight">
+        {/* Instructions Section */}
+        <div className="border border-dashed border-black p-2 mt-1 text-[10px] leading-tight">
           {/* Wrapper div to arrange both inner divs side by side */}
-          <div class="flex justify-between gap-4">
+          <div className="flex justify-between gap-4">
             {/* Left: Instructions block */}
-            <div class="w-3/4">
-              <p class="font-bold">Instructions for Visitors:</p>
-              <p>Our aim: "Safety for all"</p>
-              <p>* "Safety is our value not just priority".</p>
-              <p>
-                * Display Visitor ID in plant and return it at security main
-                gate.
+            <div className="w-3/4">
+              <p className="font-bold text-lg mb-1">
+                Instructions for Visitors:
               </p>
-              <p>* No entry under Alcohol/Drugs influence.</p>
               <p>
-                * Possession/Consumption of Alcohol or illegal Drugs is
-                prohibited.
+                <strong>Our Aim:</strong> To ensure safety for every visitor and
+                employee.
               </p>
-              <p>* Mobile use at workplace allowed only with consent.</p>
-              <p>* Photography without permission is prohibited.</p>
-              <p>* Smoking is prohibited inside the plant.</p>
+              <p>Safety is not just our priority — it defines our culture.</p>
+
+              <ol className="list-decimal ml-6 mt-2 space-y-1">
+                <li>
+                  Always display your Visitor ID inside the plant and return it
+                  at the main security gate before leaving.
+                </li>
+                <li>
+                  Entry under the influence of alcohol or drugs is strictly
+                  prohibited.
+                </li>
+                <li>
+                  Possession or consumption of alcohol or illegal drugs is not
+                  allowed on the premises.
+                </li>
+                <li>
+                  Mobile phone use at the workplace is permitted only with prior
+                  consent.
+                </li>
+                <li>
+                  Photography without authorization is strictly prohibited.
+                </li>
+                <li>Smoking is not allowed anywhere inside the plant.</li>
+              </ol>
             </div>
 
             {/* Right: Format info block */}
-            <div class="text-right w-1/4">
+            <div className="text-right w-1/4">
               <p>Format No.: WRLTAD-F-SEC-24</p>
-              <p>Rev.No.: 00</p>
+              <p>Rev. No.: 00</p>
               <p>Rev. Date: 01-09-2025</p>
             </div>
           </div>
