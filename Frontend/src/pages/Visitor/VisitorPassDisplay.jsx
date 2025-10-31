@@ -149,7 +149,36 @@ const VisitorPassDisplay = () => {
           <p>2. Entry To Prod. Dept. Not Allowed Without Permit.</p>
         </div>
 
-        
+        <div class="border border-dashed border-black p-2 mt-1 text-[10px] leading-tight">
+          {/* Wrapper div to arrange both inner divs side by side */}
+          <div class="flex justify-between gap-4">
+            {/* Left: Instructions block */}
+            <div class="w-3/4">
+              <p class="font-bold">Instructions for Visitors:</p>
+              <p>Our aim: "Safety for all"</p>
+              <p>* "Safety is our value not just priority".</p>
+              <p>
+                * Display Visitor ID in plant and return it at security main
+                gate.
+              </p>
+              <p>* No entry under Alcohol/Drugs influence.</p>
+              <p>
+                * Possession/Consumption of Alcohol or illegal Drugs is
+                prohibited.
+              </p>
+              <p>* Mobile use at workplace allowed only with consent.</p>
+              <p>* Photography without permission is prohibited.</p>
+              <p>* Smoking is prohibited inside the plant.</p>
+            </div>
+
+            {/* Right: Format info block */}
+            <div class="text-right w-1/4">
+              <p>Format No.: WRLTAD-F-SEC-24</p>
+              <p>Rev.No.: 00</p>
+              <p>Rev. Date: 01-09-2025</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Print Button */}
