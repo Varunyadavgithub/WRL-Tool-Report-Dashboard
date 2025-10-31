@@ -101,26 +101,39 @@ const VisitorPass = () => {
       );
 
       if (videoDevices.length === 0) {
-        setError("No camera found. Please connect an external camera.");
+        setError("No camera found. Please connect a camera.");
         return;
       }
 
-      // Choose the first available camera (or you could let the user choose)
-      const selectedDeviceId = videoDevices[0].deviceId;
+      // 🟢 Choose the last camera (often the external one)
+      const selectedDeviceId = videoDevices[videoDevices.length - 1].deviceId;
 
-      // Start video stream with the selected device
+      // 🟢 Use 'ideal' instead of 'exact' to prevent constraint errors
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: selectedDeviceId } },
+        video: {
+          deviceId: selectedDeviceId ? { ideal: selectedDeviceId } : undefined,
+        },
+        audio: false,
       });
 
-      videoRef.current.srcObject = stream;
+      // Assign the stream to the video element
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+
       setError(null);
     } catch (err) {
       console.error("Camera access error:", err);
+
       if (err.name === "NotAllowedError") {
         setError("Camera access denied. Please allow camera permissions.");
       } else if (err.name === "NotFoundError") {
         setError("No camera device found. Please connect one.");
+      } else if (err.name === "OverconstrainedError") {
+        setError("Could not open the selected camera. Try another one.");
+      } else if (err.name === "NotReadableError") {
+        setError("Camera might be in use by another application.");
       } else {
         setError("Could not access camera. Please check device connection.");
       }
