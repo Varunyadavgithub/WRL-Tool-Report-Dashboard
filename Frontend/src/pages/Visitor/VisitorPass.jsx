@@ -94,21 +94,22 @@ const VisitorPass = () => {
 
   const startCamera = async () => {
     try {
-      // Get all media devices
+      // 🟢 Step 1: Request permission once so that Edge can list cameras
+      await navigator.mediaDevices.getUserMedia({ video: true });
+
+      // 🟢 Step 2: Now get all available devices
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(
-        (device) => device.kind === "videoinput"
-      );
+      const videoDevices = devices.filter((d) => d.kind === "videoinput");
 
       if (videoDevices.length === 0) {
         setError("No camera found. Please connect a camera.");
         return;
       }
 
-      // 🟢 Choose the last camera (often the external one)
+      // 🟢 Step 3: Choose the last camera (often external)
       const selectedDeviceId = videoDevices[videoDevices.length - 1].deviceId;
 
-      // 🟢 Use 'ideal' instead of 'exact' to prevent constraint errors
+      // 🟢 Step 4: Start camera using the chosen device
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           deviceId: selectedDeviceId ? { ideal: selectedDeviceId } : undefined,
@@ -116,10 +117,17 @@ const VisitorPass = () => {
         audio: false,
       });
 
-      // Assign the stream to the video element
+      // 🟢 Step 5: Assign stream to the <video> element
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+
+        // Ensure autoplay works in Edge (muted + playsInline)
+        videoRef.current.muted = true;
+        videoRef.current.playsInline = true;
+
+        await videoRef.current.play().catch((playErr) => {
+          console.warn("Autoplay prevented:", playErr);
+        });
       }
 
       setError(null);
