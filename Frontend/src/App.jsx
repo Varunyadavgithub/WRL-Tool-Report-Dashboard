@@ -68,6 +68,7 @@ const LPTRecipe = lazy(() => import("./pages/Quality/LPTRecipe"));
 const UploadBISReport = lazy(() => import("./pages/Quality/UploadBISReport"));
 const BISReports = lazy(() => import("./pages/Quality/BISReports"));
 const BISStatus = lazy(() => import("./pages/Quality/BISStatus"));
+const BEECalculation = lazy(() => import("./pages/Quality/BEECalculation"));
 
 const Dashboard = lazy(() => import("./pages/Reminder/Dashboard"));
 const Tasks = lazy(() => import("./pages/Reminder/Tasks"));
@@ -79,7 +80,9 @@ const VisitorReports = lazy(() => import("./pages/Visitor/Reports"));
 const VisitorInOut = lazy(() => import("./pages/Visitor/VisitorInOut"));
 const ManageVisitor = lazy(() => import("./pages/Visitor/ManageVisitor"));
 
-const LogisticsDisplay = lazy(() => import("./pages/PerformanceDisplays/LogisticsDisplay"));
+const LogisticsDisplay = lazy(() =>
+  import("./pages/PerformanceDisplays/LogisticsDisplay")
+);
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -217,6 +220,17 @@ function App() {
               "fpa",
               "quality manager",
             ]) && <Route path="/quality/bis-status" element={<BISStatus />} />}
+            {canAccess([
+              "line quality engineer",
+              "bis engineer",
+              "fpa",
+              "quality manager",
+            ]) && (
+              <Route
+                path="/quality/bee-calculation"
+                element={<BEECalculation />}
+              />
+            )}
             {/*-------------------------------------------------------------- Dispatch --------------------------------------------------------------*/}
             <Route
               path="/dispatch/dispatch-performance-report"
@@ -289,7 +303,10 @@ function App() {
             )}
             {/*-------------------------------------------------------------- Performance Displays --------------------------------------------------------------*/}
             {canAccess(["admin"]) && (
-              <Route path="/displays/logistics" element={<LogisticsDisplay />} />
+              <Route
+                path="/displays/logistics"
+                element={<LogisticsDisplay />}
+              />
             )}
             {/*-------------------------------------------------------------- Catch All --------------------------------------------------------------*/}
             <Route path="*" element={<NotFound />} />

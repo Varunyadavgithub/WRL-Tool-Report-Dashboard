@@ -85,7 +85,6 @@ const MENU_CONFIG = [
         label: "LPT Report",
         roles: ["line quality engineer", "quality manager", "lpt"],
       },
-
       {
         path: "/quality/lpt-recipe",
         label: "LPT Recipe",
@@ -102,7 +101,6 @@ const MENU_CONFIG = [
         label: "Tag Update",
         roles: ["line quality engineer", "quality manager"],
       },
-
       {
         path: "/quality/upload-bis-report",
         label: "Upload BIS Report",
@@ -121,6 +119,16 @@ const MENU_CONFIG = [
       {
         path: "/quality/bis-status",
         label: "BIS Status",
+        roles: [
+          "line quality engineer",
+          "bis engineer",
+          "fpa",
+          "quality manager",
+        ],
+      },
+      {
+        path: "/quality/bee-calculation",
+        label: "BEE Calculation",
         roles: [
           "line quality engineer",
           "bis engineer",
