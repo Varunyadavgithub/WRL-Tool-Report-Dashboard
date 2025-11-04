@@ -70,15 +70,11 @@ const BISReports = lazy(() => import("./pages/Quality/BISReports"));
 const BISStatus = lazy(() => import("./pages/Quality/BISStatus"));
 const BEECalculation = lazy(() => import("./pages/Quality/BEECalculation"));
 
-const Dashboard = lazy(() => import("./pages/Reminder/Dashboard"));
-const Tasks = lazy(() => import("./pages/Reminder/Tasks"));
-
 const VisitorPass = lazy(() => import("./pages/Visitor/VisitorPass"));
 const ManageEmployee = lazy(() => import("./pages/Visitor/ManageEmployee"));
 const VisitorDashboard = lazy(() => import("./pages/Visitor/Dashboard"));
 const VisitorReports = lazy(() => import("./pages/Visitor/Reports"));
 const VisitorInOut = lazy(() => import("./pages/Visitor/VisitorInOut"));
-const ManageVisitor = lazy(() => import("./pages/Visitor/ManageVisitor"));
 
 const LogisticsDisplay = lazy(() =>
   import("./pages/PerformanceDisplays/LogisticsDisplay")
@@ -263,13 +259,6 @@ function App() {
               element={<FiveDaysPlaning />}
             />
             <Route path="/planing/daily-planing" element={<DailyPlan />} />
-            {/*-------------------------------------------------------------- Reminder --------------------------------------------------------------*/}
-            {canAccess(["admin"]) && (
-              <Route path="/reminder/dashboard" element={<Dashboard />} />
-            )}
-            {canAccess(["admin"]) && (
-              <Route path="/reminder/tasks" element={<Tasks />} />
-            )}
             {/*-------------------------------------------------------------- Visitor --------------------------------------------------------------*/}
             {canAccess(["admin", "security", "hr"]) && (
               <Route path="/visitor/dashboard" element={<VisitorDashboard />} />
@@ -293,12 +282,6 @@ function App() {
               <Route
                 path="/visitor/manage-employee"
                 element={<ManageEmployee />}
-              />
-            )}
-            {canAccess(["admin", "security", "hr"]) && (
-              <Route
-                path="/visitor/manage-visitor"
-                element={<ManageVisitor />}
               />
             )}
             {/*-------------------------------------------------------------- Performance Displays --------------------------------------------------------------*/}

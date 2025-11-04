@@ -173,23 +173,6 @@ const MENU_CONFIG = [
     ],
   },
   {
-    key: "reminder",
-    icon: MdNotificationsActive,
-    label: "Reminder",
-    items: [
-      {
-        path: "/reminder/dashboard",
-        label: "Dashboard",
-        roles: ["admin"],
-      },
-      {
-        path: "/reminder/tasks",
-        label: "Tasks",
-        roles: ["admin"],
-      },
-    ],
-  },
-  {
     key: "visitor",
     icon: FaUserShield,
     label: "Visitor",
@@ -212,11 +195,6 @@ const MENU_CONFIG = [
       {
         path: "/visitor/reports",
         label: "Reports",
-        roles: ["admin", "security", "hr"],
-      },
-      {
-        path: "/visitor/manage-visitor",
-        label: "Manage Visitor",
         roles: ["admin", "security", "hr"],
       },
       {

@@ -24,7 +24,6 @@ import totalProductionRoutes from "./routes/production/totalProduction.js";
 import qualityRoutes from "./routes/quality.route.js";
 import dispatchRoute from "./routes/dispatch.route.js";
 import productionPlaningRoutes from "./routes/planing.route.js";
-import reminderTasksRoutes from "./routes/task.route.js";
 import visitorRoutes from "./routes/visitor.route.js";
 
 const app = express();
@@ -64,7 +63,6 @@ app.use("/api/v1/prod", totalProductionRoutes);
 app.use("/api/v1/quality", qualityRoutes);
 app.use("/api/v1/dispatch", dispatchRoute);
 app.use("/api/v1/planing", productionPlaningRoutes);
-app.use("/api/v1/reminder", reminderTasksRoutes);
 app.use("/api/v1/visitor", visitorRoutes);
 
 // <------------------------------------------------------------- Serve Frontend from Backend ------------------------------------------------------------->

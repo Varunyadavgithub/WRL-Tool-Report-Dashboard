@@ -1,8 +1,5 @@
 import sql, { dbConfig3 } from "../../config/db.js";
-import {
-  sendReminderEmail,
-  sendVisitorPassEmail,
-} from "../../config/emailConfig.js";
+import { sendVisitorPassEmail } from "../../config/emailConfig.js";
 
 // Get Employee by Department
 export const getEmployee = async (req, res) => {
@@ -276,6 +273,7 @@ export const generateVisitorPass = async (req, res) => {
     });
   }
 };
+
 // Fetch Previous Pass
 export const fetchPreviousPass = async (req, res) => {
   const { contactNo } = req.query;
