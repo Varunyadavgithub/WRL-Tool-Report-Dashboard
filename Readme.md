@@ -213,6 +213,18 @@ Western Refrigeration Pvt. Ltd.
 🔗 [LinkedIn Profile](https://www.linkedin.com/in/thecyberdevvarun)
 
 ---
+## 👨‍💻 Developer
+
+**Vikash Kumar**
+<br/>
+Software Developer – MES Team
+<br/>
+Western Refrigeration Pvt. Ltd.
+<br/>
+📍 India
+🔗 [LinkedIn Profile](https://www.linkedin.com/in/vikash-kumar-54b464336/)
+
+---
 
 ## 📃 License
 
