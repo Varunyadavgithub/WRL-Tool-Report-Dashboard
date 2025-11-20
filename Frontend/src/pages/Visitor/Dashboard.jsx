@@ -116,14 +116,14 @@ const Dashboard = () => {
   // Bar Chart Configuration
   const barChartData = {
     labels: dashboardData.visitorTrend.map((item) => {
-      if (filter.value == "month") {
+      if (filter.value === "month") {
         return item.month;
       } else {
-        // Extract day from the date
-        const date = new Date(item.date);
-        return date.getDate(); // This will show just the day of the month
+        // Show only day from date (1–31)
+        return new Date(item.date).getDate();
       }
     }),
+
     datasets: [
       {
         label: filter.value === "month" ? "Monthly Visitors" : "Daily Visitors",
@@ -136,9 +136,9 @@ const Dashboard = () => {
   };
 
   const barChartOptions = {
-    maintainAspectRatio: false, // Key change for size control
     responsive: true,
-    height: 250, // Specify a fixed height
+    maintainAspectRatio: false, // Required for custom height
+
     plugins: {
       legend: {
         display: false,
@@ -156,20 +156,17 @@ const Dashboard = () => {
         },
       },
     },
+
     scales: {
       y: {
         beginAtZero: true,
         ticks: {
-          font: {
-            size: 10, // Smaller tick font
-          },
+          font: { size: 10 },
         },
       },
       x: {
         ticks: {
-          font: {
-            size: 10, // Smaller tick font
-          },
+          font: { size: 10 },
         },
       },
     },

@@ -1,22 +1,23 @@
 import sql, { dbConfig3 } from "../../config/db.js";
 import { sendVisitorPassEmail } from "../../config/emailConfig.js";
 
-// Get Employee by Department
-export const getEmployee = async (req, res) => {
-  const { deptId } = req.query;
-
+// Get Departments
+export const fetchDepartments = async (req, res) => {
+  const { empId } = req.query;
   try {
     const pool = await new sql.ConnectionPool(dbConfig3).connect();
     const request = pool.request();
 
-    request.input("deptId", sql.Int, deptId);
+    request.input("empId", sql.VarChar(50), empId);
 
     const result = await request.query(`
       SELECT 
-        employee_id AS emp_id,
-        name AS emp_name
-      FROM users 
-      WHERE department_id = @deptId
+        u.name, 
+        dpt.department_name,
+        dpt.deptCode
+      FROM users AS u
+      INNER JOIN departments dpt ON u.department_id = dpt.deptCode
+      WHERE employee_id = @empId
     `);
 
     res.status(200).json({
@@ -26,10 +27,27 @@ export const getEmployee = async (req, res) => {
 
     await pool.close();
   } catch (error) {
-    console.error("Error fetching employee-department list:", error);
+    console.error("SQL error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Get Employee by Department
+export const getEmployee = async (_, res) => {
+  try {
+    const query = `Select u.name, u.employee_id, dpt.department_name, dpt.deptCode from users as u
+inner join departments  dpt on u.department_id = dpt.deptCode;
+    `;
+
+    const pool = await new sql.ConnectionPool(dbConfig3).connect();
+    const result = await pool.request().query(query);
+    res.json(result.recordset);
+    await pool.close();
+  } catch (error) {
+    console.error("Error fetching employee list:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to retrieve employee and department information",
+      message: "Failed to retrieve employee information",
     });
   }
 };
@@ -62,7 +80,7 @@ export const generateVisitorPass = async (req, res) => {
     createdBy,
   } = req.body;
 
-  if (!name || !contactNo || !email) {
+  if (!name || !contactNo) {
     return res.status(400).json({
       success: false,
       message: "Name, Contact No, and Email are required",
@@ -206,54 +224,7 @@ export const generateVisitorPass = async (req, res) => {
       )
     `);
 
-    // Send notification email (optional, same as before) — your template query can stay the same
-
-    const templateData = await pool
-      .request()
-      .input("employeeTo", sql.VarChar(100), employeeTo).query(`
-        SELECT TOP 1
-          v.visitor_id,
-          v.company,
-          v.city,
-          d.department_name,
-          u.name AS employee_name,
-          u.employee_email,
-          u.manager_email
-        FROM visitors v
-        INNER JOIN visitor_passes vp ON v.visitor_id = vp.visitor_id
-        INNER JOIN users u ON u.employee_id = vp.employee_to_visit
-        INNER JOIN departments d ON d.deptCode = vp.department_to_visit
-        WHERE u.employee_id = @employeeTo
-        ORDER BY vp.created_at DESC;
-      `);
-
-    // Get the first row of the result
-    const data = templateData?.recordset[0];
-
-    if (!data) {
-      console.warn("No data found for email template.");
-      return;
-    }
-
-    // Send the visitor pass email
-    await sendVisitorPassEmail({
-      to: data.employee_email,
-      cc: [data.manager_email, process.env.CC_HR, process.env.CC_PH],
-      photoPath,
-      visitorName: name,
-      visitorContact: contactNo,
-      visitorEmail: email,
-      company,
-      city,
-      visitorId: data.visitor_id,
-      allowOn,
-      allowTill,
-      departmentToVisit: data.department_name,
-      employeeToVisit: data.employee_name,
-      purposeOfVisit,
-    });
-
-    await pool.close();
+     await pool.close();
 
     res.status(201).json({
       success: true,

@@ -202,6 +202,11 @@ const MENU_CONFIG = [
         label: "Manage Employee",
         roles: ["admin", "hr"],
       },
+      {
+        path: "/visitor/history",
+        label: "Visitor History",
+        roles: ["admin", "security", "hr"],
+      },
     ],
   },
   {

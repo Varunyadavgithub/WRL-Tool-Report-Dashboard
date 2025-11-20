@@ -15,10 +15,24 @@ export const getDashboardStats = async (req, res) => {
   } else {
     // Default to "day"
     // Today at 08:00:00
-    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0, 0);
+    startDate = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      8,
+      0,
+      0
+    );
 
     // Tomorrow at 20:00:00
-    endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 20, 0, 0);
+    endDate = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1,
+      20,
+      0,
+      0
+    );
   }
 
   // Adjust for IST (+5:30)
@@ -51,26 +65,36 @@ export const getDashboardStats = async (req, res) => {
 
     // --- Visitor Trend ---
     let visitorTrendQuery = "";
+    let startDate, endDate;
+
     if (filter === "month") {
+      // Last 6 months
+      startDate = `DATEADD(MONTH, -6, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))`;
+      endDate = "GETDATE()";
+
       visitorTrendQuery = `
-        SELECT
-          DATENAME(MONTH, check_in_time) AS [month],
-          COUNT(*) AS visitors
-        FROM visit_logs
-        WHERE check_in_time BETWEEN @startDate AND @endDate
-        GROUP BY DATENAME(MONTH, check_in_time), MONTH(check_in_time)
-        ORDER BY MONTH(check_in_time);
-      `;
+    SELECT
+      DATENAME(MONTH, check_in_time) AS [month],
+      COUNT(*) AS visitors
+    FROM visit_logs
+    WHERE check_in_time BETWEEN ${startDate} AND ${endDate}
+    GROUP BY DATENAME(MONTH, check_in_time), MONTH(check_in_time)
+    ORDER BY MONTH(check_in_time);
+  `;
     } else {
+      // Last 7 days
+      startDate = "DATEADD(DAY, -7, CAST(GETDATE() AS DATE))";
+      endDate = "GETDATE()";
+
       visitorTrendQuery = `
-        SELECT
-          CAST(check_in_time AS DATE) AS [date],
-          COUNT(*) AS visitors
-        FROM visit_logs
-        WHERE check_in_time BETWEEN @startDate AND @endDate
-        GROUP BY CAST(check_in_time AS DATE)
-        ORDER BY [date];
-      `;
+    SELECT
+      CAST(check_in_time AS DATE) AS [date],
+      COUNT(*) AS visitors
+    FROM visit_logs
+    WHERE check_in_time BETWEEN ${startDate} AND ${endDate}
+    GROUP BY CAST(check_in_time AS DATE)
+    ORDER BY [date];
+  `;
     }
 
     // --- Recent Visitors ---

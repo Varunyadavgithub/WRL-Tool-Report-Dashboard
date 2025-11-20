@@ -161,60 +161,53 @@ export const sendVisitorReportEmail = async (visitors) => {
       return false;
     }
 
-    const currentYear = new Date().getFullYear();
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Visitor Report");
 
-    const tableRows = visitors
-      .map(
-        (v, i) => `
-      <tr>
-        <td>${i + 1}</td>
-        <td>${v.visitor_name}</td>
-        <td>${v.contact_no}</td>
-        <td>${v.email}</td>
-        <td>${v.company}</td>
-        <td>${v.city}</td>
-        <td>${v.state}</td>
-        <td>${v.department_name}</td>
-        <td>${v.employee_name}</td>
-        <td>${v.purpose_of_visit}</td>
-        <td>${
-          v.check_in_time ? new Date(v.check_in_time).toLocaleString() : "-"
-        }</td>
-        <td>${
-          v.check_out_time
-            ? new Date(v.check_out_time).toLocaleString()
-            : "Currently In"
-        }</td>
-      </tr>
-    `
-      )
-      .join("");
+    worksheet.columns = [
+      { header: "Sr.", key: "sr", width: 6 },
+      { header: "Name", key: "visitor_name", width: 25 },
+      { header: "Contact", key: "contact_no", width: 15 },
+      { header: "Email", key: "email", width: 25 },
+      { header: "Company", key: "company", width: 20 },
+      { header: "City", key: "city", width: 15 },
+      { header: "State", key: "state", width: 15 },
+      { header: "Department", key: "department_name", width: 15 },
+      { header: "Employee", key: "employee_name", width: 20 },
+      { header: "Purpose", key: "purpose_of_visit", width: 25 },
+      { header: "Check In", key: "check_in_time", width: 22 },
+      { header: "Check Out", key: "check_out_time", width: 22 },
+    ];
 
-    const emailHtml = `
-      <div style="font-family: Arial, sans-serif;">
-        <h2>Visitor Report Summary</h2>
-        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%;">
-          <thead style="background-color: #f0f0f0;">
-            <tr>
-              <th>Sr.</th>
-              <th>Name</th>
-              <th>Contact</th>
-              <th>Email</th>
-              <th>Company</th>
-              <th>City</th>
-              <th>State</th>
-              <th>Department</th>
-              <th>Employee</th>
-              <th>Purpose</th>
-              <th>Check In</th>
-              <th>Check Out</th>
-            </tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-        <p style="margin-top: 16px; font-size: 12px; color: #888;">© ${currentYear} WRL Visitor Reports</p>
-      </div>
-    `;
+    visitors.forEach((v, i) => {
+      worksheet.addRow({
+        sr: i + 1,
+        visitor_name: v.visitor_name,
+        contact_no: v.contact_no,
+        email: v.email,
+        company: v.company,
+        city: v.city,
+        state: v.state,
+        department_name: v.department_name,
+        employee_name: v.employee_name,
+        purpose_of_visit: v.purpose_of_visit,
+        check_in_time: v.check_in_time
+          ? new Date(v.check_in_time).toLocaleString()
+          : "-",
+        check_out_time: v.check_out_time
+          ? new Date(v.check_out_time).toLocaleString()
+          : "Currently In",
+      });
+    });
+
+    // Style header row
+    worksheet.getRow(1).eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.alignment = { horizontal: "center" };
+    });
+
+    // ✅ Write file to buffer (no temp file needed)
+    const buffer = await workbook.xlsx.writeBuffer();
 
     const mailOptions = {
       from: {
@@ -222,15 +215,93 @@ export const sendVisitorReportEmail = async (visitors) => {
         address: "security.tadgam@westernequipments.com",
       },
       to: "vikash.kumar@westernequipments.com",
-      subject: "Visitor Report - Summary",
-      html: emailHtml,
+      subject: "Visitor Report - Excel Summary",
+      text: "Please find attached the latest visitor report (Excel format) for your reference.\n\nRegards,\nWRL Security Department",
+      attachments: [
+        {
+          filename: `visitor-report-${
+            new Date().toISOString().split("T")[0]
+          }.xlsx`,
+          content: buffer,
+          contentType:
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        },
+      ],
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log("Visitor report email sent:", info.messageId);
+    console.log("Visitor report email with Excel sent:", info.messageId);
     return true;
   } catch (error) {
     console.error("Error sending visitor report email:", error);
+    return false;
+  }
+};
+
+export const sendCurrentlyInsideVisitorsEmail = async (visitors) => {
+  try {
+    if (!Array.isArray(visitors) || visitors.length === 0) {
+      console.warn("No visitors currently inside.");
+      return false;
+    }
+
+    // Prepare visitor details in HTML table
+    const tableRows = visitors
+      .map(
+        (v, i) => `
+        <tr>
+          <td style="padding:8px; border:1px solid #ddd;">${i + 1}</td>
+          <td style="padding:8px; border:1px solid #ddd;">${v.visitor_name}</td>
+          <td style="padding:8px; border:1px solid #ddd;">${v.contact_no || "-"}</td>
+          <td style="padding:8px; border:1px solid #ddd;">${v.company || "-"}</td>
+          <td style="padding:8px; border:1px solid #ddd;">${v.department_name || "-"}</td>
+          <td style="padding:8px; border:1px solid #ddd;">${v.employee_name || "-"}</td>
+          <td style="padding:8px; border:1px solid #ddd;">${new Date(
+            v.check_in_time
+          ).toLocaleString()}</td>
+        </tr>`
+      )
+      .join("");
+
+    const htmlContent = `
+      <html>
+      <body style="font-family: Arial, sans-serif; background-color:#f8f9fa; padding:20px;">
+        <h2 style="color:#007bff;">Currently Inside Visitors</h2>
+        <p>The following visitors are still inside the premises as of ${new Date().toLocaleString()}:</p>
+        <table style="border-collapse:collapse; width:100%; background:#fff;">
+          <thead style="background:#007bff; color:#fff;">
+            <tr>
+              <th style="padding:8px; border:1px solid #ddd;">#</th>
+              <th style="padding:8px; border:1px solid #ddd;">Name</th>
+              <th style="padding:8px; border:1px solid #ddd;">Contact</th>
+              <th style="padding:8px; border:1px solid #ddd;">Company</th>
+              <th style="padding:8px; border:1px solid #ddd;">Department</th>
+              <th style="padding:8px; border:1px solid #ddd;">Employee To Visit</th>
+              <th style="padding:8px; border:1px solid #ddd;">Check-In Time</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+        <p style="margin-top:20px;">Regards,<br><strong>WRL Security Team</strong></p>
+      </body>
+      </html>
+    `;
+
+    const mailOptions = {
+      from: {
+        name: "WRL Visitor Alert",
+        address: process.env.SMTP_USER, // same as used for your visitor pass emails
+      },
+      to: "vikash.kumar@westernequipments.com",
+      subject: "⚠️ Visitors Currently Inside the Premises",
+      html: htmlContent,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Currently inside visitors alert sent:", info.messageId);
+    return true;
+  } catch (error) {
+    console.error("Error sending currently inside visitor alert:", error);
     return false;
   }
 };

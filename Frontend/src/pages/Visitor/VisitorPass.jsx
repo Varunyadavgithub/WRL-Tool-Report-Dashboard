@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { useSelector } from "react-redux";
 import { useEffect } from "react";
 import { baseURL } from "../../assets/assets";
-import { useNavigate } from "react-router-dom";
+import { data, useNavigate } from "react-router-dom";
 
 const VisitorPass = () => {
   const { user } = useSelector((store) => store.auth);
@@ -39,22 +39,20 @@ const VisitorPass = () => {
     createdBy: user?.id,
   });
   const [fetchLoading, setFetchLoading] = useState(false);
-  const [departments, setDepartments] = useState([]);
-  const [selectedDepartment, setSelectedDepartment] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [selectedEmployees, setSelectedEmployees] = useState([]);
+  const [selectedDepartment, setSelectedDepartment] = useState("");
 
   const fetchEmployees = async () => {
     try {
-      const params = {
-        deptId: selectedDepartment.value,
-      };
-      const res = await axios.get(`${baseURL}visitor/employees`, { params });
-      if (res?.data?.success) {
-        const data = res?.data.data;
+      const res = await axios.get(`${baseURL}visitor/employees`);
+      if (res?.data) {
+        const data = res?.data;
         const formatted = data.map((item) => ({
-          label: item.emp_name,
-          value: item.emp_id.toString(),
+          label: item.name,
+          value: item.employee_id.toString(),
+          departmentName: item.department_name,
+          departmentCode: item.deptCode,
         }));
         setEmployees(formatted);
       }
@@ -66,24 +64,6 @@ const VisitorPass = () => {
 
   useEffect(() => {
     fetchEmployees();
-  }, [selectedDepartment]);
-
-  const fetchDepartments = async () => {
-    try {
-      const res = await axios.get(`${baseURL}visitor/departments`);
-      const formatted = res?.data.map((item) => ({
-        label: item.department_name,
-        value: item.deptCode.toString(),
-      }));
-      setDepartments(formatted);
-    } catch (error) {
-      console.error("Failed to fetch departments:", error);
-      toast.error("Failed to fetch departments.");
-    }
-  };
-
-  useEffect(() => {
-    fetchDepartments();
   }, []);
 
   const [capturedPhoto, setCapturedPhoto] = useState(null);
@@ -253,7 +233,6 @@ const VisitorPass = () => {
     const requiredFields = [
       "name",
       "contactNo",
-      "email",
       "identityType",
       "identityNo",
       "allowOn",
@@ -408,6 +387,7 @@ const VisitorPass = () => {
                   value={visitorData.company}
                   onChange={handleInputChange}
                   className="w-full"
+                  required={false}
                 />
               </div>
               <div className="w-full">
@@ -552,27 +532,11 @@ const VisitorPass = () => {
                   />
                 </div>
                 <div className="w-full">
-                  <SelectField
+                  <InputField
                     label="City"
+                    type="text"
                     name="city"
-                    options={[
-                      { value: "", label: "Select City" },
-                      { value: "mumbai", label: "Mumbai" },
-                      { value: "delhi", label: "Delhi" },
-                      { value: "bengaluru", label: "Bengaluru" },
-                      { value: "hyderabad", label: "Hyderabad" },
-                      { value: "ahmedabad", label: "Ahmedabad" },
-                      { value: "chennai", label: "Chennai" },
-                      { value: "kolkata", label: "Kolkata" },
-                      { value: "pune", label: "Pune" },
-                      { value: "jaipur", label: "Jaipur" },
-                      { value: "lucknow", label: "Lucknow" },
-                      { value: "bhopal", label: "Bhopal" },
-                      { value: "patna", label: "Patna" },
-                      { value: "kochi", label: "Kochi" },
-                      { value: "chandigarh", label: "Chandigarh" },
-                      { value: "visakhapatnam", label: "Visakhapatnam" },
-                    ]}
+                    placeholder="Enter the city name"
                     value={visitorData.city}
                     onChange={handleInputChange}
                     className="w-full"
@@ -633,32 +597,6 @@ const VisitorPass = () => {
                     required
                   />
                 </div>
-
-                <div className="w-full">
-                  <SelectField
-                    label="Department To Visit"
-                    name="departmentTo" // Changed from departmentId to departmentTo
-                    options={departments}
-                    value={visitorData.departmentTo} // Use visitorData state
-                    onChange={(e) => {
-                      const selectedDept = departments.find(
-                        (opt) => opt.value === e.target.value
-                      );
-
-                      // Update both selectedDepartment and visitorData
-                      setSelectedDepartment(selectedDept);
-
-                      // Update visitorData with selected department
-                      setVisitorData((prev) => ({
-                        ...prev,
-                        departmentTo: e.target.value,
-                      }));
-                    }}
-                    required
-                    className="w-full"
-                  />
-                </div>
-
                 <div className="w-full">
                   <SelectField
                     label="Employee To Visit"
@@ -666,22 +604,47 @@ const VisitorPass = () => {
                     options={employees}
                     value={visitorData.employeeTo} // Use visitorData state
                     onChange={(e) => {
+                      const selectedValue = e?.target?.value || e?.value || ""; // handle both native and custom select
                       const selectedEmp = employees.find(
-                        (opt) => opt.value === e.target.value
+                        (opt) => opt.value === selectedValue
                       );
 
-                      // Update both selectedEmployees and visitorData
-                      setSelectedEmployees(selectedEmp);
+                      if (selectedEmp) {
+                        setSelectedEmployees(selectedEmp);
+                        setSelectedDepartment(selectedEmp.departmentName);
 
-                      // Update visitorData with selected employee
-                      setVisitorData((prev) => ({
-                        ...prev,
-                        employeeTo: e.target.value,
-                      }));
+                        // ✅ Ensure departmentTo updates correctly
+                        setVisitorData((prev) => ({
+                          ...prev,
+                          employeeTo: selectedEmp.value,
+                          departmentTo: selectedEmp.departmentCode,
+                        }));
+                      } else {
+                        // Reset if user clears the selection
+                        setSelectedEmployees(null);
+                        setSelectedDepartment("");
+                        setVisitorData((prev) => ({
+                          ...prev,
+                          employeeTo: "",
+                          departmentTo: "",
+                        }));
+                      }
                     }}
                     required
                     className="w-full"
                   />
+                </div>
+                <div className="w-full">
+                  <label
+                    className="block font-semibold mb-1"
+                    htmlFor="department"
+                  >
+                    Department
+                  </label>
+                  <p className="border p-2 rounded bg-white">
+                    {selectedDepartment ||
+                      "Select an employee to view department"}
+                  </p>
                 </div>
 
                 <div className="w-full">
@@ -699,13 +662,12 @@ const VisitorPass = () => {
                     className="w-full"
                   />
                 </div>
-
                 <div className="w-full">
                   <InputField
-                    label="Remark"
+                    label="Token No."
                     type="text"
                     name="remark"
-                    placeholder="Enter the remark"
+                    placeholder="Enter token no."
                     value={visitorData.remark}
                     onChange={handleInputChange}
                     className="w-full"
@@ -713,17 +675,20 @@ const VisitorPass = () => {
                 </div>
               </div>
 
-              <label className="block font-semibold mb-1">
-                Special Instruction
-              </label>
-              <textarea
-                name="specialInstruction"
-                value={visitorData.specialInstruction}
-                onChange={handleInputChange}
-                placeholder="Enter Some Special Instruction"
-                className="w-full p-2 border rounded"
-                required
-              />
+              <div className="mb-4">
+                <label className="block font-semibold mb-1">
+                  Items / Assets Brought In
+                </label>
+                <textarea
+                  name="specialInstruction"
+                  value={visitorData.specialInstruction}
+                  onChange={handleInputChange}
+                  placeholder="List any items or assets being brought onto the premises"
+                  className="w-full p-2 border rounded-md"
+                  required
+                  rows={4}
+                />
+              </div>
 
               <label className="block font-semibold mb-1">
                 Purpose of Visit

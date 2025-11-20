@@ -50,9 +50,9 @@ const VisitorPassDisplay = () => {
         {/* QR Top Right */}
         <div className="absolute top-0 right-20">
           <img
-            src={passDetails.qrCode || "https://via.placeholder.com/80"}
+            src={passDetails.qrCode || "https://via.placeholder.com/100"}
             alt="QR Code"
-            className="block w-36 h-36"
+            className="w-36 h-36 rounded-lg"
           />
         </div>
 
@@ -89,7 +89,7 @@ const VisitorPassDisplay = () => {
         {/* Pass Details */}
         <div className="flex justify-between border-2 border-black p-4 mb-3 gap-4">
           {/* Left Column */}
-          <div className="w-1/2 space-y-1 text-xs">
+          <div className="w-1/3 space-y-1 text-xs">
             <div className="flex gap-2">
               <strong>Name:</strong>
               <span>{passDetails.visitor_name}</span>
@@ -108,8 +108,8 @@ const VisitorPassDisplay = () => {
             </div>
           </div>
 
-          {/* Right Column */}
-          <div className="w-1/2 space-y-1 text-xs">
+          {/* Middle Column */}
+          <div className="w-1/3 space-y-1 text-xs">
             <div className="flex gap-2">
               <strong>Department:</strong>
               <span>{passDetails.department_name[0]}</span>
@@ -125,6 +125,14 @@ const VisitorPassDisplay = () => {
             <div className="flex gap-2">
               <strong>Valid Till:</strong>
               <span>{new Date(passDetails.allow_till).toLocaleString()}</span>
+            </div>
+          </div>
+
+          {/* Right Column - QR Code */}
+          <div className="w-1/3 space-y-1 text-xs">
+            <div className="flex gap-2">
+              <strong>Visitor PassId:</strong>
+              <span>{passId}</span>
             </div>
           </div>
         </div>
