@@ -133,37 +133,6 @@ const VisitorInOut = () => {
     }
   };
 
-  // Checkout all visitors
-  const handleCheckOutAll = async () => {
-    const insideVisitors = visitorLogs.filter(
-      (v) => v.check_in_time && !v.check_out_time
-    );
-
-    if (insideVisitors.length === 0) {
-      toast("No visitors currently inside.");
-      return;
-    }
-
-    if (!window.confirm(`Check out all ${insideVisitors.length} visitors?`)) {
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await axios.post(`${baseURL}visitor/checkout-all`);
-      if (res?.data?.success) {
-        toast.success("All visitors checked out successfully!");
-        await fetchVisitorLogs();
-      } else {
-        toast.error(res?.data?.message || "Failed to check out all visitors.");
-      }
-    } catch (error) {
-      toast.error("Something went wrong while checking out all visitors.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchVisitorLogs();
     setTimeout(() => scanInRef.current?.focus(), 500);
@@ -282,15 +251,6 @@ const VisitorInOut = () => {
               Out: {currentlyOut}
             </span>
           </div>
-
-          <Button
-            onClick={handleCheckOutAll}
-            bgColor="bg-red-500"
-            textColor="text-white"
-            className="px-4 py-2 rounded-md shadow hover:bg-red-600"
-          >
-            Check Out All
-          </Button>
         </div>
 
         {/* Visitor List */}
