@@ -11,6 +11,7 @@ import { baseURL } from "../../assets/assets.js";
 
 const FPA = () => {
   const DefectCategory = [
+    { label: "No Defect", value: "no-defect" },
     { label: "Minor", value: "minor" },
     { label: "Major", value: "major" },
     { label: "Critical", value: "critical" },
@@ -328,7 +329,7 @@ const FPA = () => {
               readOnly
               className="max-w-65"
             />
-
+           { selectedDefectCategory?.value !== "no-defect" && (
             <div className="flex flex-col gap-2 w-72">
               {/* Radio Button Toggle */}
               <div className="flex items-center gap-2">
@@ -369,7 +370,7 @@ const FPA = () => {
                   }}
                 />
               )}
-            </div>
+            </div>)}
 
             <InputField
               label="Remark"
