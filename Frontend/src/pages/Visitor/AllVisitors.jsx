@@ -32,7 +32,6 @@ const AllVisitors = () => {
       };
 
       const res = await axios.get(`${baseURL}visitor/history`, { params });
-
       if (res.data?.success) {
         setVisitors(res.data.data || []);
       } else {
@@ -220,7 +219,7 @@ const AllVisitors = () => {
                       <p className="text-sm text-gray-600">
                         <strong>Last Visit:</strong>{" "}
                         {v.check_in_time
-                          ? new Date(v.check_in_time).toLocaleString()
+                          ? v.check_in_time.replace("T", " ").replace("Z", "")
                           : "N/A"}
                       </p>
 
@@ -303,8 +302,11 @@ const AllVisitors = () => {
                     <div className="flex justify-between items-center">
                       <div>
                         <div className="text-sm text-gray-700 font-medium">
-                          {new Date(log.check_in_time).toLocaleDateString()}{" "}
-                          {new Date(log.check_in_time).toLocaleTimeString()}
+                          {log.check_in_time
+                            ? log.check_in_time
+                                .replace("T", " ")
+                                .replace("Z", "")
+                            : "N/A"}
                         </div>
                         <div className="text-sm text-gray-600">
                           Visited: {log.employee_name || "N/A"}
@@ -313,8 +315,10 @@ const AllVisitors = () => {
                       <div className="text-sm text-gray-600">
                         Out:{" "}
                         {log.check_out_time
-                          ? new Date(log.check_out_time).toLocaleString()
-                          : "-"}
+                          ? log.check_out_time
+                              .replace("T", " ")
+                              .replace("Z", "")
+                          : "N/A"}
                       </div>
                     </div>
 

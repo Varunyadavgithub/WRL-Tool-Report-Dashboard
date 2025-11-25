@@ -1,8 +1,13 @@
 import { useEffect, useState, useRef } from "react";
-import InputField from "../../components/common/InputField";
 import Title from "../../components/common/Title";
 import Button from "../../components/common/Button";
-import { FaSignInAlt, FaSignOutAlt, FaUser, FaTimes, FaUsers } from "react-icons/fa";
+import {
+  FaSignInAlt,
+  FaSignOutAlt,
+  FaUser,
+  FaTimes,
+  FaUsers,
+} from "react-icons/fa";
 import {
   MdPhone,
   MdEmail,
@@ -320,8 +325,10 @@ const VisitorInOut = () => {
                           <span className="font-medium">Check In:</span>
                           <span>
                             {visitor.check_in_time
-                              ? new Date(visitor.check_in_time).toLocaleString()
-                              : "-"}
+                              ? visitor.check_in_time
+                                  .replace("T", " ")
+                                  .replace("Z", "")
+                              : "N/A"}
                           </span>
                         </div>
 
@@ -330,10 +337,8 @@ const VisitorInOut = () => {
                           <span className="font-medium">Check Out:</span>
                           <span>
                             {visitor.check_out_time
-                              ? new Date(
-                                  visitor.check_out_time
-                                ).toLocaleString()
-                              : "-"}
+                              ? visitor.check_out_time.replace("T"," ").replace("Z","")
+                              : "N/A"}
                           </span>
                         </div>
                       </div>
