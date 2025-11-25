@@ -81,7 +81,7 @@ const AllVisitors = () => {
       <div className="max-w-6xl mx-auto mt-6 grid grid-cols-1 md:grid-cols-5 gap-3 items-center">
         <input
           type="text"
-          placeholder="Search by name, mobile, company, pass"
+          placeholder="Search by Name or Company"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="col-span-2 p-3 border rounded"
@@ -122,6 +122,49 @@ const AllVisitors = () => {
         </div>
       </div>
 
+      {/* Pagination */}
+      <div className="mt-6 px-6 flex items-center justify-between">
+        <div>
+          <label className="text-xl mr-2">Per page:</label>
+          <select
+            value={limit}
+            onChange={(e) => setLimit(Number(e.target.value))}
+            className="p-1 border rounded"
+          >
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </select>
+        </div>
+
+        {/* Buttons */}
+        <div className="flex gap-2">
+          <Button
+            onClick={() => {
+              if (offset > 0) {
+                setOffset(offset - limit);
+              }
+            }}
+            bgColor={offset > 0 ? "bg-blue-600" : "bg-gray-300"} // ACTIVE / DISABLED COLOR
+            textColor={offset > 0 ? "text-white" : "text-black"}
+          >
+            Prev
+          </Button>
+
+          <Button
+            onClick={() => {
+              if (visitors.length === limit) {
+                setOffset(offset + limit);
+              }
+            }}
+            bgColor={visitors.length === limit ? "bg-blue-600" : "bg-gray-300"} // ACTIVE / DISABLED COLOR
+            textColor={visitors.length === limit ? "text-white" : "text-black"}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+
       {/* Visitors List */}
       <div className="w-full mx-auto mt-8 px-2">
         {loading ? (
@@ -129,109 +172,83 @@ const AllVisitors = () => {
             <Loader />
           </div>
         ) : visitors.length === 0 ? (
-          <div className="text-center py-12 text-gray-600">No visitors found</div>
+          <div className="text-center py-12 text-gray-600">
+            No visitors found
+          </div>
         ) : (
-          <div className="grid gap-4">
-            {visitors.map((v) => (
-              <div
-                key={v.id}
-                className="bg-white p-6 rounded-2xl shadow-lg flex items-center gap-6 w-full"
-              >
-                <div className="shrink-0">
-                  {v.photo_url ? (
-                    <img
-                      src={v.photo_url}
-                      alt={v.visitor_name}
-                      className="w-28 h-28 rounded-full object-cover border-2"
-                    />
-                  ) : (
-                    <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
-                      <CgProfile className="text-3xl text-gray-500" />
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">{v.visitor_name}</h3>
-                    <div className="text-sm text-gray-600">
-                      Visits: <strong>{v.total_passes ?? 0}</strong>
-                    </div>
-                  </div>
-
-                  <p className="text-sm text-gray-600">
-                    <strong>Company:</strong> {v.company || "N/A"}
-                  </p>
-
-                  <p className="text-sm text-gray-600">
-                    <strong>Last Visit:</strong>{" "}
-                    {v.check_in_time
-                      ? new Date(v.check_in_time).toLocaleString()
-                      : "N/A"}
-                  </p>
-
-                  <p className="text-sm text-gray-600">
-                    <strong>Last Visited Employee:</strong>{" "}
-                    {v.employee_name || "N/A"}{" "}
-                    <span className="text-gray-400">
-                      ({v.department_name || "N/A"})
-                    </span>
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Button
-                    onClick={() => openDetails(v)}
-                    bgColor="bg-blue-600"
-                    textColor="text-white"
-                    className="px-4 py-3 text-lg flex items-center gap-2"
+          <div className="max-h-[800px] overflow-y-auto pr-2">
+            {" "}
+            {/* FIXED HEIGHT SCROLL AREA */}
+            <div className="grid gap-4">
+              {visitors.map((v) => (
+                <div
+                  key={v.id}
+                  className="bg-white p-6 rounded-2xl shadow-lg flex items-center gap-6 w-full"
+                >
+                  <div
+                    key={v.id}
+                    className="bg-white p-6 rounded-2xl shadow-lg flex items-center gap-6 w-full"
                   >
-                    <FaEye /> View Details
-                  </Button>
+                    <div className="shrink-0">
+                      {v.photo_url ? (
+                        <img
+                          src={v.photo_url}
+                          alt={v.visitor_name}
+                          className="w-28 h-28 rounded-full object-cover border-2"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
+                          <CgProfile className="text-3xl text-gray-500" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold">
+                          {v.visitor_name}
+                        </h3>
+                        <div className="text-sm text-gray-600">
+                          Visits: <strong>{v.total_passes ?? 0}</strong>
+                        </div>
+                      </div>
+
+                      <p className="text-sm text-gray-600">
+                        <strong>Company:</strong> {v.company || "N/A"}
+                      </p>
+
+                      <p className="text-sm text-gray-600">
+                        <strong>Last Visit:</strong>{" "}
+                        {v.check_in_time
+                          ? new Date(v.check_in_time).toLocaleString()
+                          : "N/A"}
+                      </p>
+
+                      <p className="text-sm text-gray-600">
+                        <strong>Last Visited Employee:</strong>{" "}
+                        {v.employee_name || "N/A"}{" "}
+                        <span className="text-gray-400">
+                          ({v.department_name || "N/A"})
+                        </span>
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        onClick={() => openDetails(v)}
+                        bgColor="bg-blue-600"
+                        textColor="text-white"
+                        className="px-4 py-3 text-lg flex items-center gap-2"
+                      >
+                        <FaEye /> View Details
+                      </Button>
+                    </div>
+                  </div>{" "}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
-
-        {/* Pagination */}
-        <div className="mt-6 flex items-center justify-between">
-          <div>
-            <label className="text-sm mr-2">Per page:</label>
-            <select
-              value={limit}
-              onChange={(e) => setLimit(Number(e.target.value))}
-              className="p-1 border rounded"
-            >
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              onClick={() => {
-                const newOffset = Math.max(0, offset - limit);
-                setOffset(newOffset);
-              }}
-              bgColor="bg-gray-300"
-              textColor="text-black"
-            >
-              Prev
-            </Button>
-            <Button
-              onClick={() => {
-                const newOffset = offset + limit;
-                setOffset(newOffset);
-              }}
-              bgColor="bg-gray-300"
-              textColor="text-black"
-            >
-              Next
-            </Button>
-          </div>
-        </div>
       </div>
 
       {/* Details Modal */}
@@ -261,9 +278,15 @@ const AllVisitors = () => {
                 </div>
               )}
               <div>
-                <h2 className="text-xl font-bold">{selectedVisitor.visitor_name}</h2>
-                <p className="text-sm text-gray-600">{selectedVisitor.contact_no}</p>
-                <p className="text-sm text-gray-600">{selectedVisitor.company}</p>
+                <h2 className="text-xl font-bold">
+                  {selectedVisitor.visitor_name}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  {selectedVisitor.contact_no}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {selectedVisitor.company}
+                </p>
               </div>
             </div>
 
