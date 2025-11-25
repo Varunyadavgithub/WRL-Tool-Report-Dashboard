@@ -92,7 +92,7 @@ const UploadBISReport = () => {
   const fetchUploadedFiles = async () => {
     try {
       const res = await axios.get(`${baseURL}quality/bis-files`);
-
+console.log(res)
       setUploadedFiles(res?.data?.files);
     } catch (error) {
       toast.error("Failed to fetch uploaded files");
@@ -266,7 +266,7 @@ const UploadBISReport = () => {
           srNo: "",
           modelName: "",
           year: "",
-          month:"",
+          month: "",
           testFrequency: "",
           description: "",
           selectedFile: null,
@@ -412,6 +412,7 @@ const UploadBISReport = () => {
                   >
                     Month
                   </label>
+
                   <select
                     id="month"
                     className="w-full border border-black rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -433,8 +434,8 @@ const UploadBISReport = () => {
                       "October",
                       "November",
                       "December",
-                    ].map((m, i) => (
-                      <option key={i + 1} value={i + 1}>
+                    ].map((m) => (
+                      <option key={m} value={m}>
                         {m}
                       </option>
                     ))}
@@ -806,12 +807,11 @@ const UploadBISReport = () => {
                     onChange={(e) =>
                       setUpdateFields({
                         ...updateFields,
-                        month: e.target.value,
+                        month: e.target.value, // this will now be the month name
                       })
                     }
                   >
                     <option value="">Select Month</option>
-
                     {[
                       "January",
                       "February",
@@ -825,8 +825,8 @@ const UploadBISReport = () => {
                       "October",
                       "November",
                       "December",
-                    ].map((m, i) => (
-                      <option key={i + 1} value={i + 1}>
+                    ].map((m) => (
+                      <option key={m} value={m}>
                         {m}
                       </option>
                     ))}

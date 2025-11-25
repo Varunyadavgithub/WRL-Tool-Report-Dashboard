@@ -235,7 +235,7 @@ const BISStatus = () => {
                       {report.Year}
                     </td>
                      <td className="px-4 py-3 text-sm text-gray-600">
-                      {report.Month || "November"}
+                      {report.Month}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {report.Prod_Count}

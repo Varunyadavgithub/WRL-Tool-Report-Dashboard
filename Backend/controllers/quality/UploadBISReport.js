@@ -6,10 +6,18 @@ const uploadDir = path.resolve("uploads", "BISReport");
 
 // Upload file controller
 export const uploadBisPdfFile = async (req, res) => {
-  const { modelName, year, testFrequency, description } = req.body;
+  const { modelName, year, month, testFrequency, description } = req.body;
+  console.log("Request Body:", req.body);
   const fileName = req.file?.filename;
 
-  if (!modelName || !year || !testFrequency || !description || !fileName) {
+  if (
+    !modelName ||
+    !year ||
+    !month ||
+    !testFrequency ||
+    !description ||
+    !fileName
+  ) {
     return res.status(400).json({ success: false, message: "Missing fields" });
   }
 
@@ -19,13 +27,14 @@ export const uploadBisPdfFile = async (req, res) => {
     const pool = await sql.connect(dbConfig1);
 
     const query = `
-      INSERT INTO BISUpload (ModelName, Year, TestFrequency, Description, FileName, UploadAt)
-      VALUES (@ModelName, @Year, @TestFrequency, @Description, @FileName, @UploadAt)
+      INSERT INTO BISUpload (ModelName, Year, Month, TestFrequency, Description, FileName, UploadAt)
+      VALUES (@ModelName, @Year, @Month, @TestFrequency, @Description, @FileName, @UploadAt)
     `;
     const result = await pool
       .request()
       .input("ModelName", sql.VarChar, modelName)
       .input("Year", sql.VarChar, year)
+      .input("Month", sql.VarChar, month)
       .input("TestFrequency", sql.VarChar, testFrequency)
       .input("Description", sql.VarChar, description)
       .input("FileName", sql.VarChar, fileName)
@@ -58,6 +67,7 @@ export const getBisPdfFiles = async (_, res) => {
       srNo: file.SrNo,
       modelName: file.ModelName,
       year: file.Year,
+      month: file.Month,
       testFrequency: file.TestFrequency,
       description: file.Description,
       fileName: file.FileName,
@@ -98,7 +108,7 @@ export const downloadBisPdfFile = async (req, res) => {
     // Verify file in database
     const pool = await sql.connect(dbConfig1);
     const query = `
-      SELECT FileName, ModelName, Year 
+      SELECT FileName, ModelName, Year, Month
       FROM BISUpload 
       WHERE SrNo = @SrNo
     `;
@@ -186,10 +196,10 @@ export const deleteBisPdfFile = async (req, res) => {
 // Update BIS File Controller
 export const updateBisPdfFile = async (req, res) => {
   const { srNo } = req.params;
-  const { modelName, year, testFrequency, description } = req.body;
+  const { modelName, year, month, testFrequency, description } = req.body;
   const newFileName = req.file?.filename;
 
-  if (!modelName || !year || !testFrequency || !description) {
+  if (!modelName || !year || !month || !testFrequency || !description) {
     return res.status(400).json({ success: false, message: "Missing fields" });
   }
 
@@ -220,6 +230,7 @@ export const updateBisPdfFile = async (req, res) => {
       UPDATE BISUpload 
       SET ModelName = @ModelName, 
           Year = @Year,
+          Month = @Month,
           testFrequency = @TestFrequency,
           Description = @Description, 
           FileName = @FileName 
@@ -230,6 +241,7 @@ export const updateBisPdfFile = async (req, res) => {
       .request()
       .input("ModelName", sql.VarChar, modelName)
       .input("Year", sql.VarChar, year)
+      .input("Month", sql.VarChar, month)
       .input("TestFrequency", sql.VarChar, testFrequency)
       .input("Description", sql.VarChar, description)
       .input("FileName", sql.VarChar, newFileName || null)
@@ -285,7 +297,8 @@ export const getBisReportStatus = async (_, res) => {
       srNo: file.SrNo,
       modelName: file.ModelName,
       year: file.Year,
-      testFrequency:file.testFrequency,
+      month: file.Month,
+      testFrequency: file.testFrequency,
       description: file.Description,
       fileName: file.FileName,
       url: `/uploads-bis-pdf/${file.FileName}`,
@@ -297,7 +310,7 @@ export const getBisReportStatus = async (_, res) => {
     const formattedDate = istDate.toISOString().slice(0, 19).replace("T", " ");
 
     const statusQuery = `
-     WITH Psno AS (
+      WITH Psno AS (
       SELECT DocNo, Material 
       FROM MaterialBarcode 
       WHERE PrintStatus = 1 AND Status <> 99
@@ -345,6 +358,7 @@ export const getBisReportStatus = async (_, res) => {
                  CONCAT(p.Model_Prefix, CASE WHEN p.LastChar = 'R' THEN ' RT' ELSE '' END)
         ) AS ModelName,
         p.Activity_Year AS Year,
+        b.Month,
         p.Model_Count AS Prod_Count,
         CASE 
             WHEN b.ModelName IS NOT NULL THEN 'Test Completed'

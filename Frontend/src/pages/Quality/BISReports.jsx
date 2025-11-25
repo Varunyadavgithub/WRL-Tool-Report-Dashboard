@@ -198,7 +198,7 @@ const BISReports = () => {
                     {file.description}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    "Coming Soon..."
+                    {file.testFrequency}
                   </td>
                   <td className="px-4 py-3 text-sm">{file.fileName}</td>
                   <td className="px-4 py-3 text-sm">
