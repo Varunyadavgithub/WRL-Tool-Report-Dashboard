@@ -8,6 +8,25 @@ import SelectField from "../../components/common/SelectField";
 import Loader from "../../components/common/Loader";
 import { getFormattedISTDate } from "../../utils/dateUtils.js";
 import { baseURL } from "../../assets/assets.js";
+import { Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title as ChartTitle,
+  Tooltip,
+  Legend,
+} from "chart.js";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  ChartTitle,
+  Tooltip,
+  Legend
+);
 
 const FPA = () => {
   const DefectCategory = [
@@ -181,7 +200,7 @@ const FPA = () => {
         setSelectedFpaDefectCategory(null);
         setAddManually(false);
         setDefectImage(null);
-        
+
         getFpaDefect(); // Refresh defect table
         getFPACountData(); // Refresh count data
         getFPQIDetails(); // Refresh FPQI values
@@ -200,6 +219,34 @@ const FPA = () => {
     getFPACountData();
     getFpaDefectCategory();
   }, []);
+
+  // Right side table Graph(FPA and Sample Inspected)
+  const chartData = {
+    labels: fpaCountData.map((item) => item.SampleInspected),
+    datasets: [
+      {
+        label: "FPA",
+        data: fpaCountData.map((item) => item.FPA),
+        backgroundColor: "rgba(99, 102, 241, 0.7)", // Indigo
+      },
+      {
+        label: "Sample Inspected",
+        data: fpaCountData.map((item) => item.SampleInspected),
+        backgroundColor: "rgba(16, 185, 129, 0.7)", // Green
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: { position: "top" },
+      title: {
+        display: true,
+        text: "FPA vs Sample Inspected",
+      },
+    },
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
@@ -290,10 +337,8 @@ const FPA = () => {
             </div>
             <div className="flex gap-4">
               <h1 className="font-semibold text-md">
-                Target FPA: <span className="text-blue-700 text-sm">1.4</span>
-              </h1>
-              <h1 className="font-semibold text-md">
-                Actual FPA: <span className="text-blue-700 text-sm">0.8</span>
+                Target FPQI Value:{" "}
+                <span className="text-blue-700 text-sm">1.4</span>
               </h1>
             </div>
             <div className="text-center">
@@ -308,6 +353,21 @@ const FPA = () => {
             </div>
           </div>
         </div>
+
+   {/* Chart Section */}
+<div className="bg-white border border-gray-300 rounded-md p-4 mt-4 
+     flex flex-col items-center justify-start shadow 
+     w-full lg:w-[420px] h-[300px]">
+
+  <h2 className="text-center font-semibold mb-3">
+    FPA vs Sample Inspected
+  </h2>
+
+  <div className="w-full h-[230px] flex items-center justify-center">
+    <Bar data={chartData} options={chartOptions} />
+  </div>
+</div>
+
       </div>
 
       {/* Summary Section */}
