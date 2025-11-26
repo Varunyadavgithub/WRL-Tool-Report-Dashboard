@@ -11,6 +11,7 @@ if (!fs.existsSync(uploadsDir)) {
 // Ensure subdirectories exist
 const fiveDaysPlanDir = path.resolve(uploadsDir, "FiveDaysPlan");
 const bisReportDir = path.resolve(uploadsDir, "BISReport");
+const fpaDefectImagesDir = path.resolve(uploadsDir, "FpaDefectImages");
 
 if (!fs.existsSync(fiveDaysPlanDir)) {
   fs.mkdirSync(fiveDaysPlanDir);
@@ -18,6 +19,10 @@ if (!fs.existsSync(fiveDaysPlanDir)) {
 
 if (!fs.existsSync(bisReportDir)) {
   fs.mkdirSync(bisReportDir);
+}
+
+if (!fs.existsSync(fpaDefectImagesDir)) {
+  fs.mkdirSync(fpaDefectImagesDir);
 }
 
 // Generic storage configuration
@@ -42,7 +47,7 @@ const createStorage = (folder) => {
   });
 };
 
-// File type configurations (keep existing)
+// # File type configurations (keep existing)
 const fileTypes = {
   excel: {
     allowedTypes: [
@@ -59,6 +64,13 @@ const fileTypes = {
   },
 };
 
+// # Image file settings
+const imageFileTypes = {
+  allowedTypes: ["image/jpeg", "image/jpg", "image/png"],
+  maxSize: 5 * 1024 * 1024, // 5MB
+  errorMessage: "Only JPG, JPEG, PNG images under 5MB are allowed",
+};
+
 // Generic file filter (keep existing)
 const createFileFilter = (fileType) => {
   return (_, file, cb) => {
@@ -72,7 +84,16 @@ const createFileFilter = (fileType) => {
   };
 };
 
-// Create upload middlewares
+// Image file filter
+const imageFileFilter = (_, file, cb) => {
+  if (imageFileTypes.allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error(imageFileTypes.errorMessage), false);
+  }
+};
+
+// Upload Five Days Plan Excel middlewares
 export const uploadFiveDaysPlanExcel = multer({
   storage: createStorage("FiveDaysPlan"),
   fileFilter: createFileFilter("excel"),
@@ -81,12 +102,20 @@ export const uploadFiveDaysPlanExcel = multer({
   },
 });
 
+// Upload BIS Report PDF middlewares
 export const uploadBISReportPDF = multer({
   storage: createStorage("BISReport"),
   fileFilter: createFileFilter("pdf"),
   limits: {
     fileSize: fileTypes.pdf.maxSize,
   },
+});
+
+// FPA Defect Image Upload Middleware
+export const uploadFpaDefectImage = multer({
+  storage: createStorage("FpaDefectImages"),
+  fileFilter: imageFileFilter,
+  limits: { fileSize: imageFileTypes.maxSize },
 });
 
 // Existing error handling middleware

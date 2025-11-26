@@ -301,10 +301,12 @@ export const addDefect = async (req, res) => {
       new Date(currentDateTime).getTime() + 330 * 60000
     );
 
+    const defectImage = req.file ? req.file.filename : null;
+
     const query = `
       INSERT INTO FPAReport
-      (Date, Model, Shift, FGSRNo, Country, Category, AddDefect, Remark)
-      VALUES (@Date, @Model, @Shift, @FGSRNo, @Country, @Category, @AddDefect, @Remark)
+      (Date, Model, Shift, FGSRNo, Country, Category, AddDefect, Remark, DefectImage)
+      VALUES (@Date, @Model, @Shift, @FGSRNo, @Country, @Category, @AddDefect, @Remark, @DefectImage)
     `;
 
     const pool = await new sql.ConnectionPool(dbConfig1).connect();
@@ -318,6 +320,7 @@ export const addDefect = async (req, res) => {
     request.input("Category", sql.NVarChar, Category?.trim() || null);
     request.input("AddDefect", sql.NVarChar, AddDefect?.trim() || null);
     request.input("Remark", sql.NVarChar, Remark?.trim() || null);
+    request.input("DefectImage", sql.NVarChar, defectImage);
 
     await request.query(query);
     await pool.close();
@@ -325,6 +328,7 @@ export const addDefect = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Defect added successfully",
+      image: defectImage,
     });
   } catch (err) {
     console.error("Error adding defect:", err.message);

@@ -41,6 +41,7 @@ import {
 import {
   handleMulterError,
   uploadBISReportPDF,
+  uploadFpaDefectImage,
 } from "../middlewares/uploadMiddleware.js";
 import {
   uploadBisPdfFile,
@@ -63,7 +64,12 @@ router.get("/asset-details", getAssetDetails);
 router.get("/fpqi-details", getFPQIDetails);
 router.get("/fpa-defect", getFpaDefect);
 router.get("/fpa-defect-category", getDefectCategory);
-router.post("/add-fpa-defect", addDefect);
+router.post(
+  "/add-fpa-defect",
+  uploadFpaDefectImage.single("image"),
+  handleMulterError,
+  addDefect
+);
 
 // -----------------> FPA Report Routes
 router.get("/fpa-report", getFpaReport);

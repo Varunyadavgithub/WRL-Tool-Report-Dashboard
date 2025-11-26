@@ -28,12 +28,12 @@ const FPA = () => {
   const [assetDetails, setAssetDetails] = useState([]);
   const [fpqiDetails, setFpqiDetails] = useState([]);
   const [fpaDefect, setFpaDefect] = useState([]);
-
   const [remark, setRemark] = useState("");
   const [country, setCountry] = useState("India");
   const [selectedDefectCategory, setSelectedDefectCategory] = useState(
     DefectCategory[0]
   );
+  const [defectImage, setDefectImage] = useState(null);
 
   const getCurrentShift = () => {
     const now = new Date();
@@ -139,7 +139,7 @@ const FPA = () => {
       ? manualCategory?.trim()
       : selectedFpaDefectCategory.label;
 
-    if (!defectToAdd || defectToAdd.length === 0) {
+    if (!defectToAdd) {
       toast.error("Please select or enter a defect.");
       return;
     }
@@ -149,18 +149,30 @@ const FPA = () => {
 
       const dynamicShift = getCurrentShift();
 
-      const payload = {
-        model: assetDetails.ModelName,
-        shift: dynamicShift.value,
-        FGSerialNumber: assetDetails.FGNo,
-        Category: selectedDefectCategory.value,
-        AddDefect: defectToAdd,
-        Remark: remark,
-        currentDateTime: getFormattedISTDate(),
-        country,
-      };
+      // ----------- FormData ----------
+      const formData = new FormData();
+      formData.append("model", assetDetails.ModelName);
+      formData.append("shift", dynamicShift.value);
+      formData.append("FGSerialNumber", assetDetails.FGNo);
+      formData.append("Category", selectedDefectCategory.value);
+      formData.append("AddDefect", defectToAdd);
+      formData.append("Remark", remark);
+      formData.append("currentDateTime", getFormattedISTDate());
+      formData.append("country", country);
 
-      const res = await axios.post(`${baseURL}quality/add-fpa-defect`, payload);
+      if (defectImage) {
+        formData.append("image", defectImage);
+      }
+
+      const res = await axios.post(
+        `${baseURL}quality/add-fpa-defect`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
 
       if (res?.data?.success) {
         toast.success(res?.data?.message || "Defect added successfully!");
@@ -168,6 +180,8 @@ const FPA = () => {
         setManualCategory("");
         setSelectedFpaDefectCategory(null);
         setAddManually(false);
+        setDefectImage(null);
+        
         getFpaDefect(); // Refresh defect table
         getFPACountData(); // Refresh count data
         getFPQIDetails(); // Refresh FPQI values
@@ -329,48 +343,49 @@ const FPA = () => {
               readOnly
               className="max-w-65"
             />
-           { selectedDefectCategory?.value !== "no-defect" && (
-            <div className="flex flex-col gap-2 w-72">
-              {/* Radio Button Toggle */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="addManually"
-                  checked={addManually}
-                  onChange={() => setAddManually(!addManually)}
-                  className="cursor-pointer"
-                />
-                <label
-                  htmlFor="addManually"
-                  className="cursor-pointer font-medium"
-                >
-                  Add Defect Manually
-                </label>
-              </div>
+            {selectedDefectCategory?.value !== "no-defect" && (
+              <div className="flex flex-col gap-2 w-72">
+                {/* Radio Button Toggle */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="addManually"
+                    checked={addManually}
+                    onChange={() => setAddManually(!addManually)}
+                    className="cursor-pointer"
+                  />
+                  <label
+                    htmlFor="addManually"
+                    className="cursor-pointer font-medium"
+                  >
+                    Add Defect Manually
+                  </label>
+                </div>
 
-              {/* Conditional Rendering */}
-              {addManually ? (
-                <InputField
-                  label="Manual Defect Category"
-                  type="text"
-                  placeholder="Enter defect category"
-                  value={manualCategory}
-                  onChange={(e) => setManualCategory(e.target.value)}
-                />
-              ) : (
-                <SelectField
-                  label="Select Defect Category"
-                  options={fpaDefectCategory}
-                  value={selectedFpaDefectCategory?.value || ""}
-                  onChange={(e) => {
-                    const selected = fpaDefectCategory.find(
-                      (option) => option.value === e.target.value
-                    );
-                    setSelectedFpaDefectCategory(selected);
-                  }}
-                />
-              )}
-            </div>)}
+                {/* Conditional Rendering */}
+                {addManually ? (
+                  <InputField
+                    label="Manual Defect Category"
+                    type="text"
+                    placeholder="Enter defect category"
+                    value={manualCategory}
+                    onChange={(e) => setManualCategory(e.target.value)}
+                  />
+                ) : (
+                  <SelectField
+                    label="Select Defect Category"
+                    options={fpaDefectCategory}
+                    value={selectedFpaDefectCategory?.value || ""}
+                    onChange={(e) => {
+                      const selected = fpaDefectCategory.find(
+                        (option) => option.value === e.target.value
+                      );
+                      setSelectedFpaDefectCategory(selected);
+                    }}
+                  />
+                )}
+              </div>
+            )}
 
             <InputField
               label="Remark"
@@ -381,6 +396,24 @@ const FPA = () => {
               value={remark}
               onChange={(e) => setRemark(e.target.value)}
             />
+            {/* Upload Defect Image — shown only when category !== no-defect */}
+            {selectedDefectCategory?.value !== "no-defect" && (
+              <div className="flex flex-col">
+                <label className="font-medium mb-1">Defect Image</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setDefectImage(e.target.files[0])}
+                  className="border border-gray-300 p-2 rounded-md w-40 cursor-pointer"
+                />
+
+                {defectImage && (
+                  <p className="text-xs text-green-600 mt-1">
+                    Selected: {defectImage.name}
+                  </p>
+                )}
+              </div>
+            )}
 
             <Button
               bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
