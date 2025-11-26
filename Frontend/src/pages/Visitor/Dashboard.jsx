@@ -113,36 +113,69 @@ const Dashboard = () => {
     getDashboardStats();
   }, [filter]);
 
-  // Bar Chart Configuration
-  const barChartData = {
-    labels: dashboardData.visitorTrend.map((item) => {
-      if (filter.value === "month") {
-        return item.month;
-      } else {
-        // Show only day from date (1–31)
-        return new Date(item.date).getDate();
-      }
-    }),
+  // ------------------------------------------------------------
+  // BAR CHART CONFIGURATION
+  // ------------------------------------------------------------
 
+  // Generate labels based on selected filter (month/day)
+  const barChartLabels = dashboardData.visitorTrend.map((item) => {
+    // If "month" filter is active → show month names
+    if (filter.value === "month") {
+      return item.month;
+    }
+
+    // Otherwise → show day number only (1–31)
+    return new Date(item.date).getDate();
+  });
+
+  // Generate dataset values (visitor count)
+  const barChartValues = dashboardData.visitorTrend.map(
+    (item) => item.visitors
+  );
+
+  // -------------------------
+  // BAR CHART DATA
+  // -------------------------
+  const barChartData = {
+    labels: barChartLabels,
     datasets: [
       {
         label: filter.value === "month" ? "Monthly Visitors" : "Daily Visitors",
-        data: dashboardData.visitorTrend.map((item) => item.visitors),
-        backgroundColor: "rgba(75, 192, 192, 0.6)",
-        borderColor: "rgba(75, 192, 192, 1)",
-        borderWidth: 1,
+
+        // Visitor numbers
+        data: barChartValues,
+
+        // Attractive gradient-like colors
+        backgroundColor: [
+          "rgba(54, 162, 235, 0.7)",
+          "rgba(75, 192, 192, 0.7)",
+          "rgba(153, 102, 255, 0.7)",
+          "rgba(255, 159, 64, 0.7)",
+        ],
+
+        borderColor: "rgba(75, 75, 75, 0.8)",
+        borderWidth: 1.5,
+        borderRadius: 5, // Smooth rounded bars for a modern look
       },
     ],
   };
 
+  // -------------------------
+  // BAR CHART OPTIONS
+  // -------------------------
   const barChartOptions = {
     responsive: true,
-    maintainAspectRatio: false, // Required for custom height
+    maintainAspectRatio: false, // Allow custom height in container
 
     plugins: {
       legend: {
-        display: false,
+        display: true, // Show a nice legend
+        labels: {
+          font: { size: 12, weight: "bold" },
+          color: "#333",
+        },
       },
+
       title: {
         display: true,
         text:
@@ -151,8 +184,20 @@ const Dashboard = () => {
             : `Daily Visitors - ${new Date().toLocaleString("default", {
                 month: "long",
               })} ${new Date().getFullYear()}`,
-        font: {
-          size: 14,
+
+        font: { size: 16, weight: "bold" },
+        color: "#222",
+        padding: { top: 10, bottom: 15 },
+      },
+
+      tooltip: {
+        enabled: true,
+        backgroundColor: "rgba(0,0,0,0.8)",
+        titleFont: { size: 14 },
+        bodyFont: { size: 12 },
+        padding: 10,
+        callbacks: {
+          label: (ctx) => `Visitors: ${ctx.raw}`, // Custom tooltip label
         },
       },
     },
@@ -161,12 +206,21 @@ const Dashboard = () => {
       y: {
         beginAtZero: true,
         ticks: {
-          font: { size: 10 },
+          font: { size: 11 },
+          color: "#444",
+        },
+        grid: {
+          color: "rgba(200, 200, 200, 0.3)",
         },
       },
+
       x: {
         ticks: {
-          font: { size: 10 },
+          font: { size: 11 },
+          color: "#444",
+        },
+        grid: {
+          display: false, // Cleaner look
         },
       },
     },
@@ -216,7 +270,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
-      <h1 className="text-3xl font-bold text-center mb-6">
+      <h1 className="text-3xl font-bold text-center mb-4">
         Visitor Management Dashboard
       </h1>
       <div className="flex items-center justify-end my-4">
@@ -266,7 +320,6 @@ const Dashboard = () => {
         {/* Visitor Trend Bar Chart */}
         <div className="bg-white shadow-md rounded-lg p-4">
           <div className="h-[250px]">
-            {/* Fixed height container */}
             {dashboardData.visitorTrend.length > 0 ? (
               <Bar data={barChartData} options={barChartOptions} />
             ) : (
@@ -276,20 +329,37 @@ const Dashboard = () => {
             )}
           </div>
 
-          {/* Department Legend */}
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {dashboardData.visitorTrend.map((item, index) => (
-              <div key={index} className="flex items-center text-xs">
-                <span
-                  className="inline-block w-3 h-3 mr-2 rounded-full"
-                  style={{ backgroundColor: "rgba(75, 192, 192, 0.6)" }}
-                />
-                <span>
-                  {item.month}: {item.visitors}
-                </span>
-              </div>
-            ))}
-          </div>
+          {/* -------------------------- Scrollable Trend Data Table -------------------------- */}
+          {dashboardData.visitorTrend.length > 0 && (
+            <div className="mt-4 max-h-48 overflow-y-auto border border-gray-200 rounded">
+              <table className="w-full text-sm border-collapse">
+                <thead className="bg-gray-100 sticky top-0">
+                  <tr>
+                    <th className="p-2 border-b border-gray-200 text-center">
+                      {filter.value === "month" ? "Month" : "Date"}
+                    </th>
+                    <th className="p-2 border-b border-gray-200 text-center">
+                      Visitors
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dashboardData.visitorTrend.map((item, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="p-2 border-b border-gray-200 text-center">
+                        {filter.value === "month"
+                          ? item.month
+                          : new Date(item.date).toLocaleDateString()}
+                      </td>
+                      <td className="p-2 border-b border-gray-200 text-center">
+                        {item.visitors}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Department Distribution Pie Chart */}
