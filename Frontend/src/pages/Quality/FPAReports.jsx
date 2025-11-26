@@ -10,6 +10,30 @@ import { useMemo } from "react";
 import ExportButton from "../../components/common/ExportButton";
 import { baseURL } from "../../assets/assets";
 import Loader from "../../components/common/Loader";
+import FpaBarGraph from "../../components/graphs/FpaReportsBarGraph";
+import { FaDownload } from "react-icons/fa";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  Title as ChartTitle,
+  Tooltip,
+  Legend,
+} from "chart.js";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement, // ✅ REQUIRED
+  PointElement, // ✅ REQUIRED
+  ChartTitle,
+  Tooltip,
+  Legend
+);
 
 const FPAReports = () => {
   const [loading, setLoading] = useState(false);
@@ -276,6 +300,45 @@ const FPAReports = () => {
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
 
+  const getChartConfig = () => {
+    if (!reportData || reportData.length === 0) return null;
+
+    let labels = [];
+
+    if (reportType === "dailyFpaReport") {
+      labels = reportData.map((item) => item.ShiftDate?.slice(0, 10));
+    } else if (reportType === "monthlyFpaReport") {
+      labels = reportData.map((item) => item.Month);
+    } else if (reportType === "yearlyFpaReport") {
+      labels = reportData.map((item) => item.Year);
+    }
+
+    return {
+      labels,
+
+      datasets: [
+        // ✅ BAR: Actual FPQI
+        {
+          type: "bar",
+          label: "FPQI Value",
+          data: reportData.map((i) => i.FPQI),
+          backgroundColor: "rgba(59, 130, 246, 0.7)",
+        },
+
+        // ✅ LINE: Target FPQI = 1.4 (HORIZONTAL LINE)
+        {
+          type: "line",
+          label: "Target FPQI (1.4)",
+          data: Array(labels.length).fill(1.4),
+          borderColor: "rgba(34, 197, 94, 1)",
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0,
+        },
+      ],
+    };
+  };
+
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="FPA Reports" align="center" />
@@ -460,6 +523,26 @@ const FPAReports = () => {
             </div>
           </div>
         )}
+
+        {/* ✅ COMMON DRY GRAPH – RIGHT SIDE OF QUICK FILTER */}
+        {["dailyFpaReport", "monthlyFpaReport", "yearlyFpaReport"].includes(
+          reportType
+        ) &&
+          reportData.length > 0 && (
+            <div className="mt-4">
+              <FpaBarGraph
+                title={
+                  reportType === "dailyFpaReport"
+                    ? "Daily FPA Trend"
+                    : reportType === "monthlyFpaReport"
+                    ? "Monthly FPA Trend"
+                    : "Yearly FPA Trend"
+                }
+                labels={getChartConfig()?.labels}
+                datasets={getChartConfig()?.datasets}
+              />
+            </div>
+          )}
       </div>
 
       {/* Summary Section */}
@@ -496,6 +579,19 @@ const FPAReports = () => {
 };
 
 const FpaReportTable = ({ data }) => {
+  const handleDownloadImage = (imageUrl, fileName = "defect-image") => {
+    if (!imageUrl) {
+      alert("No image available for this record.");
+      return;
+    }
+
+    const link = document.createElement("a");
+    link.href = imageUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
   return (
     <div className="w-full max-h-[600px] overflow-x-auto">
       <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
@@ -510,6 +606,7 @@ const FpaReportTable = ({ data }) => {
             <th className="px-1 py-1 border min-w-[120px]">Category</th>
             <th className="px-1 py-1 border min-w-[120px]">Add Defect</th>
             <th className="px-1 py-1 border min-w-[120px]">Remark</th>
+            <th className="px-1 py-1 border min-w-[140px]">Defect Image</th>
           </tr>
         </thead>
         <tbody>
@@ -527,6 +624,24 @@ const FpaReportTable = ({ data }) => {
                 <td className="px-1 py-1 border">{row.Category}</td>
                 <td className="px-1 py-1 border">{row.AddDefect}</td>
                 <td className="px-1 py-1 border">{row.Remark}</td>
+                <td className="px-1 py-1 border text-center">
+                  {row.ImageUrl || row.DefectImage || row.ImagePath ? (
+                    <button
+                      onClick={() =>
+                        handleDownloadImage(
+                          row.DefectImage,
+                          `FPA_${row.FGSRNo || index}.png`
+                        )
+                      }
+                      className="text-blue-600 hover:text-blue-800 text-lg"
+                      title="Download Image"
+                    >
+                      <FaDownload />
+                    </button>
+                  ) : (
+                    <span className="text-gray-400 text-xs">No Image</span>
+                  )}
+                </td>
               </tr>
             ))
           ) : (
