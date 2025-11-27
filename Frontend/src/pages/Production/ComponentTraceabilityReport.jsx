@@ -74,7 +74,6 @@ const ComponentTraceabilityReport = () => {
       if (res?.data?.success) {
         setTraceabilityData((prev) => [...prev, ...res?.data?.data]);
         // Set total count only when it's the first page
-        console.log(res)
         if (pageNumber === 1) {
           setTotalCount(res?.data?.totalCount);
         }

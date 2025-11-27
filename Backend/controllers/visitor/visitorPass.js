@@ -1,5 +1,4 @@
 import sql, { dbConfig3 } from "../../config/db.js";
-import { sendVisitorPassEmail } from "../../config/emailConfig.js";
 
 // Get Departments
 export const fetchDepartments = async (req, res) => {

@@ -1,4 +1,3 @@
-import sql from "mssql";
 import { sendCurrentlyInsideVisitorsEmail } from "./notification.js";
 
 export const notifyCurrentlyInsideVisitors = async (req, res) => {

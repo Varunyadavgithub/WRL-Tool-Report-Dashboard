@@ -135,9 +135,7 @@ const DailyPlan = () => {
       setLoading(false);
     }
   };
-
-  console.log(existingPlans);
-
+  
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
       <Title title="Daily Plan" align="center" />

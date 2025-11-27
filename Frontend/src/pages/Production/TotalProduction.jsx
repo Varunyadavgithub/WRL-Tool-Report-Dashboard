@@ -87,7 +87,6 @@ const TotalProduction = () => {
       };
 
       const res = await axios.get(`${baseURL}prod/barcode-details`, { params });
-      console.log(res);
       if (res?.data?.success) {
         setTotalProductionData((prev) => {
           const existing = new Set(prev.map((d) => d.FG_SR));
@@ -190,7 +189,6 @@ const TotalProduction = () => {
       const res = await axios.get(`${baseURL}prod/today-total-production`, {
         params,
       });
-      console.log(res);
       if (res?.data?.success) {
         setTotalProductionData(res?.data?.data);
         setTotalCount(res?.data?.totalCount);

@@ -7,7 +7,6 @@ const uploadDir = path.resolve("uploads", "BISReport");
 // Upload file controller
 export const uploadBisPdfFile = async (req, res) => {
   const { modelName, year, month, testFrequency, description } = req.body;
-  console.log("Request Body:", req.body);
   const fileName = req.file?.filename;
 
   if (
