@@ -19,6 +19,7 @@ const BISReports = () => {
     try {
       setLoading(true);
       const res = await axios.get(`${baseURL}quality/bis-files`);
+      console.log(res)
       setUploadedFiles(res?.data?.files || []);
     } catch (error) {
       toast.error("Failed to fetch uploaded files");
@@ -87,6 +88,9 @@ const BISReports = () => {
       case "year":
         return safeLower(file.year).includes(lowerTerm);
 
+      case "month":
+        return safeLower(file.month).includes(lowerTerm);
+
       case "description":
         return safeLower(file.description).includes(lowerTerm);
 
@@ -97,6 +101,7 @@ const BISReports = () => {
         return (
           safeLower(file.modelName).includes(lowerTerm) ||
           safeLower(file.year).includes(lowerTerm) ||
+          safeLower(file.month).includes(lowerTerm) ||
           safeLower(file.description).includes(lowerTerm) ||
           safeLower(file.fileName).includes(lowerTerm)
         );
@@ -149,6 +154,7 @@ const BISReports = () => {
             <option value="all">All Fields</option>
             <option value="modelName">Model Name</option>
             <option value="year">Year</option>
+            <option value="month">Month</option>
             <option value="description">Description</option>
             <option value="fileName">File Name</option>
           </select>
@@ -176,6 +182,7 @@ const BISReports = () => {
                 <th className="px-4 py-3 text-left">Sr. No.</th>
                 <th className="px-4 py-3 text-left">Model Name</th>
                 <th className="px-4 py-3 text-left">Year</th>
+                <th className="px-4 py-3 text-left">Month</th>
                 <th className="px-4 py-3 text-left">Description</th>
                 <th className="px-4 py-3">Test Frequency</th>
                 <th className="px-4 py-3 text-left">File Name</th>
@@ -193,6 +200,9 @@ const BISReports = () => {
                   <td className="px-4 py-3 font-semibold">{file.modelName}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {file.year}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {file.month || "N/A"}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {file.description}

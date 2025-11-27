@@ -173,7 +173,6 @@ const BISStatus = () => {
             <option value="all">All Fields</option>
             <option value="modelName">Model Name</option>
             <option value="year">Year</option>
-            <option value="month">Month</option>
             <option value="productionCount">Production Count</option>
             <option value="status">Status</option>
           </select>
@@ -209,7 +208,6 @@ const BISStatus = () => {
                 <th className="px-4 py-3">Sr. No.</th>
                 <th className="px-4 py-3">Model Name</th>
                 <th className="px-4 py-3">Year</th>
-                <th className="px-4 py-3">Month</th>
                 <th className="px-4 py-3">Production Count</th>
                 <th className="px-4 py-3">Status</th>
               </tr>
@@ -233,9 +231,6 @@ const BISStatus = () => {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {report.Year}
-                    </td>
-                     <td className="px-4 py-3 text-sm text-gray-600">
-                      {report.Month}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {report.Prod_Count}
