@@ -12,28 +12,41 @@ function StageHistoryReport() {
   const [loading, setLoading] = useState(false);
   const [serialNumber, setSerialNumber] = useState("");
   const [stageHistoryData, setStageHistoryData] = useState([]);
+  const [logisticData, setLogisticStatus] = useState([]);
   const [productName, setProductName] = useState("");
 
-  const fetchStageHistoryData = async () => {
+  const handleQuery = async () => {
     if (!serialNumber) {
-      toast.error("Please select Serial Number.");
+      toast.error("Please enter Serial Number.");
       return;
     }
+
+    setLoading(true);
+
     try {
-      setLoading(true);
-      const res = await axios.get(`${baseURL}prod/stage-history`, {
-        params: { serialNumber },
-      });
-      const data = res.data?.result?.recordsets[0] || [];
-      setStageHistoryData(data);
-      if (data.length > 0 && data[0].MaterialName) {
-        setProductName(data[0].MaterialName);
+      const [stageRes, logisticRes] = await Promise.all([
+        axios.get(`${baseURL}prod/stage-history`, { params: { serialNumber } }),
+        axios.get(`${baseURL}prod/logistic-status`, {
+          params: { serialNumber },
+        }),
+      ]);
+
+      // Stage history
+      const stageData = stageRes.data?.result?.recordsets[0] || [];
+      setStageHistoryData(stageData);
+
+      if (stageData.length > 0 && stageData[0].MaterialName) {
+        setProductName(stageData[0].MaterialName);
       } else {
         setProductName("");
       }
+
+      // Logistic data
+      const logisticData = logisticRes.data?.result?.recordsets[0] || [];
+      setLogisticStatus(logisticData);
     } catch (error) {
-      console.error("Failed to fetch fetch Stage History data:", error);
-      toast.error("Failed to fetch fetch Stage History data.");
+      console.error("Query failed:", error);
+      toast.error("Failed to fetch data.");
     } finally {
       setLoading(false);
     }
@@ -44,7 +57,7 @@ function StageHistoryReport() {
       <Title title="Stage History Report" align="center" />
 
       {/* Filters Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
         {/* First Row */}
         <div className="flex flex-wrap items-center gap-4">
           <InputField
@@ -61,7 +74,7 @@ function StageHistoryReport() {
               bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
               textColor={loading ? "text-white" : "text-black"}
               className={`font-semibold ${loading ? "cursor-not-allowed" : ""}`}
-              onClick={() => fetchStageHistoryData()}
+              onClick={handleQuery}
               disabled={loading}
             >
               Query
@@ -83,36 +96,83 @@ function StageHistoryReport() {
       {/* Summary Section */}
       <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
         <div className="bg-white border border-gray-300 rounded-md p-4">
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Table 1 */}
-            {loading ? (
+          {loading ? (
+            <div className="flex justify-center items-center py-10">
               <Loader />
-            ) : (
+            </div>
+          ) : (
+            <div className="flex flex-col gap-6">
+              {/* ---------- TABLE 1 : Logistic Status (FIRST) ---------- */}
               <div className="w-full max-h-[600px] overflow-x-auto">
+                <h2 className="font-bold mb-2">Logistic Status</h2>
                 <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
                   <thead className="bg-gray-200 sticky top-0 z-10 text-center">
                     <tr>
-                      <th className="px-1 py-1 border min-w-[120px]">PSNO</th>
-                      <th className="px-1 py-1 border min-w-[120px]">
-                        Station_Code
-                      </th>
-                      <th className="px-1 py-1 border min-w-[120px]">Name</th>
-                      <th className="px-1 py-1 border min-w-[120px]">
-                        Activity On
-                      </th>
-                      <th className="px-1 py-1 border min-w-[120px]">Alias</th>
-                      <th className="px-1 py-1 border min-w-[120px]">
-                        Customer QR
-                      </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
-                        V Serial
-                      </th>
-                      {/* <th className="px-1 py-1 border min-w-[120px]">Alias 1</th> */}
-                      <th className="px-1 py-1 border min-w-[120px]">Serial</th>
-                      <th className="px-1 py-1 border min-w-[120px]">
-                        Activity Type
-                      </th>
-                      {/* <th className="px-1 py-1 border min-w-[120px]">Type</th> */}
+                      <th className="px-1 py-1 border">Unload Time</th>
+                      <th className="px-1 py-1 border">Session ID</th>
+                      <th className="px-1 py-1 border">Dispatch Time</th>
+                      <th className="px-1 py-1 border">Vehicle No</th>
+                      <th className="px-1 py-1 border">Dock No</th>
+                      <th className="px-1 py-1 border">Latest Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logisticData.length > 0 ? (
+                      logisticData.map((item, index) => (
+                        <tr
+                          key={index}
+                          className="hover:bg-gray-100 text-center"
+                        >
+                          <td className="px-1 py-1 border">
+                            {item.Dispt_Unload_time?.replace("T", " ").replace(
+                              "Z",
+                              ""
+                            )}
+                          </td>
+                          <td className="px-1 py-1 border">
+                            {item.Session_ID}
+                          </td>
+                          <td className="px-1 py-1 border">
+                            {item.Dispatch_time?.replace("T", " ").replace(
+                              "Z",
+                              ""
+                            )}
+                          </td>
+                          <td className="px-1 py-1 border">
+                            {item.Vehicle_No}
+                          </td>
+                          <td className="px-1 py-1 border">{item.DockNo}</td>
+                          <td className="px-1 py-1 border">
+                            {item.LatestStatus}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={12} className="text-center py-4">
+                          No logistic data found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* ---------- TABLE 2 : Stage History (SECOND) ---------- */}
+              <div className="w-full max-h-[600px] overflow-x-auto">
+                <h2 className="font-bold mb-2">Stage History</h2>
+                <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
+                  <thead className="bg-gray-200 sticky top-0 z-10 text-center">
+                    <tr>
+                      <th className="px-1 py-1 border">PSNO</th>
+                      <th className="px-1 py-1 border">Station_Code</th>
+                      <th className="px-1 py-1 border">Name</th>
+                      <th className="px-1 py-1 border">Activity On</th>
+                      <th className="px-1 py-1 border">Alias</th>
+                      <th className="px-1 py-1 border">Customer QR</th>
+                      <th className="px-1 py-1 border">V Serial</th>
+                      <th className="px-1 py-1 border">Serial</th>
+                      <th className="px-1 py-1 border">Activity Type</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -130,11 +190,10 @@ function StageHistoryReport() {
                             {item.StationName}
                           </td>
                           <td className="px-1 py-1 border">
-                            {item.ActivityOn &&
-                              item.ActivityOn.replace("T", " ").replace(
-                                "Z",
-                                ""
-                              )}
+                            {item.ActivityOn?.replace("T", " ").replace(
+                              "Z",
+                              ""
+                            )}
                           </td>
                           <td className="px-1 py-1 border">
                             {item.BarcodeAlias}
@@ -143,26 +202,24 @@ function StageHistoryReport() {
                             {item.CustomerQR}
                           </td>
                           <td className="px-1 py-1 border">{item.VSerial}</td>
-                          {/* <td className="px-1 py-1 border">{item.Alias 1}</td> */}
                           <td className="px-1 py-1 border">{item.Serial}</td>
                           <td className="px-1 py-1 border">
                             {item.ActivityType}
                           </td>
-                          {/* <td className="px-1 py-1 border">N/A</td> */}
                         </tr>
                       ))
                     ) : (
                       <tr>
                         <td colSpan={12} className="text-center py-4">
-                          No data found.
+                          No stage history found.
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

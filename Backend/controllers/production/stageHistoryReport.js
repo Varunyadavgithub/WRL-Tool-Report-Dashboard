@@ -1,4 +1,4 @@
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql, { dbConfig1, dbConfig2 } from "../../config/db.js";
 
 export const getCurrentStageStatus = async (req, res) => {
   const { serialNumber } = req.query;
@@ -44,6 +44,41 @@ ORDER BY
     `;
 
     const pool = await new sql.ConnectionPool(dbConfig1).connect();
+    const request = pool
+      .request()
+      .input("serialNumber", sql.NVarChar, serialNumber);
+
+    const result = await request.query(query);
+    res.status(200).json({
+      success: true,
+      result,
+    });
+    await pool.close();
+  } catch (error) {
+    console.error("SQL Error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+export const getLogisticStatus = async (req, res) => {
+  const { serialNumber } = req.query;
+
+  if (!serialNumber) {
+    return res.status(400).json({
+      success: false,
+      message: "Serial number is required",
+    });
+  }
+  try {
+    let query = `
+      Select du.DateTime [Dispt_Unload_time], dm.Session_ID, dm.AddedOn [Dispatch_time], td.Vehicle_No, td.DockNo, td.LatestStatus  
+      from DispatchUnloading du
+      inner join DispatchMaster dm on dm.FGSerialNo = du.FGSerialNo
+      inner join Tracking_Document td on td.Session_ID = dm.Session_ID
+      where du.FGSerialNo = @serialNumber
+    `;
+
+    const pool = await new sql.ConnectionPool(dbConfig2).connect();
     const request = pool
       .request()
       .input("serialNumber", sql.NVarChar, serialNumber);
