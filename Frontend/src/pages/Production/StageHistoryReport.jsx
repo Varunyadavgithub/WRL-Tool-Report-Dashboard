@@ -141,7 +141,9 @@ function StageHistoryReport() {
                           <td className="px-1 py-1 border">
                             {item.Vehicle_No || "FG not Dispatched"}
                           </td>
-                          <td className="px-1 py-1 border">{item.DockNo || "FG not Dispatched"}</td>
+                          <td className="px-1 py-1 border">
+                            {item.DockNo || "FG not Dispatched"}
+                          </td>
                           <td className="px-1 py-1 border">
                             {item.LatestStatus || "FG not Dispatched"}
                           </td>
@@ -167,6 +169,7 @@ function StageHistoryReport() {
                       <th className="px-1 py-1 border">PSNO</th>
                       <th className="px-1 py-1 border">Station_Code</th>
                       <th className="px-1 py-1 border">Name</th>
+                      <th className="px-1 py-1 border">Operator</th>
                       <th className="px-1 py-1 border">Activity On</th>
                       <th className="px-1 py-1 border">Alias</th>
                       <th className="px-1 py-1 border">Customer QR</th>
@@ -189,6 +192,7 @@ function StageHistoryReport() {
                           <td className="px-1 py-1 border">
                             {item.StationName}
                           </td>
+                          <td className="px-1 py-1 border">{item.UserName}</td>
                           <td className="px-1 py-1 border">
                             {item.ActivityOn?.replace("T", " ").replace(
                               "Z",

@@ -11,36 +11,39 @@ export const getCurrentStageStatus = async (req, res) => {
   }
   try {
     let query = `
-WITH Psno AS (
-    SELECT DocNo, Material, Serial, VSerial, Serial2, Alias 
-    FROM MaterialBarcode 
-    WHERE Serial = @serialNumber OR Alias = @serialNumber
-)
-SELECT 
-    Psno.DocNo AS PSNO,
-    M.Name AS MaterialName,
-    B.StationCode,
-    B.Name AS StationName,
-    B.Alias AS StationAlias,
-    A.ActivityOn,
-    Psno.Serial2 As CustomerQR,
-    Psno.VSerial,
-    Psno.Alias AS BarcodeAlias,
-    Psno.Serial,
-    A.ActivityType,
-    C.Type AS ActivityTypeName
-FROM 
-    Psno
-INNER JOIN 
-    ProcessActivity A ON Psno.DocNo = A.PSNO
-INNER JOIN 
-    WorkCenter B ON A.StationCode = B.StationCode
-INNER JOIN 
-    Material M ON Psno.Material = M.MatCode
-LEFT JOIN 
-    ProcessActivityType C ON C.id = A.ActivityType
-ORDER BY 
-    A.ActivityOn DESC;
+      WITH Psno AS (
+        SELECT DocNo, Material, Serial, VSerial, Serial2, Alias 
+        FROM MaterialBarcode 
+      WHERE Serial = @serialNumber OR Alias = @serialNumber
+      )
+      SELECT 
+        Psno.DocNo AS PSNO,
+        M.Name AS MaterialName,
+        B.StationCode,
+        B.Name AS StationName,
+        B.Alias AS StationAlias,
+        A.ActivityOn,
+        Psno.Serial2 As CustomerQR,
+        Psno.VSerial,
+        Psno.Alias AS BarcodeAlias,
+        Psno.Serial,
+        A.ActivityType,
+        C.Type AS ActivityTypeName,
+        U.UserName
+      FROM 
+          Psno
+      INNER JOIN 
+          ProcessActivity A ON Psno.DocNo = A.PSNO
+      INNER JOIN 
+          WorkCenter B ON A.StationCode = B.StationCode
+      INNER JOIN 
+          Material M ON Psno.Material = M.MatCode
+      LEFT JOIN 
+          ProcessActivityType C ON C.id = A.ActivityType
+      INNER JOIN
+          Users U on U.UserCode = A.Operator
+      ORDER BY 
+          A.ActivityOn DESC;
     `;
 
     const pool = await new sql.ConnectionPool(dbConfig1).connect();
