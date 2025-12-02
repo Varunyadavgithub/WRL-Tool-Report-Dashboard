@@ -142,7 +142,6 @@ export const getHourlyModelCount = async (req, res) => {
       }
     }
 
-
     const query = `
       WITH Psno AS (
         SELECT DocNo, Material, Serial, VSerial, Alias, Type

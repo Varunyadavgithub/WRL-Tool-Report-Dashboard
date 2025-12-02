@@ -46,6 +46,7 @@ export const uploadBisPdfFile = async (req, res) => {
       fileUrl: `/uploads/BISReport/${req.file.filename}`,
       message: "Uploaded successfully",
     });
+    await pool.close();
   } catch (error) {
     console.error("Upload error:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -140,6 +141,7 @@ export const downloadBisPdfFile = async (req, res) => {
         message: "Error streaming file",
       });
     });
+    await pool.close();
   } catch (error) {
     console.error("Download error:", error);
     res.status(500).json({
@@ -186,6 +188,7 @@ export const deleteBisPdfFile = async (req, res) => {
     res
       .status(200)
       .json({ success: true, message: "File deleted successfully" });
+    await pool.close();
   } catch (error) {
     console.error("Delete error:", error.message);
     res.status(500).json({ success: false, message: "Failed to delete file" });
@@ -262,6 +265,7 @@ export const updateBisPdfFile = async (req, res) => {
       fileUrl: newFileName ? `/uploads-bis-pdf/${newFileName}` : null,
       message: "Updated successfully",
     });
+    await pool.close();
   } catch (error) {
     console.error("Update error:", error);
 

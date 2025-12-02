@@ -237,7 +237,6 @@ SELECT
     ) AS FPQI
 FROM Summary
 ORDER BY Year DESC;
-
     `;
 
     const pool = await new sql.ConnectionPool(dbConfig1).connect();

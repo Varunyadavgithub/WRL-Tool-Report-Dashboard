@@ -14,9 +14,9 @@ export const getVisitorFullHistory = async (req, res) => {
     const pool = await new sql.ConnectionPool(dbConfig3).connect();
 
     // Fetch visitor basic info
-    const visitorInfo = await pool.request()
-      .input("VisitorId", sql.VarChar(50), visitorId)
-      .query(`
+    const visitorInfo = await pool
+      .request()
+      .input("VisitorId", sql.VarChar(50), visitorId).query(`
         SELECT 
             v.visitor_id,
             v.name AS visitor_name,
@@ -43,9 +43,9 @@ export const getVisitorFullHistory = async (req, res) => {
     }
 
     // Fetch full visit logs
-    const logs = await pool.request()
-      .input("VisitorId", sql.VarChar(50), visitorId)
-      .query(`
+    const logs = await pool
+      .request()
+      .input("VisitorId", sql.VarChar(50), visitorId).query(`
         SELECT 
             vp.pass_id,
             d.department_name,
@@ -62,14 +62,13 @@ export const getVisitorFullHistory = async (req, res) => {
       `);
 
     await pool.close();
-
+    
     return res.status(200).json({
       success: true,
       message: "Visitor full history fetched successfully",
       visitor: visitorInfo.recordset[0],
       visit_logs: logs.recordset,
     });
-
   } catch (error) {
     console.error("Error fetching visitor full history:", error);
     return res.status(500).json({
@@ -84,10 +83,10 @@ export const getAllVisitorsHistory = async (req, res) => {
     const { limit = 100, offset = 0 } = req.query;
     const pool = await new sql.ConnectionPool(dbConfig3).connect();
 
-    const result = await pool.request()
+    const result = await pool
+      .request()
       .input("limit", sql.Int, limit)
-      .input("offset", sql.Int, offset)
-      .query(`
+      .input("offset", sql.Int, offset).query(`
         WITH LatestVisit AS (
             SELECT 
                 vp.visitor_id,
@@ -143,13 +142,12 @@ export const getAllVisitorsHistory = async (req, res) => {
       message: "Visitor history fetched successfully",
       data: result.recordset,
     });
-
   } catch (error) {
     console.error("SQL Error:", error.message);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch visitor history",
-      error: error.message
+      error: error.message,
     });
   }
 };

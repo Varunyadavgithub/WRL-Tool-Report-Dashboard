@@ -433,7 +433,6 @@ SELECT
     Loading_Count AS COUNT
 FROM HourlySummary
 ORDER BY HourTime;
-
     `;
 
     const pool = await new sql.ConnectionPool(dbConfig1).connect();
@@ -484,7 +483,6 @@ SELECT
     Loading_Count AS COUNT
 FROM HourlySummary
 ORDER BY HourTime;
-
     `;
 
     const pool = await new sql.ConnectionPool(dbConfig1).connect();

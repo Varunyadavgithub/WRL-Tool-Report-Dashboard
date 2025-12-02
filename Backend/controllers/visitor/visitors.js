@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import sql, { dbConfig3 } from "../../config/db.js";
+import sql, { dbConfig1, dbConfig3 } from "../../config/db.js";
 
 // Update visitor data controller
 export const updateVisitors = async (req, res) => {
@@ -68,6 +68,7 @@ export const updateVisitors = async (req, res) => {
       fileUrl: newFileName ? `/uploads-bis-pdf/${newFileName}` : null,
       message: "Updated successfully",
     });
+    await pool.close();
   } catch (error) {
     console.error("Update error:", error);
 
@@ -100,7 +101,6 @@ export const visitors = async (_, res) => {
       message: "Visitors data fetched successfully",
       data: result.recordset,
     });
-
   } catch (error) {
     console.error("Error while fetching visitor data:", error.message);
     res.status(500).json({

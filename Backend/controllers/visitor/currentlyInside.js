@@ -31,6 +31,7 @@ export const notifyCurrentlyInsideVisitors = async (req, res) => {
     } else {
       res.status(500).json({ success: false, message: "Email sending failed." });
     }
+    await pool.close();
   } catch (error) {
     console.error("Error notifying currently inside visitors:", error);
     res.status(500).json({ success: false, message: "Server error." });

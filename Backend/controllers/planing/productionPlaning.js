@@ -29,8 +29,6 @@ export const getModelName = async (req, res) => {
 
     const result = await pool.request().query(query);
 
-    await pool.close();
-
     res.status(200).json({
       success: true,
       data: result.recordset,

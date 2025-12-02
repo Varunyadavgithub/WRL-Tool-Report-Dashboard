@@ -121,6 +121,7 @@ export const addLptDefect = async (req, res) => {
     res
       .status(200)
       .json({ success: true, message: "Defect added successfully." });
+    await pool.close();
   } catch (error) {
     console.error("Error inserting defect:", error);
     res
