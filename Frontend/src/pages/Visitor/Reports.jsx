@@ -15,96 +15,52 @@ const Reports = () => {
   const [monthLoading, setMonthLoading] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [totalCount, setTotalCount] = useState([]);
-  const [searchParams, setSearchParams] = useState({
-    term: "",
-    field: "all",
-  });
+  const [searchParams, setSearchParams] = useState({ term: "", field: "all" });
 
-  // Quick Filters
-  const fetchYdayVisitorData = async () => {
+  const formatDate = (date) => {
+    const pad = (n) => (n < 10 ? "0" + n : n);
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+      date.getDate()
+    )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  const fetchVisitorData = async (start, end, setLoader) => {
+    try {
+      setLoader(true);
+      setVisitors([]);
+      const res = await axios.get(`${baseURL}visitor/repot`, {
+        params: { startTime: start, endTime: end },
+      });
+      if (res?.data?.success) setVisitors(res.data.data || []);
+    } catch (error) {
+      console.error("Failed to fetch visitor data:", error);
+      toast.error("Failed to fetch visitor data.");
+    } finally {
+      setLoader(false);
+    }
+  };
+
+  const fetchYdayVisitorData = () => {
     const now = new Date();
     const today8AM = new Date(now);
     today8AM.setHours(8, 0, 0, 0);
-
     const yesterday8AM = new Date(today8AM);
-    yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
-
-    const formatDate = (date) => {
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
-      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
-    const formattedStart = formatDate(yesterday8AM);
-    const formattedEnd = formatDate(today8AM);
-
-    try {
-      setYdayLoading(true);
-
-      setVisitors([]);
-      setTotalCount(0);
-
-      const params = {
-        startTime: formattedStart,
-        endTime: formattedEnd,
-      };
-
-      const res = await axios.get(`${baseURL}visitor/repot`, { params });
-
-      if (res?.data?.success) {
-        setVisitors(res?.data?.data);
-        setTotalCount(res?.data?.totalCount);
-      }
-    } catch (error) {
-      console.error("Failed to fetch Yesterday visitor data:", error);
-      toast.error("Failed to fetch Yesterday visitor data.");
-    } finally {
-      setYdayLoading(false);
-    }
+    yesterday8AM.setDate(today8AM.getDate() - 1);
+    fetchVisitorData(
+      formatDate(yesterday8AM),
+      formatDate(today8AM),
+      setYdayLoading
+    );
   };
 
-  const fetchTdayVisitorData = async () => {
+  const fetchTdayVisitorData = () => {
     const now = new Date();
     const today8AM = new Date(now);
-    today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
-
-    const formatDate = (date) => {
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
-      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
-    const formattedStart = formatDate(today8AM);
-    const formattedEnd = formatDate(now); // Now = current time
-
-    try {
-      setTodayLoading(true);
-
-      setVisitors([]);
-      setTotalCount(0);
-
-      const params = {
-        startTime: formattedStart,
-        endTime: formattedEnd,
-      };
-
-      const res = await axios.get(`${baseURL}visitor/repot`, { params });
-      if (res?.data?.success) {
-        setVisitors(res?.data?.data);
-        setTotalCount(res?.data?.totalCount);
-      }
-    } catch (error) {
-      console.error("Failed to fetch Today production data:", error);
-      toast.error("Failed to fetch Today production data.");
-    } finally {
-      setTodayLoading(false);
-    }
+    today8AM.setHours(8, 0, 0, 0);
+    fetchVisitorData(formatDate(today8AM), formatDate(now), setTodayLoading);
   };
 
-  const fetchMTDVisitorData = async () => {
+  const fetchMTDVisitorData = () => {
     const now = new Date();
     const startOfMonth = new Date(
       now.getFullYear(),
@@ -113,90 +69,38 @@ const Reports = () => {
       8,
       0,
       0
-    ); // 1st day at 08:00 AM
-
-    const formatDate = (date) => {
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
-      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
-    const formattedStart = formatDate(startOfMonth);
-    const formattedEnd = formatDate(now);
-    try {
-      setMonthLoading(true);
-
-      setVisitors([]);
-      setTotalCount(0);
-
-      const params = {
-        startTime: formattedStart,
-        endTime: formattedEnd,
-      };
-
-      const res = await axios.get(`${baseURL}visitor/repot`, { params });
-
-      if (res?.data?.success) {
-        setVisitors(res?.data?.data);
-        setTotalCount(res?.data?.totalCount);
-      }
-    } catch (error) {
-      console.error("Failed to fetch this Month production data:", error);
-      toast.error("Failed to fetch this Month production data.");
-    } finally {
-      setMonthLoading(false);
-    }
+    );
+    fetchVisitorData(
+      formatDate(startOfMonth),
+      formatDate(now),
+      setMonthLoading
+    );
   };
 
   const fetchVisitors = async () => {
-    if (!startTime && !endTime) {
-      toast.error("Please select the Time Range.");
-    }
-    try {
-      setLoading(true);
-      const params = {
-        startTime,
-        endTime,
-      };
-
-      const res = await axios.get(`${baseURL}visitor/repot`, { params });
-      if (res?.data?.success) {
-        setVisitors(res?.data?.data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch reports:", error);
-      toast.error("Failed to fetch reports.");
-    } finally {
-      setLoading(false);
-    }
+    if (!startTime || !endTime)
+      return toast.error("Please select the Time Range.");
+    await fetchVisitorData(startTime, endTime, setLoading);
   };
 
-  // Search functionality
   const filteredReports = visitors.filter((item) => {
     const { term, field } = searchParams;
-
     if (!term) return true;
-
     const lowerTerm = term.toLowerCase();
     const safeLower = (value) => (value ? value.toLowerCase() : "");
 
     switch (field) {
       case "name":
-        return safeLower(item.name).includes(lowerTerm);
-
+        return safeLower(item.visitor_name).includes(lowerTerm);
       case "contactno":
         return safeLower(item.contact_no).includes(lowerTerm);
-
       case "email":
         return safeLower(item.email).includes(lowerTerm);
-
       case "company":
         return safeLower(item.company).includes(lowerTerm);
-
       default:
         return (
-          safeLower(item.name).includes(lowerTerm) ||
+          safeLower(item.visitor_name).includes(lowerTerm) ||
           safeLower(item.contact_no).includes(lowerTerm) ||
           safeLower(item.email).includes(lowerTerm) ||
           safeLower(item.company).includes(lowerTerm)
@@ -204,23 +108,15 @@ const Reports = () => {
     }
   });
 
-  // Send report via email
   const handleSendReport = async () => {
-    if (!filteredReports || filteredReports.length === 0) {
-      toast.error("No report data to send.");
-      return;
-    }
-
+    if (!filteredReports.length) return toast.error("No report data to send.");
     try {
       const res = await axios.post(`${baseURL}visitor/send-report`, {
         visitors: filteredReports,
       });
-
-      if (res?.data?.success) {
-        toast.success("Report sent successfully!");
-      } else {
-        toast.error(res?.data?.message || "Failed to send report.");
-      }
+      res?.data?.success
+        ? toast.success("Report sent successfully!")
+        : toast.error(res?.data?.message || "Failed to send report.");
     } catch (error) {
       console.error("Failed to send report:", error);
       toast.error("Failed to send report.");
@@ -228,288 +124,182 @@ const Reports = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
+    <div className="min-h-screen bg-gray-50 p-6">
       <Title title="Visitors Reports" align="center" />
 
-      {/* Tables Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
+      {/* Filters & Quick Actions */}
+      <div className="mt-6 bg-white p-6 rounded-xl shadow-sm flex flex-col md:flex-row gap-6 justify-between items-center">
+        <div className="flex flex-wrap gap-4 items-center w-full md:w-auto">
+          <DateTimePicker
+            label="Start Time"
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+          />
+          <DateTimePicker
+            label="End Time"
+            value={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
+          />
+          <Button
+            onClick={fetchVisitors}
+            bgColor="bg-blue-600"
+            textColor="text-white"
+            className="px-4 py-2"
+          >
+            {loading ? <Loader /> : "Query"}
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap gap-2 items-center">
+          <input
+            type="text"
+            placeholder="Search visitor..."
+            className="px-3 py-2 border rounded-md"
+            value={searchParams.term}
+            onChange={(e) =>
+              setSearchParams((prev) => ({ ...prev, term: e.target.value }))
+            }
+          />
+          <select
+            className="px-3 py-2 border rounded-md"
+            value={searchParams.field}
+            onChange={(e) =>
+              setSearchParams((prev) => ({ ...prev, field: e.target.value }))
+            }
+          >
+            <option value="all">All Fields</option>
+            <option value="name">Name</option>
+            <option value="contactno">Contact No.</option>
+            <option value="email">Email</option>
+            <option value="company">Company</option>
+          </select>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={fetchYdayVisitorData}
+            bgColor="bg-yellow-500"
+            textColor="text-black"
+          >
+            {ydayLoading ? <Loader /> : "YDAY"}
+          </Button>
+          <Button
+            onClick={fetchTdayVisitorData}
+            bgColor="bg-blue-500"
+            textColor="text-white"
+          >
+            {todayLoading ? <Loader /> : "TDAY"}
+          </Button>
+          <Button
+            onClick={fetchMTDVisitorData}
+            bgColor="bg-green-500"
+            textColor="text-white"
+          >
+            {monthLoading ? <Loader /> : "MTD"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Visitors Table */}
+      <div className="mt-6 bg-white p-4 rounded-xl shadow-sm overflow-x-auto">
         <div className="flex justify-between items-center mb-4">
-          <div className="flex-1 text-center">
-            <span className="text-2xl font-bold text-purple-800">
-              Visitors Reports Overview
-            </span>
-          </div>
+          <h3 className="text-lg font-semibold text-gray-700">
+            Visitors ({filteredReports.length})
+          </h3>
+          <Button
+            onClick={handleSendReport}
+            bgColor="bg-purple-600"
+            textColor="text-white"
+            className="px-4 py-2"
+          >
+            Send Report
+          </Button>
         </div>
 
-        {/* Filters and Search Section */}
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl mb-4 flex flex-wrap justify-around items-center">
-          <div className="flex flex-wrap items-center justify-center gap-2 bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl w-fit">
-            <DateTimePicker
-              label="Start Time"
-              name="startTime"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-            />
-            <DateTimePicker
-              label="End Time"
-              name="endTime"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-            />
-            <div>
-              <Button
-                bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
-                textColor={loading ? "text-white" : "text-black"}
-                className={`font-semibold ${
-                  loading ? "cursor-not-allowed" : ""
-                }`}
-                onClick={fetchVisitors}
-                disabled={loading}
-              >
-                Query
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <input
-              type="text"
-              placeholder="Search visitor..."
-              className="px-3 py-2 border rounded-md w-64"
-              value={searchParams.term}
-              onChange={(e) =>
-                setSearchParams((prev) => ({
-                  ...prev,
-                  term: e.target.value,
-                }))
-              }
-            />
-
-            <select
-              className="px-3 py-2 border rounded-md z-50"
-              value={searchParams.field}
-              onChange={(e) =>
-                setSearchParams((prev) => ({
-                  ...prev,
-                  field: e.target.value,
-                }))
-              }
-            >
-              <option value="all">All Fields</option>
-              <option value="name">Name</option>
-              <option value="contactno">Contact No.</option>
-              <option value="email">Email</option>
-              <option value="company">Company</option>
-            </select>
-          </div>
-
-          <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
-              Quick Filters
-            </h2>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Button
-                bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
-                textColor={ydayLoading ? "text-white" : "text-black"}
-                className={`font-semibold ${
-                  ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
-                }`}
-                onClick={() => fetchYdayVisitorData()}
-                disabled={ydayLoading}
-              >
-                YDAY
-              </Button>
-              {ydayLoading && <Loader />}
-              <Button
-                bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
-                textColor={todayLoading ? "text-white" : "text-black"}
-                className={`font-semibold ${
-                  todayLoading ? "cursor-not-allowed" : "cursor-pointer"
-                }`}
-                onClick={() => fetchTdayVisitorData()}
-                disabled={todayLoading}
-              >
-                TDAY
-              </Button>
-              {todayLoading && <Loader />}
-              <Button
-                bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
-                textColor={monthLoading ? "text-white" : "text-black"}
-                className={`font-semibold ${
-                  monthLoading ? "cursor-not-allowed" : "cursor-pointer"
-                }`}
-                onClick={() => fetchMTDVisitorData()}
-                disabled={monthLoading}
-              >
-                MTD
-              </Button>
-              {monthLoading && <Loader />}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-gray-300 rounded-md p-4">
-          <div className="flex flex-wrap gap-4">
-            <div className="w-full overflow-x-auto">
-              <div className="flex justify-between items-center mb-2 px-6">
-                <h3 className="text-xl font-semibold text-purple-700">
-                  Visitors
-                </h3>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">
-                    Total Visitors: {filteredReports.length || "0"}
-                  </span>
-                  <button
-                    className="bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700 text-sm cursor-pointer"
-                    onClick={handleSendReport}
-                  >
-                    Send Report
-                  </button>
-                </div>
-              </div>
-
-              <div className="border rounded-lg overflow-hidden">
-                <div className="max-h-[500px] overflow-y-auto">
-                  <table className="min-w-full bg-white text-xs text-left table-auto">
-                    <thead className="bg-purple-200 sticky top-0 z-10">
-                      <tr>
-                        <th className="px-2 py-2 text-center border-b w-[50px]">
-                          Sr.No.
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[120px]">
-                          Visitor Name
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[150px]">
-                          Contact No.
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          Email
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          Company
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          Address
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          State
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[120px]">
-                          City
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          Identity Type
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          Identity No
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          Vehicle Details
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          Department
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          Employee Name
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          Check In
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          Check Out
-                        </th>
-                        <th className="px-2 py-2 text-center border-b min-w-[100px]">
-                          Purpose
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {/* Conditional rendering for users */}
-                      {filteredReports && filteredReports.length > 0 ? (
-                        filteredReports.map((visitor, index) => (
-                          <tr
-                            key={index}
-                            className="hover:bg-gray-50 transition-colors duration-200"
-                          >
-                            <td className="px-2 py-2 text-center border-b">
-                              {index + 1}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.visitor_name}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.contact_no}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.email}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.company}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.address}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.state}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.city}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.identity_type}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.identity_no}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.vehicle_details}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.department_name}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.employee_name}
-                            </td>
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.check_in_time &&
-                                visitor.check_in_time
-                                  .replace("T", " ")
-                                  .replace("Z", "")}
-                            </td>
-                            <td className="px-4 py-2 border-b">
-                              {visitor.check_out_time === null ? (
-                                <span className="text-green-600 font-bold">
-                                  Currently In
-                                </span>
-                              ) : (
-                                visitor.check_out_time
-                                  .replace("T", " ")
-                                  .replace("Z", "")
-                              )}
-                            </td>
-
-                            <td className="px-2 py-2 text-center border-b">
-                              {visitor.purpose_of_visit}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td
-                            colSpan={17}
-                            className="text-center py-4 text-gray-500"
-                          >
-                            No visitors found. Add a new visitor to get started.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <table className="min-w-full table-auto text-sm border-collapse">
+          <thead className="bg-gray-100 sticky top-0">
+            <tr>
+              {[
+                "Sr.No.",
+                "Name",
+                "Contact",
+                "Email",
+                "Company",
+                "Address",
+                "State",
+                "City",
+                "ID Type",
+                "ID No",
+                "Vehicle",
+                "Department",
+                "Employee",
+                "Check In",
+                "Check Out",
+                "Purpose",
+              ].map((header, idx) => (
+                <th key={idx} className="px-2 py-2 border text-center">
+                  {header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredReports.length ? (
+              filteredReports.map((v, i) => (
+                <tr key={i} className="hover:bg-gray-50 transition">
+                  <td className="px-2 py-1 border text-center">{i + 1}</td>
+                  <td className="px-2 py-1 border text-center">
+                    {v.visitor_name}
+                  </td>
+                  <td className="px-2 py-1 border text-center">
+                    {v.contact_no}
+                  </td>
+                  <td className="px-2 py-1 border text-center">{v.email}</td>
+                  <td className="px-2 py-1 border text-center">{v.company}</td>
+                  <td className="px-2 py-1 border text-center">{v.address}</td>
+                  <td className="px-2 py-1 border text-center">{v.state}</td>
+                  <td className="px-2 py-1 border text-center">{v.city}</td>
+                  <td className="px-2 py-1 border text-center">
+                    {v.identity_type}
+                  </td>
+                  <td className="px-2 py-1 border text-center">
+                    {v.identity_no}
+                  </td>
+                  <td className="px-2 py-1 border text-center">
+                    {v.vehicle_details}
+                  </td>
+                  <td className="px-2 py-1 border text-center">
+                    {v.department_name}
+                  </td>
+                  <td className="px-2 py-1 border text-center">
+                    {v.employee_name}
+                  </td>
+                  <td className="px-2 py-1 border text-center">
+                    {v.check_in_time?.replace("T", " ").replace("Z", "")}
+                  </td>
+                  <td className="px-2 py-1 border text-center">
+                    {v.check_out_time ? (
+                      v.check_out_time.replace("T", " ").replace("Z", "")
+                    ) : (
+                      <span className="text-green-600 font-bold">
+                        Currently In
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-2 py-1 border text-center">
+                    {v.purpose_of_visit}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={16} className="text-center py-4 text-gray-500">
+                  No visitors found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
