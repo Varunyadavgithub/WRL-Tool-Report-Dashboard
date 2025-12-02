@@ -184,12 +184,12 @@ const MENU_CONFIG = [
       },
       {
         path: "/visitor/generate-pass",
-        label: "Visitor Pass",
+        label: "Generate Pass",
         roles: ["admin", "security", "hr"],
       },
       {
         path: "/visitor/in-out",
-        label: "Visitor In Out",
+        label: "In / Out",
         roles: ["admin", "security", "hr"],
       },
       {
@@ -198,14 +198,14 @@ const MENU_CONFIG = [
         roles: ["admin", "security", "hr"],
       },
       {
+        path: "/visitor/history",
+        label: "History",
+        roles: ["admin", "security", "hr"],
+      },
+      {
         path: "/visitor/manage-employee",
         label: "Manage Employee",
         roles: ["admin", "hr"],
-      },
-      {
-        path: "/visitor/history",
-        label: "Visitor History",
-        roles: ["admin", "security", "hr"],
       },
     ],
   },
