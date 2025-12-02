@@ -1,84 +1,6 @@
 import sql, { dbConfig3 } from "../../config/db.js";
 
-export const getVisitorFullHistory = async (req, res) => {
-  const { visitorId } = req.params;
-
-  if (!visitorId) {
-    return res.status(400).json({
-      success: false,
-      message: "Visitor ID is required",
-    });
-  }
-
-  try {
-    const pool = await new sql.ConnectionPool(dbConfig3).connect();
-
-    // Fetch visitor basic info
-    const visitorInfo = await pool
-      .request()
-      .input("VisitorId", sql.VarChar(50), visitorId).query(`
-        SELECT 
-            v.visitor_id,
-            v.name AS visitor_name,
-            v.contact_no,
-            v.email,
-            v.company,
-            v.address,
-            v.city,
-            v.state,
-            v.identity_type,
-            v.identity_no,
-            v.vehicle_details,
-            v.photo_url AS visitor_photo
-        FROM visitors v
-        WHERE v.visitor_id = @VisitorId
-      `);
-
-    if (visitorInfo.recordset.length === 0) {
-      await pool.close();
-      return res.status(404).json({
-        success: false,
-        message: "Visitor not found",
-      });
-    }
-
-    // Fetch full visit logs
-    const logs = await pool
-      .request()
-      .input("VisitorId", sql.VarChar(50), visitorId).query(`
-        SELECT 
-            vp.pass_id,
-            d.department_name,
-            u.name AS employee_name,
-            vp.purpose_of_visit,
-            vl.check_in_time,
-            vl.check_out_time
-        FROM visitor_passes vp
-        INNER JOIN visit_logs vl ON vl.unique_pass_id = vp.pass_id
-        INNER JOIN departments d ON d.deptCode = vp.department_to_visit
-        INNER JOIN users u ON u.employee_id = vp.employee_to_visit
-        WHERE vp.visitor_id = @VisitorId
-        ORDER BY vl.check_in_time DESC
-      `);
-
-    await pool.close();
-    
-    return res.status(200).json({
-      success: true,
-      message: "Visitor full history fetched successfully",
-      visitor: visitorInfo.recordset[0],
-      visit_logs: logs.recordset,
-    });
-  } catch (error) {
-    console.error("Error fetching visitor full history:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch visitor full history",
-    });
-  }
-};
-
-export const getAllVisitorsHistory = async (req, res) => {
+export const getAllVisitors = async (req, res) => {
   try {
     const { limit = 100, offset = 0 } = req.query;
     const pool = await new sql.ConnectionPool(dbConfig3).connect();
@@ -148,6 +70,85 @@ export const getAllVisitorsHistory = async (req, res) => {
       success: false,
       message: "Failed to fetch visitor history",
       error: error.message,
+    });
+  }
+};
+
+export const getVisitorDetails = async (req, res) => {
+  const { visitorId } = req.params;
+
+  if (!visitorId) {
+    return res.status(400).json({
+      success: false,
+      message: "Visitor ID is required",
+    });
+  }
+
+  try {
+    const pool = await new sql.ConnectionPool(dbConfig3).connect();
+
+    // Fetch visitor basic info
+    const visitorInfo = await pool
+      .request()
+      .input("VisitorId", sql.VarChar(50), visitorId).query(`
+        SELECT 
+            v.visitor_id,
+            v.name AS visitor_name,
+            v.contact_no,
+            v.email,
+            v.company,
+            v.address,
+            v.city,
+            v.state,
+            v.identity_type,
+            v.identity_no,
+            v.vehicle_details,
+            v.photo_url AS visitor_photo
+        FROM visitors v
+        WHERE v.visitor_id = @VisitorId
+      `);
+
+    if (visitorInfo.recordset.length === 0) {
+      await pool.close();
+      return res.status(404).json({
+        success: false,
+        message: "Visitor not found",
+      });
+    }
+
+    // Fetch full visit logs
+    const logs = await pool
+      .request()
+      .input("VisitorId", sql.VarChar(50), visitorId).query(`
+        SELECT 
+            vp.pass_id,
+            vp.token,
+            d.department_name,
+            u.name AS employee_name,
+            vp.purpose_of_visit,
+            vl.check_in_time,
+            vl.check_out_time
+        FROM visitor_passes vp
+        INNER JOIN visit_logs vl ON vl.unique_pass_id = vp.pass_id
+        INNER JOIN departments d ON d.deptCode = vp.department_to_visit
+        INNER JOIN users u ON u.employee_id = vp.employee_to_visit
+        WHERE vp.visitor_id = @VisitorId
+        ORDER BY vl.check_in_time DESC
+      `);
+
+    await pool.close();
+    
+    return res.status(200).json({
+      success: true,
+      message: "Visitor full history fetched successfully",
+      visitor: visitorInfo.recordset[0],
+      visit_logs: logs.recordset,
+    });
+  } catch (error) {
+    console.error("Error fetching visitor full history:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch visitor full history",
     });
   }
 };

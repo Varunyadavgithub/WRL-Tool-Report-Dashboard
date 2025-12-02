@@ -75,7 +75,7 @@ const ManageEmployee = lazy(() => import("./pages/Visitor/ManageEmployee"));
 const VisitorDashboard = lazy(() => import("./pages/Visitor/Dashboard"));
 const VisitorReports = lazy(() => import("./pages/Visitor/Reports"));
 const VisitorInOut = lazy(() => import("./pages/Visitor/VisitorInOut"));
-const VisitorHistory = lazy(() => import("./pages/Visitor/AllVisitors"));
+const VisitorHistory = lazy(() => import("./pages/Visitor/VisitorHistory"));
 
 const LogisticsDisplay = lazy(() =>
   import("./pages/PerformanceDisplays/LogisticsDisplay")
@@ -285,15 +285,15 @@ function App() {
                 element={<ManageEmployee />}
               />
             )}
+            {canAccess(["admin", "security", "hr"]) && (
+              <Route path="/visitor/history" element={<VisitorHistory />} />
+            )}
             {/*-------------------------------------------------------------- Performance Displays --------------------------------------------------------------*/}
             {canAccess(["admin"]) && (
               <Route
                 path="/displays/logistics"
                 element={<LogisticsDisplay />}
               />
-            )}
-            {canAccess(["admin", "security", "hr"]) && (
-              <Route path="/visitor/history" element={<VisitorHistory />} />
             )}
             {/*-------------------------------------------------------------- Catch All --------------------------------------------------------------*/}
             <Route path="*" element={<NotFound />} />

@@ -73,7 +73,7 @@ export const generateVisitorPass = async (req, res) => {
     departmentTo,
     employeeTo,
     visitType,
-    remark,
+    token,
     specialInstruction,
     purposeOfVisit,
     createdBy,
@@ -176,7 +176,7 @@ export const generateVisitorPass = async (req, res) => {
     passRequest.input("DepartmentToVisit", sql.VarChar(100), departmentTo);
     passRequest.input("EmployeeToVisit", sql.VarChar(50), employeeTo || null);
     passRequest.input("VisitType", sql.VarChar(50), visitType);
-    passRequest.input("Remark", sql.VarChar(50), remark);
+    passRequest.input("Token", sql.VarChar(50), token);
     passRequest.input("NoOfPeople", sql.Int, noOfPeople || 1);
     passRequest.input(
       "AllowOn",
@@ -210,13 +210,13 @@ export const generateVisitorPass = async (req, res) => {
       INSERT INTO visitor_passes (
         pass_id, visitor_id, visitor_photo, visitor_name, visitor_contact_no,
         visitor_email, department_to_visit, employee_to_visit, visit_type,
-        remark, no_of_people, allow_on, allow_till, special_instructions,
+        token, no_of_people, allow_on, allow_till, special_instructions,
         purpose_of_visit, created_by, company, nationality, identity_type,
         identity_no, address, country, state, city, vehicle_details, status
       )
       VALUES (
         @PassId, @Visitor_id, @VisitorPhoto, @Name, @ContactNo, @Email,
-        @DepartmentToVisit, @EmployeeToVisit, @VisitType, @Remark, @NoOfPeople,
+        @DepartmentToVisit, @EmployeeToVisit, @VisitType, @Token, @NoOfPeople,
         @AllowOn, @AllowTill, @SpecialInstructions, @PurposeOfVisit, @CreatedBy,
         @Company, @Nationality, @IdentityType, @IdentityNo, @Address, @Country,
         @State, @City, @VehicleDetails, @Status
