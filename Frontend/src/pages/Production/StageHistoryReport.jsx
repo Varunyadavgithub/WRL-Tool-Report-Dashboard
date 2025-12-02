@@ -127,23 +127,23 @@ function StageHistoryReport() {
                             {item.Dispt_Unload_time?.replace("T", " ").replace(
                               "Z",
                               ""
-                            )}
+                            ) || "FG not Dispatched"}
                           </td>
                           <td className="px-1 py-1 border">
-                            {item.Session_ID}
+                            {item.Session_ID || "FG not Dispatched"}
                           </td>
                           <td className="px-1 py-1 border">
                             {item.Dispatch_time?.replace("T", " ").replace(
                               "Z",
                               ""
-                            )}
+                            ) || "FG not Dispatched"}
                           </td>
                           <td className="px-1 py-1 border">
-                            {item.Vehicle_No}
+                            {item.Vehicle_No || "FG not Dispatched"}
                           </td>
-                          <td className="px-1 py-1 border">{item.DockNo}</td>
+                          <td className="px-1 py-1 border">{item.DockNo || "FG not Dispatched"}</td>
                           <td className="px-1 py-1 border">
-                            {item.LatestStatus}
+                            {item.LatestStatus || "FG not Dispatched"}
                           </td>
                         </tr>
                       ))

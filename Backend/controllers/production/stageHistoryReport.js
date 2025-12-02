@@ -73,8 +73,8 @@ export const getLogisticStatus = async (req, res) => {
     let query = `
       Select du.DateTime [Dispt_Unload_time], dm.Session_ID, dm.AddedOn [Dispatch_time], td.Vehicle_No, td.DockNo, td.LatestStatus  
       from DispatchUnloading du
-      inner join DispatchMaster dm on dm.FGSerialNo = du.FGSerialNo
-      inner join Tracking_Document td on td.Session_ID = dm.Session_ID
+      left join DispatchMaster dm on dm.FGSerialNo = du.FGSerialNo
+      left join Tracking_Document td on td.Session_ID = dm.Session_ID
       where du.FGSerialNo = @serialNumber
     `;
 
