@@ -1,4 +1,9 @@
+import fs from "fs";
+import path from "path";
 import sql, { dbConfig1 } from "../../config/db.js";
+
+// Path where defect images are uploaded
+const uploadDir = path.join(process.cwd(), "uploads/FpaDefectImages");
 
 export const getFpaReport = async (req, res) => {
   const { startDate, endDate, model } = req.query;
@@ -251,5 +256,74 @@ ORDER BY Year DESC;
   } catch (err) {
     console.error("SQL Error:", err.message);
     res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+export const downloadDefectImage = async (req, res) => {
+  const { fgSrNo } = req.params; // Identify record by FGSRNo
+  const { filename } = req.query;
+
+  if (!fgSrNo || !filename) {
+    return res.status(400).json({
+      success: false,
+      message: "FGSerialNumber and filename are required",
+    });
+  }
+
+  const filePath = path.join(uploadDir, filename);
+
+  try {
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: "File not found on server",
+      });
+    }
+
+    // Verify file in database
+    const pool = await sql.connect(dbConfig1);
+    const query = `
+      SELECT DefectImage
+      FROM FPAReport
+      WHERE FGSRNo = @FGSRNo AND DefectImage = @FileName
+    `;
+    const result = await pool
+      .request()
+      .input("FGSRNo", sql.NVarChar, fgSrNo.trim())
+      .input("FileName", sql.NVarChar, filename)
+      .query(query);
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "File record not found in database",
+      });
+    }
+
+    // Set headers for download
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Type", "application/octet-stream");
+
+    // Stream the file
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+
+    fileStream.on("error", (error) => {
+      console.error("File streaming error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error streaming file",
+      });
+    });
+
+    await pool.close();
+  } catch (error) {
+    console.error("Download error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error during file download",
+      error: error.message,
+    });
   }
 };

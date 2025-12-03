@@ -8,6 +8,7 @@ import {
   getFPQIDetails,
 } from "../controllers/quality/fpa.js";
 import {
+  downloadDefectImage,
   getFpaDailyReport,
   getFpaMonthlyReport,
   getFpaReport,
@@ -70,6 +71,7 @@ router.post(
   handleMulterError,
   addDefect
 );
+router.get("/download-fpa-defect-image/:fgSrNo", downloadDefectImage);
 
 // -----------------> FPA Report Routes
 router.get("/fpa-report", getFpaReport);

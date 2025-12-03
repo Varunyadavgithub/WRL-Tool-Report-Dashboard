@@ -579,19 +579,40 @@ const FPAReports = () => {
 };
 
 const FpaReportTable = ({ data }) => {
-  const handleDownloadImage = (imageUrl, fileName = "defect-image") => {
-    if (!imageUrl) {
-      alert("No image available for this record.");
-      return;
-    }
+  // Download defect image handler
+const handleDownloadImage = async (fgSrNo, fileName) => {
+  if (!fgSrNo || !fileName) {
+    toast.error("No image available for this record.");
+    return;
+  }
 
+  try {
+    const response = await axios({
+      url: `${baseURL}quality/download-fpa-defect-image/${fgSrNo}`, // use fgSrNo
+      method: "GET",
+      responseType: "blob",
+      params: { filename: fileName }, // send filename as query param
+    });
+
+    // Create a blob link to download
+    const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement("a");
-    link.href = imageUrl;
-    link.download = fileName;
+    link.href = url;
+    link.setAttribute("download", fileName);
     document.body.appendChild(link);
     link.click();
+
+    // Clean up
     document.body.removeChild(link);
-  };
+    window.URL.revokeObjectURL(url);
+
+    toast.success("File download started");
+  } catch (error) {
+    console.error("Download error:", error);
+    toast.error("Failed to download file");
+  }
+};
+
   return (
     <div className="w-full max-h-[600px] overflow-x-auto">
       <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
@@ -615,7 +636,7 @@ const FpaReportTable = ({ data }) => {
               <tr key={index} className="hover:bg-gray-100 text-center">
                 <td className="px-1 py-1 border">{row.SRNo}</td>
                 <td className="px-1 py-1 border">
-                  {row.Date && row.Date.replace("T", " ").replace("Z", "")}
+                  {row.Date ? row.Date.replace("T", " ").replace("Z", "") : ""}
                 </td>
                 <td className="px-1 py-1 border">{row.Model}</td>
                 <td className="px-1 py-1 border">{row.Shift}</td>
@@ -625,28 +646,21 @@ const FpaReportTable = ({ data }) => {
                 <td className="px-1 py-1 border">{row.AddDefect}</td>
                 <td className="px-1 py-1 border">{row.Remark}</td>
                 <td className="px-1 py-1 border text-center">
-                  {row.ImageUrl || row.DefectImage || row.ImagePath ? (
-                    <button
-                      onClick={() =>
-                        handleDownloadImage(
-                          row.DefectImage,
-                          `FPA_${row.FGSRNo || index}.png`
-                        )
-                      }
-                      className="text-blue-600 hover:text-blue-800 text-lg"
-                      title="Download Image"
-                    >
-                      <FaDownload />
-                    </button>
-                  ) : (
-                    <span className="text-gray-400 text-xs">No Image</span>
-                  )}
+                  <button
+                    onClick={() =>
+                      handleDownloadImage(row.FGSRNo, row.DefectImage)
+                    }
+                    className="text-blue-600 hover:text-blue-800 text-lg cursor-pointer"
+                    title="Download Image"
+                  >
+                    <FaDownload />
+                  </button>
                 </td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan={8} className="text-center py-4">
+              <td colSpan={10} className="text-center py-4">
                 No data found.
               </td>
             </tr>

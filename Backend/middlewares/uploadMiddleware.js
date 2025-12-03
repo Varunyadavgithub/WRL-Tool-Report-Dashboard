@@ -4,26 +4,16 @@ import fs from "fs";
 
 // Create uploads directory if not exists
 const uploadsDir = path.resolve("uploads");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir);
-}
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
 // Ensure subdirectories exist
 const fiveDaysPlanDir = path.resolve(uploadsDir, "FiveDaysPlan");
 const bisReportDir = path.resolve(uploadsDir, "BISReport");
 const fpaDefectImagesDir = path.resolve(uploadsDir, "FpaDefectImages");
 
-if (!fs.existsSync(fiveDaysPlanDir)) {
-  fs.mkdirSync(fiveDaysPlanDir);
-}
-
-if (!fs.existsSync(bisReportDir)) {
-  fs.mkdirSync(bisReportDir);
-}
-
-if (!fs.existsSync(fpaDefectImagesDir)) {
-  fs.mkdirSync(fpaDefectImagesDir);
-}
+if (!fs.existsSync(fiveDaysPlanDir)) fs.mkdirSync(fiveDaysPlanDir);
+if (!fs.existsSync(bisReportDir)) fs.mkdirSync(bisReportDir);
+if (!fs.existsSync(fpaDefectImagesDir)) fs.mkdirSync(fpaDefectImagesDir);
 
 // Generic storage configuration
 const createStorage = (folder) => {
@@ -33,21 +23,32 @@ const createStorage = (folder) => {
       cb(null, uploadPath);
     },
     filename: (req, file, cb) => {
-      const uniqueValue = Math.floor(
-        100000 + Math.random() * 900000
-      ).toString();
-
       const ext = path.extname(file.originalname);
       const baseFileName = path.basename(file.originalname, ext);
 
-      // Create unique filename
-      const uniqueFilename = `${baseFileName}-${uniqueValue}${ext}`;
+      let uniqueFilename;
+
+      // Special handling for FPA defect images
+      if (folder === "FpaDefectImages") {
+        const { FGSerialNumber } = req.body;
+        if (!FGSerialNumber) {
+          return cb(new Error("FGSerialNumber is required for defect images"));
+        }
+        uniqueFilename = `${FGSerialNumber}-${Date.now()}${ext}`;
+      } else {
+        // Default random number for other uploads
+        const uniqueValue = Math.floor(
+          100000 + Math.random() * 900000
+        ).toString();
+        uniqueFilename = `${baseFileName}-${uniqueValue}${ext}`;
+      }
+
       cb(null, uniqueFilename);
     },
   });
 };
 
-// # File type configurations (keep existing)
+// File type configurations
 const fileTypes = {
   excel: {
     allowedTypes: [
@@ -64,24 +65,21 @@ const fileTypes = {
   },
 };
 
-// # Image file settings
+// Image file settings
 const imageFileTypes = {
   allowedTypes: ["image/jpeg", "image/jpg", "image/png"],
   maxSize: 5 * 1024 * 1024, // 5MB
   errorMessage: "Only JPG, JPEG, PNG images under 5MB are allowed",
 };
 
-// Generic file filter (keep existing)
-const createFileFilter = (fileType) => {
-  return (_, file, cb) => {
-    const config = fileTypes[fileType];
-
-    if (config.allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error(config.errorMessage), false);
-    }
-  };
+// Generic file filter
+const createFileFilter = (fileType) => (_, file, cb) => {
+  const config = fileTypes[fileType];
+  if (config.allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error(config.errorMessage), false);
+  }
 };
 
 // Image file filter
@@ -93,43 +91,36 @@ const imageFileFilter = (_, file, cb) => {
   }
 };
 
-// Upload Five Days Plan Excel middlewares
+// Upload middlewares
 export const uploadFiveDaysPlanExcel = multer({
   storage: createStorage("FiveDaysPlan"),
   fileFilter: createFileFilter("excel"),
-  limits: {
-    fileSize: fileTypes.excel.maxSize,
-  },
+  limits: { fileSize: fileTypes.excel.maxSize },
 });
 
-// Upload BIS Report PDF middlewares
 export const uploadBISReportPDF = multer({
   storage: createStorage("BISReport"),
   fileFilter: createFileFilter("pdf"),
-  limits: {
-    fileSize: fileTypes.pdf.maxSize,
-  },
+  limits: { fileSize: fileTypes.pdf.maxSize },
 });
 
-// FPA Defect Image Upload Middleware
+// FPA Defect Image Upload Middleware (FGSerialNumber-based filename)
 export const uploadFpaDefectImage = multer({
   storage: createStorage("FpaDefectImages"),
   fileFilter: imageFileFilter,
   limits: { fileSize: imageFileTypes.maxSize },
 });
 
-// Existing error handling middleware
+// Error handling middleware
 export const handleMulterError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    return res.status(400).json({
-      success: false,
-      message: err.message || "File upload error",
-    });
+    return res
+      .status(400)
+      .json({ success: false, message: err.message || "File upload error" });
   } else if (err) {
-    return res.status(400).json({
-      success: false,
-      message: err.message || "File upload failed",
-    });
+    return res
+      .status(400)
+      .json({ success: false, message: err.message || "File upload failed" });
   }
   next();
 };

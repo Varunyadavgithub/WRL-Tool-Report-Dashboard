@@ -354,20 +354,20 @@ const FPA = () => {
           </div>
         </div>
 
-   {/* Chart Section */}
-<div className="bg-white border border-gray-300 rounded-md p-4 mt-4 
+        {/* Chart Section */}
+        <div
+          className="bg-white border border-gray-300 rounded-md p-4 mt-4 
      flex flex-col items-center justify-start shadow 
-     w-full lg:w-[420px] h-[300px]">
+     w-full lg:w-[420px] h-[300px]"
+        >
+          <h2 className="text-center font-semibold mb-3">
+            FPA vs Sample Inspected
+          </h2>
 
-  <h2 className="text-center font-semibold mb-3">
-    FPA vs Sample Inspected
-  </h2>
-
-  <div className="w-full h-[230px] flex items-center justify-center">
-    <Bar data={chartData} options={chartOptions} />
-  </div>
-</div>
-
+          <div className="w-full h-[230px] flex items-center justify-center">
+            <Bar data={chartData} options={chartOptions} />
+          </div>
+        </div>
       </div>
 
       {/* Summary Section */}
