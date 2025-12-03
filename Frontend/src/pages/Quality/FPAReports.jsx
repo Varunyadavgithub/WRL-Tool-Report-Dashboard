@@ -300,35 +300,54 @@ const FPAReports = () => {
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
 
-  const getChartConfig = () => {
+const getChartConfig = () => {
     if (!reportData || reportData.length === 0) return null;
+
+    let sortedData = [...reportData];
+
+    // ✅ Sort based on X-axis value
+    if (reportType === "dailyFpaReport") {
+      sortedData.sort((a, b) => new Date(a.ShiftDate) - new Date(b.ShiftDate));
+    } else if (reportType === "monthlyFpaReport") {
+      sortedData.sort((a, b) => {
+        const monthA = new Date(`01 ${a.Month} 2000`);
+        const monthB = new Date(`01 ${b.Month} 2000`);
+        return monthA - monthB;
+      });
+    } else if (reportType === "yearlyFpaReport") {
+      sortedData.sort((a, b) => a.Year - b.Year);
+    }
 
     let labels = [];
 
     if (reportType === "dailyFpaReport") {
-      labels = reportData.map((item) => item.ShiftDate?.slice(0, 10));
+      labels = sortedData.map((item) => item.ShiftDate?.slice(0, 10));
     } else if (reportType === "monthlyFpaReport") {
-      labels = reportData.map((item) => item.Month);
+      labels = sortedData.map((item) => item.Month);
     } else if (reportType === "yearlyFpaReport") {
-      labels = reportData.map((item) => item.Year);
+      labels = sortedData.map((item) => item.Year);
     }
+
+    // ✅ Dynamic chart type
+    const chartType = reportType === "dailyFpaReport" ? "line" : "bar";
 
     return {
       labels,
 
       datasets: [
-        // ✅ BAR: Actual FPQI
         {
-          type: "bar",
+          type: chartType, // ✅ Line for Daily, Bar for Monthly & Yearly
           label: "FPQI Value",
-          data: reportData.map((i) => i.FPQI),
+          data: sortedData.map((i) => i.FPQI),
           backgroundColor: "rgba(59, 130, 246, 0.7)",
+          borderColor: "rgba(59, 130, 246, 1)", // Needed for line
+          borderWidth: 2,
+          tension: reportType === "dailyFpaReport" ? 0.4 : 0, // Smooth only for line
         },
 
-        // ✅ LINE: Target FPQI = 1.4 (HORIZONTAL LINE)
         {
-          type: "line",
-          label: "Target FPQI (1.4)",
+          type: "line", // ✅ Target must ALWAYS stay line
+          label: "Target FPQI (1.6)",
           data: Array(labels.length).fill(1.4),
           borderColor: "rgba(34, 197, 94, 1)",
           borderWidth: 2,
@@ -338,6 +357,7 @@ const FPAReports = () => {
       ],
     };
   };
+
 
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
