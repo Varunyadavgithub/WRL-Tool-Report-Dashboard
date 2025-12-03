@@ -44,7 +44,7 @@ const VisitorPassDisplay = () => {
   if (!passDetails) return <div>No pass details found</div>;
 
   return (
-    <div className="bg-gray-100 flex flex-col gap-4 justify-center m-7 items-center">
+    <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
       {/* ✅ WRAP ONLY THE PRINT AREA IN A UNIQUE CONTAINER */}
       <div className="visitor-pass-print-area relative w-full max-w-full border-4 border-double border-black p-1 bg-white box-border">
         {/* QR Top Right */}

@@ -9,7 +9,7 @@ import { useEffect } from "react";
 import { baseURL } from "../../assets/assets";
 import { data, useNavigate } from "react-router-dom";
 
-const VisitorPass = () => {
+const GeneratePass = () => {
   const { user } = useSelector((store) => store.auth);
   const navigate = useNavigate();
 
@@ -317,15 +317,16 @@ const VisitorPass = () => {
       setFetchLoading(false);
     }
   };
+
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
-      <Title title="Visitor Pass" align="center" />
+      <Title title="Generate Pass" align="center" />
 
       {/* Visitor Pass Form */}
       <form onSubmit={handleSubmit} className="mt-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Personal Information Section */}
-          <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl">
+          <div className="bg-white shadow-md rounded-xl p-6 border border-gray-200">
             <h2 className="text-xl font-semibold mb-4 text-center">
               Personal Information
             </h2>
@@ -440,7 +441,7 @@ const VisitorPass = () => {
               </div>
             </div>
           </div>
-          <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl">
+          <div className="bg-white shadow-md rounded-xl p-6 border border-gray-200">
             <h2 className="text-xl font-semibold mb-4 text-center">
               Address & Identity
             </h2>
@@ -559,7 +560,7 @@ const VisitorPass = () => {
           </div>
 
           {/* Visit Details Section */}
-          <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl">
+          <div className="bg-white shadow-md rounded-xl p-6 border border-gray-200">
             <h2 className="text-xl font-semibold mb-4 text-center">
               Visit Details
             </h2>
@@ -719,4 +720,4 @@ const VisitorPass = () => {
   );
 };
 
-export default VisitorPass;
+export default GeneratePass;

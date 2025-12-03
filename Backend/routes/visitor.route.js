@@ -8,29 +8,28 @@ import {
   addUser,
   updateUser,
   deleteUser,
-} from "../controllers/visitor/manageEmployee.js";
+} from "../controllers/visitor/manageEmployee.controller.js";
 import {
   getEmployee,
   generateVisitorPass,
   fetchPreviousPass,
   getVisitorPassDetails,
-} from "../controllers/visitor/visitorPass.js";
+} from "../controllers/visitor/generatepass.controller.js";
 import {
   visitorIn,
   visitorOut,
   getVisitorLogs,
-} from "../controllers/visitor/visitorInOut.js";
+} from "../controllers/visitor/inOut.controller.js";
 import {
   fetchVisitors,
   sendVisitorReport,
-} from "../controllers/visitor/reports.js";
-import { visitors } from "../controllers/visitor/visitors.js";
-import { getDashboardStats } from "../controllers/visitor/dashboard.js";
-import { notifyCurrentlyInsideVisitors } from "../controllers/visitor/currentlyInside.js";
+} from "../controllers/visitor/reports.controller.js";
+import { visitors } from "../controllers/visitor/visitors.controller.js";
+import { getDashboardStats } from "../controllers/visitor/dashboard.controller.js";
 import {
   getAllVisitors,
   getVisitorDetails,
-} from "../controllers/visitor/visitorHistoryController.js";
+} from "../controllers/visitor/history.controller.js";
 
 const router = express.Router();
 
@@ -58,7 +57,6 @@ router.post("/in", visitorIn);
 router.post("/out", visitorOut);
 router.get("/logs", getVisitorLogs);
 router.get("/reprint/:passId", getVisitorPassDetails);
-router.post("/notify-currently-inside", notifyCurrentlyInsideVisitors);
 
 // -----------------> Visitor Reports Routes
 router.get("/repot", fetchVisitors);

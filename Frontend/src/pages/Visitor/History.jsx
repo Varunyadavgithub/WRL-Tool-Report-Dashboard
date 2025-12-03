@@ -8,7 +8,7 @@ import { FaEye } from "react-icons/fa";
 import { baseURL } from "../../assets/assets";
 import Loader from "../../components/common/Loader";
 
-const VisitorHistory = () => {
+const History = () => {
   const [allVisitors, setAllVisitors] = useState([]);
   const [visitors, setVisitors] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -94,7 +94,7 @@ const VisitorHistory = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 md:px-8">
+    <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
       <Title title="Visitor History" align="center" />
 
       {/* Filters */}
@@ -174,9 +174,15 @@ const VisitorHistory = () => {
             Prev
           </Button>
           <Button
-            onClick={() => offset + limit < totalCount && setOffset(offset + limit)}
-            bgColor={offset + limit < totalCount ? "bg-blue-600" : "bg-gray-300"}
-            textColor={offset + limit < totalCount ? "text-white" : "text-black"}
+            onClick={() =>
+              offset + limit < totalCount && setOffset(offset + limit)
+            }
+            bgColor={
+              offset + limit < totalCount ? "bg-blue-600" : "bg-gray-300"
+            }
+            textColor={
+              offset + limit < totalCount ? "text-white" : "text-black"
+            }
             className="px-4 py-2 rounded-lg"
           >
             Next
@@ -218,10 +224,12 @@ const VisitorHistory = () => {
                 <h3 className="mt-4 text-lg font-semibold">{v.visitor_name}</h3>
                 <p className="text-gray-500 text-sm">{v.company || "N/A"}</p>
                 <p className="text-gray-400 text-sm mt-1">
-                  Last Visit: {v.check_in_time?.replace("T", " ").replace("Z", "") || "N/A"}
+                  Last Visit:{" "}
+                  {v.check_in_time?.replace("T", " ").replace("Z", "") || "N/A"}
                 </p>
                 <p className="text-gray-400 text-sm">
-                  Visited: {v.employee_name || "N/A"} ({v.department_name || "N/A"})
+                  Visited: {v.employee_name || "N/A"} (
+                  {v.department_name || "N/A"})
                 </p>
                 <p className="mt-2 text-blue-600 font-medium">
                   Visits: {v.total_passes ?? 0}
@@ -269,18 +277,24 @@ const VisitorHistory = () => {
                 </div>
               )}
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">{selectedVisitor.visitor_name}</h2>
+                <h2 className="text-2xl font-bold text-gray-800">
+                  {selectedVisitor.visitor_name}
+                </h2>
                 <p className="text-gray-500 mt-1 flex items-center gap-2">
-                  <span className="font-medium">Contact:</span> {selectedVisitor.contact_no || "N/A"}
+                  <span className="font-medium">Contact:</span>{" "}
+                  {selectedVisitor.contact_no || "N/A"}
                 </p>
                 <p className="text-gray-500 mt-1 flex items-center gap-2">
-                  <span className="font-medium">Company:</span> {selectedVisitor.company || "N/A"}
+                  <span className="font-medium">Company:</span>{" "}
+                  {selectedVisitor.company || "N/A"}
                 </p>
               </div>
             </div>
 
             {/* Recent Visits */}
-            <h3 className="text-xl font-semibold text-gray-700 mb-3">Recent Visits</h3>
+            <h3 className="text-xl font-semibold text-gray-700 mb-3">
+              Recent Visits
+            </h3>
             {visitLogs.length === 0 ? (
               <p className="text-gray-500 text-sm">No visit logs found.</p>
             ) : (
@@ -293,21 +307,40 @@ const VisitorHistory = () => {
                     <div className="flex justify-between items-start mb-2">
                       <div className="space-y-1">
                         <p className="text-gray-700 font-medium text-sm">
-                          Check-in: {log.check_in_time?.replace("T", " ").replace("Z", "") || "N/A"}
+                          Check-in:{" "}
+                          {log.check_in_time
+                            ?.replace("T", " ")
+                            .replace("Z", "") || "N/A"}
                         </p>
-                        <p className="text-gray-500 text-sm">Employee: {log.employee_name || "N/A"}</p>
-                        <p className="text-gray-500 text-sm">Token: {log.token || "N/A"}</p>
+                        <p className="text-gray-500 text-sm">
+                          Employee: {log.employee_name || "N/A"}
+                        </p>
+                        <p className="text-gray-500 text-sm">
+                          Token: {log.token || "N/A"}
+                        </p>
                       </div>
                       <p className="text-gray-700 font-medium text-sm text-right">
-                        Check-out: {log.check_out_time?.replace("T", " ").replace("Z", "") || "N/A"}
+                        Check-out:{" "}
+                        {log.check_out_time
+                          ?.replace("T", " ")
+                          .replace("Z", "") || "N/A"}
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-gray-500 text-sm">
-                      <p><span className="font-medium">Department:</span> {log.department_name || "N/A"}</p>
-                      <p><span className="font-medium">Purpose:</span> {log.purpose_of_visit || "N/A"}</p>
+                      <p>
+                        <span className="font-medium">Department:</span>{" "}
+                        {log.department_name || "N/A"}
+                      </p>
+                      <p>
+                        <span className="font-medium">Purpose:</span>{" "}
+                        {log.purpose_of_visit || "N/A"}
+                      </p>
                     </div>
                     {log.other_notes && (
-                      <p className="mt-2 text-gray-500 text-sm"><span className="font-medium">Notes:</span> {log.other_notes}</p>
+                      <p className="mt-2 text-gray-500 text-sm">
+                        <span className="font-medium">Notes:</span>{" "}
+                        {log.other_notes}
+                      </p>
                     )}
                   </div>
                 ))}
@@ -320,4 +353,4 @@ const VisitorHistory = () => {
   );
 };
 
-export default VisitorHistory;
+export default History;

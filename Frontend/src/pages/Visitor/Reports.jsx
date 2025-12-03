@@ -124,7 +124,7 @@ const Reports = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
       <Title title="Visitors Reports" align="center" />
 
       {/* Filters & Quick Actions */}
@@ -201,23 +201,24 @@ const Reports = () => {
       </div>
 
       {/* Visitors Table */}
-      <div className="mt-6 bg-white p-4 rounded-xl shadow-sm overflow-x-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-700">
+      <div className="mt-4 bg-white p-3 rounded-lg shadow-sm overflow-x-auto">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-md font-semibold text-gray-700">
             Visitors ({filteredReports.length})
           </h3>
+
           <Button
             onClick={handleSendReport}
             bgColor="bg-purple-600"
             textColor="text-white"
-            className="px-4 py-2"
+            className="px-3 py-1 text-sm"
           >
             Send Report
           </Button>
         </div>
 
-        <table className="min-w-full table-auto text-sm border-collapse">
-          <thead className="bg-gray-100 sticky top-0">
+        <table className="min-w-full table-auto text-xs border-collapse">
+          <thead className="bg-gray-100 sticky top-0 z-10 text-xs">
             <tr>
               {[
                 "Sr.No.",
@@ -236,48 +237,53 @@ const Reports = () => {
                 "Check In",
                 "Check Out",
                 "Purpose",
+                "Token",
               ].map((header, idx) => (
-                <th key={idx} className="px-2 py-2 border text-center">
+                <th
+                  key={idx}
+                  className="px-1 py-1 border text-center whitespace-nowrap"
+                >
                   {header}
                 </th>
               ))}
             </tr>
           </thead>
+
           <tbody>
             {filteredReports.length ? (
               filteredReports.map((v, i) => (
                 <tr key={i} className="hover:bg-gray-50 transition">
-                  <td className="px-2 py-1 border text-center">{i + 1}</td>
-                  <td className="px-2 py-1 border text-center">
+                  <td className="px-1 py-1 border text-center">{i + 1}</td>
+                  <td className="px-1 py-1 border text-center whitespace-nowrap">
                     {v.visitor_name}
                   </td>
-                  <td className="px-2 py-1 border text-center">
+                  <td className="px-1 py-1 border text-center">
                     {v.contact_no}
                   </td>
-                  <td className="px-2 py-1 border text-center">{v.email}</td>
-                  <td className="px-2 py-1 border text-center">{v.company}</td>
-                  <td className="px-2 py-1 border text-center">{v.address}</td>
-                  <td className="px-2 py-1 border text-center">{v.state}</td>
-                  <td className="px-2 py-1 border text-center">{v.city}</td>
-                  <td className="px-2 py-1 border text-center">
+                  <td className="px-1 py-1 border text-center">{v.email}</td>
+                  <td className="px-1 py-1 border text-center">{v.company}</td>
+                  <td className="px-1 py-1 border text-center">{v.address}</td>
+                  <td className="px-1 py-1 border text-center">{v.state}</td>
+                  <td className="px-1 py-1 border text-center">{v.city}</td>
+                  <td className="px-1 py-1 border text-center">
                     {v.identity_type}
                   </td>
-                  <td className="px-2 py-1 border text-center">
+                  <td className="px-1 py-1 border text-center">
                     {v.identity_no}
                   </td>
-                  <td className="px-2 py-1 border text-center">
+                  <td className="px-1 py-1 border text-center">
                     {v.vehicle_details}
                   </td>
-                  <td className="px-2 py-1 border text-center">
+                  <td className="px-1 py-1 border text-center">
                     {v.department_name}
                   </td>
-                  <td className="px-2 py-1 border text-center">
+                  <td className="px-1 py-1 border text-center">
                     {v.employee_name}
                   </td>
-                  <td className="px-2 py-1 border text-center">
+                  <td className="px-1 py-1 border text-center">
                     {v.check_in_time?.replace("T", " ").replace("Z", "")}
                   </td>
-                  <td className="px-2 py-1 border text-center">
+                  <td className="px-1 py-1 border text-center">
                     {v.check_out_time ? (
                       v.check_out_time.replace("T", " ").replace("Z", "")
                     ) : (
@@ -286,9 +292,10 @@ const Reports = () => {
                       </span>
                     )}
                   </td>
-                  <td className="px-2 py-1 border text-center">
+                  <td className="px-1 py-1 border text-center">
                     {v.purpose_of_visit}
                   </td>
+                  <td className="px-1 py-1 border text-center">{v.token}</td>
                 </tr>
               ))
             ) : (

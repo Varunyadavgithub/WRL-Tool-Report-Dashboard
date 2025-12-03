@@ -2,7 +2,6 @@ import { lazy, Suspense, useState } from "react";
 import { Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useSelector } from "react-redux";
-import VisitorPassDisplay from "./pages/Visitor/VisitorPassDisplay";
 
 // Lazy loaded components
 const Layout = lazy(() => import("./components/Layout"));
@@ -70,12 +69,15 @@ const BISReports = lazy(() => import("./pages/Quality/BISReports"));
 const BISStatus = lazy(() => import("./pages/Quality/BISStatus"));
 const BEECalculation = lazy(() => import("./pages/Quality/BEECalculation"));
 
-const VisitorPass = lazy(() => import("./pages/Visitor/VisitorPass"));
+const Dashboard = lazy(() => import("./pages/Visitor/Dashboard"));
+const GeneratePass = lazy(() => import("./pages/Visitor/GeneratePass"));
+const VisitorPassDisplay = lazy(() =>
+  import("./pages/Visitor/VisitorPassDisplay")
+);
+const InOut = lazy(() => import("./pages/Visitor/InOut"));
+const Reports = lazy(() => import("./pages/Visitor/Reports"));
+const History = lazy(() => import("./pages/Visitor/History"));
 const ManageEmployee = lazy(() => import("./pages/Visitor/ManageEmployee"));
-const VisitorDashboard = lazy(() => import("./pages/Visitor/Dashboard"));
-const VisitorReports = lazy(() => import("./pages/Visitor/Reports"));
-const VisitorInOut = lazy(() => import("./pages/Visitor/VisitorInOut"));
-const VisitorHistory = lazy(() => import("./pages/Visitor/VisitorHistory"));
 
 const LogisticsDisplay = lazy(() =>
   import("./pages/PerformanceDisplays/LogisticsDisplay")
@@ -262,10 +264,10 @@ function App() {
             <Route path="/planing/daily-planing" element={<DailyPlan />} />
             {/*-------------------------------------------------------------- Visitor --------------------------------------------------------------*/}
             {canAccess(["admin", "security", "hr"]) && (
-              <Route path="/visitor/dashboard" element={<VisitorDashboard />} />
+              <Route path="/visitor/dashboard" element={<Dashboard />} />
             )}
             {canAccess(["admin", "security", "hr"]) && (
-              <Route path="/visitor/generate-pass" element={<VisitorPass />} />
+              <Route path="/visitor/generate-pass" element={<GeneratePass />} />
             )}
             {canAccess(["admin", "security", "hr"]) && (
               <Route
@@ -274,19 +276,19 @@ function App() {
               />
             )}
             {canAccess(["admin", "security", "hr"]) && (
-              <Route path="/visitor/in-out" element={<VisitorInOut />} />
+              <Route path="/visitor/in-out" element={<InOut />} />
             )}
             {canAccess(["admin", "security", "hr"]) && (
-              <Route path="/visitor/reports" element={<VisitorReports />} />
+              <Route path="/visitor/reports" element={<Reports />} />
+            )}
+            {canAccess(["admin", "security", "hr"]) && (
+              <Route path="/visitor/history" element={<History />} />
             )}
             {canAccess(["admin", "hr"]) && (
               <Route
                 path="/visitor/manage-employee"
                 element={<ManageEmployee />}
               />
-            )}
-            {canAccess(["admin", "security", "hr"]) && (
-              <Route path="/visitor/history" element={<VisitorHistory />} />
             )}
             {/*-------------------------------------------------------------- Performance Displays --------------------------------------------------------------*/}
             {canAccess(["admin"]) && (
