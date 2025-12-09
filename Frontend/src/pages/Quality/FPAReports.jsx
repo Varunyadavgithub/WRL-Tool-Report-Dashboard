@@ -19,6 +19,8 @@ import {
   BarElement,
   LineElement,
   PointElement,
+  BarController,
+  LineController,
   Title as ChartTitle,
   Tooltip,
   Legend,
@@ -28,8 +30,10 @@ ChartJS.register(
   CategoryScale,
   LinearScale,
   BarElement,
-  LineElement, // ✅ REQUIRED
-  PointElement, // ✅ REQUIRED
+  LineElement,
+  PointElement,
+  BarController, // ✅ Required
+  LineController, // ✅ Required
   ChartTitle,
   Tooltip,
   Legend
@@ -300,7 +304,7 @@ const FPAReports = () => {
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
 
-const getChartConfig = () => {
+  const getChartConfig = () => {
     if (!reportData || reportData.length === 0) return null;
 
     let sortedData = [...reportData];
@@ -357,7 +361,6 @@ const getChartConfig = () => {
       ],
     };
   };
-
 
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
@@ -600,38 +603,38 @@ const getChartConfig = () => {
 
 const FpaReportTable = ({ data }) => {
   // Download defect image handler
-const handleDownloadImage = async (fgSrNo, fileName) => {
-  if (!fgSrNo || !fileName) {
-    toast.error("No image available for this record.");
-    return;
-  }
+  const handleDownloadImage = async (fgSrNo, fileName) => {
+    if (!fgSrNo || !fileName) {
+      toast.error("No image available for this record.");
+      return;
+    }
 
-  try {
-    const response = await axios({
-      url: `${baseURL}quality/download-fpa-defect-image/${fgSrNo}`, // use fgSrNo
-      method: "GET",
-      responseType: "blob",
-      params: { filename: fileName }, // send filename as query param
-    });
+    try {
+      const response = await axios({
+        url: `${baseURL}quality/download-fpa-defect-image/${fgSrNo}`, // use fgSrNo
+        method: "GET",
+        responseType: "blob",
+        params: { filename: fileName }, // send filename as query param
+      });
 
-    // Create a blob link to download
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", fileName);
-    document.body.appendChild(link);
-    link.click();
+      // Create a blob link to download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link);
+      link.click();
 
-    // Clean up
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
 
-    toast.success("File download started");
-  } catch (error) {
-    console.error("Download error:", error);
-    toast.error("Failed to download file");
-  }
-};
+      toast.success("File download started");
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download file");
+    }
+  };
 
   return (
     <div className="w-full max-h-[600px] overflow-x-auto">
