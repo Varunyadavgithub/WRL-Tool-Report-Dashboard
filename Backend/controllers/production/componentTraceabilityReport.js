@@ -11,24 +11,163 @@ export const generateReport = async (req, res) => {
   }
 
   try {
+    // Convert to IST (+5:30)
     const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
     const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+    const pool = await new sql.ConnectionPool({
+      ...dbConfig1,
+      requestTimeout: 120000,   // optional: increase timeout to 120s
+      connectionTimeout: 30000, // optional: 30s connection timeout
+    }).connect();
+
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
       .input("endTime", sql.DateTime, istEnd)
       .input("offset", sql.Int, offset)
-      .input("limit", sql.Int, parseInt(limit));
+      .input("limit", sql.Int, parseInt(limit, 10));
 
     if (model && model !== "0") {
       request.input("model", sql.VarChar, model);
     }
 
     const query = `
-WITH Bommaterials AS (
+WITH BomMaterials AS (
+    SELECT 
+        psno, 
+        BOMCode, 
+        RowID, 
+        Material
+    FROM ProcessInputBOM
+
+    UNION ALL
+
+    SELECT 
+        a.psno, 
+        a.BOMCode, 
+        a.RowID, 
+        b.Material
+    FROM ProcessInputBOM a
+    INNER JOIN BOMInputAltMaterial b 
+        ON a.RowID = b.RowID 
+       AND a.BOMCode = b.BOMCode
+)
+
+SELECT 
+    MATBM.Name        AS Model_Name,
+    b.Serial          AS Component_Serial_Number,
+    mat.Name          AS Component_Name,
+    MatCat.Name       AS Component_Type,
+    L.Name            AS Supplier_Name,
+    b.ScannedOn       AS Comp_ScanedOn,
+    pa.ActivityOn     AS FG_Date,
+    MATB.Serial       AS Fg_Sr_No,
+    MATB.VSerial      AS Asset_tag
+FROM ProcessOrder a
+
+INNER JOIN ProcessInputBOMScan b 
+    ON a.PSNo = b.PSNo
+
+INNER JOIN BomMaterials c 
+    ON c.PSNo     = b.PSNo 
+   AND c.RowID    = b.RowID 
+   AND c.Material = b.Material
+
+INNER JOIN Material mat 
+    ON mat.MatCode = c.Material
+
+INNER JOIN MaterialCategory MatCat 
+    ON MatCat.CategoryCode = mat.Category
+
+INNER JOIN ProdHeader d 
+    ON a.PRODNo = d.PRODNo
+
+INNER JOIN ProcessActivity pa 
+    ON pa.PSNo = a.PSNo 
+   AND pa.ActivityType = 5 
+   AND pa.StationCode IN (1220010, 1230017)
+   AND pa.ActivityOn >= @startTime 
+   AND pa.ActivityOn < @endTime
+
+INNER JOIN MaterialBarcode MATB 
+    ON MATB.DocNo   = a.PSNo
+   AND MATB.Status <> 99
+   AND MATB.VSerial IS NOT NULL
+
+LEFT JOIN Material MATBM 
+    ON MATBM.MatCode = MATB.Material
+
+LEFT JOIN Ledger L 
+    ON L.LedgerCode = mat.Ledger
+
+WHERE 
+    MATB.Status <> 99
+    AND MATB.VSerial IS NOT NULL
+    ${model && model !== "0" ? "AND MATBM.MatCode = @model" : ""}
+ORDER BY 
+    a.PSNo
+OFFSET 
+    @offset ROWS FETCH NEXT @limit ROWS ONLY;
+    `;
+
+    const result = await request.query(query);
+    const data = result.recordset;
+
+    res.status(200).json({
+      success: true,
+      data,
+    });
+
+    await pool.close();
+  } catch (err) {
+    console.error("SQL Error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+
+// Export Data
+export const fetchExportData = async (req, res) => {
+  const { startTime, endTime, model } = req.query;
+
+  if (!startTime || !endTime) {
+    return res.status(400).json({
+      success: false,
+      message: "startTime and endTime are required",
+    });
+  }
+
+  try {
+    const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
+    const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
+
+    const pool = await new sql.ConnectionPool({
+      ...dbConfig1,
+      requestTimeout: 120000,   // ✅ Prevent 15s timeout
+      connectionTimeout: 30000
+    }).connect();
+
+    const request = pool
+      .request()
+      .input("startTime", sql.DateTime, istStart)
+      .input("endTime", sql.DateTime, istEnd);
+
+    if (model && model !== "0") {
+      request.input("model", sql.VarChar, model);
+    }
+
+    const query = `
+WITH FilteredActivity AS (
+    SELECT PSNo, ActivityOn
+    FROM ProcessActivity
+    WHERE ActivityType = 5
+      AND StationCode IN (1220010, 1230017)
+      AND ActivityOn >= @startTime 
+      AND ActivityOn < @endTime
+),
+Bommaterials AS (
     SELECT psno, BOMCode, RowID, Material, Qty, ConsumedQty
     FROM ProcessInputBOM
 
@@ -46,158 +185,59 @@ WITH Bommaterials AS (
         ON a.RowID = b.RowID 
         AND a.BOMCode = b.BOMCode
 )
+
 SELECT 
     a.PSNo,
-    MATBM.Name AS Model_Name,
-    b.Serial AS Component_Serial_Number,
-    mat.Name AS Component_Name,
-    MatCat.Name AS Component_Type,
-    L.Name AS Supplier_Name,
-    b.ScannedOn AS Comp_ScanedOn,
-    pa.ActivityOn AS FG_Date,
-    MATB.Serial AS Fg_Sr_No,
-    MATB.VSerial AS Asset_tag,
-    mat.AltName AS SAP_Item_Code
+    MATBM.Name        AS Model_Name,
+    b.Serial          AS Component_Serial_Number,
+    mat.Name          AS Component_Name,
+    MatCat.Name       AS Component_Type,
+    L.Name            AS Supplier_Name,
+    b.ScannedOn       AS Comp_ScanedOn,
+    pa.ActivityOn     AS FG_Date,
+    MATB.Serial       AS Fg_Sr_No,
+    MATB.VSerial      AS Asset_tag,
+    mat.AltName       AS SAP_Item_Code
 FROM ProcessOrder a
+
 INNER JOIN ProcessInputBOMScan b 
     ON a.PSNo = b.PSNo
+
 INNER JOIN Bommaterials c 
-    ON c.PSNo = a.PSNo 
-    AND c.RowID = b.RowID 
-    AND c.Material = b.Material
+    ON c.PSNo     = a.PSNo 
+   AND c.RowID    = b.RowID 
+   AND c.Material = b.Material
+
 INNER JOIN Material mat 
     ON mat.MatCode = c.Material
+
 INNER JOIN ProdHeader d 
     ON a.PRODNo = d.PRODNo
+
 INNER JOIN MaterialCategory MatCat 
     ON MatCat.CategoryCode = mat.Category
+
 INNER JOIN MaterialBarcode MATB 
     ON MATB.DocNo = a.PSNo
-INNER JOIN ProcessActivity pa 
-    ON pa.PSNo = a.PSNo 
-    AND pa.ActivityType = 5 
-    AND pa.StationCode IN (1220010, 1230017)
-    AND pa.ActivityOn BETWEEN @startTime AND @endTime
+   AND MATB.Status <> 99
+   AND MATB.VSerial IS NOT NULL
+
+INNER JOIN FilteredActivity pa 
+    ON pa.PSNo = a.PSNo
+
 LEFT JOIN Material MATBM 
     ON MATBM.MatCode = MATB.Material
+
 LEFT JOIN Ledger L 
     ON L.LedgerCode = mat.Ledger
+
 WHERE 
-    MATB.status <> 99
+    MATB.Status <> 99
     AND MATB.VSerial IS NOT NULL
-        ${model && model !== "0" ? "AND MATBM.MatCode = @model" : ""}
-      ORDER BY a.PSNo
-      OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY;
-    `;
-
-    const result = await request.query(query);
-
-    const data = result.recordset;
-    const totalCount = data.length > 0 ? data[0].totalCount : 0;
-
-    res.status(200).json({
-      success: true,
-      data,
-      totalCount,
-    });
-
-    await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-};
-
-// Export Data
-export const fetchExportData = async (req, res) => {
-  const { startTime, endTime, model } = req.query;
-
-  if (!startTime || !endTime) {
-    return res.status(400).json({
-      success: false,
-      message: "startTime and endTime are required",
-    });
-  }
-
-  try {
-    const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
-
-    let query = `
-        WITH Bommaterials AS (
-            SELECT psno, BOMCode, RowID, Material, Qty, ConsumedQty
-            FROM ProcessInputBOM
-
-            UNION ALL
-
-            SELECT 
-                a.psno, 
-                a.BOMCode, 
-                a.RowID, 
-                b.Material, 
-                NULL AS Qty, 
-                NULL AS ConsumedQty
-            FROM ProcessInputBOM a
-            INNER JOIN BOMInputAltMaterial b 
-                ON a.RowID = b.RowID 
-                AND a.BOMCode = b.BOMCode
-        )
-        SELECT 
-            a.PSNo,
-            MATBM.Name AS Model_Name,
-            b.Serial AS Component_Serial_Number,
-            mat.Name AS Component_Name,
-            MatCat.Name AS Component_Type,
-            L.Name AS Supplier_Name,
-            b.ScannedOn AS Comp_ScanedOn,
-            pa.ActivityOn AS FG_Date,
-            MATB.Serial AS Fg_Sr_No,
-            MATB.VSerial AS Asset_tag,
-            mat.AltName AS SAP_Item_Code
-        FROM ProcessOrder a
-        INNER JOIN ProcessInputBOMScan b 
-            ON a.PSNo = b.PSNo
-        INNER JOIN Bommaterials c 
-            ON c.PSNo = a.PSNo 
-            AND c.RowID = b.RowID 
-            AND c.Material = b.Material
-        INNER JOIN Material mat 
-            ON mat.MatCode = c.Material
-        INNER JOIN ProdHeader d 
-            ON a.PRODNo = d.PRODNo
-        INNER JOIN MaterialCategory MatCat 
-            ON MatCat.CategoryCode = mat.Category
-        INNER JOIN MaterialBarcode MATB 
-            ON MATB.DocNo = a.PSNo
-        INNER JOIN ProcessActivity pa 
-            ON pa.PSNo = a.PSNo 
-            AND pa.ActivityType = 5 
-            AND pa.StationCode IN (1220010, 1230017)
-            AND pa.ActivityOn BETWEEN @startTime AND @endTime
-        LEFT JOIN Material MATBM 
-            ON MATBM.MatCode = MATB.Material
-        LEFT JOIN Ledger L 
-            ON L.LedgerCode = mat.Ledger
-        WHERE 
-            MATB.status <> 99
-            AND MATB.VSerial IS NOT NULL
-    `;
-
-    if (model && model !== "0") {
-      query += ` AND MATBM.MatCode = @model`;
-    }
-
-    query += " ORDER BY a.PSNo;";
-
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
-    const request = pool
-      .request()
-      .input("startTime", sql.DateTime, istStart)
-      .input("endTime", sql.DateTime, istEnd);
-
-    if (model && model !== "0") {
-      request.input("model", sql.VarChar, model);
-    }
+    ${model && model !== "0" ? "AND MATBM.MatCode = @model" : ""}
+ORDER BY 
+    a.PSNo;
+`;
 
     const result = await request.query(query);
 
@@ -212,3 +252,4 @@ export const fetchExportData = async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
+

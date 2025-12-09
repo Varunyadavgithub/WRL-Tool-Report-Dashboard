@@ -206,7 +206,6 @@ const ComponentTraceabilityReport = () => {
             <table className="min-w-full border bg-white text-xs rounded-lg table-auto">
               <thead className="bg-gray-200 sticky top-0 z-10 text-center">
                 <tr>
-                  <th className="p-2 border">PS_No.</th>
                   <th className="p-2 border">Model_Name</th>
 
                   <th className="p-2 border">Component Serial No.</th>
@@ -217,7 +216,6 @@ const ComponentTraceabilityReport = () => {
                   <th className="p-2 border">FG On</th>
                   <th className="p-2 border">Fg Sr. No.</th>
                   <th className="p-2 border">Asset tag</th>
-                  <th className="p-2 border">SAP Item Code</th>
                 </tr>
               </thead>
               <tbody>
@@ -229,7 +227,6 @@ const ComponentTraceabilityReport = () => {
                       ref={isLast ? lastRowRef : null}
                       className="hover:bg-gray-100 text-center"
                     >
-                      <td className="border">{item.PSNo}</td>
                       <td className="border">{item.Model_Name}</td>
 
                       <td className="border">{item.Component_Serial_Number}</td>
@@ -246,7 +243,6 @@ const ComponentTraceabilityReport = () => {
                       </td>
                       <td className="border">{item.Fg_Sr_No}</td>
                       <td className="border">{item.Asset_tag}</td>
-                      <td className="border">{item.SAP_Item_Code}</td>
                     </tr>
                   );
                 })}
