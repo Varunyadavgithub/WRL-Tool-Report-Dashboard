@@ -42,7 +42,7 @@ function StageHistoryReport() {
       }
 
       // Logistic data
-      const logisticData = logisticRes.data?.result?.recordsets[0] || [];
+      const logisticData = logisticRes?.data?.data || [];
       setLogisticStatus(logisticData);
     } catch (error) {
       console.error("Query failed:", error);
@@ -102,64 +102,6 @@ function StageHistoryReport() {
             </div>
           ) : (
             <div className="flex flex-col gap-6">
-              {/* ---------- TABLE 1 : Logistic Status (FIRST) ---------- */}
-              <div className="w-full max-h-[600px] overflow-x-auto">
-                <h2 className="font-bold mb-2">Logistic Status</h2>
-                <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
-                  <thead className="bg-gray-200 sticky top-0 z-10 text-center">
-                    <tr>
-                      <th className="px-1 py-1 border">Unload Time</th>
-                      <th className="px-1 py-1 border">Session ID</th>
-                      <th className="px-1 py-1 border">Dispatch Time</th>
-                      <th className="px-1 py-1 border">Vehicle No</th>
-                      <th className="px-1 py-1 border">Dock No</th>
-                      <th className="px-1 py-1 border">Latest Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {logisticData.length > 0 ? (
-                      logisticData.map((item, index) => (
-                        <tr
-                          key={index}
-                          className="hover:bg-gray-100 text-center"
-                        >
-                          <td className="px-1 py-1 border">
-                            {item.Dispt_Unload_time?.replace("T", " ").replace(
-                              "Z",
-                              ""
-                            ) || "FG not Dispatched"}
-                          </td>
-                          <td className="px-1 py-1 border">
-                            {item.Session_ID || "FG not Dispatched"}
-                          </td>
-                          <td className="px-1 py-1 border">
-                            {item.Dispatch_time?.replace("T", " ").replace(
-                              "Z",
-                              ""
-                            ) || "FG not Dispatched"}
-                          </td>
-                          <td className="px-1 py-1 border">
-                            {item.Vehicle_No || "FG not Dispatched"}
-                          </td>
-                          <td className="px-1 py-1 border">
-                            {item.DockNo || "FG not Dispatched"}
-                          </td>
-                          <td className="px-1 py-1 border">
-                            {item.LatestStatus || "FG not Dispatched"}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={12} className="text-center py-4">
-                          No logistic data found.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
               {/* ---------- TABLE 2 : Stage History (SECOND) ---------- */}
               <div className="w-full max-h-[600px] overflow-x-auto">
                 <h2 className="font-bold mb-2">Stage History</h2>
@@ -216,6 +158,76 @@ function StageHistoryReport() {
                       <tr>
                         <td colSpan={12} className="text-center py-4">
                           No stage history found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* ---------- TABLE 1 : Logistic Status (FIRST) ---------- */}
+              <div className="w-full max-h-[600px] overflow-x-auto">
+                <h2 className="font-bold mb-2">Logistic Status</h2>
+                <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
+                  <thead className="bg-gray-200 sticky top-0 z-10 text-center">
+                    <tr>
+                      <th className="px-1 py-1 border">FG Auto Scan</th>
+                      <th className="px-1 py-1 border">FG Auto Scan Date</th>
+                      <th className="px-1 py-1 border">FG unloading</th>
+                      <th className="px-1 py-1 border">FG Unloading Date</th>
+                      <th className="px-1 py-1 border">Session ID</th>
+                      <th className="px-1 py-1 border">Vehicle No</th>
+                      <th className="px-1 py-1 border">DockNo</th>
+                      <th className="px-1 py-1 border">Vehicle Entry Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.isArray(logisticData) && logisticData.length > 0 ? (
+                      logisticData.map((item, index) => (
+                        <tr
+                          key={index}
+                          className="hover:bg-gray-100 text-center"
+                        >
+                          <td className="px-1 py-1 border">
+                            {item?.FG_Auto_Scan ?? "FG Not Unloaded"}
+                          </td>
+
+                          <td className="px-1 py-1 border">
+                            {item?.FG_Auto_Scan_Date ?? "FG Not Unloaded"}
+                          </td>
+
+                          <td className="px-1 py-1 border">
+                            {item?.FG_Unloading ?? "FG not Scanned"}
+                          </td>
+
+                          <td className="px-1 py-1 border">
+                            {item?.FG_Unloading_Date ?? "FG not Scanned"}
+                          </td>
+
+                          <td className="px-1 py-1 border">
+                            {item?.Session_ID ?? "FG not Dispatched"}
+                          </td>
+
+                          <td className="px-1 py-1 border">
+                            {item?.Vehicle_No ?? "FG not Dispatched"}
+                          </td>
+
+                          <td className="px-1 py-1 border">
+                            {item?.DockNo ?? "FG not Dispatched"}
+                          </td>
+
+                          <td className="px-1 py-1 border">
+                            {item?.Vehicle_Entry_Time ?? "FG not Dispatched"}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={8}
+                          className="text-center py-4 text-red-600 font-semibold"
+                        >
+                          No logistic data found.
                         </td>
                       </tr>
                     )}
