@@ -102,69 +102,6 @@ function StageHistoryReport() {
             </div>
           ) : (
             <div className="flex flex-col gap-6">
-              {/* ---------- TABLE 2 : Stage History (SECOND) ---------- */}
-              <div className="w-full max-h-[600px] overflow-x-auto">
-                <h2 className="font-bold mb-2">Stage History</h2>
-                <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
-                  <thead className="bg-gray-200 sticky top-0 z-10 text-center">
-                    <tr>
-                      <th className="px-1 py-1 border">PSNO</th>
-                      <th className="px-1 py-1 border">Station_Code</th>
-                      <th className="px-1 py-1 border">Name</th>
-                      <th className="px-1 py-1 border">Operator</th>
-                      <th className="px-1 py-1 border">Activity On</th>
-                      <th className="px-1 py-1 border">Alias</th>
-                      <th className="px-1 py-1 border">Customer QR</th>
-                      <th className="px-1 py-1 border">V Serial</th>
-                      <th className="px-1 py-1 border">Serial</th>
-                      <th className="px-1 py-1 border">Activity Type</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stageHistoryData.length > 0 ? (
-                      stageHistoryData.map((item, index) => (
-                        <tr
-                          key={index}
-                          className="hover:bg-gray-100 text-center"
-                        >
-                          <td className="px-1 py-1 border">{item.PSNO}</td>
-                          <td className="px-1 py-1 border">
-                            {item.StationCode}
-                          </td>
-                          <td className="px-1 py-1 border">
-                            {item.StationName}
-                          </td>
-                          <td className="px-1 py-1 border">{item.UserName}</td>
-                          <td className="px-1 py-1 border">
-                            {item.ActivityOn?.replace("T", " ").replace(
-                              "Z",
-                              ""
-                            )}
-                          </td>
-                          <td className="px-1 py-1 border">
-                            {item.BarcodeAlias}
-                          </td>
-                          <td className="px-1 py-1 border">
-                            {item.CustomerQR}
-                          </td>
-                          <td className="px-1 py-1 border">{item.VSerial}</td>
-                          <td className="px-1 py-1 border">{item.Serial}</td>
-                          <td className="px-1 py-1 border">
-                            {item.ActivityType}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={12} className="text-center py-4">
-                          No stage history found.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
               {/* ---------- TABLE 1 : Logistic Status (FIRST) ---------- */}
               <div className="w-full max-h-[600px] overflow-x-auto">
                 <h2 className="font-bold mb-2">Logistic Status</h2>
@@ -228,6 +165,68 @@ function StageHistoryReport() {
                           className="text-center py-4 text-red-600 font-semibold"
                         >
                           No logistic data found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {/* ---------- TABLE 2 : Stage History (SECOND) ---------- */}
+              <div className="w-full max-h-[600px] overflow-x-auto">
+                <h2 className="font-bold mb-2">Stage History</h2>
+                <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
+                  <thead className="bg-gray-200 sticky top-0 z-10 text-center">
+                    <tr>
+                      <th className="px-1 py-1 border">PSNO</th>
+                      <th className="px-1 py-1 border">Station_Code</th>
+                      <th className="px-1 py-1 border">Name</th>
+                      <th className="px-1 py-1 border">Operator</th>
+                      <th className="px-1 py-1 border">Activity On</th>
+                      <th className="px-1 py-1 border">Alias</th>
+                      <th className="px-1 py-1 border">Customer QR</th>
+                      <th className="px-1 py-1 border">V Serial</th>
+                      <th className="px-1 py-1 border">Serial</th>
+                      <th className="px-1 py-1 border">Activity Type</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stageHistoryData.length > 0 ? (
+                      stageHistoryData.map((item, index) => (
+                        <tr
+                          key={index}
+                          className="hover:bg-gray-100 text-center"
+                        >
+                          <td className="px-1 py-1 border">{item.PSNO}</td>
+                          <td className="px-1 py-1 border">
+                            {item.StationCode}
+                          </td>
+                          <td className="px-1 py-1 border">
+                            {item.StationName}
+                          </td>
+                          <td className="px-1 py-1 border">{item.UserName}</td>
+                          <td className="px-1 py-1 border">
+                            {item.ActivityOn?.replace("T", " ").replace(
+                              "Z",
+                              ""
+                            )}
+                          </td>
+                          <td className="px-1 py-1 border">
+                            {item.BarcodeAlias}
+                          </td>
+                          <td className="px-1 py-1 border">
+                            {item.CustomerQR}
+                          </td>
+                          <td className="px-1 py-1 border">{item.VSerial}</td>
+                          <td className="px-1 py-1 border">{item.Serial}</td>
+                          <td className="px-1 py-1 border">
+                            {item.ActivityType}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={12} className="text-center py-4">
+                          No stage history found.
                         </td>
                       </tr>
                     )}
