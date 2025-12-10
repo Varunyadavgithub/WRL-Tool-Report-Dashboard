@@ -1,463 +1,152 @@
 import { useState } from "react";
-import Button from "../../components/common/Button";
-import ExportButton from "../../components/common/ExportButton";
 import Title from "../../components/common/Title";
-import InputField from "../../components/common/InputField";
-import DateTimePicker from "../../components/common/DateTimePicker";
 
 const GateEntry = () => {
+  const fixedHeaders = [
+    "GATE ENTRY NUMBER",
+    "GATE ENTRY DATE",
+    "PO NUMBER",
+    "LINE ITEM",
+    "PO DATE",
+    "INVOICE VALUE",
+    "BASIC RATE",
+    "HSN CODE AS PER INVOICE",
+    "GRN:103",
+    "GRN:101 /105",
+    "SUPPLIER CODE",
+    "SUPPLIER NAME",
+    "INVOICE NO.",
+    "INVOICE DATE",
+    "ITEM CODE",
+    "DESCRIPTION OF THE GOODS",
+    "UOM",
+    "INVOICE QTY.",
+    "RECEIVED QTY.",
+    "DISCREPANCY",
+    "MATERIAL GROUP",
+    "VEHICLE NO.",
+    "DELIVERY TYPE",
+    "VEHICLE NAME",
+    "VEHICLE TYPE",
+    "FUEL TYPE",
+    "TOTAL CARRYING CAPACITY OF THE VEHICLE",
+    "REMARKS",
+  ];
+
+  const [pasteData, setPasteData] = useState("");
+  const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [serialNumber, setSerialNumber] = useState("");
-  const [date, setDate] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
 
-  const handleClearFilters = () => {};
+  // Handle parsing pasted data and sending to backend
+  const handleParseData = async () => {
+    if (!pasteData) return;
 
-  const handleQuery = () => {
-    console.log("Clicked");
+    setLoading(true);
+
+    // Parse pasted data
+    const lines = pasteData
+      .trim()
+      .split(/\r?\n/)
+      .filter((line) => line.trim() !== "");
+    const parsedRows = lines.map((line) => line.split("\t"));
+
+    setRows(parsedRows);
+
+    // Send parsed data to backend API
+    try {
+      const response = await fetch("/api/sendGateEntryEmail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: parsedRows, headers: fixedHeaders }),
+      });
+
+      const result = await response.json();
+      alert(result.message || "Email sent successfully!");
+    } catch (error) {
+      console.error(error);
+      alert("Failed to send email. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleClear = () => {
+    setPasteData("");
+    setRows([]);
+  };
+
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="Gate Entry" align="center" />
 
-      {/* Filters */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-md gap-6">
-        <div className="flex gap-2">
-          {/* Column 1 */}
-          <div>
-            <fieldset className="border border-black p-4 rounded-md">
-              <legend className="font-semibold text-gray-700 px-2">
-                Gate Entry Details
-              </legend>
-              <div className="grid grid-cols-1 gap-4">
-                <div className="flex flex-col gap-4">
-                  <InputField
-                    label="Entry No."
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="vehicleNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Entry Date"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="UOM"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Received QTY"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Material Group"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="HSN"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Discrepency"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                </div>
-              </div>
-            </fieldset>
-          </div>
+      <textarea
+        className="w-full p-2 border rounded mb-4"
+        rows={8}
+        placeholder="Paste your Excel data rows here (without headers)"
+        value={pasteData}
+        onChange={(e) => setPasteData(e.target.value)}
+        disabled={loading}
+      />
 
-          {/* Column 2 */}
-          <div className="flex flex-col gap-4">
-            <fieldset className="border border-black p-4 rounded-md">
-              <legend className="font-semibold text-gray-700 px-2">
-                PO Details
-              </legend>
-              <div className="grid grid-cols-1 gap-4">
-                <div className="flex flex-col gap-4">
-                  <InputField
-                    label="PO No."
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="vehicleNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="PO Date"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Basic Rate"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                </div>
-              </div>
-            </fieldset>
-            <div className="flex gap-2 items-center justify-center">
-              <Button
-                bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
-                textColor={loading ? "text-white" : "text-black"}
-                className={`font-semibold ${
-                  loading ? "cursor-not-allowed" : ""
-                }`}
-                onClick={console.log("Clicked Add")}
-                disabled={loading}
-              >
-                Add
-              </Button>
-              <Button
-                bgColor={loading ? "bg-gray-400" : "bg-green-600"}
-                textColor={loading ? "text-white" : "text-black"}
-                className={`font-semibold ${
-                  loading ? "cursor-not-allowed" : ""
-                }`}
-                onClick={console.log("Clicked Settings")}
-                disabled={loading}
-              >
-                Settings
-              </Button>
-            </div>
-          </div>
-          {/* Column 3 */}
-          <div className="flex flex-col gap-4">
-            <fieldset className="border border-black p-4 rounded-md">
-              <legend className="font-semibold text-gray-700 px-2">
-                Supplier Details
-              </legend>
-              <div className="grid grid-cols-1 gap-4">
-                <div className="flex flex-col gap-4">
-                  <InputField
-                    label="Supplier Name"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="vehicleNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Supplier Code"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                </div>
-              </div>
-            </fieldset>
-
-            <div className="flex items-center justify-center">
-              <Button
-                bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
-                textColor={loading ? "text-white" : "text-black"}
-                className={`font-semibold ${
-                  loading ? "cursor-not-allowed" : ""
-                }`}
-                onClick={console.log("Clicked Save")}
-                disabled={loading}
-              >
-                Save
-              </Button>
-            </div>
-          </div>
-          {/* Column 4 */}
-          <div>
-            <fieldset className="border border-black p-4 rounded-md">
-              <legend className="font-semibold text-gray-700 px-2">
-                GRN Details
-              </legend>
-              <div className="grid grid-cols-1 gap-4">
-                <div className="flex flex-col gap-4">
-                  <InputField
-                    label="GRN 103"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="vehicleNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="GRN 101/105"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                </div>
-              </div>
-            </fieldset>
-          </div>
-          {/* Column 5 */}
-          <div>
-            <fieldset className="border border-black p-4 rounded-md">
-              <legend className="font-semibold text-gray-700 px-2">
-                Invoice Details
-              </legend>
-              <div className="grid grid-cols-1 gap-4">
-                <div className="flex flex-col gap-4">
-                  <InputField
-                    label="Invoice No."
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="vehicleNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Invoice Date"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Item Code"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Invoice QTY"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Line Item"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Value"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Description"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                </div>
-              </div>
-            </fieldset>
-          </div>
-
-          {/* Column 6 */}
-          <div>
-            <fieldset className="border border-black p-4 rounded-md">
-              <legend className="font-semibold text-gray-700 px-2">
-                Vehicle Details
-              </legend>
-              <div className="grid grid-cols-1 gap-4">
-                <div className="flex flex-col gap-4">
-                  <InputField
-                    label="Vehicle No."
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="vehicleNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Vehicle in Time"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Vehicle Name"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Vehicle Type"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Carry Capacity"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Fuel Type"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                  <InputField
-                    label="Remarks"
-                    type="text"
-                    placeholder="Enter details"
-                    className="w-full text-md"
-                    name="lrNo"
-                    value={serialNumber}
-                    onChange={(e) => setSerialNumber(e.target.value)}
-                  />
-                </div>
-              </div>
-            </fieldset>
-          </div>
-        </div>
+      <div className="flex gap-2 mb-4">
+        <button
+          className={`bg-blue-600 text-white px-4 py-2 rounded ${
+            loading ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+          onClick={handleParseData}
+          disabled={loading}
+        >
+          {loading ? "Sending Email..." : "Send Email"}
+        </button>
+        <button
+          className="bg-gray-400 text-black px-4 py-2 rounded"
+          onClick={handleClear}
+          disabled={loading}
+        >
+          Clear
+        </button>
       </div>
 
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-md gap-6 mt-2">
-        <fieldset className="border border-black p-4 rounded-md">
-          <legend className="font-semibold text-gray-700 px-2">
-            Gate Entry Details
-          </legend>
-          <div>
-            <div className="flex gap-2">
-              <div>
-                <InputField
-                  label="Vehicle No."
-                  type="text"
-                  placeholder="Enter details"
-                  className="w-full text-md"
-                  name="vehicleNo"
-                  value={serialNumber}
-                  onChange={(e) => setSerialNumber(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col items-center gap-4">
-                <div className="flex gap-2">
-                  <Button
-                    bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
-                    textColor={loading ? "text-white" : "text-black"}
-                    className={`font-semibold ${
-                      loading ? "cursor-not-allowed" : ""
-                    }`}
-                    onClick={console.log("clicked")}
-                    disabled={loading}
+      {rows.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="table-auto border-collapse border border-gray-300 w-full text-sm">
+            <thead className="bg-gray-200">
+              <tr>
+                {fixedHeaders.map((header, idx) => (
+                  <th
+                    key={idx}
+                    className="border border-gray-300 px-2 py-1 text-left whitespace-nowrap"
                   >
-                    Query
-                  </Button>
-                  <ExportButton />
-                </div>
-                <div className="text-left font-bold text-lg">
-                  COUNT: <span className="text-blue-700">000</span>
-                </div>
-              </div>
-            </div>
-            <div>
-              <fieldset className="border border-black p-4 rounded-md">
-                <legend className="font-semibold text-gray-700 px-2">
-                  Search by Date
-                </legend>
-                <div>
-                  <div className="flex gap-2">
-                    <DateTimePicker
-                      label="Start Time"
-                      name="startTime"
-                      value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                    />
-                    <DateTimePicker
-                      label="End Time"
-                      name="endTime"
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </fieldset>
-            </div>
-          </div>
-        </fieldset>
-      </div>
-
-      {/* Summary Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md"></div>
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rIdx) => (
+                <tr
+                  key={rIdx}
+                  className={rIdx % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                >
+                  {fixedHeaders.map((_, cIdx) => (
+                    <td
+                      key={cIdx}
+                      className="border border-gray-300 px-2 py-1 whitespace-pre-wrap"
+                    >
+                      {row[cIdx] || ""}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-center text-gray-600">
+          Paste your Excel data above and click <strong>"Send Email"</strong> to
+          display it in a table and automatically send it to your team.
+        </p>
+      )}
     </div>
   );
 };
