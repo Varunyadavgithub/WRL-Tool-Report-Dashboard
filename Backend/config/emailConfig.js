@@ -2,21 +2,21 @@ import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 dotenv.config();
 
-// Create transporter with your custom SMTP settings
+// Create transporter
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: false, // use TLS
+  port: parseInt(process.env.SMTP_PORT), // ensure number
+  secure: process.env.SMTP_PORT === "465", // true for 465, false for 587
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
   tls: {
-    ciphers: "SSLv3",
-    rejectUnauthorized: false, // avoid cert errors (optional; test carefully)
+    rejectUnauthorized: false, // optional, only if needed
   },
 });
 
+// -------------------- Visitor Pass Email --------------------
 export const sendVisitorPassEmail = async ({
   to,
   cc,
@@ -41,119 +41,87 @@ export const sendVisitorPassEmail = async ({
 
     const currentYear = new Date().getFullYear();
 
+    const html = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>Visitor Pass Notification</title>
+        <style>
+          body { font-family: Arial, sans-serif; background-color: #f0f0f0; margin: 0; padding: 20px; }
+          .container { max-width: 600px; margin: auto; background: #fff; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; }
+          .header { background-color: #2575fc; color: #fff; text-align: center; padding: 20px; }
+          .section { padding: 20px; font-size: 14px; color: #333; }
+          .details td { padding: 5px; vertical-align: top; }
+          .footer { background-color: #f9f9f9; text-align: center; padding: 10px; font-size: 12px; color: #666; }
+          .visitor-img { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; display: block; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header"><h2>Visitor Pass Notification</h2></div>
+          <div class="section">
+            <table width="100%">
+              <tr>
+                <td width="50%" align="center">
+                  <img src="${photoPath}" alt="Visitor Image" class="visitor-img"/>
+                </td>
+                <td width="50%">
+                  <p><strong>Name:</strong> ${visitorName}</p>
+                  <p><strong>Contact:</strong> ${visitorContact}</p>
+                  <p><strong>Email:</strong> ${visitorEmail}</p>
+                  <p><strong>Company:</strong> ${company}</p>
+                  <p><strong>City:</strong> ${city || "N/A"}</p>
+                </td>
+              </tr>
+            </table>
+          </div>
+          <div class="section" style="background-color: #f4f4f4;">
+            <table width="100%" class="details">
+              <tr>
+                <td>
+                  <p><strong>Visitor ID:</strong> ${visitorId}</p>
+                  <p><strong>Allow On:</strong> ${new Date(
+                    allowOn
+                  ).toLocaleString()}</p>
+                  <p><strong>Department to Visit:</strong> ${departmentToVisit}</p>
+                </td>
+                <td>
+                  <p><strong>Purpose of Visit:</strong> ${purposeOfVisit}</p>
+                  <p><strong>Allow Till:</strong> ${
+                    allowTill ? new Date(allowTill).toLocaleString() : "N/A"
+                  }</p>
+                  <p><strong>Employee to Visit:</strong> ${employeeToVisit}</p>
+                </td>
+              </tr>
+            </table>
+          </div>
+          <div class="footer">© ${currentYear} WRL Security Team — This is an automated message.</div>
+        </div>
+      </body>
+      </html>
+    `;
+
     const mailOptions = {
-      from: {
-        name: "WRL Security Team",
-        address: "security.tadgam@westernequipments.com",
-      },
+      from: { name: "WRL Security Team", address: process.env.SMTP_USER },
       to,
       cc,
       subject: `Visitor Pass Generated for ${visitorName}`,
-      html: `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <title>Visitor Pass Notification</title>
-        </head>
-        <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f0f0f0;">
-          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f0f0f0; padding: 20px 0;">
-            <tr>
-              <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
-                  <!-- Header -->
-                  <tr>
-                    <td style="background-color: #2575fc; color: #fff; padding: 20px; text-align: center;">
-                      <h2 style="margin: 0">Visitor Pass Notification</h2>
-                    </td>
-                  </tr>
-
-                  <!-- Image & Info -->
-                  <tr>
-                    <td style="padding: 20px;">
-                      <table width="100%" cellpadding="0" cellspacing="0">
-                        <tr>
-                          <!-- Left: Image -->
-                          <td width="50%" align="center" valign="middle" style="padding-right: 10px;">
-                            <div style="width: 150px; height: 150px; border-radius: 50%; overflow: hidden; display: inline-block;">
-                              <img
-                                src="${photoPath}"
-                                alt="Visitor Image"
-                                width="150"
-                                height="150"
-                                style="display: block; object-fit: cover;"
-                              />
-                            </div>
-                          </td>
-
-                          <!-- Right: Details -->
-                          <td width="50%" valign="top" style="font-size: 14px; color: #333;">
-                            <p><strong>Name:</strong> ${visitorName}</p>
-                            <p><strong>Contact:</strong> ${visitorContact}</p>
-                            <p><strong>Email:</strong> ${visitorEmail}</p>
-                            <p><strong>Company:</strong> ${company}</p>
-                            <p><strong>City:</strong> ${city || "N/A"}</p>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-
-                  <!-- Additional Details -->
-                  <tr>
-                    <td style="background-color: #f4f4f4; padding: 20px; font-size: 14px; color: #555;">
-                      <table width="100%" cellpadding="5" cellspacing="0" border="0">
-                        <tr>
-                          <td width="50%" style="vertical-align: top;">
-                            <p><strong>Visitor ID:</strong> ${visitorId}</p>
-                            <p><strong>Allow On:</strong> ${new Date(
-                              allowOn
-                            ).toLocaleString()}</p>
-                            <p><strong>Department to Visit:</strong> ${departmentToVisit}</p>
-                          </td>
-                          <td width="50%" style="vertical-align: top;">
-                          <p><strong>Purpose of Visit:</strong> ${purposeOfVisit}</p>
-                            <p><strong>Allow Till:</strong> ${
-                              allowTill
-                                ? new Date(allowTill).toLocaleString()
-                                : "N/A"
-                            }</p>
-                             <p><strong>Employee to Visit:</strong> ${employeeToVisit}</p>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-
-                  <!-- Footer -->
-                  <tr>
-                    <td style="background-color: #f9f9f9; text-align: center; padding: 10px; font-size: 12px; color: #666;">
-                      © ${currentYear} WRL Tool Report — This is an automated message.
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-        </html>
-      `,
+      html,
     };
 
     const info = await transporter.sendMail(mailOptions);
     console.log(
-      `Visitor pass email sent to ${to} (cc: ${cc || "none"}) — Message ID: ${
-        info.messageId
-      }`
+      `Visitor pass email sent to ${to} — Message ID: ${info.messageId}`
     );
     return true;
   } catch (error) {
-    console.error("Failed to send visitor pass email:", error);
+    console.error("Error sending Visitor Pass email:", error);
     return false;
   }
 };
 
+// -------------------- Visitor Report Email --------------------
 export const sendVisitorReportEmail = async (visitors) => {
   try {
     if (!Array.isArray(visitors) || visitors.length === 0) {
@@ -161,84 +129,174 @@ export const sendVisitorReportEmail = async (visitors) => {
       return false;
     }
 
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Visitor Report");
-
-    worksheet.columns = [
-      { header: "Sr.", key: "sr", width: 6 },
-      { header: "Name", key: "visitor_name", width: 25 },
-      { header: "Contact", key: "contact_no", width: 15 },
-      { header: "Email", key: "email", width: 25 },
-      { header: "Company", key: "company", width: 20 },
-      { header: "City", key: "city", width: 15 },
-      { header: "State", key: "state", width: 15 },
-      { header: "Department", key: "department_name", width: 15 },
-      { header: "Employee", key: "employee_name", width: 20 },
-      { header: "Purpose", key: "purpose_of_visit", width: 25 },
-      { header: "Check In", key: "check_in_time", width: 22 },
-      { header: "Check Out", key: "check_out_time", width: 22 },
+    const headers = [
+      "Sr.",
+      "Name",
+      "Contact",
+      "Email",
+      "Company",
+      "City",
+      "State",
+      "Department",
+      "Employee",
+      "Purpose",
+      "Check In",
+      "Check Out",
     ];
 
-    visitors.forEach((v, i) => {
-      worksheet.addRow({
-        sr: i + 1,
-        visitor_name: v.visitor_name,
-        contact_no: v.contact_no,
-        email: v.email,
-        company: v.company,
-        city: v.city,
-        state: v.state,
-        department_name: v.department_name,
-        employee_name: v.employee_name,
-        purpose_of_visit: v.purpose_of_visit,
-        check_in_time: v.check_in_time
-          ? new Date(v.check_in_time).toLocaleString()
-          : "-",
-        check_out_time: v.check_out_time
-          ? new Date(v.check_out_time).toLocaleString()
-          : "Currently In",
-      });
-    });
+    const tableRows = visitors
+      .map(
+        (v, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${v.visitor_name || ""}</td>
+        <td>${v.contact_no || ""}</td>
+        <td>${v.email || ""}</td>
+        <td>${v.company || ""}</td>
+        <td>${v.city || ""}</td>
+        <td>${v.state || ""}</td>
+        <td>${v.department_name || ""}</td>
+        <td>${v.employee_name || ""}</td>
+        <td>${v.purpose_of_visit || ""}</td>
+        <td>${
+          v.check_in_time ? new Date(v.check_in_time).toLocaleString() : "-"
+        }</td>
+        <td>${
+          v.check_out_time
+            ? new Date(v.check_out_time).toLocaleString()
+            : "Currently In"
+        }</td>
+      </tr>
+    `
+      )
+      .join("");
 
-    // Style header row
-    worksheet.getRow(1).eachCell((cell) => {
-      cell.font = { bold: true };
-      cell.alignment = { horizontal: "center" };
-    });
-
-    // ✅ Write file to buffer (no temp file needed)
-    const buffer = await workbook.xlsx.writeBuffer();
+    const html = `
+      <html>
+      <head>
+        <style>
+          table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
+          th, td { border: 1px solid #ddd; padding: 5px; }
+          th { background-color: #2575fc; color: white; }
+          tr:nth-child(even) { background-color: #f2f2f2; }
+        </style>
+      </head>
+      <body>
+        <h2>Visitor Report</h2>
+        <table>
+          <thead><tr>${headers
+            .map((h) => `<th>${h}</th>`)
+            .join("")}</tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+        <p>Regards,<br/>WRL Security Team</p>
+      </body>
+      </html>
+    `;
 
     const mailOptions = {
-      from: {
-        name: "WRL Visitor Reports",
-        address: "security.tadgam@westernequipments.com",
-      },
+      from: { name: "WRL Security Team", address: process.env.SMTP_USER },
       to: "vikash.kumar@westernequipments.com",
-      subject: "Visitor Report - Excel Summary",
-      text: "Please find attached the latest visitor report (Excel format) for your reference.\n\nRegards,\nWRL Security Department",
-      attachments: [
-        {
-          filename: `visitor-report-${
-            new Date().toISOString().split("T")[0]
-          }.xlsx`,
-          content: buffer,
-          contentType:
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        },
-      ],
+      subject: "Visitor Report",
+      html,
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log("Visitor report email with Excel sent:", info.messageId);
+    console.log("Visitor report email sent:", info.messageId);
     return true;
   } catch (error) {
-    console.error("Error sending visitor report email:", error);
+    console.error("Error sending Visitor Report email:", error);
     return false;
   }
 };
 
-// Verify transporter connection
+// -------------------- Gate Entry Report Email --------------------
+export const sendGateEntryReportEmail = async (gateEntries) => {
+  try {
+    if (!Array.isArray(gateEntries) || gateEntries.length === 0) {
+      console.warn("No Gate Entry data to email.");
+      return false;
+    }
+
+    const headers = [
+      "GATE ENTRY NUMBER",
+      "GATE ENTRY DATE",
+      "PO NUMBER",
+      "LINE ITEM",
+      "PO DATE",
+      "INVOICE VALUE",
+      "BASIC RATE",
+      "HSN CODE AS PER INVOICE",
+      "GRN:103",
+      "GRN:101 /105",
+      "SUPPLIER CODE",
+      "SUPPLIER NAME",
+      "INVOICE NO.",
+      "INVOICE DATE",
+      "ITEM CODE",
+      "DESCRIPTION OF THE GOODS",
+      "UOM",
+      "INVOICE QTY.",
+      "RECEIVED QTY.",
+      "DISCREPANCY",
+      "MATERIAL GROUP",
+      "VEHICLE NO.",
+      "DELIVERY TYPE",
+      "VEHICLE NAME",
+      "VEHICLE TYPE",
+      "FUEL TYPE",
+      "TOTAL CARRYING CAPACITY OF THE VEHICLE",
+      "REMARKS",
+    ];
+
+    const tableRows = gateEntries
+      .map(
+        (entry) => `
+      <tr>${headers.map((h, i) => `<td>${entry[i] || ""}</td>`).join("")}</tr>
+    `
+      )
+      .join("");
+
+    const html = `
+      <html>
+      <head>
+        <style>
+          table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
+          th, td { border: 1px solid #ddd; padding: 5px; }
+          th { background-color: #2575fc; color: white; }
+          tr:nth-child(even) { background-color: #f2f2f2; }
+        </style>
+      </head>
+      <body>
+        <h2>Gate Entry Report</h2>
+        <table>
+          <thead><tr>${headers
+            .map((h) => `<th>${h}</th>`)
+            .join("")}</tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+        <p>Regards,<br/>WRL Security Team</p>
+      </body>
+      </html>
+    `;
+
+    const mailOptions = {
+      from: { name: "WRL Inward Alert", address: process.env.SMTP_USER },
+      to: "vikash.kumar@westernequipments.com",
+      subject: "Gate Entry Report",
+      html,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Gate Entry report email sent:", info.messageId);
+    return true;
+  } catch (error) {
+    console.error("Error sending Gate Entry email:", error);
+    return false;
+  }
+};
+
+// -------------------- Verify SMTP --------------------
 transporter.verify((error, success) => {
   if (error) {
     console.error("SMTP Connection Error:", error);

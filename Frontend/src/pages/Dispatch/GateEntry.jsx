@@ -1,5 +1,9 @@
 import { useState } from "react";
 import Title from "../../components/common/Title";
+import axios from "axios";
+import Loader from "../../components/common/Loader";
+import toast from "react-hot-toast";
+import { baseURL } from "../../assets/assets";
 
 const GateEntry = () => {
   const fixedHeaders = [
@@ -39,32 +43,38 @@ const GateEntry = () => {
 
   // Handle parsing pasted data and sending to backend
   const handleParseData = async () => {
-    if (!pasteData) return;
+    if (!pasteData) {
+      toast.error("Please paste Gate Entry data first.");
+      return;
+    }
 
     setLoading(true);
 
-    // Parse pasted data
-    const lines = pasteData
-      .trim()
-      .split(/\r?\n/)
-      .filter((line) => line.trim() !== "");
-    const parsedRows = lines.map((line) => line.split("\t"));
-
-    setRows(parsedRows);
-
-    // Send parsed data to backend API
     try {
-      const response = await fetch("/api/sendGateEntryEmail", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: parsedRows, headers: fixedHeaders }),
+      // Parse pasted data into rows
+      const lines = pasteData
+        .trim()
+        .split(/\r?\n/)
+        .filter((line) => line.trim() !== "");
+
+      const parsedRows = lines.map((line) => line.split("\t"));
+      setRows(parsedRows);
+
+      // Send data to backend API
+      const res = await axios.post(`${baseURL}dispatch/material-gate-entry`, {
+        data: parsedRows,
       });
 
-      const result = await response.json();
-      alert(result.message || "Email sent successfully!");
+      if (res?.data?.success) {
+        toast.success(
+          res.data.message || "Gate Entry report sent successfully!"
+        );
+      } else {
+        toast.error(res?.data?.message || "Failed to send Gate Entry report.");
+      }
     } catch (error) {
-      console.error(error);
-      alert("Failed to send email. Please try again.");
+      console.error("Error sending Gate Entry report:", error);
+      toast.error("Failed to send Gate Entry report. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -107,7 +117,9 @@ const GateEntry = () => {
         </button>
       </div>
 
-      {rows.length > 0 ? (
+      {loading ? (
+        <Loader />
+      ) : rows.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="table-auto border-collapse border border-gray-300 w-full text-sm">
             <thead className="bg-gray-200">
