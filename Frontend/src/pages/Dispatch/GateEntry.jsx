@@ -120,14 +120,14 @@ const GateEntry = () => {
       {loading ? (
         <Loader />
       ) : rows.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="table-auto border-collapse border border-gray-300 w-full text-sm">
-            <thead className="bg-gray-200">
+        <div className="overflow-x-auto w-full border border-gray-300 rounded">
+          <table className="table-auto border-collapse w-full text-sm">
+            <thead className="bg-gray-200 sticky top-0 z-10">
               <tr>
                 {fixedHeaders.map((header, idx) => (
                   <th
                     key={idx}
-                    className="border border-gray-300 px-2 py-1 text-left whitespace-nowrap"
+                    className="border border-gray-300 px-2 py-1 text-left whitespace-nowrap bg-gray-200"
                   >
                     {header}
                   </th>

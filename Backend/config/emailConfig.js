@@ -196,7 +196,7 @@ export const sendVisitorReportEmail = async (visitors) => {
 
     const mailOptions = {
       from: { name: "WRL Security Team", address: process.env.SMTP_USER },
-      to: "vikash.kumar@westernequipments.com",
+      to: "vatsal.patel@westernequipments.com",
       subject: "Visitor Report",
       html,
     };
