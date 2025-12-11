@@ -25,6 +25,7 @@ const ModelNameUpdate = lazy(() =>
 const TotalProduction = lazy(() =>
   import("./pages/Production/TotalProduction")
 );
+const NFCReport = lazy(() => import("./pages/Production/NFCReport"));
 const ComponentDetails = lazy(() =>
   import("./pages/Production/ComponentDetails")
 );
@@ -154,6 +155,7 @@ function App() {
               path="/production/total-production"
               element={<TotalProduction />}
             />
+            <Route path="/production/nfc-report" element={<NFCReport />} />
             {/*-------------------------------------------------------------- Quality --------------------------------------------------------------*/}
             {canAccess([]) && (
               <Route path="/quality/rework-report" element={<ReworkReport />} />
