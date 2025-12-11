@@ -20,6 +20,7 @@ import stageHistoryReportRoutes from "./routes/production/stageHistoryReport.js"
 import modelNameUpdateRoutes from "./routes/production/modelNameUpdate.js";
 import componentDetailsRoutes from "./routes/production/componentDetails.js";
 import totalProductionRoutes from "./routes/production/totalProduction.js";
+import nfcReportRoutes from "./routes/production/nfcReport.js"
 
 import qualityRoutes from "./routes/quality.route.js";
 import dispatchRoute from "./routes/dispatch.route.js";
@@ -59,6 +60,8 @@ app.use("/api/v1/prod", stageHistoryReportRoutes);
 app.use("/api/v1/prod", modelNameUpdateRoutes);
 app.use("/api/v1/prod", componentDetailsRoutes);
 app.use("/api/v1/prod", totalProductionRoutes);
+app.use("/api/v1/prod", nfcReportRoutes);
+
 
 app.use("/api/v1/quality", qualityRoutes);
 app.use("/api/v1/dispatch", dispatchRoute);

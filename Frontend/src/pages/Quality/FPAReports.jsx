@@ -669,15 +669,17 @@ const FpaReportTable = ({ data }) => {
                 <td className="px-1 py-1 border">{row.AddDefect}</td>
                 <td className="px-1 py-1 border">{row.Remark}</td>
                 <td className="px-1 py-1 border text-center">
-                  <button
-                    onClick={() =>
-                      handleDownloadImage(row.FGSRNo, row.DefectImage)
-                    }
-                    className="text-blue-600 hover:text-blue-800 text-lg cursor-pointer"
-                    title="Download Image"
-                  >
-                    <FaDownload />
-                  </button>
+                  {row.DefectImage && (
+                    <button
+                      onClick={() =>
+                        handleDownloadImage(row.FGSRNo, row.DefectImage)
+                      }
+                      className="text-blue-600 hover:text-blue-800 text-lg cursor-pointer"
+                      title="Download Image"
+                    >
+                      <FaDownload />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))

@@ -45,6 +45,7 @@ const MENU_CONFIG = [
         label: "Component Details",
       },
       { path: "/production/total-production", label: "Total Production" },
+      { path: "/production/nfc-report", label: "NCF Report" },
     ],
   },
   {
