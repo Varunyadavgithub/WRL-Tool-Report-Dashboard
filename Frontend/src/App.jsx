@@ -30,6 +30,7 @@ const ComponentDetails = lazy(() =>
   import("./pages/Production/ComponentDetails")
 );
 
+const ReworkEntry = lazy(() => import("./pages/Quality/ReworkEntry"));
 const ReworkReport = lazy(() => import("./pages/Quality/ReworkReport"));
 const BrazingReport = lazy(() => import("./pages/Quality/BrazingReport"));
 const GasChargingReport = lazy(() =>
@@ -157,6 +158,9 @@ function App() {
             />
             <Route path="/production/nfc-report" element={<NFCReport />} />
             {/*-------------------------------------------------------------- Quality --------------------------------------------------------------*/}
+            {canAccess([]) && (
+              <Route path="/quality/rework-entry" element={<ReworkEntry />} />
+            )}
             {canAccess([]) && (
               <Route path="/quality/rework-report" element={<ReworkReport />} />
             )}

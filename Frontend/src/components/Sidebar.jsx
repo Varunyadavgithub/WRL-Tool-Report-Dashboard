@@ -54,6 +54,11 @@ const MENU_CONFIG = [
     label: "Quality",
     items: [
       {
+        path: "/quality/rework-entry",
+        label: "Rework Entry",
+        roles: ["admin"],
+      },
+      {
         path: "/quality/rework-report",
         label: "Rework Report",
         roles: ["admin"],
