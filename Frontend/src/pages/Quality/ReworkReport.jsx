@@ -14,13 +14,16 @@ const ReworkReport = () => {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const stageOption = [
-    { label: "Frz. Post Foaming", value: "frz-post-foaming" },
-    { label: "Choc. Post Foaming", value: "choc-post-foaming" },
-    { label: "SUS. Post Foaming", value: "sus-post-foaming" },
+    { label: "Post Foaming", value: "post-foaming" },
+    { label: "Gas Charging", value: "gas-charging" },
+    { label: "EST", value: "est" },
+    { label: "HLD", value: "hld" },
+    { label: "Final Inspection", value: "final-inspection" },
   ];
   const [selecedStage, setSelectedStage] = useState(stageOption[0]);
   const [totalReworkData, setTotalReworkData] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [lineType, setLineType] = useState("1");
 
   const handleQuery = () => {
     console.log("Handle Query Clicked.");
@@ -34,9 +37,11 @@ const ReworkReport = () => {
       <Title title="Rework Report" align="center" />
 
       {/* Filters Section */}
-      <div className="flex gap-4">
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
-          <div className="flex flex-wrap gap-4">
+      <div className="flex gap-4 items-start">
+        {/* Box 1: Main Filters */}
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-6 rounded-xl w-full max-w-[650px]">
+          {/* Row 1: Stage + Line Type */}
+          <div className="flex flex-wrap gap-8 items-start">
             <SelectField
               label="Stage"
               options={stageOption}
@@ -47,29 +52,58 @@ const ReworkReport = () => {
                     null
                 )
               }
-              className="max-w-64"
+              className="w-64"
             />
+
+            {/* Line Type */}
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-purple-700">
+                Line Type
+              </span>
+
+              {[
+                { value: "1", label: "Freezer Line" },
+                { value: "2", label: "Chocolate Line" },
+                { value: "3", label: "SUS Line" },
+              ].map((item) => (
+                <label key={item.value} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="lineType"
+                    value={item.value}
+                    checked={lineType === item.value}
+                    onChange={(e) => setLineType(e.target.value)}
+                  />
+                  {item.label}
+                </label>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-4 mt-4">
+
+          {/* Row 2: Date Pickers */}
+          <div className="flex flex-wrap gap-8 mt-6">
             <DateTimePicker
               label="Start Time"
               name="startTime"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
-              className="max-w-64"
+              className="w-64"
             />
+
             <DateTimePicker
               label="End Time"
               name="endTime"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
-              className="max-w-64"
+              className="w-64"
             />
           </div>
         </div>
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit items-center">
+
+        {/* Box 2: Query + Count */}
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl h-fit">
           <div className="flex flex-col items-center gap-2">
-            <div className="flex items-center gap-2 mt-4">
+            <div className="flex items-center gap-2">
               <Button
                 onClick={handleQuery}
                 bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
@@ -81,6 +115,7 @@ const ReworkReport = () => {
               >
                 Query
               </Button>
+
               {totalReworkData.length > 0 && (
                 <ExportButton
                   fetchData={fetchExportData}
@@ -88,15 +123,19 @@ const ReworkReport = () => {
                 />
               )}
             </div>
-            <div className="mt-4 text-left font-bold text-lg">
+
+            <div className="mt-2 font-bold text-lg text-center">
               COUNT: <span className="text-blue-700">{totalCount}</span>
             </div>
           </div>
         </div>
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
+
+        {/* Box 3: Quick Filters */}
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl h-fit">
           <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
             Quick Filters
           </h2>
+
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Button
               bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
@@ -104,31 +143,30 @@ const ReworkReport = () => {
               className={`font-semibold ${
                 ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
               }`}
-              // onClick={() => fetchYesterdayTotalProductionData()}
               disabled={ydayLoading}
             >
               YDAY
             </Button>
             {ydayLoading && <Loader />}
+
             <Button
               bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
               textColor={todayLoading ? "text-white" : "text-black"}
               className={`font-semibold ${
                 todayLoading ? "cursor-not-allowed" : "cursor-pointer"
               }`}
-              // onClick={() => fetchTodayTotalProductionData()}
               disabled={todayLoading}
             >
               TDAY
             </Button>
             {todayLoading && <Loader />}
+
             <Button
               bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
               textColor={monthLoading ? "text-white" : "text-black"}
               className={`font-semibold ${
                 monthLoading ? "cursor-not-allowed" : "cursor-pointer"
               }`}
-              // onClick={() => fetchMTDTotalProductionData()}
               disabled={monthLoading}
             >
               MTD
