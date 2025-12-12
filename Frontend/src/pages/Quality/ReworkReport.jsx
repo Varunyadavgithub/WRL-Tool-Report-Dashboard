@@ -1,65 +1,140 @@
 import Title from "../../components/common/Title";
 import Loader from "../../components/common/Loader";
 import { useState } from "react";
+import SelectField from "../../components/common/SelectField";
+import DateTimePicker from "../../components/common/DateTimePicker";
+import Button from "../../components/common/Button";
+import ExportButton from "../../components/common/ExportButton";
 
 const ReworkReport = () => {
   const [loading, setLoading] = useState(false);
+  const [ydayLoading, setYdayLoading] = useState(false);
+  const [todayLoading, setTodayLoading] = useState(false);
+  const [monthLoading, setMonthLoading] = useState(false);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const stageOption = [
+    { label: "Frz. Post Foaming", value: "frz-post-foaming" },
+    { label: "Choc. Post Foaming", value: "choc-post-foaming" },
+    { label: "SUS. Post Foaming", value: "sus-post-foaming" },
+  ];
+  const [selecedStage, setSelectedStage] = useState(stageOption[0]);
+  const [totalReworkData, setTotalReworkData] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+
+  const handleQuery = () => {
+    console.log("Handle Query Clicked.");
+  };
+
+  const fetchExportData = async () => {
+    console.log("Fetch Export data clicked.");
+  };
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="Rework Report" align="center" />
 
       {/* Filters Section */}
-      <div className="flex gap-2">
-        {/* <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl items-center">
-          <div className="flex flex-col gap-1 font-playfair">
-            <label className="font-semibold text-md">Start Date</label>
-            <input
-              type="date"
-              name="startDate"
+      <div className="flex gap-4">
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
+          <div className="flex flex-wrap gap-4">
+            <SelectField
+              label="Stage"
+              options={stageOption}
+              value={selecedStage?.value || ""}
+              onChange={(e) =>
+                setSelectedStage(
+                  stageOption.find((opt) => opt.value === e.target.value) ||
+                    null
+                )
+              }
+              className="max-w-64"
+            />
+          </div>
+          <div className="flex flex-wrap gap-4 mt-4">
+            <DateTimePicker
+              label="Start Time"
+              name="startTime"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
-              className="border px-2 py-1 rounded-md"
+              className="max-w-64"
             />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="font-semibold text-md">End Date</label>
-            <input
-              type="date"
-              name="endDate"
+            <DateTimePicker
+              label="End Time"
+              name="endTime"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
-              className="border px-2 py-1 rounded-md"
+              className="max-w-64"
             />
           </div>
-        </div> */}
-
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
-          {/* Buttons and Checkboxes */}
-          {/* <div className="flex flex-wrap items-center gap-4">
-            <div className="flex flex-col items-center gap-4">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
-                  textColor={loading ? "text-white" : "text-black"}
-                  className={`font-semibold ${
-                    loading ? "cursor-not-allowed" : ""
-                  }`}
-                  onClick={handleQuery}
-                  disabled={loading}
-                >
-                  Query
-                </Button>
-                {reportData && reportData.length > 0 && (
-                  <ExportButton data={reportData} filename="CPT_Report" />
-                )}
-              </div>
-              <div className="text-left font-bold text-lg">
-                COUNT:{" "}
-                <span className="text-blue-700">{totalCount || "0"}</span>
-              </div>
+        </div>
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit items-center">
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center gap-2 mt-4">
+              <Button
+                onClick={handleQuery}
+                bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
+                textColor={loading ? "text-white" : "text-black"}
+                className={`font-semibold ${
+                  loading ? "cursor-not-allowed" : ""
+                }`}
+                disabled={loading}
+              >
+                Query
+              </Button>
+              {totalReworkData.length > 0 && (
+                <ExportButton
+                  fetchData={fetchExportData}
+                  filename="Total_Production_Report"
+                />
+              )}
             </div>
-          </div> */}
+            <div className="mt-4 text-left font-bold text-lg">
+              COUNT: <span className="text-blue-700">{totalCount}</span>
+            </div>
+          </div>
+        </div>
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
+            Quick Filters
+          </h2>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Button
+              bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
+              textColor={ydayLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
+              // onClick={() => fetchYesterdayTotalProductionData()}
+              disabled={ydayLoading}
+            >
+              YDAY
+            </Button>
+            {ydayLoading && <Loader />}
+            <Button
+              bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
+              textColor={todayLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                todayLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
+              // onClick={() => fetchTodayTotalProductionData()}
+              disabled={todayLoading}
+            >
+              TDAY
+            </Button>
+            {todayLoading && <Loader />}
+            <Button
+              bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
+              textColor={monthLoading ? "text-white" : "text-black"}
+              className={`font-semibold ${
+                monthLoading ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
+              // onClick={() => fetchMTDTotalProductionData()}
+              disabled={monthLoading}
+            >
+              MTD
+            </Button>
+            {monthLoading && <Loader />}
+          </div>
         </div>
       </div>
 
