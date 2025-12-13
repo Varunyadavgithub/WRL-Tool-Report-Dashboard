@@ -46,19 +46,17 @@ export const getReworkEntryDetailsByAssemblySerial = async (req, res) => {
    REWORK IN  → INSERT NEW ROW
 ========================================================= */
 export const createReworkInEntry = async (req, res) => {
-  const { AssemblySerial, ModelName, Category, Defect, Part, Shift } = req.body;
+  const { AssemblySerial, ModelName, Category, Defect, Part, Shift, UserCode } = req.body;
 
   if (!AssemblySerial || !Defect || !Part || !Shift) {
-    return res.status(400).json({
-      message: "Missing required Rework IN fields",
-    });
+    return res.status(400).json({ message: "Missing required Rework IN fields" });
   }
 
   let pool;
   try {
     pool = await sql.connect(dbConfig1);
 
-    // 🔒 Prevent duplicate active IN
+    // Prevent duplicate active IN
     const checkQuery = `
       SELECT 1
       FROM ReworkEntry
@@ -72,9 +70,7 @@ export const createReworkInEntry = async (req, res) => {
       .query(checkQuery);
 
     if (checkResult.recordset.length > 0) {
-      return res.status(409).json({
-        message: "Rework IN already exists for this Serial Number",
-      });
+      return res.status(409).json({ message: "Rework IN already exists for this Serial Number" });
     }
 
     const insertQuery = `
@@ -86,6 +82,7 @@ export const createReworkInEntry = async (req, res) => {
         Defect,
         Part,
         Shift,
+        Usercode,
         ReworkInAt,
         Status
       )
@@ -97,6 +94,7 @@ export const createReworkInEntry = async (req, res) => {
         @Defect,
         @Part,
         @Shift,
+        @Usercode,
         GETDATE(),
         'IN'
       );
@@ -110,16 +108,13 @@ export const createReworkInEntry = async (req, res) => {
       .input("Defect", sql.VarChar, Defect)
       .input("Part", sql.VarChar, Part)
       .input("Shift", sql.VarChar, Shift)
+      .input("Usercode", sql.VarChar, UserCode ? String(UserCode) : "Unknown")
       .query(insertQuery);
 
-    res.status(201).json({
-      message: "Rework IN completed successfully",
-    });
+    res.status(201).json({ message: "Rework IN completed successfully" });
   } catch (error) {
     console.error("Rework IN Error:", error.message);
-    res.status(500).json({
-      message: "Failed to create Rework IN entry",
-    });
+    res.status(500).json({ message: "Failed to create Rework IN entry" });
   } finally {
     if (pool) await pool.close();
   }
@@ -129,19 +124,10 @@ export const createReworkInEntry = async (req, res) => {
    REWORK OUT  → UPDATE EXISTING IN ROW
 ========================================================= */
 export const createReworkOutEntry = async (req, res) => {
-  const { AssemblySerial, RootCause, FailCategory, Origin, ContainmentAction } =
-    req.body;
+  const { AssemblySerial, RootCause, FailCategory, Origin, ContainmentAction, UserCode } = req.body;
 
-  if (
-    !AssemblySerial ||
-    !RootCause ||
-    !FailCategory ||
-    !Origin ||
-    !ContainmentAction
-  ) {
-    return res.status(400).json({
-      message: "Missing required Rework OUT fields",
-    });
+  if (!AssemblySerial || !RootCause || !FailCategory || !Origin || !ContainmentAction) {
+    return res.status(400).json({ message: "Missing required Rework OUT fields" });
   }
 
   let pool;
@@ -155,6 +141,7 @@ export const createReworkOutEntry = async (req, res) => {
         FailCategory = @FailCategory,
         Origin = @Origin,
         ContainmentAction = @ContainmentAction,
+        Usercode = @Usercode,
         ReworkOutAt = GETDATE(),
         Status = 'OUT'
       WHERE
@@ -169,22 +156,17 @@ export const createReworkOutEntry = async (req, res) => {
       .input("FailCategory", sql.VarChar, FailCategory)
       .input("Origin", sql.VarChar, Origin)
       .input("ContainmentAction", sql.VarChar, ContainmentAction)
+      .input("Usercode", sql.VarChar, UserCode ? String(UserCode) : "Unknown")
       .query(updateQuery);
 
     if (result.rowsAffected[0] === 0) {
-      return res.status(404).json({
-        message: "No active Rework IN found for this Serial Number",
-      });
+      return res.status(404).json({ message: "No active Rework IN found for this Serial Number" });
     }
 
-    res.json({
-      message: "Rework OUT completed successfully",
-    });
+    res.json({ message: "Rework OUT completed successfully" });
   } catch (error) {
     console.error("Rework OUT Error:", error.message);
-    res.status(500).json({
-      message: "Failed to create Rework OUT entry",
-    });
+    res.status(500).json({ message: "Failed to create Rework OUT entry" });
   } finally {
     if (pool) await pool.close();
   }
@@ -197,19 +179,16 @@ export const getReworkReport = async (req, res) => {
   const { stage, lineType, startTime, endTime } = req.query;
 
   let pool;
-
   try {
     pool = await sql.connect(dbConfig1);
 
-    // ========================= BUILD FILTER =========================
     let filters = [];
     if (stage) filters.push(`Category = @stage`);
     if (lineType) filters.push(`Shift LIKE @lineType + '%'`);
     if (startTime) filters.push(`ReworkInAt >= @startTime`);
     if (endTime) filters.push(`ReworkInAt <= @endTime`);
 
-    const whereClause =
-      filters.length > 0 ? "WHERE " + filters.join(" AND ") : "";
+    const whereClause = filters.length ? "WHERE " + filters.join(" AND ") : "";
 
     const query = `
       SELECT 
@@ -224,6 +203,7 @@ export const getReworkReport = async (req, res) => {
         Origin,
         ContainmentAction,
         Shift,
+        Usercode,
         ReworkInAt,
         ReworkOutAt,
         Status
@@ -233,7 +213,6 @@ export const getReworkReport = async (req, res) => {
     `;
 
     const request = pool.request();
-
     if (stage) request.input("stage", sql.VarChar, stage);
     if (lineType) request.input("lineType", sql.VarChar, lineType);
     if (startTime) request.input("startTime", sql.DateTime, startTime);
@@ -241,10 +220,7 @@ export const getReworkReport = async (req, res) => {
 
     const result = await request.query(query);
 
-    res.json({
-      totalCount: result.recordset.length,
-      data: result.recordset,
-    });
+    res.json({ totalCount: result.recordset.length, data: result.recordset });
   } catch (error) {
     console.error("Rework Report Error:", error.message);
     res.status(500).json({ message: "Failed to fetch Rework Report" });

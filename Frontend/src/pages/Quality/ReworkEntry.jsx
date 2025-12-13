@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSelector } from "react-redux";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Button from "../../components/common/Button";
@@ -7,25 +8,28 @@ import Title from "../../components/common/Title";
 import { baseURL } from "../../assets/assets.js";
 
 const ReworkEntry = () => {
-  const [loading, setLoading] = useState(false);
-  const [serialNumber, setSerialNumber] = useState("");
+  const { user } = useSelector((store) => store.auth);
 
+  // ===== States =====
+  const [loadingQuery, setLoadingQuery] = useState(false);
+  const [loadingIn, setLoadingIn] = useState(false);
+  const [loadingOut, setLoadingOut] = useState(false);
+
+  const [serialNumber, setSerialNumber] = useState("");
   const [modelName, setModelName] = useState("");
   const [category, setCategory] = useState("");
 
-  // ===== Rework IN states =====
+  // Rework IN
   const [defect, setDefect] = useState("");
   const [part, setPart] = useState("");
 
-  // ===== Rework OUT states =====
+  // Rework OUT
   const [rootCause, setRootCause] = useState("");
   const [failCategory, setFailCategory] = useState("");
   const [origin, setOrigin] = useState("");
   const [containmentAction, setContainmentAction] = useState("");
 
-  /* =========================================================
-     RESET HELPERS (BEST PRACTICE)
-  ========================================================= */
+  // ===== Reset Helpers =====
   const resetReworkInFields = () => {
     setDefect("");
     setPart("");
@@ -46,9 +50,7 @@ const ReworkEntry = () => {
     resetReworkOutFields();
   };
 
-  /* =========================================================
-     FETCH MODEL & CATEGORY
-  ========================================================= */
+  // ===== Fetch Model & Category =====
   const handleQuery = async () => {
     if (!serialNumber) {
       toast.error("Please enter Serial Number");
@@ -56,7 +58,7 @@ const ReworkEntry = () => {
     }
 
     try {
-      setLoading(true);
+      setLoadingQuery(true);
 
       const { data } = await axios.get(
         `${baseURL}quality/rework-entry/details`,
@@ -77,22 +79,18 @@ const ReworkEntry = () => {
       console.error(error);
       toast.error("Failed to fetch Rework Entry details");
     } finally {
-      setLoading(false);
+      setLoadingQuery(false);
     }
   };
 
-  /* =========================================================
-     SHIFT
-  ========================================================= */
+  // ===== Shift Calculation =====
   const getCurrentShift = () => {
     const now = new Date();
     const mins = now.getHours() * 60 + now.getMinutes();
     return mins >= 480 && mins < 1200 ? "Shift 1" : "Shift 2";
   };
 
-  /* =========================================================
-     REWORK IN
-  ========================================================= */
+  // ===== Handle Rework IN =====
   const handleReworkIn = async () => {
     if (!serialNumber || !modelName || !category) {
       toast.error("Please fetch Rework Entry details first");
@@ -105,6 +103,8 @@ const ReworkEntry = () => {
     }
 
     try {
+      setLoadingIn(true);
+
       const payload = {
         AssemblySerial: serialNumber,
         ModelName: modelName,
@@ -112,23 +112,23 @@ const ReworkEntry = () => {
         Defect: defect,
         Part: part,
         Shift: getCurrentShift(),
+        UserCode: user?.usercode || "defaultUser",
       };
 
       const { data } = await axios.post(`${baseURL}quality/rework-in`, payload);
-
       toast.success(data.message);
 
-      // ✅ Clear only IN fields
+      // Clear only IN fields
       resetReworkInFields();
     } catch (error) {
       console.error(error);
       toast.error(error.response?.data?.message || "Rework IN failed");
+    } finally {
+      setLoadingIn(false);
     }
   };
 
-  /* =========================================================
-     REWORK OUT
-  ========================================================= */
+  // ===== Handle Rework OUT =====
   const handleReworkOut = async () => {
     if (!serialNumber) {
       toast.error("Please enter Serial Number");
@@ -141,12 +141,15 @@ const ReworkEntry = () => {
     }
 
     try {
+      setLoadingOut(true);
+
       const payload = {
         AssemblySerial: serialNumber,
         RootCause: rootCause,
         FailCategory: failCategory,
         Origin: origin,
         ContainmentAction: containmentAction,
+        UserCode: user?.usercode || "defaultUser",
       };
 
       const { data } = await axios.post(
@@ -156,11 +159,13 @@ const ReworkEntry = () => {
 
       toast.success(data.message);
 
-      // ✅ Clear everything after OUT
+      // Clear everything after OUT
       resetAllFields();
     } catch (error) {
       console.error(error);
       toast.error(error.response?.data?.message || "Rework OUT failed");
+    } finally {
+      setLoadingOut(false);
     }
   };
 
@@ -168,7 +173,7 @@ const ReworkEntry = () => {
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="Rework Entry" align="center" />
 
-      {/* ================= REWORK ENTRY ================= */}
+      {/* ===== Rework Entry Form ===== */}
       <div className="bg-white border rounded-lg p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">Rework Entry</h2>
 
@@ -183,9 +188,9 @@ const ReworkEntry = () => {
             onClick={handleQuery}
             bgColor="bg-blue-500"
             textColor="text-white"
-            disabled={loading}
+            disabled={loadingQuery}
           >
-            {loading ? "Loading..." : "Go"}
+            {loadingQuery ? "Loading..." : "Go"}
           </Button>
 
           <InputField label="Model Name" value={modelName} readOnly />
@@ -193,25 +198,22 @@ const ReworkEntry = () => {
         </div>
       </div>
 
-      {/* ================= IN & OUT ================= */}
+      {/* ===== Rework IN & OUT ===== */}
       <div className="flex flex-col md:flex-row gap-8">
-        {/* ================= REWORK IN ================= */}
+        {/* Rework IN */}
         <div className="md:w-1/2 bg-white border rounded-lg p-6">
           <h2 className="text-lg font-semibold mb-4">Rework In</h2>
-
           <div className="space-y-4">
             <InputField
               label="Defect"
               value={defect}
               onChange={(e) => setDefect(e.target.value)}
             />
-
             <InputField
               label="Part"
               value={part}
               onChange={(e) => setPart(e.target.value)}
             />
-
             <InputField
               label="Current Shift"
               value={getCurrentShift()}
@@ -222,35 +224,32 @@ const ReworkEntry = () => {
               onClick={handleReworkIn}
               bgColor="bg-indigo-500"
               textColor="text-white"
+              disabled={loadingIn}
             >
-              IN
+              {loadingIn ? "Processing..." : "IN"}
             </Button>
           </div>
         </div>
 
-        {/* ================= REWORK OUT ================= */}
+        {/* Rework OUT */}
         <div className="md:w-1/2 bg-white border rounded-lg p-6">
           <h2 className="text-lg font-semibold mb-4">Rework Out</h2>
-
           <div className="space-y-4">
             <InputField
               label="Root Cause"
               value={rootCause}
               onChange={(e) => setRootCause(e.target.value)}
             />
-
             <InputField
               label="Fail Category"
               value={failCategory}
               onChange={(e) => setFailCategory(e.target.value)}
             />
-
             <InputField
               label="Origin"
               value={origin}
               onChange={(e) => setOrigin(e.target.value)}
             />
-
             <InputField
               label="Containment Action"
               value={containmentAction}
@@ -261,8 +260,9 @@ const ReworkEntry = () => {
               onClick={handleReworkOut}
               bgColor="bg-green-500"
               textColor="text-white"
+              disabled={loadingOut}
             >
-              OUT
+              {loadingOut ? "Processing..." : "OUT"}
             </Button>
           </div>
         </div>
