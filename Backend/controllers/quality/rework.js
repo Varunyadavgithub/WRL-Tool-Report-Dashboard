@@ -189,3 +189,66 @@ export const createReworkOutEntry = async (req, res) => {
     if (pool) await pool.close();
   }
 };
+
+/* =========================================================
+   REWORK REPORT  → GET REWORK REPORT
+========================================================= */
+export const getReworkReport = async (req, res) => {
+  const { stage, lineType, startTime, endTime } = req.query;
+
+  let pool;
+
+  try {
+    pool = await sql.connect(dbConfig1);
+
+    // ========================= BUILD FILTER =========================
+    let filters = [];
+    if (stage) filters.push(`Category = @stage`);
+    if (lineType) filters.push(`Shift LIKE @lineType + '%'`);
+    if (startTime) filters.push(`ReworkInAt >= @startTime`);
+    if (endTime) filters.push(`ReworkInAt <= @endTime`);
+
+    const whereClause =
+      filters.length > 0 ? "WHERE " + filters.join(" AND ") : "";
+
+    const query = `
+      SELECT 
+        ReworkID,
+        SerialNumber,
+        ModelName,
+        Category,
+        Defect,
+        Part,
+        RootCause,
+        FailCategory,
+        Origin,
+        ContainmentAction,
+        Shift,
+        ReworkInAt,
+        ReworkOutAt,
+        Status
+      FROM ReworkEntry
+      ${whereClause}
+      ORDER BY ReworkInAt DESC
+    `;
+
+    const request = pool.request();
+
+    if (stage) request.input("stage", sql.VarChar, stage);
+    if (lineType) request.input("lineType", sql.VarChar, lineType);
+    if (startTime) request.input("startTime", sql.DateTime, startTime);
+    if (endTime) request.input("endTime", sql.DateTime, endTime);
+
+    const result = await request.query(query);
+
+    res.json({
+      totalCount: result.recordset.length,
+      data: result.recordset,
+    });
+  } catch (error) {
+    console.error("Rework Report Error:", error.message);
+    res.status(500).json({ message: "Failed to fetch Rework Report" });
+  } finally {
+    if (pool) await pool.close();
+  }
+};

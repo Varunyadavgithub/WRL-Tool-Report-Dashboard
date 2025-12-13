@@ -58,6 +58,7 @@ import {
   createReworkInEntry,
   createReworkOutEntry,
   getReworkEntryDetailsByAssemblySerial,
+  getReworkReport,
 } from "../controllers/quality/rework.js";
 const router = express.Router();
 
@@ -82,6 +83,7 @@ router.get("/download-fpa-defect-image/:fgSrNo", downloadDefectImage);
 router.get("/rework-entry/details", getReworkEntryDetailsByAssemblySerial);
 router.post("/rework-in", createReworkInEntry);
 router.post("/rework-out", createReworkOutEntry);
+router.get("/rework-report", getReworkReport);
 
 // -----------------> FPA Report Routes
 router.get("/fpa-report", getFpaReport);
