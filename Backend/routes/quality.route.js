@@ -54,6 +54,11 @@ import {
 } from "../controllers/quality/UploadBISReport.js";
 import { getDispatchHoldDetails } from "../controllers/quality/holdCabinetDetails.js";
 import { getCPTReport } from "../controllers/quality/cptReport.js";
+import {
+  createReworkInEntry,
+  createReworkOutEntry,
+  getReworkEntryDetailsByAssemblySerial,
+} from "../controllers/quality/rework.js";
 const router = express.Router();
 
 // -----------------> CPT Routes
@@ -72,6 +77,11 @@ router.post(
   addDefect
 );
 router.get("/download-fpa-defect-image/:fgSrNo", downloadDefectImage);
+
+// -----------------> Rework Entry
+router.get("/rework-entry/details", getReworkEntryDetailsByAssemblySerial);
+router.post("/rework-in", createReworkInEntry);
+router.post("/rework-out", createReworkOutEntry);
 
 // -----------------> FPA Report Routes
 router.get("/fpa-report", getFpaReport);
