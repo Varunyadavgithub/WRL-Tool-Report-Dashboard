@@ -29,6 +29,7 @@ const ManageEmployee = () => {
   const [departments, setDepartments] = useState([]);
   const [editingDeptCode, setEditingDeptCode] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState(null);
 
   const fetchUsers = async () => {
     try {
@@ -253,13 +254,18 @@ const ManageEmployee = () => {
   const filteredUsers = users.filter((user) => {
     const term = searchTerm.toLowerCase();
 
-    return (
+    const matchesSearch =
       user.name?.toLowerCase().includes(term) ||
       user.employee_id?.toLowerCase().includes(term) ||
       user.employee_email?.toLowerCase().includes(term) ||
       user.manager_email?.toLowerCase().includes(term) ||
-      user.contact_number?.toLowerCase().includes(term)
-    );
+      user.contact_number?.toLowerCase().includes(term);
+
+    const matchesDepartment =
+      !selectedDepartmentId ||
+      user.department_id.toString() === selectedDepartmentId.toString();
+
+    return matchesSearch && matchesDepartment;
   });
 
   return (
@@ -443,6 +449,11 @@ const ManageEmployee = () => {
               <div className="flex flex-wrap justify-between items-center mb-2 gap-2">
                 <h3 className="text-xl font-semibold text-purple-700">
                   Registered Users
+                  {selectedDepartmentId && (
+                    <span className="ml-2 text-sm text-gray-500">
+                      (Dept: {selectedDepartmentId})
+                    </span>
+                  )}
                 </h3>
 
                 <input
@@ -453,9 +464,20 @@ const ManageEmployee = () => {
                   className="border border-gray-300 rounded-md px-3 py-1 text-sm w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-purple-400"
                 />
 
-                <span className="text-sm text-gray-600">
-                  Total Users: {filteredUsers.length}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">
+                    Total Users: {filteredUsers.length}
+                  </span>
+
+                  {selectedDepartmentId && (
+                    <button
+                      onClick={() => setSelectedDepartmentId(null)}
+                      className="text-xs text-red-500 hover:underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="border rounded-lg overflow-hidden">
@@ -606,7 +628,12 @@ const ManageEmployee = () => {
                         departments.map((dept, index) => (
                           <tr
                             key={dept.value}
-                            className="hover:bg-gray-50 transition-colors duration-200"
+                            onClick={() => setSelectedDepartmentId(dept.value)}
+                            className={`cursor-pointer transition-colors duration-200 ${
+                              selectedDepartmentId === dept.value
+                                ? "bg-purple-200"
+                                : "hover:bg-gray-50"
+                            }`}
                           >
                             <td className="px-2 py-2 text-center border-b">
                               {index + 1}
