@@ -69,11 +69,11 @@ FilteredData AS (
     JOIN Material m 
         ON m.MatCode = Psno.Material
        AND m.Type = 100 
-       AND m.Ledger = 0
+       AND m.name like '%KW%'
 
     WHERE 
         b.ActivityType = 5
-        AND c.StationCode IN (1220010, 1230017)
+        AND c.StationCode IN (1220010)
         AND b.ActivityOn BETWEEN @startTime AND @endTime
 )
 
@@ -97,8 +97,8 @@ FROM FilteredData;
   }
 };
 
-// Export Data
-export const fetchExportData = async (req, res) => {
+// Quick Filters NFC Reports
+export const getQuickFiltersNfcReports = async (req, res) => {
   const { startDate, endDate, model } = req.query;
 
   if (!startDate || !endDate) {
@@ -118,7 +118,6 @@ export const fetchExportData = async (req, res) => {
     if (model && model != 0) {
       request.input("model", sql.VarChar, model);
     }
-
     const query = `
  WITH Psno AS (
     SELECT DocNo, Material, Serial, VSerial, Serial2, Alias 
@@ -164,11 +163,11 @@ FilteredData AS (
     JOIN Material m 
         ON m.MatCode = Psno.Material
        AND m.Type = 100 
-       AND m.Ledger = 0
+       AND m.Ledger = 1220018
 
     WHERE 
         b.ActivityType = 5
-        AND c.StationCode IN (1220010, 1230017)
+        AND c.StationCode IN (1220010)
         AND b.ActivityOn BETWEEN @startTime AND @endTime
 )
 
@@ -181,13 +180,12 @@ FROM FilteredData;
     res.status(200).json({
       success: true,
       data: result.recordset,
-      totalCount:
-        result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
+      totalCount: result.recordset.length ? result.recordset[0].totalCount : 0,
     });
 
     await pool.close();
   } catch (error) {
-    console.error("Error fetching NFC details:", error);
+    console.error("Error fetching NFC quick filter reports:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
