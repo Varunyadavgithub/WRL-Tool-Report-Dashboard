@@ -28,6 +28,7 @@ const ManageEmployee = () => {
   const [editingUserId, setEditingUserId] = useState(null);
   const [departments, setDepartments] = useState([]);
   const [editingDeptCode, setEditingDeptCode] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const fetchUsers = async () => {
     try {
@@ -249,6 +250,18 @@ const ManageEmployee = () => {
     }
   };
 
+  const filteredUsers = users.filter((user) => {
+    const term = searchTerm.toLowerCase();
+
+    return (
+      user.name?.toLowerCase().includes(term) ||
+      user.employee_id?.toLowerCase().includes(term) ||
+      user.employee_email?.toLowerCase().includes(term) ||
+      user.manager_email?.toLowerCase().includes(term) ||
+      user.contact_number?.toLowerCase().includes(term)
+    );
+  });
+
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
       <Title title="Manage Employee" align="center" />
@@ -427,15 +440,22 @@ const ManageEmployee = () => {
           <div className="flex flex-wrap gap-4">
             {/* Users Table Section */}
             <div className="w-full md:w-[calc(70%-1rem)] overflow-x-auto">
-              <div className="flex justify-between items-center mb-2">
+              <div className="flex flex-wrap justify-between items-center mb-2 gap-2">
                 <h3 className="text-xl font-semibold text-purple-700">
                   Registered Users
                 </h3>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">
-                    Total Users: {users.length || "0"}
-                  </span>
-                </div>
+
+                <input
+                  type="text"
+                  placeholder="Search employees..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-1 text-sm w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+
+                <span className="text-sm text-gray-600">
+                  Total Users: {filteredUsers.length}
+                </span>
               </div>
 
               <div className="border rounded-lg overflow-hidden">
@@ -471,8 +491,8 @@ const ManageEmployee = () => {
                     </thead>
                     <tbody>
                       {/* Conditional rendering for users */}
-                      {users && users.length > 0 ? (
-                        users.map((user, index) => (
+                      {filteredUsers.length > 0 ? (
+                        filteredUsers.map((user, index) => (
                           <tr
                             key={user.id}
                             className="hover:bg-gray-50 transition-colors duration-200"
@@ -537,7 +557,9 @@ const ManageEmployee = () => {
                             colSpan={7}
                             className="text-center py-4 text-gray-500"
                           >
-                            No users found. Add a new user to get started.
+                            {searchTerm
+                              ? "No matching users found."
+                              : "No users found. Add a new user to get started."}
                           </td>
                         </tr>
                       )}
