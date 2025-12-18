@@ -82,6 +82,27 @@ const NFCReport = () => {
     }
   };
 
+  const fetchExportData = async () => {
+    if (!startTime || !endTime) {
+      toast.error("Please select Time Range.");
+      return;
+    }
+    try {
+      const params = {
+        startDate: startTime,
+        endDate: endTime,
+      };
+      const res = await axios.get(`${baseURL}prod/export-nfc-report`, {
+        params,
+      });
+      return res?.data?.success ? res?.data?.data : [];
+    } catch (error) {
+      console.error("Failed to fetch export NFC Report data:", error);
+      toast.error("Failed to fetch export NFC Report data.");
+      return [];
+    }
+  };
+
   // Quick Filters
   const fetchYesterdaynfcReportData = async () => {
     const now = new Date();
@@ -227,17 +248,6 @@ const NFCReport = () => {
     setNfcReportData([]);
     setHasMore(false);
     fetchNFCReportData(1);
-  };
-
-  const fetchExportData = async () => {
-    try {
-      const res = await axios.get(`${baseURL}prod/export-nfc-report`);
-      return res?.data?.success ? res?.data?.data : [];
-    } catch (error) {
-      console.error("Failed to fetch export NFC Report data:", error);
-      toast.error("Failed to fetch export NFC Report data.");
-      return [];
-    }
   };
 
   const getModelNameCount = (data) => {
@@ -400,6 +410,7 @@ const NFCReport = () => {
                         { label: "Asset Tag", key: "Asset_tag" },
                         { label: "Customer QR", key: "CustomerQR" },
                         { label: "NFC UID", key: "NFC_UID" },
+                        { label: "CreatedOn", key: "CreatedOn" },
                       ].map((col) => (
                         <th
                           key={col.key}
@@ -442,6 +453,10 @@ const NFCReport = () => {
                           </td>
                           <td className="px-2 py-1 border font-mono">
                             {item.NFC_UID}
+                          </td>
+                          <td className="px-2 py-1 border font-mono">
+                            {item.CreatedOn &&
+                              item.CreatedOn.replace("T", " ").replace("Z","")}
                           </td>
                         </tr>
                       );
