@@ -8,24 +8,7 @@ import cookieParser from "cookie-parser";
 // const _dirname = path.resolve();
 
 // <------------------------------------------------------------- All API Routes ------------------------------------------------------------->
-import authRoutes from "./routes/auth.route.js";
-import sharedRoutes from "./routes/shared.route.js";
-
-// <----- Production Routes ----->
-import ProductionReportRoutes from "./routes/production/ProductionReport.js";
-import componentTraceabilityReportRoutes from "./routes/production/componentTraceabilityReport.js";
-import hourlyReportRoutes from "./routes/production/hourlyReport.js";
-import lineHourlyReportRoutes from "./routes/production/lineHourlyReport.js";
-import stageHistoryReportRoutes from "./routes/production/stageHistoryReport.js";
-import modelNameUpdateRoutes from "./routes/production/modelNameUpdate.js";
-import componentDetailsRoutes from "./routes/production/componentDetails.js";
-import totalProductionRoutes from "./routes/production/totalProduction.js";
-import nfcReportRoutes from "./routes/production/nfcReport.js"
-
-import qualityRoutes from "./routes/quality.route.js";
-import dispatchRoute from "./routes/dispatch.route.js";
-import productionPlaningRoutes from "./routes/planing.route.js";
-import visitorRoutes from "./routes/visitor.route.js";
+import routes from "./routes/index.js";
 
 const app = express();
 app.use(
@@ -48,25 +31,7 @@ app.use("/uploads", express.static(path.resolve("uploads"))); // Static files
 })();
 
 // <------------------------------------------------------------- APIs ------------------------------------------------------------->
-app.use("/api/v1/auth", authRoutes);
-app.use("/api/v1/shared", sharedRoutes);
-
-// Production API
-app.use("/api/v1/prod", ProductionReportRoutes);
-app.use("/api/v1/prod", componentTraceabilityReportRoutes);
-app.use("/api/v1/prod", hourlyReportRoutes);
-app.use("/api/v1/prod", lineHourlyReportRoutes);
-app.use("/api/v1/prod", stageHistoryReportRoutes);
-app.use("/api/v1/prod", modelNameUpdateRoutes);
-app.use("/api/v1/prod", componentDetailsRoutes);
-app.use("/api/v1/prod", totalProductionRoutes);
-app.use("/api/v1/prod", nfcReportRoutes);
-
-
-app.use("/api/v1/quality", qualityRoutes);
-app.use("/api/v1/dispatch", dispatchRoute);
-app.use("/api/v1/planing", productionPlaningRoutes);
-app.use("/api/v1/visitor", visitorRoutes);
+app.use("/api/v1/", routes);
 
 // <------------------------------------------------------------- Serve Frontend from Backend ------------------------------------------------------------->
 // app.use(express.static(path.join(_dirname, "Frontend", "dist")));

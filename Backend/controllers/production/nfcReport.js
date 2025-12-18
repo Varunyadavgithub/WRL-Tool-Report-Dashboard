@@ -37,15 +37,15 @@ FilteredData AS (
 
       -- NEW ? NFC UID before semicolon
       CASE 
-          WHEN CHARINDEX(';', Psno.Serial2) > 0 
-               THEN LEFT(Psno.Serial2, CHARINDEX(';', Psno.Serial2) - 1)
+          WHEN CHARINDEX('/', Psno.Serial2) > 0 
+               THEN LEFT(Psno.Serial2, CHARINDEX('/', Psno.Serial2) - 1)
           ELSE NULL
       END AS NFC_UID,
 
       -- Clean CustomerQR after semicolon
       CASE 
-          WHEN CHARINDEX(';', Psno.Serial2) > 0 
-               THEN SUBSTRING(Psno.Serial2, CHARINDEX(';', Psno.Serial2) + 1, LEN(Psno.Serial2))
+          WHEN CHARINDEX('/', Psno.Serial2) > 0 
+               THEN SUBSTRING(Psno.Serial2, CHARINDEX('/', Psno.Serial2) + 1, LEN(Psno.Serial2))
           ELSE Psno.Serial2
       END AS CustomerQR,
 
@@ -99,7 +99,7 @@ FROM FilteredData;
 };
 
 // Export Data
-export const fetchExportData = async (req, res) => {
+export const nfcReportExportData = async (req, res) => {
   const { startDate, endDate } = req.query;
 
   if (!startDate || !endDate) {
@@ -145,17 +145,17 @@ export const fetchExportData = async (req, res) => {
 
           -- NFC UID (before semicolon)
           CASE 
-            WHEN CHARINDEX(';', Psno.Serial2) > 0 
-                 THEN LEFT(Psno.Serial2, CHARINDEX(';', Psno.Serial2) - 1)
+            WHEN CHARINDEX('/', Psno.Serial2) > 0 
+                 THEN LEFT(Psno.Serial2, CHARINDEX('/', Psno.Serial2) - 1)
             ELSE NULL
           END AS NFC_UID,
 
           -- Customer QR (after semicolon)
           CASE 
-            WHEN CHARINDEX(';', Psno.Serial2) > 0 
+            WHEN CHARINDEX('/', Psno.Serial2) > 0 
                  THEN SUBSTRING(
                    Psno.Serial2,
-                   CHARINDEX(';', Psno.Serial2) + 1,
+                   CHARINDEX('/', Psno.Serial2) + 1,
                    LEN(Psno.Serial2)
                  )
             ELSE Psno.Serial2
@@ -229,15 +229,15 @@ FilteredData AS (
 
       -- NEW ? NFC UID before semicolon
       CASE 
-          WHEN CHARINDEX(';', Psno.Serial2) > 0 
-               THEN LEFT(Psno.Serial2, CHARINDEX(';', Psno.Serial2) - 1)
+          WHEN CHARINDEX('/', Psno.Serial2) > 0 
+               THEN LEFT(Psno.Serial2, CHARINDEX('/', Psno.Serial2) - 1)
           ELSE NULL
       END AS NFC_UID,
 
       -- Clean CustomerQR after semicolon
       CASE 
-          WHEN CHARINDEX(';', Psno.Serial2) > 0 
-               THEN SUBSTRING(Psno.Serial2, CHARINDEX(';', Psno.Serial2) + 1, LEN(Psno.Serial2))
+          WHEN CHARINDEX('/', Psno.Serial2) > 0 
+               THEN SUBSTRING(Psno.Serial2, CHARINDEX('/', Psno.Serial2) + 1, LEN(Psno.Serial2))
           ELSE Psno.Serial2
       END AS CustomerQR,
 

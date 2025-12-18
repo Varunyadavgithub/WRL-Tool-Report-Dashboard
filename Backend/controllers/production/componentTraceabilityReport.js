@@ -129,7 +129,7 @@ OFFSET
 
 
 // Export Data
-export const fetchExportData = async (req, res) => {
+export const componentTraceabilityExportData = async (req, res) => {
   const { startTime, endTime, model } = req.query;
 
   if (!startTime || !endTime) {

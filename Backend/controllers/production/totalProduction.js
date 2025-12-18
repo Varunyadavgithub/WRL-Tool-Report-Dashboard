@@ -116,7 +116,7 @@ export const getBarcodeDetails = async (req, res) => {
 };
 
 // Export Data
-export const fetchExportData = async (req, res) => {
+export const totalProductionExportData = async (req, res) => {
   const { startDate, endDate, model, department } = req.query;
 
   if (!startDate || !endDate) {
