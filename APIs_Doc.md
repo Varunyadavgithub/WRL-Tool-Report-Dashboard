@@ -54,6 +54,24 @@
 
 ---
 
+# Common Module
+
+## Common Routes
+
+### GET `/model-variants`
+
+**Description**: Fetche all models names.
+
+### GET `/stage-names`
+
+**Description**: Fetche all stage names.
+
+### GET `/departments`
+
+**Description**: Fetche all departments.
+
+---
+
 # 🚚 Dispatch Module
 
 ## Performance Reports

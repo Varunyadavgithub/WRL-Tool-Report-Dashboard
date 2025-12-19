@@ -3,7 +3,7 @@ import {
   getDepartments,
   getModelVariants,
   getStageNames,
-} from "../controllers/sharedController.js";
+} from "../controllers/common.controller.js";
 
 const router = express.Router();
 
