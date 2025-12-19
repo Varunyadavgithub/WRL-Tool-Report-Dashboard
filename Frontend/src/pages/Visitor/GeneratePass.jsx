@@ -1,13 +1,12 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import Title from "../../components/common/Title";
 import InputField from "../../components/common/InputField";
 import SelectField from "../../components/common/SelectField";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { useSelector } from "react-redux";
-import { useEffect } from "react";
 import { baseURL } from "../../assets/assets";
-import { data, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 const GeneratePass = () => {
   const { user } = useSelector((store) => store.auth);
@@ -33,7 +32,7 @@ const GeneratePass = () => {
     departmentTo: "",
     employeeTo: "",
     visitType: "",
-    remark: "",
+    token: "",
     specialInstruction: "",
     purposeOfVisit: "",
     createdBy: user?.id,
@@ -43,26 +42,22 @@ const GeneratePass = () => {
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState("");
 
-  const fetchEmployees = async () => {
-    try {
-      const res = await axios.get(`${baseURL}visitor/employees`);
-      if (res?.data) {
-        const data = res?.data;
-        const formatted = data.map((item) => ({
-          label: item.name,
-          value: item.employee_id.toString(),
-          departmentName: item.department_name,
-          departmentCode: item.deptCode,
+  /* ================= FETCH EMPLOYEES ================= */
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const res = await axios.get(`${baseURL}visitor/employees`);
+        const formatted = res.data.map((emp) => ({
+          label: emp.name,
+          value: emp.employee_id.toString(),
+          departmentName: emp.department_name,
+          departmentCode: emp.deptCode,
         }));
         setEmployees(formatted);
+      } catch {
+        toast.error("Failed to fetch employees");
       }
-    } catch (error) {
-      console.error("Failed to fetch employees:", error);
-      toast.error("Failed to fetch employees.");
-    }
-  };
-
-  useEffect(() => {
+    };
     fetchEmployees();
   }, []);
 
@@ -186,7 +181,14 @@ const GeneratePass = () => {
 
                 <button
                   onClick={capturePhoto}
-                  className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75 cursor-pointer"
+                  disabled={!videoRef.current?.srcObject}
+                  className={`px-4 py-2 font-semibold rounded-lg shadow-md
+    ${
+      videoRef.current?.srcObject
+        ? "bg-green-600 text-white hover:bg-green-700 cursor-pointer"
+        : "bg-gray-400 text-white cursor-not-allowed"
+    }
+  `}
                 >
                   Capture Photo
                 </button>
@@ -229,6 +231,13 @@ const GeneratePass = () => {
   // Submit handler
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 🚨 PHOTO REQUIRED
+    if (!visitorData.visitorPhoto) {
+      toast.error("Please capture visitor photo before generating the pass.");
+      return;
+    }
+
     // Basic validation
     const requiredFields = [
       "name",
@@ -667,9 +676,9 @@ const GeneratePass = () => {
                   <InputField
                     label="Token No."
                     type="text"
-                    name="remark"
+                    name="token"
                     placeholder="Enter token no."
-                    value={visitorData.remark}
+                    value={visitorData.token}
                     onChange={handleInputChange}
                     className="w-full"
                   />
@@ -710,7 +719,14 @@ const GeneratePass = () => {
         <div className="mt-6 text-center">
           <button
             type="submit"
-            className="bg-purple-600 text-white px-6 py-2 rounded hover:bg-purple-700 transition cursor-pointer"
+            disabled={!visitorData.visitorPhoto || loading}
+            className={`px-6 py-2 rounded text-white transition
+    ${
+      visitorData.visitorPhoto
+        ? "bg-purple-600 hover:bg-purple-700 cursor-pointer"
+        : "bg-gray-400 cursor-not-allowed"
+    }
+  `}
           >
             Generate Visitor Pass
           </button>
