@@ -23,6 +23,7 @@ export const fetchVisitors = async (req, res) => {
     const query = `
       SELECT 
         v.visitor_id As id,
+        vp.visit_type,
         v.name As visitor_name,
         v.contact_no,
         v.email,
@@ -37,7 +38,8 @@ export const fetchVisitors = async (req, res) => {
         u.name As employee_name,
         vp.purpose_of_visit,
         vl.check_in_time,
-        vl.check_out_time
+        vl.check_out_time,
+        vp.token
       FROM visitors v
       INNER JOIN visitor_passes vp ON v.visitor_id = vp.visitor_id
       INNER JOIN visit_logs vl ON vl.unique_pass_id = vp.pass_id

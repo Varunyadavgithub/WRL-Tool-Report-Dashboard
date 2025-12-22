@@ -142,7 +142,8 @@ export const visitorIn = async (req, res) => {
         u.employee_email,
         u.manager_email,
         v.company,
-        v.city
+        v.city,
+        vp.purpose_of_visit
       FROM visitor_passes vp
       INNER JOIN visitors v ON v.visitor_id = vp.visitor_id
       LEFT JOIN departments d ON vp.department_to_visit = d.deptCode
@@ -173,7 +174,7 @@ export const visitorIn = async (req, res) => {
         allowTill: data.allow_till,
         departmentToVisit: data.department_name,
         employeeToVisit: data.employee_name,
-        purposeOfVisit: data.purposeOfVisit,
+        purposeOfVisit: data.purpose_of_visit,
       });
     }
 
