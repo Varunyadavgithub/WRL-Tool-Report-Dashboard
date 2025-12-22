@@ -295,7 +295,9 @@ const Reports = () => {
                   <td className="px-1 py-1 border text-center">
                     {v.purpose_of_visit}
                   </td>
-                  <td className="px-1 py-1 border text-center">{v.token}</td>
+                   <td className="px-1 py-1 border text-center">
+                    {v.token}
+                  </td>
                 </tr>
               ))
             ) : (

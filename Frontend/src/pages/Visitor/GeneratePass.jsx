@@ -180,15 +180,18 @@ const GeneratePass = () => {
                 </button>
 
                 <button
-                  onClick={capturePhoto}
-                  disabled={!videoRef.current?.srcObject}
-                  className={`px-4 py-2 font-semibold rounded-lg shadow-md
-    ${
-      videoRef.current?.srcObject
-        ? "bg-green-600 text-white hover:bg-green-700 cursor-pointer"
-        : "bg-gray-400 text-white cursor-not-allowed"
-    }
-  `}
+                  type="button"
+                  onClick={async () => {
+                    if (!videoRef.current?.srcObject) {
+                      toast.error(
+                        "Camera is not active. Please allow camera access or connect a camera device."
+                      );
+                      await startCamera();
+                      return;
+                    }
+                    capturePhoto();
+                  }}
+                  className="px-4 py-2 font-semibold rounded-lg shadow-md bg-green-600 text-white hover:bg-green-700 cursor-pointer"
                 >
                   Capture Photo
                 </button>
@@ -235,6 +238,9 @@ const GeneratePass = () => {
     // 🚨 PHOTO REQUIRED
     if (!visitorData.visitorPhoto) {
       toast.error("Please capture visitor photo before generating the pass.");
+      document
+        .querySelector(".photo-capture-section")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
@@ -663,8 +669,10 @@ const GeneratePass = () => {
                     name="visitType"
                     options={[
                       { value: "", label: "Select Visit Type" },
-                      { value: "business", label: "Business" },
-                      { value: "tourism", label: "Tourism" },
+                      { value: "customer", label: "Customer" },
+                      { value: "supplier", label: "Supplier" },
+                      { value: "employee", label: "Employee" },
+                      { value: "contractor", label: "Contractor" },
                       { value: "other", label: "Other" },
                     ]}
                     value={visitorData.visitType}
@@ -719,14 +727,7 @@ const GeneratePass = () => {
         <div className="mt-6 text-center">
           <button
             type="submit"
-            disabled={!visitorData.visitorPhoto || loading}
-            className={`px-6 py-2 rounded text-white transition
-    ${
-      visitorData.visitorPhoto
-        ? "bg-purple-600 hover:bg-purple-700 cursor-pointer"
-        : "bg-gray-400 cursor-not-allowed"
-    }
-  `}
+            className="px-6 py-2 rounded text-white transition bg-purple-600 hover:bg-purple-700 cursor-pointer"
           >
             Generate Visitor Pass
           </button>
