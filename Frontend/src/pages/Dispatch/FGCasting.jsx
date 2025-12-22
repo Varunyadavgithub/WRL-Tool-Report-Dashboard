@@ -109,8 +109,11 @@ const FGCasting = () => {
             <ExportButton
               data={fetchFgCastingData.map((item) => ({
                 ModelName: item.ModelName,
-                AssetCode: item.AssetCode,
-                FGSerialNo: item.FGSerialNo,
+                FGSerialNo: item.FG_Serial,
+                AssetCode: item.VSerial,
+                CustomerQR: item.CustomerQR,
+                NFCID: item.NFCID,
+                CreatedOn: item.CreatedOn.replace("T", " ").replace("Z", ""),
               }))}
               filename="FG_Casting_Data"
             />
@@ -236,6 +239,15 @@ const FGCasting = () => {
                       <th className="px-1 py-1 border min-w-[120px]">
                         Asset Code
                       </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Customer QR
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        NFC UID
+                      </th>
+                      <th className="px-1 py-1 border min-w-[120px]">
+                        Created On
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -247,9 +259,17 @@ const FGCasting = () => {
                         >
                           <td className="px-1 py-1 border">{item.ModelName}</td>
                           <td className="px-1 py-1 border">
-                            {item.FGSerialNo}
+                            {item.FG_Serial}
                           </td>
-                          <td className="px-1 py-1 border">{item.AssetCode}</td>
+                          <td className="px-1 py-1 border">{item.VSerial}</td>
+                          <td className="px-1 py-1 border">
+                            {item.CustomerQR}
+                          </td>
+                          <td className="px-1 py-1 border">{item.NFCID}</td>
+                          <td className="px-1 py-1 border">
+                            {item.CreatedOn &&
+                              item.CreatedOn.replace("T", " ").replace("Z", "")}
+                          </td>
                         </tr>
                       ))
                     ) : (
