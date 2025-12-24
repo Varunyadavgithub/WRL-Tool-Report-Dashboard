@@ -240,6 +240,8 @@ const Reports = () => {
                 "Department To Visit",
                 "Check In Time",
                 "Check Out Time",
+                "Visit Duration",
+                "No of visit",
                 "Purpose of Visit",
                 "Token No",
               ].map((header, idx) => (
@@ -298,6 +300,12 @@ const Reports = () => {
                         Currently In
                       </span>
                     )}
+                  </td>
+                  <td className="px-1 py-1 border text-center">
+                    {v.visit_duration}
+                  </td>
+                  <td className="px-1 py-1 border text-center">
+                    {v.no_of_visit}
                   </td>
                   <td className="px-1 py-1 border text-center">
                     {v.purpose_of_visit}

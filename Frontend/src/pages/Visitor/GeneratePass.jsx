@@ -255,6 +255,7 @@ const GeneratePass = () => {
       "departmentTo",
       "employeeTo",
       "purposeOfVisit",
+      "visitType",
     ];
     for (let field of requiredFields) {
       if (!visitorData[field]) {
@@ -678,6 +679,7 @@ const GeneratePass = () => {
                     value={visitorData.visitType}
                     onChange={handleInputChange}
                     className="w-full"
+                    required
                   />
                 </div>
                 <div className="w-full">

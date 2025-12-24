@@ -13,13 +13,14 @@ const ComponentTraceabilityReport = () => {
   const [loading, setLoading] = useState(false);
   const [variants, setVariants] = useState([]);
   const [selectedVariant, setSelectedVariant] = useState(null);
+  const [compType, setCompType] = useState([]);
+  const [selectedCompType, setSelectedCompType] = useState(null);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [traceabilityData, setTraceabilityData] = useState([]);
   const [page, setPage] = useState(1);
   const [limit] = useState(100);
   const [hasMore, setHasMore] = useState(false);
-  const [totalCount, setTotalCount] = useState(0);
 
   const observer = useRef();
   const lastRowRef = useCallback(
@@ -51,6 +52,22 @@ const ComponentTraceabilityReport = () => {
     }
   };
 
+  const fetchCompType = async () => {
+    try {
+      const res = await axios.get(`${baseURL}shared/comp-type`);
+
+      const formatted = res?.data?.map((item) => ({
+        label: item.Name,
+        value: item.CategoryCode.toString(),
+      }));
+
+      setCompType(formatted);
+    } catch (error) {
+      console.error("Failed to fetch comp type:", error);
+      toast.error("Failed to fetch comp type.");
+    }
+  };
+
   const fetchTraceabilityData = async (pageNumber = 1) => {
     if (!startTime || !endTime) {
       toast.error("Please select Time Range.");
@@ -63,6 +80,7 @@ const ComponentTraceabilityReport = () => {
         startTime,
         endTime,
         model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+        compType: selectedCompType ? parseInt(selectedCompType.value, 10) : 0,
         page: pageNumber,
         limit,
       };
@@ -73,10 +91,6 @@ const ComponentTraceabilityReport = () => {
 
       if (res?.data?.success) {
         setTraceabilityData((prev) => [...prev, ...res?.data?.data]);
-        // Set total count only when it's the first page
-        if (pageNumber === 1) {
-          setTotalCount(res?.data?.totalCount);
-        }
         setHasMore(res?.data?.data.length > 0);
       }
     } catch (error) {
@@ -97,6 +111,7 @@ const ComponentTraceabilityReport = () => {
         startTime,
         endTime,
         model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+        compType: selectedCompType ? parseInt(selectedCompType.value, 10) : 0,
       };
 
       const res = await axios.get(
@@ -121,6 +136,7 @@ const ComponentTraceabilityReport = () => {
 
   useEffect(() => {
     fetchModelVariants();
+    fetchCompType();
   }, []);
 
   useEffect(() => {
@@ -149,6 +165,17 @@ const ComponentTraceabilityReport = () => {
               onChange={(e) =>
                 setSelectedVariant(
                   variants.find((opt) => opt.value === e.target.value) || null
+                )
+              }
+              className="max-w-64"
+            />
+            <SelectField
+              label="Component Type"
+              options={compType}
+              value={selectedCompType?.value || ""}
+              onChange={(e) =>
+                setSelectedCompType(
+                  compType.find((opt) => opt.value === e.target.value) || null
                 )
               }
               className="max-w-64"
