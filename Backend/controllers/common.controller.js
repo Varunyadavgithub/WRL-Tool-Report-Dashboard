@@ -20,6 +20,23 @@ export const getModelVariants = async (_, res) => {
   }
 };
 
+// Fetches a list of active model variants from the Material table.
+export const getCompType = async (_, res) => {
+  try {
+    const query = `
+      Select CategoryCode, Name from MaterialCategory where CategoryType = 200;
+  `;
+
+    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+    const result = await pool.request().query(query);
+    res.json(result.recordset);
+    await pool.close();
+  } catch (error) {
+    console.error("SQL error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 // Fetches a list of all work stages from the WorkCenter table.
 export const getStageNames = async (_, res) => {
   try {
