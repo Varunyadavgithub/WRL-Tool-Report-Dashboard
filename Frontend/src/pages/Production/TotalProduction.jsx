@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 import Loader from "../../components/common/Loader";
 import { FaCaretUp, FaCaretDown } from "react-icons/fa";
 import { baseURL } from "../../assets/assets";
+import { useGetModelVariantsQuery } from "../../redux/apis/common/commonApi";
 
 const TotalProduction = () => {
   const [loading, setLoading] = useState(false);
@@ -18,8 +19,7 @@ const TotalProduction = () => {
 
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [variants, setVariants] = useState([]);
-  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [selectedModelVariant, setSelectedModelVariant] = useState(null);
   const [totalProductionData, setTotalProductionData] = useState([]);
   const [page, setPage] = useState(1);
   const [limit] = useState(1000);
@@ -51,23 +51,16 @@ const TotalProduction = () => {
     [loading, hasMore]
   );
 
-  const fetchModelVariants = async () => {
-    try {
-      const res = await axios.get(`${baseURL}shared/model-variants`);
-      const formatted = res?.data.map((item) => ({
-        label: item.MaterialName,
-        value: item.MatCode.toString(),
-      }));
-      setVariants(formatted);
-    } catch (error) {
-      console.error("Failed to fetch model variants:", error);
-      toast.error("Failed to fetch model variants.");
-    }
-  };
+  /* ===================== RTK QUERY ===================== */
+  const {
+    data: variants = [],
+    isLoading: variantsLoading,
+    error: variantsError,
+  } = useGetModelVariantsQuery();
 
   useEffect(() => {
-    fetchModelVariants();
-  }, []);
+    if (variantsError) toast.error("Failed to load model variants");
+  }, [variantsError]);
 
   const fetchTotalProductionData = async (pageNumber = 1) => {
     if (!startTime || !endTime) {
@@ -83,7 +76,9 @@ const TotalProduction = () => {
         page: pageNumber,
         limit,
         department: selecedDep.value,
-        model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+        model: selectedModelVariant
+          ? parseInt(selectedModelVariant.value, 10)
+          : 0,
       };
 
       const res = await axios.get(`${baseURL}prod/barcode-details`, { params });
@@ -139,7 +134,9 @@ const TotalProduction = () => {
         startDate: formattedStart,
         endDate: formattedEnd,
         department: selecedDep.value,
-        model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+        model: selectedModelVariant
+          ? parseInt(selectedModelVariant.value, 10)
+          : 0,
       };
 
       const res = await axios.get(`${baseURL}prod/yday-total-production`, {
@@ -183,7 +180,9 @@ const TotalProduction = () => {
         startDate: formattedStart,
         endDate: formattedEnd,
         department: selecedDep.value,
-        model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+        model: selectedModelVariant
+          ? parseInt(selectedModelVariant.value, 10)
+          : 0,
       };
 
       const res = await axios.get(`${baseURL}prod/today-total-production`, {
@@ -232,7 +231,9 @@ const TotalProduction = () => {
         startDate: formattedStart,
         endDate: formattedEnd,
         department: selecedDep.value,
-        model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+        model: selectedModelVariant
+          ? parseInt(selectedModelVariant.value, 10)
+          : 0,
       };
 
       const res = await axios.get(`${baseURL}prod/month-total-production`, {
@@ -273,7 +274,9 @@ const TotalProduction = () => {
         startDate: startTime,
         endDate: endTime,
         department: selecedDep.value,
-        model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+        model: selectedModelVariant
+          ? parseInt(selectedModelVariant.value, 10)
+          : 0,
       };
       const res = await axios.get(`${baseURL}prod/export-total-production`, {
         params,
@@ -338,6 +341,8 @@ const TotalProduction = () => {
     setSortConfig({ key, direction });
   };
 
+  if (variantsLoading) return <Loader />;
+
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="Total Production" align="center" />
@@ -349,9 +354,9 @@ const TotalProduction = () => {
             <SelectField
               label="Model Variant"
               options={variants}
-              value={selectedVariant?.value || ""}
+              value={selectedModelVariant?.value || ""}
               onChange={(e) =>
-                setSelectedVariant(
+                setSelectedModelVariant(
                   variants.find((opt) => opt.value === e.target.value) || null
                 )
               }
