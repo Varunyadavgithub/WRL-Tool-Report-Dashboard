@@ -98,15 +98,12 @@ const Reports = () => {
         return safeLower(item.email).includes(lowerTerm);
       case "company":
         return safeLower(item.company).includes(lowerTerm);
-      case "Visitor Type":
-        return safeLower(item.visit_type).includes(lowerTerm);
       default:
         return (
           safeLower(item.visitor_name).includes(lowerTerm) ||
           safeLower(item.contact_no).includes(lowerTerm) ||
           safeLower(item.email).includes(lowerTerm) ||
-          safeLower(item.company).includes(lowerTerm) ||
-          safeLower(item.visit_type).includes(lowerTerm)
+          safeLower(item.company).includes(lowerTerm)
         );
     }
   });
@@ -225,25 +222,22 @@ const Reports = () => {
             <tr>
               {[
                 "Sr.No.",
-                "Vistor Type",
                 "Name",
                 "Contact",
                 "Email",
                 "Company",
                 "Address",
-                "City",
                 "State",
+                "City",
                 "ID Type",
                 "ID No",
                 "Vehicle",
-                "Employee To Visit",
-                "Department To Visit",
-                "Check In Time",
-                "Check Out Time",
-                "Visit Duration",
-                "No of visit",
-                "Purpose of Visit",
-                "Token No",
+                "Department",
+                "Employee",
+                "Check In",
+                "Check Out",
+                "Purpose",
+                "Token",
               ].map((header, idx) => (
                 <th
                   key={idx}
@@ -261,9 +255,6 @@ const Reports = () => {
                 <tr key={i} className="hover:bg-gray-50 transition">
                   <td className="px-1 py-1 border text-center">{i + 1}</td>
                   <td className="px-1 py-1 border text-center whitespace-nowrap">
-                    {v.visit_type}
-                  </td>
-                  <td className="px-1 py-1 border text-center whitespace-nowrap">
                     {v.visitor_name}
                   </td>
                   <td className="px-1 py-1 border text-center">
@@ -272,8 +263,8 @@ const Reports = () => {
                   <td className="px-1 py-1 border text-center">{v.email}</td>
                   <td className="px-1 py-1 border text-center">{v.company}</td>
                   <td className="px-1 py-1 border text-center">{v.address}</td>
-                  <td className="px-1 py-1 border text-center">{v.city}</td>
                   <td className="px-1 py-1 border text-center">{v.state}</td>
+                  <td className="px-1 py-1 border text-center">{v.city}</td>
                   <td className="px-1 py-1 border text-center">
                     {v.identity_type}
                   </td>
@@ -284,10 +275,10 @@ const Reports = () => {
                     {v.vehicle_details}
                   </td>
                   <td className="px-1 py-1 border text-center">
-                    {v.employee_name}
+                    {v.department_name}
                   </td>
                   <td className="px-1 py-1 border text-center">
-                    {v.department_name}
+                    {v.employee_name}
                   </td>
                   <td className="px-1 py-1 border text-center">
                     {v.check_in_time?.replace("T", " ").replace("Z", "")}
@@ -302,12 +293,6 @@ const Reports = () => {
                     )}
                   </td>
                   <td className="px-1 py-1 border text-center">
-                    {v.visit_duration}
-                  </td>
-                  <td className="px-1 py-1 border text-center">
-                    {v.no_of_visit}
-                  </td>
-                  <td className="px-1 py-1 border text-center">
                     {v.purpose_of_visit}
                   </td>
                   <td className="px-1 py-1 border text-center">{v.token}</td>
@@ -315,7 +300,7 @@ const Reports = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={18} className="text-center py-4 text-gray-500">
+                <td colSpan={16} className="text-center py-4 text-gray-500">
                   No visitors found.
                 </td>
               </tr>

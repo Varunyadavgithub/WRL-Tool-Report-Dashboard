@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import ExcelJS from "exceljs";
 dotenv.config();
 
 // Create transporter
@@ -162,83 +163,79 @@ export const sendVisitorReportEmail = async (visitors) => {
       return false;
     }
 
-    const headers = [
-      "Sr.",
-      "Name",
-      "Contact",
-      "Email",
-      "Company",
-      "City",
-      "State",
-      "Department",
-      "Employee",
-      "Purpose",
-      "Check In",
-      "Check Out",
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Visitor Report");
+
+    worksheet.columns = [
+      { header: "Sr.", key: "sr", width: 6 },
+      { header: "Name", key: "visitor_name", width: 25 },
+      { header: "Contact", key: "contact_no", width: 15 },
+      { header: "Email", key: "email", width: 25 },
+      { header: "Company", key: "company", width: 20 },
+      { header: "City", key: "city", width: 15 },
+      { header: "State", key: "state", width: 15 },
+      { header: "Department", key: "department_name", width: 15 },
+      { header: "Employee", key: "employee_name", width: 20 },
+      { header: "Purpose", key: "purpose_of_visit", width: 25 },
+      { header: "Check In", key: "check_in_time", width: 22 },
+      { header: "Check Out", key: "check_out_time", width: 22 },
     ];
 
-    const tableRows = visitors
-      .map(
-        (v, i) => `
-      <tr>
-        <td>${i + 1}</td>
-        <td>${v.visitor_name || ""}</td>
-        <td>${v.contact_no || ""}</td>
-        <td>${v.email || ""}</td>
-        <td>${v.company || ""}</td>
-        <td>${v.city || ""}</td>
-        <td>${v.state || ""}</td>
-        <td>${v.department_name || ""}</td>
-        <td>${v.employee_name || ""}</td>
-        <td>${v.purpose_of_visit || ""}</td>
-        <td>${
-          v.check_in_time ? new Date(v.check_in_time).toLocaleString() : "-"
-        }</td>
-        <td>${
-          v.check_out_time
-            ? new Date(v.check_out_time).toLocaleString()
-            : "Currently In"
-        }</td>
-      </tr>
-    `
-      )
-      .join("");
+    visitors.forEach((v, i) => {
+      worksheet.addRow({
+        sr: i + 1,
+        visitor_name: v.visitor_name,
+        contact_no: v.contact_no,
+        email: v.email,
+        company: v.company,
+        city: v.city,
+        state: v.state,
+        department_name: v.department_name,
+        employee_name: v.employee_name,
+        purpose_of_visit: v.purpose_of_visit,
+        check_in_time: v.check_in_time
+          ? new Date(v.check_in_time).toLocaleString()
+          : "-",
+        check_out_time: v.check_out_time
+          ? new Date(v.check_out_time).toLocaleString()
+          : "Currently In",
+      });
+    });
 
-    const html = `
-      <html>
-      <head>
-        <style>
-          table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
-          th, td { border: 1px solid #ddd; padding: 5px; }
-          th { background-color: #2575fc; color: white; }
-          tr:nth-child(even) { background-color: #f2f2f2; }
-        </style>
-      </head>
-      <body>
-        <h2>Visitor Report</h2>
-        <table>
-          <thead><tr>${headers
-            .map((h) => `<th>${h}</th>`)
-            .join("")}</tr></thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-        <p>Regards,<br/>WRL Security Team</p>
-      </body>
-      </html>
-    `;
+    // Style header row
+    worksheet.getRow(1).eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.alignment = { horizontal: "center" };
+    });
+
+    // ? Write file to buffer (no temp file needed)
+    const buffer = await workbook.xlsx.writeBuffer();
 
     const mailOptions = {
-      from: { name: "WRL Security Team", address: process.env.SMTP_USER },
-      to: "vatsal.patel@westernequipments.com",
-      subject: "Visitor Report",
-      html,
+      from: {
+        name: "WRL Visitor Reports",
+        address: "security.tadgam@westernequipments.com",
+      },
+      to: "vikash.kumar@westernequipments.com",
+      subject: "Visitor Report - Excel Summary",
+      text: "Please find attached the latest visitor report (Excel format) for your reference.\n\nRegards,\nWRL Security Department",
+      attachments: [
+        {
+          filename: `visitor-report-${
+            new Date().toISOString().split("T")[0]
+          }.xlsx`,
+          content: buffer,
+          contentType:
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        },
+      ],
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log("Visitor report email sent:", info.messageId);
+    console.log("Visitor report email with Excel sent:", info.messageId);
     return true;
   } catch (error) {
-    console.error("Error sending Visitor Report email:", error);
+    console.error("Error sending visitor report email:", error);
     return false;
   }
 };

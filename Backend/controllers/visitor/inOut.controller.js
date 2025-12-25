@@ -1,5 +1,5 @@
-import sql, { dbConfig3 } from "../../config/db.js";
-import { sendVisitorPassEmail } from "../../config/emailConfig.js";
+import sql, { dbConfig3 } from "../config/db.js";
+import { sendVisitorPassEmail } from "../config/emailConfig.js";
 
 export const getVisitorLogs = async (_, res) => {
   try {

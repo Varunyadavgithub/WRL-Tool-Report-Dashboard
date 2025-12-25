@@ -1,5 +1,5 @@
-import sql, { dbConfig3 } from "../../config/db.js";
-import { sendVisitorReportEmail } from "../../config/emailConfig.js";
+import sql, { dbConfig3 } from "../config/db.js";
+import { sendVisitorReportEmail } from "../config/emailConfig.js";
 
 // Visitor
 export const fetchVisitors = async (req, res) => {
@@ -22,54 +22,28 @@ export const fetchVisitors = async (req, res) => {
 
     const query = `
       SELECT 
-          v.visitor_id AS id,
-          vp.visit_type,
-          v.name AS visitor_name,
-          v.contact_no,
-          v.email,
-          v.identity_type,
-          v.identity_no,
-          v.company,
-          v.address,
-          v.city,
-          v.state,
-          v.vehicle_details,
-          d.department_name,
-          u.name AS employee_name,
-          vp.purpose_of_visit,
-          vl.check_in_time,
-          vl.check_out_time,
-
-          -- Duration HH:MM:SS
-          CONVERT(
-              VARCHAR(8),
-              DATEADD(
-                  SECOND,
-                  DATEDIFF(SECOND, vl.check_in_time, ISNULL(vl.check_out_time, GETDATE())),
-                  0
-              ),
-              108
-          ) AS visit_duration,
-
-          vp_count.total_passes AS no_of_visit,
-          vp.token
-
+        v.visitor_id As id,
+        v.name As visitor_name,
+        v.contact_no,
+        v.email,
+        v.identity_type,
+        v.identity_no,
+        v.company,
+        v.address,
+        v.city,
+        v.state,
+        v.vehicle_details,
+        d.department_name,
+        u.name As employee_name,
+        vp.purpose_of_visit,
+        vp.token,
+        vl.check_in_time,
+        vl.check_out_time
       FROM visitors v
-      INNER JOIN visitor_passes vp 
-          ON v.visitor_id = vp.visitor_id
-      INNER JOIN visit_logs vl 
-          ON vl.unique_pass_id = vp.pass_id
-      INNER JOIN users u 
-          ON u.employee_id = vp.employee_to_visit
-      INNER JOIN departments d 
-          ON d.deptCode = vp.department_to_visit
-
-      LEFT JOIN (
-          SELECT visitor_id, COUNT(*) AS total_passes
-          FROM visitor_passes
-          GROUP BY visitor_id
-      ) vp_count 
-          ON vp_count.visitor_id = v.visitor_id
+      INNER JOIN visitor_passes vp ON v.visitor_id = vp.visitor_id
+      INNER JOIN visit_logs vl ON vl.unique_pass_id = vp.pass_id
+      INNER JOIN users u ON u.employee_id = vp.employee_to_visit
+      INNER JOIN departments d ON d.deptCode = vp.department_to_visit
       where vl.check_in_time between @startTime and @endTime
     `;
     const result = await request.query(query);

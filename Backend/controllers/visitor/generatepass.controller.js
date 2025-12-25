@@ -1,4 +1,4 @@
-import sql, { dbConfig3 } from "../../config/db.js";
+import sql, { dbConfig3 } from "../config/db.js";
 
 // Get Departments
 export const fetchDepartments = async (req, res) => {
