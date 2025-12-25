@@ -8,12 +8,14 @@ import Loader from "../../components/common/Loader";
 import ExportButton from "../../components/common/ExportButton";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets";
+import {
+  useGetModelVariantsQuery,
+  useGetComponentTypesQuery,
+} from "../../redux/apis/common/commonApi";
 
 const ComponentTraceabilityReport = () => {
   const [loading, setLoading] = useState(false);
-  const [variants, setVariants] = useState([]);
   const [selectedVariant, setSelectedVariant] = useState(null);
-  const [compType, setCompType] = useState([]);
   const [selectedCompType, setSelectedCompType] = useState(null);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -22,7 +24,27 @@ const ComponentTraceabilityReport = () => {
   const [limit] = useState(100);
   const [hasMore, setHasMore] = useState(false);
 
+  /* ===================== RTK QUERY ===================== */
+  const {
+    data: variants = [],
+    isLoading: variantsLoading,
+    error: variantsError,
+  } = useGetModelVariantsQuery();
+
+  const {
+    data: compType = [],
+    isLoading: compTypeLoading,
+    error: compTypeError,
+  } = useGetComponentTypesQuery();
+
+  useEffect(() => {
+    if (variantsError) toast.error("Failed to load model variants");
+    if (compTypeError) toast.error("Failed to load component types");
+  }, [variantsError, compTypeError]);
+
+  /* ===================== INFINITE SCROLL ===================== */
   const observer = useRef();
+
   const lastRowRef = useCallback(
     (node) => {
       if (loading) return;
@@ -30,44 +52,16 @@ const ComponentTraceabilityReport = () => {
 
       observer.current = new IntersectionObserver((entries) => {
         if (entries[0].isIntersecting && hasMore) {
-          setPage((prevPage) => prevPage + 1);
+          setPage((prev) => prev + 1);
         }
       });
+
       if (node) observer.current.observe(node);
     },
     [loading, hasMore]
   );
 
-  const fetchModelVariants = async () => {
-    try {
-      const res = await axios.get(`${baseURL}shared/model-variants`);
-      const formatted = res?.data.map((item) => ({
-        label: item.MaterialName,
-        value: item.MatCode.toString(),
-      }));
-      setVariants(formatted);
-    } catch (error) {
-      console.error("Failed to fetch model variants:", error);
-      toast.error("Failed to fetch model variants.");
-    }
-  };
-
-  const fetchCompType = async () => {
-    try {
-      const res = await axios.get(`${baseURL}shared/comp-type`);
-
-      const formatted = res?.data?.map((item) => ({
-        label: item.Name,
-        value: item.CategoryCode.toString(),
-      }));
-
-      setCompType(formatted);
-    } catch (error) {
-      console.error("Failed to fetch comp type:", error);
-      toast.error("Failed to fetch comp type.");
-    }
-  };
-
+  /* ===================== API CALLS ===================== */
   const fetchTraceabilityData = async (pageNumber = 1) => {
     if (!startTime || !endTime) {
       toast.error("Please select Time Range.");
@@ -134,14 +128,9 @@ const ComponentTraceabilityReport = () => {
     }
   };
 
+  /* ===================== EFFECTS ===================== */
   useEffect(() => {
-    fetchModelVariants();
-    fetchCompType();
-  }, []);
-
-  useEffect(() => {
-    if (page === 1) return;
-    fetchTraceabilityData(page);
+    if (page > 1) fetchTraceabilityData(page);
   }, [page]);
 
   const handleTraceabilityData = () => {
@@ -149,6 +138,8 @@ const ComponentTraceabilityReport = () => {
     setPage(1);
     fetchTraceabilityData(1);
   };
+
+  if (variantsLoading || compTypeLoading) return <Loader />;
 
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
@@ -234,7 +225,6 @@ const ComponentTraceabilityReport = () => {
               <thead className="bg-gray-200 sticky top-0 z-10 text-center">
                 <tr>
                   <th className="p-2 border">Model_Name</th>
-
                   <th className="p-2 border">Component Serial No.</th>
                   <th className="p-2 border">Component Name</th>
                   <th className="p-2 border">Component Type</th>
@@ -273,6 +263,7 @@ const ComponentTraceabilityReport = () => {
                     </tr>
                   );
                 })}
+
                 {!loading && traceabilityData.length === 0 && (
                   <tr>
                     <td colSpan={11} className="text-center py-4">
@@ -282,6 +273,7 @@ const ComponentTraceabilityReport = () => {
                 )}
               </tbody>
             </table>
+
             {loading && <Loader />}
           </div>
         </div>

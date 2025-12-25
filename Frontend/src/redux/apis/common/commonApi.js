@@ -27,7 +27,20 @@ export const commonApi = createApi({
         })),
       providesTags: ["Common"],
     }),
+
+    getComponentTypes: builder.query({
+      query: () => "shared/comp-type",
+      transformResponse: (response) =>
+        response.map((item) => ({
+          label: item.Name,
+          value: item.CategoryCode.toString(),
+        })),
+    }),
   }),
 });
 
-export const { useGetModelVariantsQuery, useGetStagesQuery } = commonApi;
+export const {
+  useGetModelVariantsQuery,
+  useGetStagesQuery,
+  useGetComponentTypesQuery,
+} = commonApi;

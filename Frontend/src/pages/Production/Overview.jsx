@@ -259,6 +259,9 @@ const Overview = () => {
   const handleModelRowClick = (modelName) => {
     setSelectedModelName(modelName === selectedModelName ? null : modelName);
   };
+
+  if (variantsLoading || stagesLoading) return <Loader />;
+
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
       <Title title="Production Overview" align="center" />
