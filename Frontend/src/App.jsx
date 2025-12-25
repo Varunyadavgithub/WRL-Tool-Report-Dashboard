@@ -249,13 +249,9 @@ function App() {
               path="/dispatch/dispatch-unloading"
               element={<DispatchUnloading />}
             />
-            {canAccess(["logistic"]) && (
-              <Route path="/dispatch/fg-casting" element={<FGCasting />} />
-            )}
+            <Route path="/dispatch/fg-casting" element={<FGCasting />} />
             <Route path="/dispatch/gate-entry" element={<GateEntry />} />
-            {canAccess(["logistic"]) && (
-              <Route path="/dispatch/error-log" element={<ErrorLog />} />
-            )}
+            <Route path="/dispatch/error-log" element={<ErrorLog />} />
             {/*-------------------------------------------------------------- Planing --------------------------------------------------------------*/}
             {canAccess(["production manager", "planning team"]) && (
               <Route

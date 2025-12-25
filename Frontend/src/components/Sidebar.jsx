@@ -158,10 +158,9 @@ const MENU_CONFIG = [
       {
         path: "/dispatch/fg-casting",
         label: "FG Casting",
-        roles: ["logistic"],
       },
       { path: "/dispatch/gate-entry", label: "Gate Entry" },
-      { path: "/dispatch/error-log", label: "Error Log", roles: ["logistic"] },
+      { path: "/dispatch/error-log", label: "Error Log" },
     ],
   },
   {
