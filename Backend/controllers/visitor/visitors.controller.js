@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import sql, { dbConfig1, dbConfig3 } from "../config/db.js";
+import sql, { dbConfig1, dbConfig3 } from "../../config/db.js";
 
 // Update visitor data controller
 export const updateVisitors = async (req, res) => {

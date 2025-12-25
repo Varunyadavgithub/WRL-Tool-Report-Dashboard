@@ -1,5 +1,5 @@
-import sql, { dbConfig3 } from "../config/db.js";
-import { sendVisitorReportEmail } from "../config/emailConfig.js";
+import sql, { dbConfig3 } from "../../config/db.js";
+import { sendVisitorReportEmail } from "../../config/emailConfig.js";
 
 // Visitor
 export const fetchVisitors = async (req, res) => {
