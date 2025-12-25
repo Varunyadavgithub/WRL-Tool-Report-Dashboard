@@ -35,6 +35,7 @@ export const commonApi = createApi({
           label: item.Name,
           value: item.CategoryCode.toString(),
         })),
+      providesTags: ["Common"],
     }),
   }),
 });

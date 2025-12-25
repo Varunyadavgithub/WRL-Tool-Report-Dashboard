@@ -631,7 +631,7 @@ const HourlyReport = () => {
       <div className="flex gap-4">
         <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
           <SelectField
-            label="Model"
+            label="Model Variant"
             value={selectedModel?.value}
             onChange={(e) => {
               const selected = model.find(

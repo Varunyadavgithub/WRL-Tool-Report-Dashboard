@@ -15,7 +15,7 @@ import {
 
 const ComponentTraceabilityReport = () => {
   const [loading, setLoading] = useState(false);
-  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [selectedModelVariant, setSelectedModelVariant] = useState(null);
   const [selectedCompType, setSelectedCompType] = useState(null);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -73,7 +73,9 @@ const ComponentTraceabilityReport = () => {
       const params = {
         startTime,
         endTime,
-        model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+        model: selectedModelVariant
+          ? parseInt(selectedModelVariant.value, 10)
+          : 0,
         compType: selectedCompType ? parseInt(selectedCompType.value, 10) : 0,
         page: pageNumber,
         limit,
@@ -104,7 +106,9 @@ const ComponentTraceabilityReport = () => {
       const params = {
         startTime,
         endTime,
-        model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+        model: selectedModelVariant
+          ? parseInt(selectedModelVariant.value, 10)
+          : 0,
         compType: selectedCompType ? parseInt(selectedCompType.value, 10) : 0,
       };
 
@@ -152,9 +156,9 @@ const ComponentTraceabilityReport = () => {
             <SelectField
               label="Model Variant"
               options={variants}
-              value={selectedVariant?.value || ""}
+              value={selectedModelVariant?.value || ""}
               onChange={(e) =>
-                setSelectedVariant(
+                setSelectedModelVariant(
                   variants.find((opt) => opt.value === e.target.value) || null
                 )
               }

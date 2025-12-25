@@ -19,7 +19,7 @@ const Overview = () => {
   const [todayLoading, setTodayLoading] = useState(false);
   const [monthLoading, setMonthLoading] = useState(false);
 
-  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [selectedModelVariant, setSelectedModelVariant] = useState(null);
   const [selectedStage, setSelectedStage] = useState(null);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -70,7 +70,7 @@ const Overview = () => {
 
   /* ===================== API CALLS ===================== */
   const fetchProductionData = async (pageNumber = 1) => {
-    if (!startTime || !endTime || (!selectedVariant && !selectedStage)) {
+    if (!startTime || !endTime || (!selectedModelVariant && !selectedStage)) {
       toast.error("Please select Stage and Time Range.");
       return;
     }
@@ -84,7 +84,7 @@ const Overview = () => {
         page: pageNumber,
         limit,
         stationCode: selectedStage?.value || null,
-        model: selectedVariant ? Number(selectedVariant.value) : 0,
+        model: selectedModelVariant ? Number(selectedModelVariant.value) : 0,
       };
 
       const res = await axios.get(`${baseURL}prod/fgdata`, { params });
@@ -121,7 +121,7 @@ const Overview = () => {
         startTime: start,
         endTime: end,
         stationCode: selectedStage?.value || null,
-        model: selectedVariant ? Number(selectedVariant.value) : 0,
+        model: selectedModelVariant ? Number(selectedModelVariant.value) : 0,
       };
 
       const res = await axios.get(`${baseURL}${url}`, { params });
@@ -214,13 +214,15 @@ const Overview = () => {
   }, [page]);
 
   const fetchExportData = async () => {
-    if (startTime && endTime && (selectedVariant || selectedStage)) {
+    if (startTime && endTime && (selectedModelVariant || selectedStage)) {
       try {
         const params = {
           startTime,
           endTime,
           stationCode: selectedStage?.value || null,
-          model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
+          model: selectedModelVariant
+            ? parseInt(selectedModelVariant.value, 10)
+            : 0,
         };
 
         const res = await axios.get(`${baseURL}prod/export-production-report`, {
@@ -273,9 +275,9 @@ const Overview = () => {
             <SelectField
               label="Model Variant"
               options={variants}
-              value={selectedVariant?.value || ""}
+              value={selectedModelVariant?.value || ""}
               onChange={(e) =>
-                setSelectedVariant(
+                setSelectedModelVariant(
                   variants.find((opt) => opt.value === e.target.value) || 0
                 )
               }
