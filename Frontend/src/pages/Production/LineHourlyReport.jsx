@@ -13,6 +13,10 @@ import DateTimePicker from "../../components/common/DateTimePicker";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Loader from "../../components/common/Loader";
+import FinalLoadingFreezer from "../../components/lineHourly/FinalLoading/FinalLoadingFreezer.jsx";
+import FinalLoadingChoc from "../../components/lineHourly/FinalLoading/FinalLoadingChoc.jsx";
+import FinalLoadingSUS from "../../components/lineHourly/FinalLoading/FinalLoadingSUS.jsx";
+import FinalCategoryLoadingCount from "../../components/lineHourly/FinalLine/FinalCategoryCount.jsx";
 import FinalFreezer from "../../components/lineHourly/FinalLine/FinalFreezer";
 import FinalChoc from "../../components/lineHourly/FinalLine/FinalChoc";
 import FinalSUS from "../../components/lineHourly/FinalLine/FinalSUS";
@@ -72,6 +76,12 @@ const LineHourlyReport = () => {
   const [lineType, setLineType] = useState("final_line");
 
   // State for diffrent table data
+  const [finalFreezerLoadingData, setFinalFreezerLoadingData] = useState([]);
+  const [finalChocLoadingData, setFinalChocLoadingData] = useState([]);
+  const [finalSUSLoadingData, setFinalSUSLoadingData] = useState([]);
+  const [finalCategoryLoadingCountData, setFinalCategoryLoadingCountData] =
+    useState([]);
+
   const [finalFreezerData, setFinalFreezerData] = useState([]);
   const [finalChocData, setFinalChocData] = useState([]);
   const [finalSUSData, setFinalSUSData] = useState([]);
@@ -110,6 +120,10 @@ const LineHourlyReport = () => {
     setFoamingCategoryData([]);
     setPostCategoryCountData([]);
     setFinalCategoryCountData([]);
+    setFinalFreezerLoadingData([]);
+    setFinalChocLoadingData([]);
+    setFinalSUSLoadingData([]);
+    setFinalCategoryLoadingCountData([]);
 
     // Common request parameters
     const params = {
@@ -119,7 +133,41 @@ const LineHourlyReport = () => {
 
     try {
       // Handle Final Line data
-      if (lineType === "final_line") {
+      // Handle Final Line Loading data
+      if (lineType === "final_loading") {
+        try {
+          // Final Freezer Loading
+          const res1 = await axios.get(`${API_BASE_URL}/final-loading-hp-frz`, {
+            params,
+          });
+          setFinalFreezerLoadingData(res1?.data || []);
+
+          // Final Choc
+          const res2 = await axios.get(
+            `${API_BASE_URL}/final-loading-hp-choc`,
+            {
+              params,
+            }
+          );
+          setFinalChocLoadingData(res2?.data || []);
+
+          // Final SUS
+          const res3 = await axios.get(`${API_BASE_URL}/final-loading-hp-sus`, {
+            params,
+          });
+          setFinalSUSLoadingData(res3?.data || []);
+
+          // Category Count
+          const res4 = await axios.get(`${API_BASE_URL}/final-loading-hp-cat`, {
+            params,
+          });
+          const data = await mapCategory(res4?.data);
+          setFinalCategoryLoadingCountData(data || []);
+        } catch (error) {
+          console.error("Error fetch Yesterday Final Line data:", error);
+          toast.error("Failed to fetch Yesterday Final Line data");
+        }
+      } else if (lineType === "final_line") {
         try {
           // Final Freezer
           const res1 = await axios.get(`${API_BASE_URL}/final-hp-frz`, {
@@ -232,6 +280,10 @@ const LineHourlyReport = () => {
     setFoamingCategoryData([]);
     setPostCategoryCountData([]);
     setFinalCategoryCountData([]);
+    setFinalFreezerLoadingData([]);
+    setFinalChocLoadingData([]);
+    setFinalSUSLoadingData([]);
+    setFinalCategoryLoadingCountData([]);
 
     const now = new Date();
     const today8AM = new Date(now);
@@ -257,8 +309,41 @@ const LineHourlyReport = () => {
     };
 
     try {
-      // Handle Final Line data
-      if (lineType === "final_line") {
+      // Handle Final Line Loading data
+      if (lineType === "final_loading") {
+        try {
+          // Final Freezer Loading
+          const res1 = await axios.get(`${API_BASE_URL}/final-loading-hp-frz`, {
+            params,
+          });
+          setFinalFreezerLoadingData(res1?.data || []);
+
+          // Final Choc
+          const res2 = await axios.get(
+            `${API_BASE_URL}/final-loading-hp-choc`,
+            {
+              params,
+            }
+          );
+          setFinalChocLoadingData(res2?.data || []);
+
+          // Final SUS
+          const res3 = await axios.get(`${API_BASE_URL}/final-loading-hp-sus`, {
+            params,
+          });
+          setFinalSUSLoadingData(res3?.data || []);
+
+          // Category Count
+          const res4 = await axios.get(`${API_BASE_URL}/final-loading-hp-cat`, {
+            params,
+          });
+          const data = await mapCategory(res4?.data);
+          setFinalCategoryLoadingCountData(data || []);
+        } catch (error) {
+          console.error("Error fetch Yesterday Final Line data:", error);
+          toast.error("Failed to fetch Yesterday Final Line data");
+        }
+      } else if (lineType === "final_line") {
         try {
           // Final Freezer
           const res1 = await axios.get(`${API_BASE_URL}/final-hp-frz`, {
@@ -370,6 +455,10 @@ const LineHourlyReport = () => {
     setFoamingCategoryData([]);
     setPostCategoryCountData([]);
     setFinalCategoryCountData([]);
+    setFinalFreezerLoadingData([]);
+    setFinalChocLoadingData([]);
+    setFinalSUSLoadingData([]);
+    setFinalCategoryLoadingCountData([]);
 
     const now = new Date();
     const today8AM = new Date(now);
@@ -393,7 +482,40 @@ const LineHourlyReport = () => {
 
     try {
       // Handle Final Line data
-      if (lineType === "final_line") {
+      if (lineType === "final_loading") {
+        try {
+          // Final Freezer Loading
+          const res1 = await axios.get(`${API_BASE_URL}/final-loading-hp-frz`, {
+            params,
+          });
+          setFinalFreezerLoadingData(res1?.data || []);
+
+          // Final Choc
+          const res2 = await axios.get(
+            `${API_BASE_URL}/final-loading-hp-choc`,
+            {
+              params,
+            }
+          );
+          setFinalChocLoadingData(res2?.data || []);
+
+          // Final SUS
+          const res3 = await axios.get(`${API_BASE_URL}/final-loading-hp-sus`, {
+            params,
+          });
+          setFinalSUSLoadingData(res3?.data || []);
+
+          // Category Count
+          const res4 = await axios.get(`${API_BASE_URL}/final-loading-hp-cat`, {
+            params,
+          });
+          const data = await mapCategory(res4?.data);
+          setFinalCategoryLoadingCountData(data || []);
+        } catch (error) {
+          console.error("Error fetch Yesterday Final Line data:", error);
+          toast.error("Failed to fetch Yesterday Final Line data");
+        }
+      } else if (lineType === "final_line") {
         try {
           // Final Freezer
           const res1 = await axios.get(`${API_BASE_URL}/final-hp-frz`, {
@@ -545,6 +667,16 @@ const LineHourlyReport = () => {
                   <input
                     type="radio"
                     name="lineType"
+                    value="final_loading"
+                    checked={lineType === "final_loading"}
+                    onChange={(e) => setLineType(e.target.value)}
+                  />
+                  Final Loading
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="lineType"
                     value="post_Foaming"
                     checked={lineType === "post_Foaming"}
                     onChange={(e) => setLineType(e.target.value)}
@@ -621,6 +753,26 @@ const LineHourlyReport = () => {
             <Loader />
           ) : (
             <>
+              {lineType === "final_loading" && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <FinalFreezer
+                      title={"Final Freezer Loading"}
+                      data={finalFreezerLoadingData}
+                    />
+                    <FinalChoc
+                      title={"Final Choc"}
+                      data={finalChocLoadingData}
+                    />
+                    <FinalSUS title={"Final SUS"} data={finalSUSLoadingData} />
+                    <FinalCategoryCount
+                      title={"Category Count"}
+                      data={finalCategoryLoadingCountData}
+                    />
+                  </div>
+                </>
+              )}
+
               {lineType === "final_line" && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

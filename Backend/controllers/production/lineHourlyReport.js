@@ -8,6 +8,190 @@ const replacePlaceholders = (query, startTime, endTime) => {
 };
 
 // Final Line
+export const getFinalLoadingHPFrz = async (req, res) => {
+  const { StartTime, EndTime } = req.query;
+  try {
+    const query = `
+WITH Psno AS (
+SELECT DocNo, Material, Serial, VSerial, Alias, Type
+FROM MaterialBarcode
+WHERE PrintStatus = 1 AND Status <> 99 AND Type NOT IN (200)
+),
+HourlySummary AS (
+SELECT 
+    DATEPART(DAY, b.ActivityOn) AS TIMEDAY,
+    DATEPART(HOUR, b.ActivityOn) AS TIMEHOUR,
+    CAST(CAST(CAST(b.ActivityOn AS DATE) AS VARCHAR) + ' ' + 
+        CAST(DATEPART(HOUR, b.ActivityOn) AS VARCHAR) + ':00:00' AS DATETIME) AS HourTime,
+    COUNT(*) AS Loading_Count
+FROM Psno
+    JOIN ProcessActivity b ON b.PSNo = Psno.DocNo
+    JOIN WorkCenter c ON b.StationCode = c.StationCode
+    JOIN Material m ON Psno.Material = m.MatCode
+    JOIN Users u ON b.Operator = u.UserCode
+WHERE
+    c.StationCode = 1220005 AND
+    b.ActivityType = 5 AND
+    b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}' 
+    AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005)
+    And u.UserRole = 225002
+GROUP BY 
+    DATEPART(DAY, b.ActivityOn), 
+    DATEPART(HOUR, b.ActivityOn),
+    CAST(CAST(CAST(b.ActivityOn AS DATE) AS VARCHAR) + ' ' + 
+    CAST(DATEPART(HOUR, b.ActivityOn) AS VARCHAR) + ':00:00' AS DATETIME)
+)
+SELECT 
+CONCAT('H', ROW_NUMBER() OVER (ORDER BY HourTime)) AS HOUR_NUMBER, TIMEHOUR, Loading_Count AS COUNT
+FROM HourlySummary
+ORDER BY HourTime;
+  `;
+    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+    const result = await pool
+      .request()
+      .query(replacePlaceholders(query, StartTime, EndTime));
+    res.status(200).json(result.recordset);
+    await pool.close();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const getFinalLoadingHPChoc = async (req, res) => {
+  const { StartTime, EndTime } = req.query;
+
+  try {
+    const query = `
+WITH Psno AS (
+SELECT DocNo, Material, Serial, VSerial, Alias, Type
+FROM MaterialBarcode
+WHERE PrintStatus = 1 AND Status <> 99 AND Type NOT IN (200)
+),
+HourlySummary AS (
+SELECT 
+    DATEPART(DAY, b.ActivityOn) AS TIMEDAY,
+    DATEPART(HOUR, b.ActivityOn) AS TIMEHOUR,
+    CAST(CAST(CAST(b.ActivityOn AS DATE) AS VARCHAR) + ' ' + 
+        CAST(DATEPART(HOUR, b.ActivityOn) AS VARCHAR) + ':00:00' AS DATETIME) AS HourTime,
+    COUNT(*) AS Loading_Count
+FROM Psno
+    JOIN ProcessActivity b ON b.PSNo = Psno.DocNo
+    JOIN WorkCenter c ON b.StationCode = c.StationCode
+    JOIN Material m ON Psno.Material = m.MatCode
+    JOIN Users u ON b.Operator = u.UserCode
+WHERE
+    c.StationCode = 1220005 AND
+    b.ActivityType = 5 AND
+    b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}'
+AND m.Category in (1240001, 1250005)
+And u.UserRole = 225001
+GROUP BY 
+    DATEPART(DAY, b.ActivityOn), 
+    DATEPART(HOUR, b.ActivityOn),
+    CAST(CAST(CAST(b.ActivityOn AS DATE) AS VARCHAR) + ' ' + 
+    CAST(DATEPART(HOUR, b.ActivityOn) AS VARCHAR) + ':00:00' AS DATETIME)
+)
+SELECT 
+CONCAT('H', ROW_NUMBER() OVER (ORDER BY HourTime)) AS HOUR_NUMBER, TIMEHOUR, Loading_Count AS COUNT
+FROM HourlySummary
+ORDER BY HourTime;
+`;
+    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+    const result = await pool
+      .request()
+      .query(replacePlaceholders(query, StartTime, EndTime));
+    res.status(200).json(result.recordset);
+    await pool.close();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const getFinalLoadingHPSUS = async (req, res) => {
+  const { StartTime, EndTime } = req.query;
+
+  try {
+    const query = 
+`WITH Psno AS (
+SELECT DocNo, Material, Serial, VSerial, Alias, Type
+FROM MaterialBarcode
+WHERE PrintStatus = 1 AND Status <> 99 AND Type NOT IN (200)
+),
+HourlySummary AS (
+SELECT 
+    DATEPART(DAY, b.ActivityOn) AS TIMEDAY,
+    DATEPART(HOUR, b.ActivityOn) AS TIMEHOUR,
+    CAST(CAST(CAST(b.ActivityOn AS DATE) AS VARCHAR) + ' ' + 
+        CAST(DATEPART(HOUR, b.ActivityOn) AS VARCHAR) + ':00:00' AS DATETIME) AS HourTime,
+    COUNT(*) AS Loading_Count
+FROM Psno
+    JOIN ProcessActivity b ON b.PSNo = Psno.DocNo
+    JOIN WorkCenter c ON b.StationCode = c.StationCode
+    JOIN Material m ON Psno.Material = m.MatCode
+    JOIN Users u ON b.Operator = u.UserCode
+WHERE
+    c.StationCode = 1230013 AND
+    b.ActivityType = 5 AND
+    b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}'
+GROUP BY 
+    DATEPART(DAY, b.ActivityOn), 
+    DATEPART(HOUR, b.ActivityOn),
+    CAST(CAST(CAST(b.ActivityOn AS DATE) AS VARCHAR) + ' ' + 
+    CAST(DATEPART(HOUR, b.ActivityOn) AS VARCHAR) + ':00:00' AS DATETIME)
+)
+SELECT 
+CONCAT('H', ROW_NUMBER() OVER (ORDER BY HourTime)) AS HOUR_NUMBER, TIMEHOUR, Loading_Count AS COUNT
+FROM HourlySummary
+ORDER BY HourTime;
+`;
+    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+    const result = await pool
+      .request()
+      .query(replacePlaceholders(query, StartTime, EndTime));
+    res.status(200).json(result.recordset);
+    await pool.close();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const getFinalLoadingHPCAT = async (req, res) => {
+  const { StartTime, EndTime } = req.query;
+
+  try {
+    const query = `
+WITH Psno AS (
+    SELECT DocNo, Material, Serial, VSerial, Alias
+    FROM MaterialBarcode
+    WHERE PrintStatus = 1 AND Status <> 99 AND Type NOT IN (200)
+)
+SELECT 
+    ISNULL(mc.Alias, 'N/A') AS category,
+    COUNT(*) AS TotalCount
+FROM Psno
+JOIN ProcessActivity b ON b.PSNo = Psno.DocNo
+JOIN WorkCenter c ON b.StationCode = c.StationCode
+JOIN Users us ON us.UserCode = b.Operator
+JOIN Material m ON m.MatCode = Psno.Material
+LEFT JOIN MaterialCategory mc ON mc.CategoryCode = m.Category
+WHERE b.ActivityType = 5
+  AND c.StationCode IN (1230013, 1220005)  
+  AND b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}'
+GROUP BY ISNULL(mc.Alias, 'N/A')
+ORDER BY TotalCount DESC;
+  `;
+    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+    const result = await pool
+      .request()
+      .query(replacePlaceholders(query, StartTime, EndTime));
+    res.status(200).json(result.recordset);
+    await pool.close();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Final Line
 export const getFinalHPFrz = async (req, res) => {
   const { StartTime, EndTime } = req.query;
   try {

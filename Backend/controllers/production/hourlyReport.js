@@ -40,6 +40,12 @@ export const getHourlySummary = async (req, res) => {
       } else if (line == "2") {
         userRoleCondition = " AND u.UserRole = 224007 ";
       }
+    } else if (stationCode == 1220005) {
+      if (line == "1") {
+        userRoleCondition = " And u.UserRole = 225002 ";
+      } else if (line == "2") {
+        userRoleCondition = " AND u.UserRole = 225001 ";
+      }
     }
 
     const query = `
@@ -139,6 +145,12 @@ export const getHourlyModelCount = async (req, res) => {
         userRoleCondition = " And u.UserRole = 224006 ";
       } else if (line == "2") {
         userRoleCondition = " AND u.UserRole = 224007 ";
+      }
+    } else if (stationCode == 1220005) {
+      if (line == "1") {
+        userRoleCondition = " And u.UserRole = 225002 ";
+      } else if (line == "2") {
+        userRoleCondition = " AND u.UserRole = 225001 ";
       }
     }
 
@@ -244,6 +256,12 @@ export const getHourlyCategoryCount = async (req, res) => {
         userRoleCondition = " And u.UserRole = 224006 ";
       } else if (line == "2") {
         userRoleCondition = " AND u.UserRole = 224007 ";
+      }
+    } else if (stationCode == 1220005) {
+      if (line == "1") {
+        userRoleCondition = " And u.UserRole = 225002 ";
+      } else if (line == "2") {
+        userRoleCondition = " AND u.UserRole = 225001 ";
       }
     }
 
