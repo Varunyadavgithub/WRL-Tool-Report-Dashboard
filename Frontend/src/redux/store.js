@@ -1,5 +1,6 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
-import authSlice from "./authSlice.js";
+import authSlice from "./authSlice";
+import { commonApi } from "./apis/common/commonApi";
 import {
   persistReducer,
   FLUSH,
@@ -9,7 +10,6 @@ import {
   PURGE,
   REGISTER,
 } from "redux-persist";
-
 import storage from "redux-persist/lib/storage";
 
 const persistConfig = {
@@ -20,8 +20,11 @@ const persistConfig = {
 
 const rootReducer = combineReducers({
   auth: authSlice,
+  [commonApi.reducerPath]: commonApi.reducer,
 });
+
 const persistedReducer = persistReducer(persistConfig, rootReducer);
+
 const store = configureStore({
   reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
@@ -29,6 +32,7 @@ const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }),
+    }).concat(commonApi.middleware),
 });
+
 export default store;

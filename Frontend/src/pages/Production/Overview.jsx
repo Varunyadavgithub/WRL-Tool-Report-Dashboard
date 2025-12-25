@@ -8,18 +8,22 @@ import Loader from "../../components/common/Loader";
 import ExportButton from "../../components/common/ExportButton";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets";
+import {
+  useGetModelVariantsQuery,
+  useGetStagesQuery,
+} from "../../redux/apis/common/commonApi";
 
 const Overview = () => {
   const [loading, setLoading] = useState(false);
   const [ydayLoading, setYdayLoading] = useState(false);
   const [todayLoading, setTodayLoading] = useState(false);
   const [monthLoading, setMonthLoading] = useState(false);
-  const [variants, setVariants] = useState([]);
+
   const [selectedVariant, setSelectedVariant] = useState(null);
-  const [stages, setStages] = useState([]);
   const [selectedStage, setSelectedStage] = useState(null);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+
   const [productionData, setProductionData] = useState([]);
   const [page, setPage] = useState(1);
   const [limit] = useState(1000);
@@ -27,7 +31,27 @@ const Overview = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [selectedModelName, setSelectedModelName] = useState(null);
 
+  /* ===================== RTK QUERY ===================== */
+  const {
+    data: variants = [],
+    isLoading: variantsLoading,
+    error: variantsError,
+  } = useGetModelVariantsQuery();
+
+  const {
+    data: stages = [],
+    isLoading: stagesLoading,
+    error: stagesError,
+  } = useGetStagesQuery();
+
+  useEffect(() => {
+    if (variantsError) toast.error("Failed to load model variants");
+    if (stagesError) toast.error("Failed to load stages");
+  }, [variantsError, stagesError]);
+
+  /* ===================== INFINITE SCROLL ===================== */
   const observer = useRef();
+
   const lastRowRef = useCallback(
     (node) => {
       if (loading) return;
@@ -35,114 +59,159 @@ const Overview = () => {
 
       observer.current = new IntersectionObserver((entries) => {
         if (entries[0].isIntersecting && hasMore) {
-          setPage((prevPage) => prevPage + 1);
+          setPage((prev) => prev + 1);
         }
       });
+
       if (node) observer.current.observe(node);
     },
     [loading, hasMore]
   );
 
-  const fetchModelVariants = async () => {
-    try {
-      const res = await axios.get(`${baseURL}shared/model-variants`);
-      const formatted = res?.data.map((item) => ({
-        label: item.MaterialName,
-        value: item.MatCode.toString(),
-      }));
-      setVariants(formatted);
-    } catch (error) {
-      console.error("Failed to fetch model variants:", error);
-      toast.error("Failed to fetch model variants.");
-    }
-  };
-
-  const fetchStages = async () => {
-    try {
-      const res = await axios.get(`${baseURL}shared/stage-names`);
-      const formatted = res?.data.map((item) => ({
-        label: item.Name,
-        value: item.StationCode.toString(),
-      }));
-      setStages(formatted);
-    } catch (error) {
-      console.error("Failed to fetch stages name:", error);
-      toast.error("Failed to fetch stages name.");
-    }
-  };
-
+  /* ===================== API CALLS ===================== */
   const fetchProductionData = async (pageNumber = 1) => {
-    if (startTime && endTime && (selectedVariant || selectedStage)) {
-      try {
-        setLoading(true);
-
-        const params = {
-          startTime,
-          endTime,
-          stationCode: selectedStage?.value || null,
-          page: pageNumber,
-          limit,
-          model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
-        };
-
-        const res = await axios.get(`${baseURL}prod/fgdata`, { params });
-
-        if (res?.data?.success) {
-          setProductionData((prev) => [...prev, ...res?.data?.data]);
-          // Set total count only when it's the first page
-          if (pageNumber === 1) {
-            setTotalCount(res?.data?.totalCount);
-          }
-          setHasMore(res?.data?.data.length > 0);
-        }
-      } catch (error) {
-        console.error("Failed to fetch production data:", error);
-        toast.error("Failed to fetch production data.");
-      } finally {
-        setLoading(false);
-      }
-    } else {
+    if (!startTime || !endTime || (!selectedVariant && !selectedStage)) {
       toast.error("Please select Stage and Time Range.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const params = {
+        startTime,
+        endTime,
+        page: pageNumber,
+        limit,
+        stationCode: selectedStage?.value || null,
+        model: selectedVariant ? Number(selectedVariant.value) : 0,
+      };
+
+      const res = await axios.get(`${baseURL}prod/fgdata`, { params });
+
+      if (res?.data?.success) {
+        setProductionData((prev) =>
+          pageNumber === 1 ? res.data.data : [...prev, ...res.data.data]
+        );
+        if (pageNumber === 1) setTotalCount(res.data.totalCount);
+        setHasMore(res.data.data.length > 0);
+      }
+    } catch (error) {
+      toast.error("Failed to fetch production data.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  /* ===================== QUICK FILTERS ===================== */
+  const getFormattedDate = (date) => {
+    const pad = (n) => (n < 10 ? `0${n}` : n);
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+      date.getDate()
+    )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  const fetchQuickData = async (url, start, end, setLoader) => {
+    try {
+      setLoader(true);
+      setProductionData([]);
+      setTotalCount(0);
+
+      const params = {
+        startTime: start,
+        endTime: end,
+        stationCode: selectedStage?.value || null,
+        model: selectedVariant ? Number(selectedVariant.value) : 0,
+      };
+
+      const res = await axios.get(`${baseURL}${url}`, { params });
+
+      if (res?.data?.success) {
+        setProductionData(res.data.data);
+        setTotalCount(res.data.totalCount);
+      }
+    } catch {
+      toast.error("Failed to fetch data");
+    } finally {
+      setLoader(false);
+    }
+  };
+
+  const fetchYesterdayProductionData = () => {
+    const now = new Date();
+    const today8AM = new Date(now.setHours(8, 0, 0, 0));
+    const yesterday8AM = new Date(today8AM);
+    yesterday8AM.setDate(today8AM.getDate() - 1);
+
+    fetchQuickData(
+      "prod/yday-fgdata",
+      getFormattedDate(yesterday8AM),
+      getFormattedDate(today8AM),
+      setYdayLoading
+    );
+  };
+
+  const fetchTodayProductionData = () => {
+    const now = new Date();
+    const today8AM = new Date(now.setHours(8, 0, 0, 0));
+
+    fetchQuickData(
+      "prod/today-fgdata",
+      getFormattedDate(today8AM),
+      getFormattedDate(new Date()),
+      setTodayLoading
+    );
+  };
+
+  const fetchMTDProductionData = () => {
+    const now = new Date();
+    const startOfMonth = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1,
+      8,
+      0,
+      0
+    );
+
+    fetchQuickData(
+      "prod/month-fgdata",
+      getFormattedDate(startOfMonth),
+      getFormattedDate(now),
+      setMonthLoading
+    );
+  };
+
+  /* ===================== AGGREGATION ===================== */
   const aggregateProductionData = () => {
-    const aggregatedData = {};
+    const map = {};
 
     productionData.forEach((item) => {
-      const modelName = item.Model_Name;
+      const model = item.Model_Name;
       const serial = item.FG_SR || item.Assembly_Sr_No;
-
       if (!serial) return;
 
-      if (!aggregatedData[modelName]) {
-        aggregatedData[modelName] = {
-          startSerial: serial,
-          endSerial: serial,
-          count: 1,
-        };
+      if (!map[model]) {
+        map[model] = { start: serial, end: serial, count: 1 };
       } else {
-        // Update end serial if current serial is greater (assuming serials are comparable)
-        if (serial > aggregatedData[modelName].endSerial) {
-          aggregatedData[modelName].endSerial = serial;
-        }
-        // Update start serial if current serial is smaller (in case start and end range matters)
-        if (serial < aggregatedData[modelName].startSerial) {
-          aggregatedData[modelName].startSerial = serial;
-        }
-        // Increment count
-        aggregatedData[modelName].count += 1;
+        map[model].count += 1;
+        map[model].start = Math.min(map[model].start, serial);
+        map[model].end = Math.max(map[model].end, serial);
       }
     });
 
-    // Convert aggregated data to array
-    return Object.entries(aggregatedData).map(([modelName, data]) => ({
-      Model_Name: modelName,
-      StartSerial: data.startSerial,
-      EndSerial: data.endSerial,
-      TotalCount: data.count,
+    return Object.entries(map).map(([k, v]) => ({
+      Model_Name: k,
+      StartSerial: v.start,
+      EndSerial: v.end,
+      TotalCount: v.count,
     }));
   };
+
+  /* ===================== EFFECTS ===================== */
+  useEffect(() => {
+    if (page > 1) fetchProductionData(page);
+  }, [page]);
 
   const fetchExportData = async () => {
     if (startTime && endTime && (selectedVariant || selectedStage)) {
@@ -171,163 +240,6 @@ const Overview = () => {
       toast.error("Please select Stage and Time Range.");
     }
   };
-
-  // Quick Filters
-  const fetchYesterdayProductionData = async () => {
-    if (selectedVariant || selectedStage) {
-      const now = new Date();
-      const today8AM = new Date(now);
-      today8AM.setHours(8, 0, 0, 0);
-
-      const yesterday8AM = new Date(today8AM);
-      yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
-
-      const formatDate = (date) => {
-        const pad = (n) => (n < 10 ? "0" + n : n);
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-          date.getDate()
-        )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-      };
-
-      const formattedStart = formatDate(yesterday8AM);
-      const formattedEnd = formatDate(today8AM);
-
-      try {
-        setYdayLoading(true);
-
-        setProductionData([]);
-        setTotalCount(0);
-
-        const params = {
-          startTime: formattedStart,
-          endTime: formattedEnd,
-          stationCode: selectedStage?.value || null,
-          model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
-        };
-
-        const res = await axios.get(`${baseURL}prod/yday-fgdata`, { params });
-
-        if (res?.data?.success) {
-          setProductionData(res?.data?.data);
-          setTotalCount(res?.data?.totalCount);
-        }
-      } catch (error) {
-        console.error("Failed to fetch Yesterday production data:", error);
-        toast.error("Failed to fetch Yesterday production data.");
-      } finally {
-        setYdayLoading(false);
-      }
-    } else {
-      toast.error("Please select Stage.");
-    }
-  };
-
-  const fetchTodayProductionData = async () => {
-    if (selectedVariant || selectedStage) {
-      const now = new Date();
-      const today8AM = new Date(now);
-      today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
-
-      const formatDate = (date) => {
-        const pad = (n) => (n < 10 ? "0" + n : n);
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-          date.getDate()
-        )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-      };
-
-      const formattedStart = formatDate(today8AM);
-      const formattedEnd = formatDate(now); // Now = current time
-
-      try {
-        setTodayLoading(true);
-
-        setProductionData([]);
-        setTotalCount(0);
-
-        const params = {
-          startTime: formattedStart,
-          endTime: formattedEnd,
-          stationCode: selectedStage?.value || null,
-          model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
-        };
-
-        const res = await axios.get(`${baseURL}prod/today-fgdata`, { params });
-
-        if (res?.data?.success) {
-          setProductionData(res?.data?.data);
-          setTotalCount(res?.data?.totalCount);
-        }
-      } catch (error) {
-        console.error("Failed to fetch Today production data:", error);
-        toast.error("Failed to fetch Today production data.");
-      } finally {
-        setTodayLoading(false);
-      }
-    } else {
-      toast.error("Please select Stage.");
-    }
-  };
-
-  const fetchMTDProductionData = async () => {
-    if (selectedVariant || selectedStage) {
-      const now = new Date();
-      const startOfMonth = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        1,
-        8,
-        0,
-        0
-      ); // 1st day at 08:00 AM
-
-      const formatDate = (date) => {
-        const pad = (n) => (n < 10 ? "0" + n : n);
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-          date.getDate()
-        )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-      };
-
-      const formattedStart = formatDate(startOfMonth);
-      const formattedEnd = formatDate(now);
-      try {
-        setMonthLoading(true);
-
-        setProductionData([]);
-        setTotalCount(0);
-
-        const params = {
-          startTime: formattedStart,
-          endTime: formattedEnd,
-          stationCode: selectedStage?.value || null,
-          model: selectedVariant ? parseInt(selectedVariant.value, 10) : 0,
-        };
-
-        const res = await axios.get(`${baseURL}prod/month-fgdata`, { params });
-
-        if (res?.data?.success) {
-          setProductionData(res?.data?.data);
-          setTotalCount(res?.data?.totalCount);
-        }
-      } catch (error) {
-        console.error("Failed to fetch this Month production data:", error);
-        toast.error("Failed to fetch this Month production data.");
-      } finally {
-        setMonthLoading(false);
-      }
-    } else {
-      toast.error("Please select Stage.");
-    }
-  };
-
-  useEffect(() => {
-    fetchModelVariants();
-    fetchStages();
-  }, []);
-
-  useEffect(() => {
-    if (page === 1) return;
-    fetchProductionData(page);
-  }, [page]);
 
   const handleFgData = () => {
     setProductionData([]);
