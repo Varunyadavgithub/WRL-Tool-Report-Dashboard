@@ -10,6 +10,10 @@ import {
   getHourlySummary,
 } from "../controllers/production/hourlyReport.js";
 import {
+  getFinalLoadingHPFrz,
+  getFinalLoadingHPChoc,
+  getFinalLoadingHPSUS,
+  getFinalLoadingHPCAT,
   getFinalHPCAT,
   getFinalHPChoc,
   getFinalHPFrz,
@@ -58,6 +62,12 @@ router.get("/hourly-summary", getHourlySummary);
 router.get("/hourly-model-count", getHourlyModelCount);
 router.get("/hourly-category-count", getHourlyCategoryCount);
 // -----------------> Line Hourly Report
+// FinalHP Routes
+router.get("/final-loading-hp-frz", getFinalLoadingHPFrz);
+router.get("/final-loading-hp-choc", getFinalLoadingHPChoc);
+router.get("/final-loading-hp-sus", getFinalLoadingHPSUS);
+router.get("/final-loading-hp-cat", getFinalLoadingHPCAT);
+
 // FinalHP Routes
 router.get("/final-hp-frz", getFinalHPFrz);
 router.get("/final-hp-choc", getFinalHPChoc);
