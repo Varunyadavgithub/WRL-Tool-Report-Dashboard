@@ -81,6 +81,7 @@ const MENU_CONFIG = [
       },
       { path: "/quality/fpa", label: "FPA", roles: ["fpa", "quality manager"] },
       { path: "/quality/fpa-report", label: "FPA Report" },
+      { path: "/quality/fpa-defect-report", label: "FPA Defect Report" },
       {
         path: "/quality/lpt",
         label: "LPT",

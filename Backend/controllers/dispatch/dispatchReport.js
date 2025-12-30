@@ -59,6 +59,7 @@ export const getFgDispatch = async (req, res) => {
 
   const lowerStatus = status.toLowerCase();
   let tableName, statusValue, additionalField;
+
   if (lowerStatus === "completed") {
     tableName = "DispatchMaster";
     statusValue = "Completed";
@@ -79,6 +80,7 @@ export const getFgDispatch = async (req, res) => {
     const query = `
       WITH DispatchData AS (
         SELECT 
+          ROW_NUMBER() OVER(ORDER BY DM.AddedOn DESC) AS RowNum,
           DM.ModelName, 
           DM.FGSerialNo, 
           DM.AssetCode, 
@@ -94,11 +96,11 @@ export const getFgDispatch = async (req, res) => {
         FROM ${tableName} DM
         INNER JOIN Tracking_Document TD ON DM.Document_ID = TD.Document_ID
         WHERE DM.AddedOn BETWEEN @startDate AND @endDate
-          AND TD.LatestStatus = @StatusValue
+        AND TD.LatestStatus = @StatusValue
       )
       SELECT 
         (SELECT COUNT(*) FROM DispatchData) AS totalCount,
-        * 
+        *
       FROM DispatchData
       WHERE RowNum > @offset AND RowNum <= (@offset + @limit);
     `;
@@ -115,17 +117,17 @@ export const getFgDispatch = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      totalCount: result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
       data: result.recordset,
-      totalCount:
-        result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
     });
 
     await pool.close();
   } catch (error) {
-    console.error("SQL Error:", error.message);
+    console.error("SQL Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
 
 // Quick Filters
 export const getQuickFgUnloading = async (req, res) => {

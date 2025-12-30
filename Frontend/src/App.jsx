@@ -40,6 +40,7 @@ const ESTReport = lazy(() => import("./pages/Quality/ESTReport"));
 const CPTReport = lazy(() => import("./pages/Quality/CPTReport"));
 const FPA = lazy(() => import("./pages/Quality/FPA"));
 const FPAReports = lazy(() => import("./pages/Quality/FPAReports"));
+const FPADefectReport = lazy(() => import("./pages/Quality/FPADefectReport"));
 const LPT = lazy(() => import("./pages/Quality/LPT"));
 const LPTReport = lazy(() => import("./pages/Quality/LPTReport"));
 const DispatchHold = lazy(() => import("./pages/Quality/DispatchHold"));
@@ -186,6 +187,10 @@ function App() {
               <Route path="/quality/fpa" element={<FPA />} />
             )}
             <Route path="/quality/fpa-report" element={<FPAReports />} />
+            <Route
+              path="/quality/fpa-defect-report"
+              element={<FPADefectReport />}
+            />
             {canAccess(["line quality engineer", "quality manager", "lpt"]) && (
               <Route path="/quality/lpt" element={<LPT />} />
             )}

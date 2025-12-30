@@ -14,6 +14,7 @@ import {
   getFpaReport,
   getFpaYearlyReport,
 } from "../controllers/quality/fpaReport.js";
+import {getFpaDefectReport} from "../controllers/quality/fpadefectReport.js";
 import {
   addLptDefect,
   getLptAssetDetails,
@@ -90,6 +91,7 @@ router.get("/fpa-report", getFpaReport);
 router.get("/fpa-daily-report", getFpaDailyReport);
 router.get("/fpa-monthly-report", getFpaMonthlyReport);
 router.get("/fpa-yearly-report", getFpaYearlyReport);
+router.get("/fpa-defect-report", getFpaDefectReport);
 
 // -----------------> LPT Routes
 router.get("/lpt-asset-details", getLptAssetDetails);

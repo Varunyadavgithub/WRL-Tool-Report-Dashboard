@@ -70,7 +70,7 @@ FilteredData AS (
     JOIN Material m 
         ON m.MatCode = Psno.Material
        AND m.Type = 100 
-       AND m.name like '%KW%'
+       AND (m.name like '%KW%' or m.name like '%HU')
 
     WHERE 
         b.ActivityType = 5

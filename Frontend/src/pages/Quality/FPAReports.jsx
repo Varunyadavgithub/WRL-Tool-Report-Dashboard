@@ -351,7 +351,7 @@ const FPAReports = () => {
 
         {
           type: "line", // ✅ Target must ALWAYS stay line
-          label: "Target FPQI (1.6)",
+          label: "Target FPQI (1.4)",
           data: Array(labels.length).fill(1.4),
           borderColor: "rgba(34, 197, 94, 1)",
           borderWidth: 2,
