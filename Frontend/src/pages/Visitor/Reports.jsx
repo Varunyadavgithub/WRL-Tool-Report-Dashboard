@@ -222,6 +222,7 @@ const Reports = () => {
             <tr>
               {[
                 "Sr.No.",
+                "Visitor Type",
                 "Name",
                 "Contact",
                 "Email",
@@ -232,11 +233,13 @@ const Reports = () => {
                 "ID Type",
                 "ID No",
                 "Vehicle",
-                "Department",
-                "Employee",
+                "Employee To Visit",
+                "Department To visit",
                 "Check In",
                 "Check Out",
-                "Purpose",
+                "Visit Duration",
+                "No of Visit",
+                "Purpose Of Visit",
                 "Token",
               ].map((header, idx) => (
                 <th
@@ -254,6 +257,9 @@ const Reports = () => {
               filteredReports.map((v, i) => (
                 <tr key={i} className="hover:bg-gray-50 transition">
                   <td className="px-1 py-1 border text-center">{i + 1}</td>
+                  <td className="px-1 py-1 border text-center whitespace-nowrap">
+                    {v.visit_type}
+                  </td>
                   <td className="px-1 py-1 border text-center whitespace-nowrap">
                     {v.visitor_name}
                   </td>
@@ -275,10 +281,10 @@ const Reports = () => {
                     {v.vehicle_details}
                   </td>
                   <td className="px-1 py-1 border text-center">
-                    {v.department_name}
+                    {v.employee_name}
                   </td>
                   <td className="px-1 py-1 border text-center">
-                    {v.employee_name}
+                    {v.department_name}
                   </td>
                   <td className="px-1 py-1 border text-center">
                     {v.check_in_time?.replace("T", " ").replace("Z", "")}
@@ -291,6 +297,12 @@ const Reports = () => {
                         Currently In
                       </span>
                     )}
+                  </td>
+                  <td className="px-1 py-1 border text-center">
+                    {v.visit_duration}
+                  </td>
+                  <td className="px-1 py-1 border text-center">
+                    {v.no_of_visit}
                   </td>
                   <td className="px-1 py-1 border text-center">
                     {v.purpose_of_visit}

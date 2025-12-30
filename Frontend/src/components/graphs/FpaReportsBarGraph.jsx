@@ -1,42 +1,47 @@
-import { Bar } from "react-chartjs-2";
+import { useEffect, useRef } from "react";
+import { Chart } from "chart.js";
 
-const FpaReportsBarGraph = ({ title, labels, datasets }) => {
-  const chartData = {
-    labels,
-    datasets,
-  };
+const FpaBarGraph = ({ title, labels, datasets }) => {
+  const chartRef = useRef(null);
+  const chartInstance = useRef(null);
 
-  const chartOptions = {
-    responsive: true,
+  useEffect(() => {
+    if (chartInstance.current) chartInstance.current.destroy(); // prevent duplicate mount
 
-    scales: {
-      y: {
-        beginAtZero: true,
-        suggestedMax: 3, // ✅ FPQI always visible clearly
+    const ctx = chartRef.current.getContext("2d");
+
+    chartInstance.current = new Chart(ctx, {
+      type: "bar", // you can switch dynamically if needed
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true },
+          title: {
+            display: true,
+            text: title,
+            font: { size: 18, weight: "bold" },
+            padding: 10,
+          },
+        },
+        scales: {
+          x: { beginAtZero: true },
+          y: { beginAtZero: true },
+        },
       },
-    },
+    });
 
-    plugins: {
-      legend: { position: "top" },
-      title: {
-        display: true,
-        text: title,
-      },
-    },
-  };
+    return () => {
+      if (chartInstance.current) chartInstance.current.destroy();
+    };
+  }, [labels, datasets, title]);
 
   return (
-    <div
-      className="bg-white border border-gray-300 rounded-md p-4 shadow 
-                    w-full lg:w-[420px] h-[300px]"
-    >
-      <h2 className="text-center font-semibold mb-2">{title}</h2>
-
-      <div className="w-full h-[230px] flex items-center justify-center">
-        <Bar data={chartData} options={chartOptions} />
-      </div>
+    <div style={{ width: "100%", height: "350px" }}>
+      <canvas ref={chartRef}></canvas>
     </div>
   );
 };
 
-export default FpaReportsBarGraph;
+export default FpaBarGraph;
