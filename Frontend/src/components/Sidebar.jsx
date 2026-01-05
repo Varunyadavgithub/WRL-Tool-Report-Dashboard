@@ -45,7 +45,7 @@ const MENU_CONFIG = [
         label: "Component Details",
       },
       { path: "/production/total-production", label: "Total Production" },
-      { path: "/production/nfc-report", label: "NCF Report" },
+      { path: "/production/nfc-report", label: "NFC Report" },
     ],
   },
   {
@@ -223,6 +223,18 @@ const MENU_CONFIG = [
       {
         path: "/displays/logistics",
         label: "Logistics",
+        roles: ["admin"],
+      },
+    ],
+  },
+    {
+    key: "Compliance",
+    icon: MdOutlineDisplaySettings,
+    label: "Compliance",
+    items: [
+      {
+        path: "/compliance/calibiration",
+        label: "calibiration",
         roles: ["admin"],
       },
     ],

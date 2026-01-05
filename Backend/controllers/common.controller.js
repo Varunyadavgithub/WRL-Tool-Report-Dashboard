@@ -1,5 +1,5 @@
 import sql from "mssql";
-import { dbConfig1 } from "../config/db.js";
+import { dbConfig1, dbConfig3 } from "../config/db.js";
 
 // Fetches a list of active model variants from the Material table.
 export const getModelVariants = async (_, res) => {

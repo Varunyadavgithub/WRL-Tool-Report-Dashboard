@@ -86,6 +86,8 @@ const LogisticsDisplay = lazy(() =>
   import("./pages/PerformanceDisplays/LogisticsDisplay")
 );
 
+const Calibiration = lazy(() => import("./pages/Compliance/Calibration"));
+
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 function App() {
@@ -302,6 +304,13 @@ function App() {
               <Route
                 path="/displays/logistics"
                 element={<LogisticsDisplay />}
+              />
+            )}
+            {/*-------------------------------------------------------------- Compliance --------------------------------------------------------------*/}
+            {canAccess(["admin"]) && (
+              <Route
+                path="/compliance/calibiration"
+                element={<Calibiration />}
               />
             )}
             {/*-------------------------------------------------------------- Catch All --------------------------------------------------------------*/}
