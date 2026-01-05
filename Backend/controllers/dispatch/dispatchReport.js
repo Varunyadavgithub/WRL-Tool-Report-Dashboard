@@ -14,17 +14,20 @@ export const getFgUnloading = async (req, res) => {
 
     const query = `
       WITH UnloadingData AS (
-        SELECT 
-          * 
+        SELECT
+          ROW_NUMBER() OVER (ORDER BY DateTime DESC) AS RowNum,
+          FGSerialNo,
+          AssetCode,
+          ScannerNo,
+          DateTime
         FROM DispatchUnloading
         WHERE DateTime BETWEEN @startDate AND @endDate
       )
-      SELECT 
+      SELECT
         (SELECT COUNT(*) FROM UnloadingData) AS totalCount,
-        * 
+        *
       FROM UnloadingData
-      WHERE RowNum > @offset AND RowNum <= (@offset + @limit)
-    ;
+      WHERE RowNum BETWEEN (@offset + 1) AND (@offset + @limit);
     `;
 
     const pool = await new sql.ConnectionPool(dbConfig2).connect();
@@ -38,14 +41,14 @@ export const getFgUnloading = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: result.recordset,
       totalCount:
         result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
+      data: result.recordset,
     });
 
     await pool.close();
   } catch (error) {
-    console.error("SQL Error:", error.message);
+    console.error("SQL Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 };

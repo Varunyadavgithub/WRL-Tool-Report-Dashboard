@@ -3,7 +3,7 @@ import {
   getDepartments,
   getModelVariants,
   getStageNames,
-  getCompType
+  getCompType,
 } from "../controllers/common.controller.js";
 
 const router = express.Router();
