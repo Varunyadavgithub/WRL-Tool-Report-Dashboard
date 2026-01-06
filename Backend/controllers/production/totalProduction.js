@@ -120,7 +120,7 @@ export const getBarcodeDetails = tryCatch(async (req, res) => {
 });
 
 // Export Data
-export const totalProductionExportData = async (req, res) => {
+export const totalProductionExportData = tryCatch(async (req, res) => {
   const { startDate, endDate, model, department } = req.query;
 
   if (!startDate || !endDate) {
@@ -224,10 +224,10 @@ export const totalProductionExportData = async (req, res) => {
   } finally {
     await pool.close();
   }
-};
+});
 
 // Quick Filters Data
-export const getQuickFiltersBarcodeDetails = async (req, res) => {
+export const getQuickFiltersBarcodeDetails = tryCatch(async (req, res) => {
   const { startDate, endDate, model, department } = req.query;
 
   if (!startDate || !endDate) {
@@ -329,4 +329,4 @@ export const getQuickFiltersBarcodeDetails = async (req, res) => {
   } finally {
     await pool.close();
   }
-};
+});
