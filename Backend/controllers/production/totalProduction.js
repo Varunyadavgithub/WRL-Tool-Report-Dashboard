@@ -1,6 +1,8 @@
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
 
-export const getBarcodeDetails = async (req, res) => {
+export const getBarcodeDetails = tryCatch(async (req, res) => {
   const {
     startDate,
     endDate,
@@ -11,36 +13,35 @@ export const getBarcodeDetails = async (req, res) => {
   } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate.",
+      400
+    );
   }
 
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const offset = (parseInt(page) - 1) * parseInt(limit);
+
+  const finalStationCodes = ["1220010", "1230017"];
+  const postFoamingStationCodes = ["1230007", "1220003", "1220004", "1230012"];
+  const finalLoadingStationCodes = ["1220005", "1230013"];
+
+  let selectedStationCodes = [];
+
+  if (department === "final") {
+    selectedStationCodes = finalStationCodes;
+  } else if (department === "post-foaming") {
+    selectedStationCodes = postFoamingStationCodes;
+  } else if (department === "final-loading") {
+    selectedStationCodes = finalLoadingStationCodes;
+  } else {
+    return res.status(400).send("Invalid department value.");
+  }
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-
-    const finalStationCodes = ["1220010", "1230017"];
-    const postFoamingStationCodes = [
-      "1230007",
-      "1220003",
-      "1220004",
-      "1230012",
-    ];
-    const finalLoadingStationCodes = ["1220005", "1230013"];
-
-    let selectedStationCodes = [];
-
-    if (department === "final") {
-      selectedStationCodes = finalStationCodes;
-    } else if (department === "post-foaming") {
-      selectedStationCodes = postFoamingStationCodes;
-    } else if (department === "final-loading") {
-      selectedStationCodes = finalLoadingStationCodes;
-    } else {
-      return res.status(400).send("Invalid department value.");
-    }
-
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
@@ -97,58 +98,60 @@ export const getBarcodeDetails = async (req, res) => {
     * 
   FROM FilteredData
   WHERE RowNum > @offset AND RowNum <= (@offset + @limit);
-`;
+    `;
 
     const result = await request.query(query);
 
     res.status(200).json({
       success: true,
+      message: "Barcode Details data retrieved successfully",
       data: result.recordset,
       totalCount:
         result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
     });
-
-    await pool.close();
   } catch (error) {
-    console.error("Error fetching barcode details:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    throw new AppError(
+      `Failed to fetch Barcode Details data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});
 
 // Export Data
 export const totalProductionExportData = async (req, res) => {
   const { startDate, endDate, model, department } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate.",
+      400
+    );
   }
 
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+
+  const finalStationCodes = ["1220010", "1230017"];
+  const postFoamingStationCodes = ["1230007", "1220003", "1220004", "1230012"];
+  const finalLoadingStationCodes = ["1220005", "1230013"];
+
+  let selectedStationCodes = [];
+
+  if (department === "final") {
+    selectedStationCodes = finalStationCodes;
+  } else if (department === "post-foaming") {
+    selectedStationCodes = postFoamingStationCodes;
+  } else if (department === "final-loading") {
+    selectedStationCodes = finalLoadingStationCodes;
+  } else {
+    return res.status(400).send("Invalid department value.");
+  }
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
-
-    const finalStationCodes = ["1220010", "1230017"];
-    const postFoamingStationCodes = [
-      "1230007",
-      "1220003",
-      "1220004",
-      "1230012",
-    ];
-    const finalLoadingStationCodes = ["1220005", "1230013"];
-
-    let selectedStationCodes = [];
-
-    if (department === "final") {
-      selectedStationCodes = finalStationCodes;
-    } else if (department === "post-foaming") {
-      selectedStationCodes = postFoamingStationCodes;
-    } else if (department === "final-loading") {
-      selectedStationCodes = finalLoadingStationCodes;
-    } else {
-      return res.status(400).send("Invalid department value.");
-    }
-
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
@@ -202,21 +205,24 @@ export const totalProductionExportData = async (req, res) => {
     (SELECT COUNT(*) FROM FilteredData) AS totalCount,
     * 
   FROM FilteredData
-`;
+    `;
 
     const result = await request.query(query);
 
     res.status(200).json({
       success: true,
+      message: "Total Production Export data retrieved successfully",
       data: result.recordset,
       totalCount:
         result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
     });
-
-    await pool.close();
   } catch (error) {
-    console.error("Error fetching barcode details:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    throw new AppError(
+      `Failed to fetch Total Production Export data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
 };
 
@@ -225,35 +231,34 @@ export const getQuickFiltersBarcodeDetails = async (req, res) => {
   const { startDate, endDate, model, department } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate.",
+      400
+    );
   }
 
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+
+  const finalStationCodes = ["1220010", "1230017"];
+  const postFoamingStationCodes = ["1230007", "1220003", "1220004", "1230012"];
+  const finalLoadingStationCodes = ["1220005", "1230013"];
+
+  let selectedStationCodes = [];
+
+  if (department === "final") {
+    selectedStationCodes = finalStationCodes;
+  } else if (department === "post-foaming") {
+    selectedStationCodes = postFoamingStationCodes;
+  } else if (department === "final-loading") {
+    selectedStationCodes = finalLoadingStationCodes;
+  } else {
+    return res.status(400).send("Invalid department value.");
+  }
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
-
-    const finalStationCodes = ["1220010", "1230017"];
-    const postFoamingStationCodes = [
-      "1230007",
-      "1220003",
-      "1220004",
-      "1230012",
-    ];
-    const finalLoadingStationCodes = ["1220005", "1230013"];
-
-    let selectedStationCodes = [];
-
-    if (department === "final") {
-      selectedStationCodes = finalStationCodes;
-    } else if (department === "post-foaming") {
-      selectedStationCodes = postFoamingStationCodes;
-    } else if (department === "final-loading") {
-      selectedStationCodes = finalLoadingStationCodes;
-    } else {
-      return res.status(400).send("Invalid department value.");
-    }
-
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
@@ -306,19 +311,22 @@ export const getQuickFiltersBarcodeDetails = async (req, res) => {
     (SELECT COUNT(*) FROM FilteredData) AS totalCount,
     * 
   FROM FilteredData
-`;
+    `;
 
     const result = await request.query(query);
 
     res.status(200).json({
       success: true,
+      message: "Quick Filters Barcode Details data retrieved successfully",
       data: result.recordset,
       totalCount: result.recordset.length,
     });
-
-    await pool.close();
   } catch (error) {
-    console.error("Error fetching barcode details:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    throw new AppError(
+      `Failed to fetch Quick Filters Barcode Details data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
 };

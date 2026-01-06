@@ -1,16 +1,16 @@
-import sql, { dbConfig1, dbConfig2 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-export const getCurrentStageStatus = async (req, res) => {
+export const getCurrentStageStatus = tryCatch(async (req, res) => {
   const { serialNumber } = req.query;
 
   if (!serialNumber) {
-    return res.status(400).json({
-      success: false,
-      message: "Serial number is required",
-    });
+    throw new AppError("Serial number is required", 400);
   }
-  try {
-    let query = `
+
+  let query = `
       WITH Psno AS (
         SELECT DocNo, Material, Serial, VSerial, Serial2, Alias 
         FROM MaterialBarcode 
@@ -44,37 +44,40 @@ export const getCurrentStageStatus = async (req, res) => {
           Users U on U.UserCode = A.Operator
       ORDER BY 
           A.ActivityOn DESC;
-    `;
+  `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const request = pool
       .request()
       .input("serialNumber", sql.NVarChar, serialNumber);
 
     const result = await request.query(query);
+
     res.status(200).json({
       success: true,
-      result,
+      message: "Current Stage Status retrieved successfully",
+      data: result,
     });
-    await pool.close();
   } catch (error) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
+    throw new AppError(
+      `Failed to fetch Current Stage Status data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});
 
-export const getLogisticStatus = async (req, res) => {
+export const getLogisticStatus = tryCatch(async (req, res) => {
   const { serialNumber } = req.query;
 
   if (!serialNumber) {
-    return res.status(400).json({
-      success: false,
-      message: "Serial number is required",
-    });
+    throw new AppError("Serial number is required", 400);
   }
 
-  try {
-    const query = `
+  const query = `
  
 --------------------------------------------------------
 -- STEP 1: TEMP TABLE FOR UNLOADING DATA
@@ -220,8 +223,9 @@ LEFT JOIN #DispatchMaster dm
 
     `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
+  try {
     const request = pool
       .request()
       .input("serialNumber", sql.NVarChar, serialNumber);
@@ -230,16 +234,15 @@ LEFT JOIN #DispatchMaster dm
 
     res.status(200).json({
       success: true,
+      message: "Logistic Status retrieved successfully",
       data: result.recordset,
     });
-
-    await pool.close();
   } catch (error) {
-    console.error("SQL Error:", error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    throw new AppError(
+      `Failed to fetch Logistic Stage Status data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
-
+});
