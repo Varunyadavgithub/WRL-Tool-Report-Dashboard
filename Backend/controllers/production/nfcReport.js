@@ -1,18 +1,25 @@
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-export const getNfcReoprts = async (req, res) => {
+export const getNfcReoprts = tryCatch(async (req, res) => {
   const { startDate, endDate, model, page = 1, limit = 1000 } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
@@ -80,39 +87,45 @@ FilteredData AS (
 
 SELECT *
 FROM FilteredData;
-`;
+    `;
 
     const result = await request.query(query);
 
     res.status(200).json({
       success: true,
+      message: "NFC Report data retrieved successfully",
       data: result.recordset,
       totalCount:
         result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
     });
-
-    await pool.close();
   } catch (error) {
-    console.error("Error fetching NFC details:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    throw new AppError(
+      `Failed to fetch NFC Report data: ${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});
 
 // Export Data
-export const nfcReportExportData = async (req, res) => {
+export const nfcReportExportData = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate",
+      400
+    );
   }
 
+  // Convert input dates to IST
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    // Convert input dates to IST
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
-
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
-
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
@@ -184,30 +197,31 @@ export const nfcReportExportData = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      message: "NFC Report Data Exported Successfully",
       data: result.recordset,
       totalCount: result.recordset.length,
     });
-
-    await pool.close();
   } catch (error) {
-    console.error("Error fetching NFC Report Data:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    throw new AppError(`Failed to fetch NFC Reports: ${error.message}`, 500);
+  } finally {
+    await pool.close();
   }
-};
+});
 
 // Quick Filters NFC Reports
-export const getQuickFiltersNfcReports = async (req, res) => {
+export const getQuickFiltersNfcReports = tryCatch(async (req, res) => {
   const { startDate, endDate, model } = req.query;
 
   if (!startDate || !endDate) {
     return res.status(400).send("Missing startDate or endDate.");
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
@@ -216,6 +230,7 @@ export const getQuickFiltersNfcReports = async (req, res) => {
     if (model && model != 0) {
       request.input("model", sql.VarChar, model);
     }
+
     const query = `
  WITH Psno AS (
     SELECT DocNo, Material, Serial, VSerial, Serial2, Alias, CreatedOn
@@ -272,19 +287,22 @@ FilteredData AS (
 
 SELECT *
 FROM FilteredData;
-`;
+    `;
 
     const result = await request.query(query);
 
     res.status(200).json({
       success: true,
+      message: "Quick Filter NFC Report data retrieved successfully",
       data: result.recordset,
       totalCount: result.recordset.length ? result.recordset[0].totalCount : 0,
     });
-
-    await pool.close();
   } catch (error) {
-    console.error("Error fetching NFC quick filter reports:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    throw new AppError(
+      `Failed to fetch Quick Filter NFC Report data: ${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});

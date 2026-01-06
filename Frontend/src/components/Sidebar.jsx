@@ -160,7 +160,11 @@ const MENU_CONFIG = [
         path: "/dispatch/fg-casting",
         label: "FG Casting",
       },
-      { path: "/dispatch/gate-entry", label: "Gate Entry" },
+      {
+        path: "/dispatch/gate-entry",
+        label: "Gate Entry",
+        roles: ["gate entry user"],
+      },
       { path: "/dispatch/error-log", label: "Error Log" },
     ],
   },
@@ -227,7 +231,7 @@ const MENU_CONFIG = [
       },
     ],
   },
-    {
+  {
     key: "Compliance",
     icon: MdOutlineDisplaySettings,
     label: "Compliance",

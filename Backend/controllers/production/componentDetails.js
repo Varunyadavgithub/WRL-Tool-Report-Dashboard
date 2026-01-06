@@ -55,7 +55,10 @@ export const getComponentDetails = tryCatch(async (req, res) => {
       data: result.recordset,
     });
   } catch (error) {
-    throw new AppError("Failed to fetch component details", 500);
+    throw new AppError(
+      `Failed to fetch component details: ${error.message}`,
+      500
+    );
   } finally {
     await pool.close();
   }

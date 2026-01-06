@@ -106,7 +106,7 @@ const ModelNameUpdate = () => {
           params,
         });
 
-        const modelName = res1.data;
+        const modelName = res1?.data?.data;
 
         if (!modelName || modelName === "~") {
           toast.error(

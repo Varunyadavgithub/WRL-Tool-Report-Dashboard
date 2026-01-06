@@ -1,59 +1,83 @@
-import sql, { dbConfig1, dbConfig2 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1, dbConfig2 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-export const getModelName = async (req, res) => {
+export const getModelName = tryCatch(async (req, res) => {
   const { modelCode } = req.query;
 
-  try {
-    const query = `
-    select name from material where AltName=@modelCode;
-    `;
+  if (!modelCode) {
+    throw new AppError("Model code is required", 400);
+  }
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const query = `
+    Select name 
+    From material 
+    Where AltName=@modelCode;
+  `;
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .input("modelCode", sql.NVarChar, modelCode)
       .query(query);
 
-    // If no record is found, return null
-    if (result.recordset.length === 0) {
-      return "~";
+    if (!result.recordset.length) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Model not found", data: "~" });
     }
 
-    res.json(result.recordset[0].name);
+    res.status(200).json({
+      success: true,
+      message: "Model name fetched successfully",
+      data: result.recordset[0].name,
+    });
+  } catch (error) {
+    throw new AppError(`Failed to fetch model name: ${error.message}`, 500);
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("Error fetching model name:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const modelNameUpdate = async (req, res) => {
+export const modelNameUpdate = tryCatch(async (req, res) => {
   const { fgSerial, modelName } = req.body;
 
   if (!fgSerial) {
-    return res.status(400).json({
-      success: false,
-      message: "Fg Serial number is required",
-    });
+    throw new AppError("FG Serial Number is required", 400);
   }
 
-  try {
-    const query = `Update DispatchUnloading set ModelName=@modelName where FGSerialNo=@fgSerial`;
+  const query = `
+    Update DispatchUnloading 
+    Set ModelName=@modelName 
+    Where FGSerialNo=@fgSerial
+  `;
 
-    const pool = await new sql.ConnectionPool(dbConfig2).connect();
+  const pool = await new sql.ConnectionPool(dbConfig2).connect();
+
+  try {
     const result = await pool
       .request()
       .input("modelName", sql.NVarChar, modelName)
       .input("fgSerial", sql.NVarChar, fgSerial)
       .query(query);
 
+    if (!result.rowsAffected[0]) {
+      throw new AppError(
+        "No records updated. Please check the FG Serial Number.",
+        404
+      );
+    }
+
     res.status(200).json({
       success: true,
       data: result.rowsAffected[0],
     });
+  } catch (error) {
+    throw new AppError(`Failed to update model name: ${error.message}`, 500);
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});

@@ -1,6 +1,9 @@
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-export const fetchFGData = async (req, res) => {
+export const fetchFGData = tryCatch(async (req, res) => {
   const {
     startTime,
     endTime,
@@ -11,18 +14,19 @@ export const fetchFGData = async (req, res) => {
   } = req.query;
 
   if (!startTime || !endTime || !stationCode) {
-    return res.status(400).json({
-      success: false,
-      message: "startTime, endTime, and stationCode are required",
-    });
+    throw new AppError(
+      "Missing required query parameters: startDate, endDate and stationCode",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+  const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
+  const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
@@ -100,34 +104,33 @@ WHERE SrNo > @offset AND SrNo <= (@offset + @limit);
 
     res.status(200).json({
       success: true,
+      message: "FG Data retrieved successfully",
       data: result.recordset,
       totalCount:
         result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
     });
-
+  } catch (error) {
+    throw new AppError(`Failed to fetch FG data:${error.message}`, 500);
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
 // Export Data
-export const productionReportExportData = async (req, res) => {
+export const productionReportExportData = tryCatch(async (req, res) => {
   const { startTime, endTime, model, stationCode } = req.query;
 
   if (!startTime || !endTime || !stationCode) {
-    return res.status(400).json({
-      success: false,
-      message: "startTime, endTime, and stationCode are required",
-    });
+    throw new AppError(
+      "Missing required query parameters: startDate, endDate and stationCode",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
 
-    let query = `
+  let query = `
       WITH FilteredData AS (
           SELECT
               mb.Material,
@@ -178,7 +181,9 @@ export const productionReportExportData = async (req, res) => {
       ORDER BY SrNo;
     `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
@@ -192,30 +197,39 @@ export const productionReportExportData = async (req, res) => {
     }
 
     const result = await request.query(query);
-    res.status(200).json({ success: true, data: result.recordset });
+
+    res.status(200).json({
+      success: true,
+      message: "Production Report data exported successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch Production Report export data: ${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
 // Quick Filters Data
-export const fetchQuickFiltersData = async (req, res) => {
+export const fetchQuickFiltersData = tryCatch(async (req, res) => {
   const { startTime, endTime, model, stationCode } = req.query;
 
   if (!startTime || !endTime || !stationCode) {
-    return res.status(400).json({
-      success: false,
-      message: "startTime, endTime, and stationCode are required",
-    });
+    throw new AppError(
+      "Missing required query parameters: startDate, endDate and stationCode",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
@@ -284,13 +298,16 @@ ModelStats AS (
 
     res.status(200).json({
       success: true,
+      message: "Production Report Quick Filter data retrieved successfully",
       data: result.recordset,
       totalCount: result.recordset.length,
     });
-
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch Production Report Quick Filter data: ${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});

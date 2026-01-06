@@ -131,7 +131,7 @@ export const generateReport = tryCatch(async (req, res) => {
           a.PSNo
       OFFSET 
           @offset ROWS FETCH NEXT @limit ROWS ONLY;
-          `;
+    `;
 
     const result = await request.query(query);
 
@@ -141,7 +141,10 @@ export const generateReport = tryCatch(async (req, res) => {
       data: result.recordset,
     });
   } catch (error) {
-    throw new AppError("Failed to generate component traceability report", 500);
+    throw new AppError(
+      `Failed to generate component traceability report: ${error.message}`,
+      500
+    );
   } finally {
     await pool.close();
   }
@@ -262,7 +265,7 @@ export const componentTraceabilityExportData = tryCatch(async (req, res) => {
           }
       ORDER BY 
           a.PSNo;
-`;
+    `;
 
     const result = await request.query(query);
 
@@ -272,7 +275,10 @@ export const componentTraceabilityExportData = tryCatch(async (req, res) => {
       data: result.recordset,
     });
   } catch (error) {
-    throw new AppError("Failed to export component traceability data", 500);
+    throw new AppError(
+      `Failed to export component traceability data: ${error.message}`,
+      500
+    );
   } finally {
     await pool.close();
   }

@@ -86,7 +86,7 @@ export const getHourlySummary = tryCatch(async (req, res) => {
         CONCAT('H', ROW_NUMBER() OVER (ORDER BY HourTime)) AS HOUR_NUMBER, TIMEHOUR, Loading_Count AS COUNT
       FROM HourlySummary
       ORDER BY HourTime;
-    `;
+  `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
@@ -109,7 +109,7 @@ export const getHourlySummary = tryCatch(async (req, res) => {
       data: result.recordset,
     });
   } catch (error) {
-    throw new AppError("Failed to fetch hourly summary", 500);
+    throw new AppError(`Failed to fetch hourly summary: ${error.message}`, 500);
   } finally {
     await pool.close();
   }
@@ -204,7 +204,7 @@ export const getHourlyModelCount = tryCatch(async (req, res) => {
       SELECT TIMEHOUR, Material_Name, Loading_Count AS COUNT
       FROM HourlyCount
       ORDER BY TIMEHOUR, Material_Name;
-    `;
+  `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
@@ -227,7 +227,10 @@ export const getHourlyModelCount = tryCatch(async (req, res) => {
       data: result.recordset,
     });
   } catch (error) {
-    throw new AppError("Failed to fetch hourly model count", 500);
+    throw new AppError(
+      `Failed to fetch hourly model count: ${error.message}`,
+      500
+    );
   } finally {
     await pool.close();
   }
@@ -324,7 +327,7 @@ export const getHourlyCategoryCount = tryCatch(async (req, res) => {
       SELECT TIMEHOUR, category, Loading_Count AS COUNT
       FROM HourlyCount
       ORDER BY TIMEHOUR, category;
-    `;
+  `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
@@ -346,7 +349,7 @@ export const getHourlyCategoryCount = tryCatch(async (req, res) => {
       data: result.recordset,
     });
   } catch (error) {
-    throw new AppError("Failed to fetch hourly category count", 500);
+    throw new AppError(`Failed to fetch hourly category count: ${error.message}`, 500);
   } finally {
     await pool.close();
   }

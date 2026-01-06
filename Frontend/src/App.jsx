@@ -257,7 +257,9 @@ function App() {
               element={<DispatchUnloading />}
             />
             <Route path="/dispatch/fg-casting" element={<FGCasting />} />
-            <Route path="/dispatch/gate-entry" element={<GateEntry />} />
+            {canAccess(["gate entry user"]) && (
+              <Route path="/dispatch/gate-entry" element={<GateEntry />} />
+            )}
             <Route path="/dispatch/error-log" element={<ErrorLog />} />
             {/*-------------------------------------------------------------- Planing --------------------------------------------------------------*/}
             {canAccess(["production manager", "planning team"]) && (

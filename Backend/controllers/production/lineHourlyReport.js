@@ -63,7 +63,10 @@ ORDER BY HourTime;
       data: result.recordset,
     });
   } catch (error) {
-    throw new AppError("Failed to fetch Final HP Frz hourly loading data", 500);
+    throw new AppError(
+      `Failed to fetch Final HP Frz hourly loading data: ${error.message}`,
+      500
+    );
   } finally {
     await pool.close();
   }
@@ -122,7 +125,7 @@ ORDER BY HourTime;
     });
   } catch (error) {
     throw new AppError(
-      "Failed to fetch Final HP Choc hourly loading data",
+      `Failed to fetch Final HP Choc hourly loading data: ${error.message}`,
       500
     );
   } finally {
@@ -180,7 +183,10 @@ ORDER BY HourTime;
       data: result.recordset,
     });
   } catch (error) {
-    throw new AppError("Failed to fetch Final HP SUS hourly loading data", 500);
+    throw new AppError(
+      `Failed to fetch Final HP SUS hourly loading data: ${error.message}`,
+      500
+    );
   } finally {
     await pool.close();
   }
@@ -224,7 +230,10 @@ ORDER BY TotalCount DESC;
       data: result.recordset,
     });
   } catch (error) {
-    throw new AppError("Failed to fetch Final HP CAT loading data", 500);
+    throw new AppError(
+      `Failed to fetch Final HP CAT loading data: ${error.message}`,
+      500
+    );
   } finally {
     await pool.close();
   }
@@ -287,7 +296,10 @@ ORDER BY HourTime;
       data: result.recordset,
     });
   } catch (error) {
-    throw new AppError("Failed to fetch Final HP Frz hourly loading data", 500);
+    throw new AppError(
+      `Failed to fetch Final HP Frz hourly loading data: ${error.message}`,
+      500
+    );
   } finally {
     await pool.close();
   }
@@ -349,7 +361,7 @@ ORDER BY HourTime;
     });
   } catch (error) {
     throw new AppError(
-      "Failed to fetch Final HP Choc hourly loading data",
+      `Failed to fetch Final HP Choc hourly loading data: ${error.message}`,
       500
     );
   } finally {
@@ -409,7 +421,10 @@ ORDER BY HourTime;
       data: result.recordset,
     });
   } catch (error) {
-    throw new AppError("Failed to fetch Final HP SUS hourly loading data", 500);
+    throw new AppError(
+      `Failed to fetch Final HP SUS hourly loading data: ${error.message}`,
+      500
+    );
   } finally {
     await pool.close();
   }
@@ -453,7 +468,10 @@ ORDER BY TotalCount DESC;
       data: result.recordset,
     });
   } catch (error) {
-    throw new AppError("Failed to fetch Final HP CAT loading data", 500);
+    throw new AppError(
+      `Failed to fetch Final HP CAT loading data: ${error.message}`,
+      500
+    );
   } finally {
     await pool.close();
   }
@@ -517,7 +535,7 @@ ORDER BY HourTime;
     });
   } catch (error) {
     throw new AppError(
-      "Failed to fetch Post Foaming HP Frz hourly loading data",
+      `Failed to fetch Post Foaming HP Frz hourly loading data: ${error.message}`,
       500
     );
   } finally {
@@ -582,7 +600,7 @@ ORDER BY HourTime;
     });
   } catch (error) {
     throw new AppError(
-      "Failed to fetch Manual Post Foaming HP hourly loading data",
+      `Failed to fetch Manual Post Foaming HP hourly loading data: ${error.message}`,
       500
     );
   } finally {
@@ -644,7 +662,7 @@ ORDER BY HourTime;
     });
   } catch (error) {
     throw new AppError(
-      "Failed to fetch Post Foaming HP SUS hourly loading data",
+      `Failed to fetch Post Foaming HP SUS hourly loading data: ${error.message}`,
       500
     );
   } finally {
@@ -675,7 +693,7 @@ WHERE b.ActivityType = 5
   AND b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}'
 GROUP BY ISNULL(mc.Alias, 'N/A')
 ORDER BY TotalCount DESC;
-    `;
+  `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
@@ -690,7 +708,10 @@ ORDER BY TotalCount DESC;
       data: result.recordset,
     });
   } catch (error) {
-    throw new AppError("Failed to fetch Post Foaming HP CAT loading data", 500);
+    throw new AppError(
+      `Failed to fetch Post Foaming HP CAT loading data: ${error.message}`,
+      500
+    );
   } finally {
     await pool.close();
   }
@@ -750,7 +771,7 @@ ORDER BY HourTime;
     });
   } catch (error) {
     throw new AppError(
-      "Failed to fetch Foaming HP FOM A hourly loading data",
+      `Failed to fetch Foaming HP FOM A hourly loading data: ${error.message}`,
       500
     );
   } finally {
@@ -811,7 +832,7 @@ ORDER BY HourTime;
     });
   } catch (error) {
     throw new AppError(
-      "Failed to fetch Foaming HP FOM B hourly loading data",
+      `Failed to fetch Foaming HP FOM B hourly loading data: ${error.message}`,
       500
     );
   } finally {
@@ -842,7 +863,7 @@ WHERE b.ActivityType = 5
   AND b.ActivityOn BETWEEN '{StartTime}' AND '{EndTime}'
 GROUP BY ISNULL(mc.Alias, 'N/A')
 ORDER BY TotalCount DESC;
-    `;
+  `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
@@ -857,7 +878,10 @@ ORDER BY TotalCount DESC;
       data: result.recordset,
     });
   } catch (error) {
-    throw new AppError("Failed to fetch Foaming HP FOM CAT loading data", 500);
+    throw new AppError(
+      `Failed to fetch Foaming HP FOM CAT loading data: ${error.message}`,
+      500
+    );
   } finally {
     await pool.close();
   }
