@@ -17,6 +17,10 @@ import Loader from "../../components/common/Loader";
 import toast from "react-hot-toast";
 import { CATEGORY_MAPPINGS } from "../../utils/mapCategories.js";
 import { baseURL } from "../../assets/assets.js";
+import {
+  useGetModelVariantsQuery,
+  useGetStagesQuery,
+} from "../../redux/apis/common/commonApi";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 // Map Categories with TIMEHOUR grouping
@@ -58,8 +62,6 @@ const mapCategory = async (data, mappings = CATEGORY_MAPPINGS) => {
 };
 
 const HourlyReport = () => {
-  const [model, setModel] = useState([]);
-  const [stage, setStages] = useState([]);
   const [stationCode, setStationCode] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -73,34 +75,26 @@ const HourlyReport = () => {
   const [selectedModel, setSelectedModel] = useState(null);
   const [lineType, setLineType] = useState("1");
 
-  const fetchModel = async () => {
-    try {
-      const res = await axios.get(`${baseURL}shared/model-variants`);
-      const formatted = res?.data.map((item) => ({
-        label: item.MaterialName,
-        value: item.MatCode.toString(),
-      }));
-      setModel(formatted);
-    } catch (error) {
-      console.error("Failed to fetch model variants:", error);
-      toast.error("Failed to fetch model variants.");
-    }
-  };
+  const {
+    data: modelVariants = [],
+    isLoading: modelsLoading,
+    error: modelsError,
+  } = useGetModelVariantsQuery();
 
-  const fetchStages = async () => {
-    try {
-      const res = await axios.get(`${baseURL}shared/stage-names`);
-      const formatted = res?.data.map((item) => ({
-        label: item.Name,
-        value: item.StationCode,
-      }));
+  const {
+    data: stages = [],
+    isLoading: stagesLoading,
+    error: stagesError,
+  } = useGetStagesQuery();
 
-      setStages(formatted);
-    } catch (error) {
-      console.error("Failed to fetch stage name:", error);
-      toast.error("Failed to fetch stage name.");
-    }
-  };
+  useEffect(() => {
+    if (modelsError) toast.error("Failed to load model variants");
+    if (stagesError) toast.error("Failed to load stages");
+  }, [modelsError, stagesError]);
+
+  if (modelsLoading || stagesLoading) {
+    return <Loader />;
+  }
 
   const fetchHourlyProduction = async () => {
     if (!stationCode || !startTime || !endTime) {
@@ -125,7 +119,7 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-summary`, {
         params,
       });
-      setHourData(res.data);
+      setHourData(res?.data?.data);
     } catch (error) {
       console.error("Error fetching hourly production data:", error);
       toast.error("Error fetching hourly production data.");
@@ -156,7 +150,7 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-model-count`, {
         params,
       });
-      setHourlyModelCount(res?.data);
+      setHourlyModelCount(res?.data?.data);
     } catch (error) {
       console.error("Error fetching hourly model count data:", error);
       toast.error("Error fetching hourly model count data.");
@@ -188,7 +182,7 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-category-count`, {
         params,
       });
-      const data = await mapCategory(res?.data);
+      const data = await mapCategory(res?.data?.data);
       setHourlyCategoryCount(data);
     } catch (error) {
       console.error("Error fetching hourly Category count data:", error);
@@ -240,7 +234,7 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-summary`, {
         params,
       });
-      setHourData(res.data);
+      setHourData(res?.data?.data);
     } catch (error) {
       console.error("Error fetching Yesterday hourly production data:", error);
       toast.error("Error fetching Yesterday hourly production data.");
@@ -291,7 +285,7 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-model-count`, {
         params,
       });
-      setHourlyModelCount(res?.data);
+      setHourlyModelCount(res?.data?.data);
     } catch (error) {
       console.error("Error fetching Yesterday hourly model count data:", error);
       toast.error("Error fetching Yesterday hourly model count data.");
@@ -343,7 +337,7 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-category-count`, {
         params,
       });
-      const data = await mapCategory(res?.data);
+      const data = await mapCategory(res?.data?.data);
       setHourlyCategoryCount(data);
     } catch (error) {
       console.error(
@@ -396,7 +390,7 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-summary`, {
         params,
       });
-      setHourData(res.data);
+      setHourData(res?.data?.data);
     } catch (error) {
       console.error("Error fetching Today hourly production data:", error);
       toast.error("Error fetching Today hourly production data.");
@@ -444,7 +438,7 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-model-count`, {
         params,
       });
-      setHourlyModelCount(res?.data);
+      setHourlyModelCount(res?.data?.data);
     } catch (error) {
       console.error("Error fetching Today hourly model count data:", error);
       toast.error("Error fetching Today hourly model count data.");
@@ -493,7 +487,7 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-category-count`, {
         params,
       });
-      const data = await mapCategory(res?.data);
+      const data = await mapCategory(res?.data?.data);
       setHourlyCategoryCount(data);
     } catch (error) {
       console.error("Error fetching Today hourly Category count data:", error);
@@ -514,11 +508,6 @@ const HourlyReport = () => {
     await fetchTodayHourlyModelCount();
     await getTodayHourlyCategoryCount();
   };
-
-  useEffect(() => {
-    fetchModel();
-    fetchStages();
-  }, []);
 
   // Auto Refresh Logic
   useEffect(() => {
@@ -632,21 +621,22 @@ const HourlyReport = () => {
         <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
           <SelectField
             label="Model Variant"
-            value={selectedModel?.value}
+            value={selectedModel?.value || ""}
+            options={modelVariants}
             onChange={(e) => {
-              const selected = model.find(
+              const selected = modelVariants.find(
                 (opt) => opt.value === e.target.value
               );
-              setSelectedModel(selected);
+              setSelectedModel(selected || null);
             }}
-            options={model}
           />
+
           <SelectField
             label="Stage Name"
             name="stationCode"
             value={stationCode}
+            options={stages}
             onChange={(e) => setStationCode(e.target.value)}
-            options={stage}
           />
 
           <DateTimePicker

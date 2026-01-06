@@ -23,7 +23,7 @@ const ComponentDetails = () => {
       const res = await axios.get(`${baseURL}prod/component-details`, {
         params: { serialNumber },
       });
-      const data = res.data || [];
+      const data = res?.data?.data || [];
       setComponentDetailsData(data);
     } catch (error) {
       console.error("Failed to fetch Component Details Data:", error);

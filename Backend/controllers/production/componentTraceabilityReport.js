@@ -1,6 +1,10 @@
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-export const generateReport = async (req, res) => {
+// Generates a report detailing the traceability of components used in finished goods within a specified timeframe.
+export const generateReport = tryCatch(async (req, res) => {
   const {
     startTime,
     endTime,
@@ -11,24 +15,21 @@ export const generateReport = async (req, res) => {
   } = req.query;
 
   if (!startTime || !endTime) {
-    return res.status(400).json({
-      success: false,
-      message: "startTime and endTime are required",
-    });
+    throw new AppError("startTime and endTime are required", 400);
   }
 
+  // Convert to IST (+5:30)
+  const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
+  const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+
+  const pool = await new sql.ConnectionPool({
+    ...dbConfig1,
+    requestTimeout: 120000, // optional: increase timeout to 120s
+    connectionTimeout: 30000, // optional: 30s connection timeout
+  }).connect();
+
   try {
-    // Convert to IST (+5:30)
-    const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
-    const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-
-    const pool = await new sql.ConnectionPool({
-      ...dbConfig1,
-      requestTimeout: 120000, // optional: increase timeout to 120s
-      connectionTimeout: 30000, // optional: 30s connection timeout
-    }).connect();
-
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
@@ -133,41 +134,37 @@ export const generateReport = async (req, res) => {
           `;
 
     const result = await request.query(query);
-    const data = result.recordset;
 
     res.status(200).json({
       success: true,
-      data,
+      message: "Component Traceability Report generated successfully",
+      data: result.recordset,
     });
-
+  } catch (error) {
+    throw new AppError("Failed to generate component traceability report", 500);
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-// Export Data
-export const componentTraceabilityExportData = async (req, res) => {
+// Export Data for Component Traceability Report
+export const componentTraceabilityExportData = tryCatch(async (req, res) => {
   const { startTime, endTime, model, compType } = req.query;
 
   if (!startTime || !endTime) {
-    return res.status(400).json({
-      success: false,
-      message: "startTime and endTime are required",
-    });
+    throw new AppError("startTime and endTime are required", 400);
   }
 
+  const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
+
+  const pool = await new sql.ConnectionPool({
+    ...dbConfig1,
+    requestTimeout: 120000, // ✅ Prevent 15s timeout
+    connectionTimeout: 30000,
+  }).connect();
+
   try {
-    const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
-
-    const pool = await new sql.ConnectionPool({
-      ...dbConfig1,
-      requestTimeout: 120000, // ✅ Prevent 15s timeout
-      connectionTimeout: 30000,
-    }).connect();
-
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
@@ -271,12 +268,12 @@ export const componentTraceabilityExportData = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      result: result.recordset,
+      message: "Component Traceability Report export data fetched successfully",
+      data: result.recordset,
     });
-
+  } catch (error) {
+    throw new AppError("Failed to export component traceability data", 500);
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});

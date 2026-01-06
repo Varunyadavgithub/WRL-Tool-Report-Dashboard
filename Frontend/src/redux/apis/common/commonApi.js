@@ -11,7 +11,7 @@ export const commonApi = createApi({
     getModelVariants: builder.query({
       query: () => "shared/model-variants",
       transformResponse: (response) =>
-        response.map((item) => ({
+        response.data.map((item) => ({
           label: item.MaterialName,
           value: item.MatCode.toString(),
         })),
@@ -21,7 +21,7 @@ export const commonApi = createApi({
     getStages: builder.query({
       query: () => "shared/stage-names",
       transformResponse: (response) =>
-        response.map((item) => ({
+        response.data.map((item) => ({
           label: item.Name,
           value: item.StationCode.toString(),
         })),
@@ -31,7 +31,7 @@ export const commonApi = createApi({
     getComponentTypes: builder.query({
       query: () => "shared/comp-type",
       transformResponse: (response) =>
-        response.map((item) => ({
+        response.data.map((item) => ({
           label: item.Name,
           value: item.CategoryCode.toString(),
         })),

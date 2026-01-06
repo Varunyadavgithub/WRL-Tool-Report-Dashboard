@@ -1,54 +1,57 @@
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-export const getHourlySummary = async (req, res) => {
+// Fetches hourly production summary data for a specific station within a given date range, optionally filtered by model and line.
+export const getHourlySummary = tryCatch(async (req, res) => {
   const { stationCode, startDate, endDate, model, line } = req.query;
 
   if (!stationCode || !startDate || !endDate) {
-    return res.status(400).send("Missing stationCode, startDate or endDate.");
+    throw new AppError("Missing stationCode, startDate, or endDate.", 400);
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    let categoryCondition = "";
-    let userRoleCondition = "";
-    let stationCodeCondition = "= @stationCode"; // default single station
+  let categoryCondition = "";
+  let userRoleCondition = "";
+  let stationCodeCondition = "= @stationCode"; // default single station
 
-    if (stationCode == 1220010) {
-      if (line == "1") {
-        categoryCondition =
-          " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
-      } else if (line == "2") {
-        categoryCondition = " AND m.Category in (1240001, 1250005) ";
-      }
-    } else if (stationCode == 1220005) {
-      if (line == "1") {
-        categoryCondition =
-          " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
-      } else if (line == "2") {
-        categoryCondition = " AND m.Category in (1240001, 1250005) ";
-      }
-    } else if (stationCode == 1230017) {
+  if (stationCode == 1220010) {
+    if (line == "1") {
       categoryCondition =
-        " AND m.Category in (1230003, 1230004, 1230009, 1230010, 1250004) ";
+        " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
+    } else if (line == "2") {
+      categoryCondition = " AND m.Category in (1240001, 1250005) ";
     }
-
-    if (stationCode == 1220010) {
-      if (line == "1") {
-        userRoleCondition = " And u.UserRole = 224006 ";
-      } else if (line == "2") {
-        userRoleCondition = " AND u.UserRole = 224007 ";
-      }
-    } else if (stationCode == 1220005) {
-      if (line == "1") {
-        userRoleCondition = " And u.UserRole = 225002 ";
-      } else if (line == "2") {
-        userRoleCondition = " AND u.UserRole = 225001 ";
-      }
+  } else if (stationCode == 1220005) {
+    if (line == "1") {
+      categoryCondition =
+        " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
+    } else if (line == "2") {
+      categoryCondition = " AND m.Category in (1240001, 1250005) ";
     }
+  } else if (stationCode == 1230017) {
+    categoryCondition =
+      " AND m.Category in (1230003, 1230004, 1230009, 1230010, 1250004) ";
+  }
 
-    const query = `
+  if (stationCode == 1220010) {
+    if (line == "1") {
+      userRoleCondition = " And u.UserRole = 224006 ";
+    } else if (line == "2") {
+      userRoleCondition = " AND u.UserRole = 224007 ";
+    }
+  } else if (stationCode == 1220005) {
+    if (line == "1") {
+      userRoleCondition = " And u.UserRole = 225002 ";
+    } else if (line == "2") {
+      userRoleCondition = " AND u.UserRole = 225001 ";
+    }
+  }
+
+  const query = `
       WITH Psno AS (
         SELECT DocNo, Material, Serial, VSerial, Alias, Type
         FROM MaterialBarcode
@@ -85,12 +88,14 @@ export const getHourlySummary = async (req, res) => {
       ORDER BY HourTime;
     `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
-    const request = pool.request();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
-    request.input("stationCode", sql.Int, parseInt(stationCode));
-    request.input("startDate", sql.DateTime, istStart);
-    request.input("endDate", sql.DateTime, istEnd);
+  try {
+    const request = pool
+      .request()
+      .input("stationCode", sql.Int, parseInt(stationCode))
+      .input("startDate", sql.DateTime, istStart)
+      .input("endDate", sql.DateTime, istEnd);
 
     if (model && model !== "0") {
       request.input("model", sql.VarChar, model);
@@ -98,63 +103,67 @@ export const getHourlySummary = async (req, res) => {
 
     const result = await request.query(query);
 
-    res.json(result.recordset);
+    res.status(200).json({
+      success: true,
+      message: "Hourly summary fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError("Failed to fetch hourly summary", 500);
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const getHourlyModelCount = async (req, res) => {
+// Fetches hourly model-wise production count for a specific station within a given date range, optionally filtered by model and line.
+export const getHourlyModelCount = tryCatch(async (req, res) => {
   const { stationCode, startDate, endDate, model, line } = req.query;
 
   if (!stationCode || !startDate || !endDate) {
-    return res.status(400).send("Missing stationCode, startDate, or endDate.");
+    throw new AppError("Missing stationCode, startDate or endDate.", 400);
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    let categoryCondition = "";
-    let userRoleCondition = "";
-    let stationCodeCondition = "= @stationCode"; // default single station
+  let categoryCondition = "";
+  let userRoleCondition = "";
+  let stationCodeCondition = "= @stationCode"; // default single station
 
-    if (stationCode == 1220010) {
-      if (line == "1") {
-        categoryCondition =
-          " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
-      } else if (line == "2") {
-        categoryCondition = " AND m.Category in (1240001, 1250005) ";
-      }
-    } else if (stationCode == 1220005) {
-      if (line == "1") {
-        categoryCondition =
-          " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
-      } else if (line == "2") {
-        categoryCondition = " AND m.Category in (1240001, 1250005) ";
-      }
-    } else if (stationCode == 1230017) {
+  if (stationCode == 1220010) {
+    if (line == "1") {
       categoryCondition =
-        " AND m.Category in (1230003, 1230004, 1230009, 1230010, 1250004) ";
+        " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
+    } else if (line == "2") {
+      categoryCondition = " AND m.Category in (1240001, 1250005) ";
     }
-
-    if (stationCode == 1220010) {
-      if (line == "1") {
-        userRoleCondition = " And u.UserRole = 224006 ";
-      } else if (line == "2") {
-        userRoleCondition = " AND u.UserRole = 224007 ";
-      }
-    } else if (stationCode == 1220005) {
-      if (line == "1") {
-        userRoleCondition = " And u.UserRole = 225002 ";
-      } else if (line == "2") {
-        userRoleCondition = " AND u.UserRole = 225001 ";
-      }
+  } else if (stationCode == 1220005) {
+    if (line == "1") {
+      categoryCondition =
+        " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
+    } else if (line == "2") {
+      categoryCondition = " AND m.Category in (1240001, 1250005) ";
     }
+  } else if (stationCode == 1230017) {
+    categoryCondition =
+      " AND m.Category in (1230003, 1230004, 1230009, 1230010, 1250004) ";
+  }
 
-    const query = `
+  if (stationCode == 1220010) {
+    if (line == "1") {
+      userRoleCondition = " And u.UserRole = 224006 ";
+    } else if (line == "2") {
+      userRoleCondition = " AND u.UserRole = 224007 ";
+    }
+  } else if (stationCode == 1220005) {
+    if (line == "1") {
+      userRoleCondition = " And u.UserRole = 225002 ";
+    } else if (line == "2") {
+      userRoleCondition = " AND u.UserRole = 225001 ";
+    }
+  }
+
+  const query = `
       WITH Psno AS (
         SELECT DocNo, Material, Serial, VSerial, Alias, Type
         FROM MaterialBarcode
@@ -197,75 +206,82 @@ export const getHourlyModelCount = async (req, res) => {
       ORDER BY TIMEHOUR, Material_Name;
     `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
-    const request = pool.request();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
-    request.input("stationCode", sql.Int, parseInt(stationCode));
-    request.input("startDate", sql.DateTime, istStart);
-    request.input("endDate", sql.DateTime, istEnd);
+  try {
+    const request = pool
+      .request()
+      .input("stationCode", sql.Int, parseInt(stationCode))
+      .input("startDate", sql.DateTime, istStart)
+      .input("endDate", sql.DateTime, istEnd);
 
     if (model && model !== "0") {
       request.input("model", sql.VarChar, model);
     }
 
     const result = await request.query(query);
-    res.status(200).json(result.recordset);
-    await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-};
 
-export const getHourlyCategoryCount = async (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: "Hourly model count fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError("Failed to fetch hourly model count", 500);
+  } finally {
+    await pool.close();
+  }
+});
+
+// Fetches hourly category-wise production count for a specific station within a given date range, optionally filtered by model and line.
+export const getHourlyCategoryCount = tryCatch(async (req, res) => {
   const { stationCode, startDate, endDate, model, line } = req.query;
 
   if (!stationCode || !startDate || !endDate) {
-    return res.status(400).send("Missing stationCode, startDate or endDate.");
+    throw new AppError("Missing stationCode, startDate or endDate.", 400);
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    let categoryCondition = "";
-    let userRoleCondition = "";
-    let stationCodeCondition = "= @stationCode"; // default single station
+  let categoryCondition = "";
+  let userRoleCondition = "";
+  let stationCodeCondition = "= @stationCode"; // default single station
 
-    if (stationCode == 1220010) {
-      if (line == "1") {
-        categoryCondition =
-          " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
-      } else if (line == "2") {
-        categoryCondition = " AND m.Category in (1240001, 1250005) ";
-      }
-    } else if (stationCode == 1220005) {
-      if (line == "1") {
-        categoryCondition =
-          " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
-      } else if (line == "2") {
-        categoryCondition = " AND m.Category in (1240001, 1250005) ";
-      }
-    } else if (stationCode == 1230017) {
+  if (stationCode == 1220010) {
+    if (line == "1") {
       categoryCondition =
-        " AND m.Category in (1230003, 1230004, 1230009, 1230010, 1250004) ";
+        " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
+    } else if (line == "2") {
+      categoryCondition = " AND m.Category in (1240001, 1250005) ";
     }
-
-    if (stationCode == 1220010) {
-      if (line == "1") {
-        userRoleCondition = " And u.UserRole = 224006 ";
-      } else if (line == "2") {
-        userRoleCondition = " AND u.UserRole = 224007 ";
-      }
-    } else if (stationCode == 1220005) {
-      if (line == "1") {
-        userRoleCondition = " And u.UserRole = 225002 ";
-      } else if (line == "2") {
-        userRoleCondition = " AND u.UserRole = 225001 ";
-      }
+  } else if (stationCode == 1220005) {
+    if (line == "1") {
+      categoryCondition =
+        " AND m.Category in (1220005,	1220010,	1220012,	1220016,	1220017,	1220018,	1220019,	1220020,	1220021,	1220022,	1220023,	1230008,	1250005) ";
+    } else if (line == "2") {
+      categoryCondition = " AND m.Category in (1240001, 1250005) ";
     }
+  } else if (stationCode == 1230017) {
+    categoryCondition =
+      " AND m.Category in (1230003, 1230004, 1230009, 1230010, 1250004) ";
+  }
 
-    const query = `
+  if (stationCode == 1220010) {
+    if (line == "1") {
+      userRoleCondition = " And u.UserRole = 224006 ";
+    } else if (line == "2") {
+      userRoleCondition = " AND u.UserRole = 224007 ";
+    }
+  } else if (stationCode == 1220005) {
+    if (line == "1") {
+      userRoleCondition = " And u.UserRole = 225002 ";
+    } else if (line == "2") {
+      userRoleCondition = " AND u.UserRole = 225001 ";
+    }
+  }
+
+  const query = `
       WITH Psno AS (
         SELECT DocNo, Material, Serial, VSerial, Alias, Type
         FROM MaterialBarcode
@@ -310,21 +326,28 @@ export const getHourlyCategoryCount = async (req, res) => {
       ORDER BY TIMEHOUR, category;
     `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
-    const request = pool.request();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
-    request.input("stationCode", sql.Int, parseInt(stationCode));
-    request.input("startDate", sql.DateTime, istStart);
-    request.input("endDate", sql.DateTime, istEnd);
+  try {
+    const request = pool
+      .request()
+      .input("stationCode", sql.Int, parseInt(stationCode))
+      .input("startDate", sql.DateTime, istStart)
+      .input("endDate", sql.DateTime, istEnd);
+
     if (model && model !== "0") {
       request.input("model", sql.VarChar, model);
     }
 
     const result = await request.query(query);
-    res.status(200).json(result.recordset);
+    res.status(200).json({
+      success: true,
+      message: "Hourly category count fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError("Failed to fetch hourly category count", 500);
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});

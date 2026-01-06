@@ -119,7 +119,7 @@ const ComponentTraceabilityReport = () => {
         }
       );
       if (res?.data?.success) {
-        return res?.data?.result;
+        return res?.data?.data;
       }
       return [];
     } catch (error) {

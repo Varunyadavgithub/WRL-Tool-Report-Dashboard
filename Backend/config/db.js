@@ -39,16 +39,27 @@ export const dbConfig3 = {
 };
 
 // Function to connect to any given config
+const pools = new Map();
+
 export const connectToDB = async (dbConfig) => {
+  const key = `${dbConfig.server}_${dbConfig.database}`;
+
+  if (pools.has(key)) {
+    console.log(`?? Reusing pool: ${dbConfig.database}`);
+    return pools.get(key);
+  }
+
   try {
-    const pool = await sql.connect(dbConfig);
-    console.log(`Connected to SQL Server: ${dbConfig.server}`);
+    const pool = new sql.ConnectionPool(dbConfig);
+    await pool.connect();
+
+    pools.set(key, pool);
+
+    console.log(`Connected to ${dbConfig.database} ---> ${dbConfig.server}`);
+
     return pool;
   } catch (err) {
-    console.error(
-      `Database connection failed for server ${dbConfig.server}:`,
-      err
-    );
+    console.error(`? DB connection failed: ${dbConfig.database}`, err);
     throw err;
   }
 };

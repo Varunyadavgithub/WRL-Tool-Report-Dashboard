@@ -4,6 +4,7 @@ import { dbConfig1 } from "../config/db.js";
 import { tryCatch } from "../config/tryCatch.js";
 import { AppError } from "../utils/AppError.js";
 
+// Handles user login by verifying credentials and issuing a JWT token.
 export const login = tryCatch(async (req, res) => {
   const { empcod, password } = req.body;
 
@@ -19,16 +20,16 @@ export const login = tryCatch(async (req, res) => {
       .request()
       .input("empcod", sql.VarChar, empcod)
       .input("password", sql.VarChar, password).query(`
-        SELECT 
+        Select 
           U.UserCode, 
           U.UserName, 
           U.UserID, 
           U.Password, 
           U.UserRole, 
           R.RoleName 
-        FROM Users U
+        From Users U
         JOIN UserRoles R ON U.UserRole = R.RoleCode
-        WHERE U.UserID = @empcod AND U.Password = @password
+        Where U.UserID = @empcod AND U.Password = @password
       `);
   } finally {
     await pool.close();
@@ -70,6 +71,7 @@ export const login = tryCatch(async (req, res) => {
   });
 });
 
+// Handles user logout by clearing the JWT token cookie.
 export const logout = tryCatch(async (_, res) => {
   res.clearCookie("token", {
     httpOnly: true,
