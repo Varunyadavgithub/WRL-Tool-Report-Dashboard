@@ -240,8 +240,8 @@ export const sendVisitorReportEmail = async (visitors) => {
   }
 };
 
-// -------------------- Gate Entry Report Email --------------------
-export const sendGateEntryReportEmail = async (gateEntries) => {
+// -------------------- Gate Entry Alert Email --------------------
+export const sendGateEntryAlertEmail = async (gateEntries) => {
   try {
     if (!Array.isArray(gateEntries) || gateEntries.length === 0) {
       console.warn("No Gate Entry data to email.");
@@ -312,7 +312,20 @@ export const sendGateEntryReportEmail = async (gateEntries) => {
 
     const mailOptions = {
       from: { name: "WRL Inward Alert", address: process.env.SMTP_USER },
-      to: "vikash.kumar@westernequipments.com",
+      to: "vikash.kumar@westernequipments.com", //sujith.s@westernequipments.com
+      cc: [
+        "rahul.bagul@westernequipments.com",
+        "shubhanshu.dixit@westernequipments.com",
+        "shubham.singh@westernequipments.com",
+        "ashutosh.jena@westernequipments.com",
+        "jenish.gandhi@westernequipments.com",
+        "mayank.garg@westernequipments.com",
+        "devesh.gaur@westernequipments.com",
+        "vinay.yadav@westernequipments.com",
+        "rushikesh.naik@westernequipments.com",
+        "harshal.prajapati@westernequipments.com",
+        "vaikunth.surve@westernequipments.com",
+      ],
       subject: "Gate Entry Report",
       html,
     };
@@ -326,6 +339,7 @@ export const sendGateEntryReportEmail = async (gateEntries) => {
   }
 };
 
+// -------------------- Calibration Alert Email --------------------
 export function sendMail(to, asset, subject, reportLink = "#") {
   if (!to) return;
 

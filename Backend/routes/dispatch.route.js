@@ -14,7 +14,7 @@ import {
   getQuickFgUnloading,
 } from "../controllers/dispatch/dispatchReport.js";
 import { getDispatchMasterBySession } from "../controllers/dispatch/fgCasting.js";
-import { sendMaterialGateEntryEmail } from "../controllers/dispatch/gateEntry.js";
+import { sendMaterialGateEntryAlertEmail } from "../controllers/dispatch/gateEntry.js";
 import { getDispatchErrorLog } from "../controllers/dispatch/errorLog.js";
 
 const router = express.Router();
@@ -37,7 +37,7 @@ router.get("/quick-fg-dispatch", getQuickFgDispatch);
 router.get("/fg-casting", getDispatchMasterBySession);
 
 // -----------------> Gate Entry Routes
-router.post("/material-gate-entry", sendMaterialGateEntryEmail);
+router.post("/material-gate-entry", sendMaterialGateEntryAlertEmail);
 
 // -----------------> Error Log Routes
 router.get("/error-log", getDispatchErrorLog);
