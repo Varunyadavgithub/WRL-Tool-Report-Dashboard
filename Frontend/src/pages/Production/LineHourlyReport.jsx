@@ -140,7 +140,7 @@ const LineHourlyReport = () => {
           const res1 = await axios.get(`${API_BASE_URL}/final-loading-hp-frz`, {
             params,
           });
-          setFinalFreezerLoadingData(res1?.data || []);
+          setFinalFreezerLoadingData(res1?.data?.data || []);
 
           // Final Choc
           const res2 = await axios.get(
@@ -149,19 +149,19 @@ const LineHourlyReport = () => {
               params,
             }
           );
-          setFinalChocLoadingData(res2?.data || []);
+          setFinalChocLoadingData(res2?.data?.data || []);
 
           // Final SUS
           const res3 = await axios.get(`${API_BASE_URL}/final-loading-hp-sus`, {
             params,
           });
-          setFinalSUSLoadingData(res3?.data || []);
+          setFinalSUSLoadingData(res3?.data?.data || []);
 
           // Category Count
           const res4 = await axios.get(`${API_BASE_URL}/final-loading-hp-cat`, {
             params,
           });
-          const data = await mapCategory(res4?.data);
+          const data = await mapCategory(res4?.data?.data);
           setFinalCategoryLoadingCountData(data || []);
         } catch (error) {
           console.error("Error fetch Yesterday Final Line data:", error);
@@ -173,25 +173,25 @@ const LineHourlyReport = () => {
           const res1 = await axios.get(`${API_BASE_URL}/final-hp-frz`, {
             params,
           });
-          setFinalFreezerData(res1?.data || []);
+          setFinalFreezerData(res1?.data?.data || []);
 
           // Final Choc
           const res2 = await axios.get(`${API_BASE_URL}/final-hp-choc`, {
             params,
           });
-          setFinalChocData(res2?.data || []);
+          setFinalChocData(res2?.data?.data || []);
 
           // Final SUS
           const res3 = await axios.get(`${API_BASE_URL}/final-hp-sus`, {
             params,
           });
-          setFinalSUSData(res3?.data || []);
+          setFinalSUSData(res3?.data?.data || []);
 
           // Category Count
           const res4 = await axios.get(`${API_BASE_URL}/final-hp-cat`, {
             params,
           });
-          const data = await mapCategory(res4?.data);
+          const data = await mapCategory(res4?.data?.data);
           setFinalCategoryCountData(data || []);
         } catch (error) {
           console.error("Error fetch Final Line data:", error);
@@ -205,25 +205,25 @@ const LineHourlyReport = () => {
           const res1 = await axios.get(`${API_BASE_URL}/post-hp-frz`, {
             params,
           });
-          setPostFoamingFreezerData(res1?.data || []);
+          setPostFoamingFreezerData(res1?.data?.data || []);
 
           // Manual Post Foaming
           const res2 = await axios.get(`${API_BASE_URL}/manual-post-hp`, {
             params,
           });
-          setManualPostFoamingData(res2?.data || []);
+          setManualPostFoamingData(res2?.data?.data || []);
 
           // Post Foaming SUS
           const res3 = await axios.get(`${API_BASE_URL}/post-hp-sus`, {
             params,
           });
-          setPostFoamingSUSData(res3?.data || []);
+          setPostFoamingSUSData(res3?.data?.data || []);
 
           // Category Count
           const res4 = await axios.get(`${API_BASE_URL}/post-hp-cat`, {
             params,
           });
-          const data = await mapCategory(res4?.data);
+          const data = await mapCategory(res4?.data?.data);
           setPostCategoryCountData(data || []);
         } catch (error) {
           console.error("Error fetch Post Foaming data:", error);
@@ -237,19 +237,19 @@ const LineHourlyReport = () => {
           const res1 = await axios.get(`${API_BASE_URL}/Foaming-hp-fom-a`, {
             params,
           });
-          setFoamingFOMAData(res1?.data || []);
+          setFoamingFOMAData(res1?.data?.data || []);
 
           // Foaming FOM B
           const res2 = await axios.get(`${API_BASE_URL}/Foaming-hp-fom-b`, {
             params,
           });
-          setFoamingFOMBData(res2?.data || []);
+          setFoamingFOMBData(res2?.data?.data || []);
 
           // Foaming Category
           const res3 = await axios.get(`${API_BASE_URL}/Foaming-hp-fom-cat`, {
             params,
           });
-          const data = await mapCategory(res3?.data);
+          const data = await mapCategory(res3?.data?.data);
           setFoamingCategoryData(data || []);
         } catch (error) {
           console.error("Error fetch Foaming data:", error);
@@ -316,7 +316,7 @@ const LineHourlyReport = () => {
           const res1 = await axios.get(`${API_BASE_URL}/final-loading-hp-frz`, {
             params,
           });
-          setFinalFreezerLoadingData(res1?.data || []);
+          setFinalFreezerLoadingData(res1?.data?.data || []);
 
           // Final Choc
           const res2 = await axios.get(
@@ -325,19 +325,19 @@ const LineHourlyReport = () => {
               params,
             }
           );
-          setFinalChocLoadingData(res2?.data || []);
+          setFinalChocLoadingData(res2?.data?.data || []);
 
           // Final SUS
           const res3 = await axios.get(`${API_BASE_URL}/final-loading-hp-sus`, {
             params,
           });
-          setFinalSUSLoadingData(res3?.data || []);
+          setFinalSUSLoadingData(res3?.data?.data || []);
 
           // Category Count
           const res4 = await axios.get(`${API_BASE_URL}/final-loading-hp-cat`, {
             params,
           });
-          const data = await mapCategory(res4?.data);
+          const data = await mapCategory(res4?.data?.data);
           setFinalCategoryLoadingCountData(data || []);
         } catch (error) {
           console.error("Error fetch Yesterday Final Line data:", error);
@@ -349,25 +349,25 @@ const LineHourlyReport = () => {
           const res1 = await axios.get(`${API_BASE_URL}/final-hp-frz`, {
             params,
           });
-          setFinalFreezerData(res1?.data || []);
+          setFinalFreezerData(res1?.data?.data || []);
 
           // Final Choc
           const res2 = await axios.get(`${API_BASE_URL}/final-hp-choc`, {
             params,
           });
-          setFinalChocData(res2?.data || []);
+          setFinalChocData(res2?.data?.data || []);
 
           // Final SUS
           const res3 = await axios.get(`${API_BASE_URL}/final-hp-sus`, {
             params,
           });
-          setFinalSUSData(res3?.data || []);
+          setFinalSUSData(res3?.data?.data || []);
 
           // Category Count
           const res4 = await axios.get(`${API_BASE_URL}/final-hp-cat`, {
             params,
           });
-          const data = await mapCategory(res4?.data);
+          const data = await mapCategory(res4?.data?.data);
           setFinalCategoryCountData(data || []);
         } catch (error) {
           console.error("Error fetch Yesterday Final Line data:", error);
@@ -381,25 +381,25 @@ const LineHourlyReport = () => {
           const res1 = await axios.get(`${API_BASE_URL}/post-hp-frz`, {
             params,
           });
-          setPostFoamingFreezerData(res1?.data || []);
+          setPostFoamingFreezerData(res1?.data?.data || []);
 
           // Manual Post Foaming
           const res2 = await axios.get(`${API_BASE_URL}/manual-post-hp`, {
             params,
           });
-          setManualPostFoamingData(res2?.data || []);
+          setManualPostFoamingData(res2?.data?.data || []);
 
           // Post Foaming SUS
           const res3 = await axios.get(`${API_BASE_URL}/post-hp-sus`, {
             params,
           });
-          setPostFoamingSUSData(res3?.data || []);
+          setPostFoamingSUSData(res3?.data?.data || []);
 
           // Category Count
           const res4 = await axios.get(`${API_BASE_URL}/post-hp-cat`, {
             params,
           });
-          const data = await mapCategory(res4?.data);
+          const data = await mapCategory(res4?.data?.data);
           setPostCategoryCountData(data || []);
         } catch (error) {
           console.error("Error fetch Yesterday Post Foaming data:", error);
@@ -413,19 +413,19 @@ const LineHourlyReport = () => {
           const res1 = await axios.get(`${API_BASE_URL}/Foaming-hp-fom-a`, {
             params,
           });
-          setFoamingFOMAData(res1?.data || []);
+          setFoamingFOMAData(res1?.data?.data || []);
 
           // Foaming FOM B
           const res2 = await axios.get(`${API_BASE_URL}/Foaming-hp-fom-b`, {
             params,
           });
-          setFoamingFOMBData(res2?.data || []);
+          setFoamingFOMBData(res2?.data?.data || []);
 
           // Foaming Category
           const res3 = await axios.get(`${API_BASE_URL}/Foaming-hp-fom-cat`, {
             params,
           });
-          const data = await mapCategory(res3?.data);
+          const data = await mapCategory(res3?.data?.data);
           setFoamingCategoryData(data || []);
         } catch (error) {
           console.error("Error fetch Yesterday Foaming data:", error);
@@ -488,7 +488,7 @@ const LineHourlyReport = () => {
           const res1 = await axios.get(`${API_BASE_URL}/final-loading-hp-frz`, {
             params,
           });
-          setFinalFreezerLoadingData(res1?.data || []);
+          setFinalFreezerLoadingData(res1?.data?.data || []);
 
           // Final Choc
           const res2 = await axios.get(
@@ -497,19 +497,19 @@ const LineHourlyReport = () => {
               params,
             }
           );
-          setFinalChocLoadingData(res2?.data || []);
+          setFinalChocLoadingData(res2?.data?.data || []);
 
           // Final SUS
           const res3 = await axios.get(`${API_BASE_URL}/final-loading-hp-sus`, {
             params,
           });
-          setFinalSUSLoadingData(res3?.data || []);
+          setFinalSUSLoadingData(res3?.data?.data || []);
 
           // Category Count
           const res4 = await axios.get(`${API_BASE_URL}/final-loading-hp-cat`, {
             params,
           });
-          const data = await mapCategory(res4?.data);
+          const data = await mapCategory(res4?.data?.data);
           setFinalCategoryLoadingCountData(data || []);
         } catch (error) {
           console.error("Error fetch Yesterday Final Line data:", error);
@@ -521,25 +521,25 @@ const LineHourlyReport = () => {
           const res1 = await axios.get(`${API_BASE_URL}/final-hp-frz`, {
             params,
           });
-          setFinalFreezerData(res1?.data || []);
+          setFinalFreezerData(res1?.data?.data || []);
 
           // Final Choc
           const res2 = await axios.get(`${API_BASE_URL}/final-hp-choc`, {
             params,
           });
-          setFinalChocData(res2?.data || []);
+          setFinalChocData(res2?.data?.data || []);
 
           // Final SUS
           const res3 = await axios.get(`${API_BASE_URL}/final-hp-sus`, {
             params,
           });
-          setFinalSUSData(res3?.data || []);
+          setFinalSUSData(res3?.data?.data || []);
 
           // Category Count
           const res4 = await axios.get(`${API_BASE_URL}/final-hp-cat`, {
             params,
           });
-          const data = await mapCategory(res4?.data);
+          const data = await mapCategory(res4?.data?.data);
           setFinalCategoryCountData(data || []);
         } catch (error) {
           console.error("Error fetch Today Final Line data:", error);
@@ -553,25 +553,25 @@ const LineHourlyReport = () => {
           const res1 = await axios.get(`${API_BASE_URL}/post-hp-frz`, {
             params,
           });
-          setPostFoamingFreezerData(res1?.data || []);
+          setPostFoamingFreezerData(res1?.data?.data || []);
 
           // Manual Post Foaming
           const res2 = await axios.get(`${API_BASE_URL}/manual-post-hp`, {
             params,
           });
-          setManualPostFoamingData(res2?.data || []);
+          setManualPostFoamingData(res2?.data?.data || []);
 
           // Post Foaming SUS
           const res3 = await axios.get(`${API_BASE_URL}/post-hp-sus`, {
             params,
           });
-          setPostFoamingSUSData(res3?.data || []);
+          setPostFoamingSUSData(res3?.data?.data || []);
 
           // Category Count
           const res4 = await axios.get(`${API_BASE_URL}/post-hp-cat`, {
             params,
           });
-          const data = await mapCategory(res4?.data);
+          const data = await mapCategory(res4?.data?.data);
           setPostCategoryCountData(data || []);
         } catch (error) {
           console.error("Error fetch Today Post Foaming data:", error);
@@ -585,19 +585,19 @@ const LineHourlyReport = () => {
           const res1 = await axios.get(`${API_BASE_URL}/Foaming-hp-fom-a`, {
             params,
           });
-          setFoamingFOMAData(res1?.data || []);
+          setFoamingFOMAData(res1?.data?.data || []);
 
           // Foaming FOM B
           const res2 = await axios.get(`${API_BASE_URL}/Foaming-hp-fom-b`, {
             params,
           });
-          setFoamingFOMBData(res2?.data || []);
+          setFoamingFOMBData(res2?.data?.data || []);
 
           // Foaming Category
           const res3 = await axios.get(`${API_BASE_URL}/Foaming-hp-fom-cat`, {
             params,
           });
-          const data = await mapCategory(res3?.data);
+          const data = await mapCategory(res3?.data?.data);
           setFoamingCategoryData(data || []);
         } catch (error) {
           console.error("Error fetch Today Foaming data:", error);

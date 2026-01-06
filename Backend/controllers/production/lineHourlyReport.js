@@ -1,4 +1,7 @@
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
 // Utility to replace placeholders safely
 const replacePlaceholders = (query, startTime, endTime) => {
@@ -8,10 +11,10 @@ const replacePlaceholders = (query, startTime, endTime) => {
 };
 
 // Final Line
-export const getFinalLoadingHPFrz = async (req, res) => {
+export const getFinalLoadingHPFrz = tryCatch(async (req, res) => {
   const { StartTime, EndTime } = req.query;
-  try {
-    const query = `
+
+  const query = `
 WITH Psno AS (
 SELECT DocNo, Material, Serial, VSerial, Alias, Type
 FROM MaterialBarcode
@@ -46,22 +49,30 @@ CONCAT('H', ROW_NUMBER() OVER (ORDER BY HourTime)) AS HOUR_NUMBER, TIMEHOUR, Loa
 FROM HourlySummary
 ORDER BY HourTime;
   `;
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
 
-export const getFinalLoadingHPChoc = async (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: "Final HP Frz hourly loading data fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError("Failed to fetch Final HP Frz hourly loading data", 500);
+  } finally {
+    await pool.close();
+  }
+});
+
+export const getFinalLoadingHPChoc = tryCatch(async (req, res) => {
   const { StartTime, EndTime } = req.query;
 
-  try {
-    const query = `
+  const query = `
 WITH Psno AS (
 SELECT DocNo, Material, Serial, VSerial, Alias, Type
 FROM MaterialBarcode
@@ -96,23 +107,34 @@ CONCAT('H', ROW_NUMBER() OVER (ORDER BY HourTime)) AS HOUR_NUMBER, TIMEHOUR, Loa
 FROM HourlySummary
 ORDER BY HourTime;
 `;
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
 
-export const getFinalLoadingHPSUS = async (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: "Final HP Choc hourly loading data fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      "Failed to fetch Final HP Choc hourly loading data",
+      500
+    );
+  } finally {
+    await pool.close();
+  }
+});
+
+export const getFinalLoadingHPSUS = tryCatch(async (req, res) => {
   const { StartTime, EndTime } = req.query;
 
-  try {
-    const query = 
-`WITH Psno AS (
+  const query = `
+  WITH Psno AS (
 SELECT DocNo, Material, Serial, VSerial, Alias, Type
 FROM MaterialBarcode
 WHERE PrintStatus = 1 AND Status <> 99 AND Type NOT IN (200)
@@ -144,22 +166,30 @@ CONCAT('H', ROW_NUMBER() OVER (ORDER BY HourTime)) AS HOUR_NUMBER, TIMEHOUR, Loa
 FROM HourlySummary
 ORDER BY HourTime;
 `;
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
 
-export const getFinalLoadingHPCAT = async (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: "Final HP SUS hourly loading data fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError("Failed to fetch Final HP SUS hourly loading data", 500);
+  } finally {
+    await pool.close();
+  }
+});
+
+export const getFinalLoadingHPCAT = tryCatch(async (req, res) => {
   const { StartTime, EndTime } = req.query;
 
-  try {
-    const query = `
+  const query = `
 WITH Psno AS (
     SELECT DocNo, Material, Serial, VSerial, Alias
     FROM MaterialBarcode
@@ -180,22 +210,31 @@ WHERE b.ActivityType = 5
 GROUP BY ISNULL(mc.Alias, 'N/A')
 ORDER BY TotalCount DESC;
   `;
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
+
+    res.status(200).json({
+      success: true,
+      message: "Final HP CAT loading data fetched successfully",
+      data: result.recordset,
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    throw new AppError("Failed to fetch Final HP CAT loading data", 500);
+  } finally {
+    await pool.close();
   }
-};
+});
 
 // Final Line
-export const getFinalHPFrz = async (req, res) => {
+export const getFinalHPFrz = tryCatch(async (req, res) => {
   const { StartTime, EndTime } = req.query;
-  try {
-    const query = `
+
+  const query = `
 WITH Psno AS (
     SELECT DocNo, Material, Serial, VSerial, Alias, Type
     FROM MaterialBarcode
@@ -234,22 +273,30 @@ FROM HourlySummary
 ORDER BY HourTime;
 
   `;
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
 
-export const getFinalHPChoc = async (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: "Final HP Frz hourly loading data fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError("Failed to fetch Final HP Frz hourly loading data", 500);
+  } finally {
+    await pool.close();
+  }
+});
+
+export const getFinalHPChoc = tryCatch(async (req, res) => {
   const { StartTime, EndTime } = req.query;
 
-  try {
-    const query = `
+  const query = `
 WITH Psno AS (
     SELECT DocNo, Material, Serial, VSerial, Alias, Type
     FROM MaterialBarcode
@@ -287,22 +334,33 @@ SELECT
 FROM HourlySummary
 ORDER BY HourTime;
 `;
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
 
-export const getFinalHPSUS = async (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: "Final HP Choc hourly loading data fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      "Failed to fetch Final HP Choc hourly loading data",
+      500
+    );
+  } finally {
+    await pool.close();
+  }
+});
+
+export const getFinalHPSUS = tryCatch(async (req, res) => {
   const { StartTime, EndTime } = req.query;
 
-  try {
-    const query = `  WITH Psno AS (
+  const query = `  WITH Psno AS (
     SELECT DocNo, Material, Serial, VSerial, Alias, Type
     FROM MaterialBarcode
     WHERE PrintStatus = 1 AND Status <> 99 AND Type NOT IN (200)
@@ -337,22 +395,30 @@ SELECT
 FROM HourlySummary
 ORDER BY HourTime;
 `;
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
 
-export const getFinalHPCAT = async (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: "Final HP SUS hourly loading data fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError("Failed to fetch Final HP SUS hourly loading data", 500);
+  } finally {
+    await pool.close();
+  }
+});
+
+export const getFinalHPCAT = tryCatch(async (req, res) => {
   const { StartTime, EndTime } = req.query;
 
-  try {
-    const query = `
+  const query = `
 WITH Psno AS (
     SELECT DocNo, Material, Serial, VSerial, Alias
     FROM MaterialBarcode
@@ -373,23 +439,31 @@ WHERE b.ActivityType = 5
 GROUP BY ISNULL(mc.Alias, 'N/A')
 ORDER BY TotalCount DESC;
   `;
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
+
+    res.status(200).json({
+      success: true,
+      message: "Final HP CAT loading data fetched successfully",
+      data: result.recordset,
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    throw new AppError("Failed to fetch Final HP CAT loading data", 500);
+  } finally {
+    await pool.close();
   }
-};
+});
 
 // Post Foaming
-export const getPostHPFrz = async (req, res) => {
+export const getPostHPFrz = tryCatch(async (req, res) => {
   const { StartTime, EndTime } = req.query;
 
-  try {
-    const query = `
+  const query = `
 WITH FilteredActivity AS (
     SELECT 
         CAST(CAST(b.ActivityOn AS DATE) AS DATETIME) AS ActivityDate,
@@ -428,22 +502,33 @@ FROM Grouped
 ORDER BY HourTime;
 
   `;
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
 
-export const getManualPostHP = async (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: "Post Foaming HP Frz hourly loading data fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      "Failed to fetch Post Foaming HP Frz hourly loading data",
+      500
+    );
+  } finally {
+    await pool.close();
+  }
+});
+
+export const getManualPostHP = tryCatch(async (req, res) => {
   const { StartTime, EndTime } = req.query;
 
-  try {
-    const query = `
+  const query = `
 WITH FilteredActivity AS (
     SELECT 
         CAST(CAST(b.ActivityOn AS DATE) AS DATETIME) AS ActivityDate,
@@ -481,22 +566,34 @@ SELECT
 FROM Grouped
 ORDER BY HourTime;
   `;
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
 
-export const getPostHPSUS = async (req, res) => {
+    res.status(200).json({
+      success: true,
+      message:
+        "Manual Post Foaming HP hourly loading data fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      "Failed to fetch Manual Post Foaming HP hourly loading data",
+      500
+    );
+  } finally {
+    await pool.close();
+  }
+});
+
+export const getPostHPSUS = tryCatch(async (req, res) => {
   const { StartTime, EndTime } = req.query;
 
-  try {
-    const query = `
+  const query = `
 WITH Psno AS (
     SELECT DocNo, Material, Serial, VSerial, Alias, Type
     FROM MaterialBarcode
@@ -532,22 +629,33 @@ FROM HourlySummary
 ORDER BY HourTime;
 
   `;
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
 
-export const getPostHPCAT = async (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: "Post Foaming HP SUS hourly loading data fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      "Failed to fetch Post Foaming HP SUS hourly loading data",
+      500
+    );
+  } finally {
+    await pool.close();
+  }
+});
+
+export const getPostHPCAT = tryCatch(async (req, res) => {
   const { StartTime, EndTime } = req.query;
 
-  try {
-    const query = `
+  const query = `
  WITH Psno AS (
     SELECT DocNo, Material, Serial, VSerial, Alias
     FROM MaterialBarcode
@@ -568,22 +676,31 @@ WHERE b.ActivityType = 5
 GROUP BY ISNULL(mc.Alias, 'N/A')
 ORDER BY TotalCount DESC;
     `;
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
+
+    res.status(200).json({
+      success: true,
+      message: "Post Foaming HP CAT loading data fetched successfully",
+      data: result.recordset,
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    throw new AppError("Failed to fetch Post Foaming HP CAT loading data", 500);
+  } finally {
+    await pool.close();
   }
-};
+});
 
 // Foaming
-export const getFoamingHpFomA = async (req, res) => {
+export const getFoamingHpFomA = tryCatch(async (req, res) => {
   const { StartTime, EndTime } = req.query;
-  try {
-    const query = `
+
+  const query = `
 WITH Psno AS (
     SELECT DocNo, Material, Serial, VSerial, Alias, Type
     FROM MaterialBarcode
@@ -619,21 +736,32 @@ FROM HourlySummary
 ORDER BY HourTime;
     `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
 
-export const getFoamingHpFomB = async (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: "Foaming HP FOM A hourly loading data fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      "Failed to fetch Foaming HP FOM A hourly loading data",
+      500
+    );
+  } finally {
+    await pool.close();
+  }
+});
+
+export const getFoamingHpFomB = tryCatch(async (req, res) => {
   const { StartTime, EndTime } = req.query;
-  try {
-    const query = `
+
+  const query = `
 WITH Psno AS (
     SELECT DocNo, Material, Serial, VSerial, Alias, Type
     FROM MaterialBarcode
@@ -669,21 +797,32 @@ FROM HourlySummary
 ORDER BY HourTime;
     `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
 
-export const getFoamingHpFomCat = async (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: "Foaming HP FOM B hourly loading data fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      "Failed to fetch Foaming HP FOM B hourly loading data",
+      500
+    );
+  } finally {
+    await pool.close();
+  }
+});
+
+export const getFoamingHpFomCat = tryCatch(async (req, res) => {
   const { StartTime, EndTime } = req.query;
-  try {
-    const query = `
+
+  const query = `
 WITH Psno AS (
     SELECT DocNo, Material, Serial, VSerial, Alias
     FROM MaterialBarcode
@@ -705,13 +844,21 @@ GROUP BY ISNULL(mc.Alias, 'N/A')
 ORDER BY TotalCount DESC;
     `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .query(replacePlaceholders(query, StartTime, EndTime));
-    res.status(200).json(result.recordset);
-    await pool.close();
+
+    res.status(200).json({
+      success: true,
+      message: "Foaming HP FOM CAT loading data fetched successfully",
+      data: result.recordset,
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    throw new AppError("Failed to fetch Foaming HP FOM CAT loading data", 500);
+  } finally {
+    await pool.close();
   }
-};
+});
