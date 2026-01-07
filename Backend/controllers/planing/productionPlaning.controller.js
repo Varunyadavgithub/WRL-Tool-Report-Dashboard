@@ -1,70 +1,84 @@
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-export const getModelName = async (req, res) => {
+export const getModelName = tryCatch(async (req, res) => {
   const { plan } = req.query;
-  try {
-    if (!plan || !["assembly", "fg"].includes(plan)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid plan type",
-      });
-    }
 
-    let query;
-    if (plan === "assembly") {
-      query = `
+  if (!plan || !["assembly", "fg"].includes(plan)) {
+    throw new AppError("Invalid plan type.", 400);
+  }
+
+  let query;
+  if (plan === "assembly") {
+    query = `
         SELECT Alias, matCode 
         FROM Material 
         WHERE type = 400 AND (Alias LIKE 'S %' OR Alias LIKE '% S')
       `;
-    } else {
-      query = `
+  } else {
+    query = `
         SELECT Alias, matCode 
         FROM Material 
         WHERE type = 100
       `;
-    }
+  }
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
+  try {
     const result = await pool.request().query(query);
 
     res.status(200).json({
       success: true,
+      message: "Model Name data retrieved successfully.",
       data: result.recordset,
     });
+  } catch (error) {
+    throw new AppError(`Failed to fetch Model Name data:${error.message}`, 500);
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL error:", err);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const getPlanMonth = async (_, res) => {
+export const getPlanMonth = tryCatch(async (_, res) => {
+  const query = `
+    Select DISTINCT(PlanMonthYear) 
+    from "PlanOrderPrint"
+  `;
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    const query = `Select DISTINCT(PlanMonthYear) from "PlanOrderPrint"`;
-
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const result = await pool.request().query(query);
 
-    res.status(200).json({ success: true, data: result.recordset });
+    res.status(200).json({
+      success: true,
+      message: "Plan month data retrieved successfully.",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(`Failed to fetch plan month data:${error.message}`, 500);
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL error:", err);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const productionPlaningData = async (req, res) => {
+export const productionPlaningData = tryCatch(async (req, res) => {
   const { planType, planMonthYear, matcode } = req.query;
 
   // Only planType and planMonthYear are required
   if (!planType || !planMonthYear) {
-    return res.status(400).send("planType and planMonthYear are required");
+    throw new AppError(
+      "Missing required query parameters: planType and planMonthYear.",
+      400
+    );
   }
 
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const request = pool.request();
 
     request.input("planType", sql.VarChar, planType);
@@ -88,15 +102,22 @@ export const productionPlaningData = async (req, res) => {
 
     const result = await request.query(query);
 
-    res.status(200).json({ success: true, data: result.recordset });
+    res.status(200).json({
+      success: true,
+      message: "Production planing data retrieved successfully.",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch Production planing data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL error:", err);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const updateProductionPlaningData = async (req, res) => {
+export const updateProductionPlaningData = tryCatch(async (req, res) => {
   const { planQty, userCode, remark, matcode, planMonthYear, planType } =
     req.body;
 
@@ -108,22 +129,21 @@ export const updateProductionPlaningData = async (req, res) => {
     !planMonthYear ||
     !planType
   ) {
-    return res
-      .status(400)
-      .send(
-        "planQty, userCode, remark, matcode, planMonthYear and planType are required"
-      );
+    throw new AppError(
+      "Missing required query parameters: planQty, userCode, remark, matcode, planMonthYear and planType.",
+      400
+    );
   }
 
-  try {
-    const query = `
+  const query = `
       UPDATE PlanOrderPrint 
       SET PlanQty = @planQty, CreatedBy=@userCode, Remark = @remark 
       WHERE PlanMaterial = @matcode AND PlanMonthYear = @planMonthYear AND PlanType = @planType;
     `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
+  try {
     const result = await pool
       .request()
       .input("planQty", sql.NVarChar, planQty)
@@ -136,40 +156,44 @@ export const updateProductionPlaningData = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      rowsAffected: result.rowsAffected,
-      payload: "Plan updated successfully",
+      message: "Production Planing Data updated successfully.",
+      data: result.rowsAffected,
     });
+  } catch (error) {
+    throw new AppError(
+      `Failed to update the production planing data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const addProductionPlaningData = async (req, res) => {
+export const addProductionPlaningData = tryCatch(async (req, res) => {
   const { planQty, userCode, remark, matcode, planMonthYear, planType } =
     req.body;
 
   if (!planQty || !userCode || !matcode || !planMonthYear || !planType) {
-    return res.status(400).json({
-      success: false,
-      message: "Missing required fields",
-    });
+    throw new AppError(
+      "Missing required query parameters: planQty, userCode, matcode, planMonthYear and planType.",
+      400
+    );
   }
+
   const planNo = 453454;
   const currentDateTime = new Date(new Date().getTime() + 330 * 60000);
   const status = 0;
 
-  try {
-    const query = `
+  const query = `
       INSERT INTO PlanOrderPrint 
         (PlanNo, PlanMonthYear, PlanMaterial, PlanQty, PlanType, Remark, CreatedBy, CreatedOn, Status)
       VALUES
         (@planNo, @planMonthYear, @planMaterial, @planQty, @planType, @remark, @createdBy, @createdOn, @status);
-    `;
+  `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
+  try {
     const result = await pool
       .request()
       .input("planNo", sql.Int, planNo)
@@ -185,15 +209,15 @@ export const addProductionPlaningData = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      rowsAffected: result.rowsAffected,
-      payload: "Plan updated successfully",
+      message: "Production Planing Data added successfully",
+      data: result.rowsAffected,
     });
-    await pool.close();
   } catch (error) {
-    console.error("Error adding production plan:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to add production plan",
-    });
+    throw new AppError(
+      `Failed to add the production planing data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});

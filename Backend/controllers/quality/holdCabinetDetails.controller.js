@@ -1,10 +1,15 @@
 import sql, { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-export const getDispatchHoldDetails = async (req, res) => {
+export const getDispatchHoldDetails = tryCatch(async (req, res) => {
   const { startDate, endDate, status } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate or endDate.",
+      400
+    );
   }
 
   const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
@@ -55,8 +60,9 @@ export const getDispatchHoldDetails = async (req, res) => {
     ${statusCondition};
   `;
 
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
@@ -65,13 +71,16 @@ export const getDispatchHoldDetails = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      message: "Dispatch Hold Details data retrieved successfully.",
       data: result.recordset,
       totalCount: result.recordset.length,
     });
-
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the Dispatch Hold Details data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});

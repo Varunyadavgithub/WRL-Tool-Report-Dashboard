@@ -1,20 +1,27 @@
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
 /* =========================================================
    GET MODEL & CATEGORY BY ASSEMBLY SERIAL
 ========================================================= */
-export const getReworkEntryDetailsByAssemblySerial = async (req, res) => {
-  const { AssemblySerial } = req.query;
+export const getReworkEntryDetailsByAssemblySerial = tryCatch(
+  async (req, res) => {
+    const { AssemblySerial } = req.query;
 
-  if (!AssemblySerial) {
-    return res.status(400).json({ message: "AssemblySerial is required" });
-  }
+    if (!AssemblySerial) {
+      throw new AppError(
+        "Missing required query parameters: assemblySerial.",
+        400
+      );
+    }
 
-  let pool;
-  try {
-    pool = await sql.connect(dbConfig1);
+    let pool;
+    try {
+      pool = await sql.connect(dbConfig1);
 
-    const query = `
+      const query = `
       SELECT
         mb.Serial AS modelName,
         mc.Name AS category
@@ -24,32 +31,43 @@ export const getReworkEntryDetailsByAssemblySerial = async (req, res) => {
       WHERE mb.Alias = @AssemblySerial;
     `;
 
-    const result = await pool
-      .request()
-      .input("AssemblySerial", sql.VarChar, AssemblySerial)
-      .query(query);
+      const result = await pool
+        .request()
+        .input("AssemblySerial", sql.VarChar, AssemblySerial)
+        .query(query);
 
-    if (!result.recordset.length) {
-      return res.json({ modelName: null, category: null });
+      if (!result.recordset.length) {
+        return res.json({ modelName: null, category: null });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Rework Entry Details data retrieved successfully.",
+        data: result.recordset[0],
+      });
+    } catch (error) {
+      throw new AppError(
+        `Failed to fetch the Rework Entry Details By Assembly Serial data:${error.message}`,
+        500
+      );
+    } finally {
+      await pool.close();
     }
-
-    res.json(result.recordset[0]);
-  } catch (error) {
-    console.error("SQL Error:", error.message);
-    res.status(500).json({ message: "Failed to fetch details" });
-  } finally {
-    if (pool) await pool.close();
   }
-};
+);
 
 /* =========================================================
    REWORK IN  → INSERT NEW ROW
 ========================================================= */
-export const createReworkInEntry = async (req, res) => {
-  const { AssemblySerial, ModelName, Category, Defect, Part, Shift, UserCode } = req.body;
+export const createReworkInEntry = tryCatch(async (req, res) => {
+  const { AssemblySerial, ModelName, Category, Defect, Part, Shift, UserCode } =
+    req.body;
 
   if (!AssemblySerial || !Defect || !Part || !Shift) {
-    return res.status(400).json({ message: "Missing required Rework IN fields" });
+    throw new AppError(
+      "Missing required fields: AssemblySerial, Defect, Part or Shift.",
+      400
+    );
   }
 
   let pool;
@@ -70,7 +88,9 @@ export const createReworkInEntry = async (req, res) => {
       .query(checkQuery);
 
     if (checkResult.recordset.length > 0) {
-      return res.status(409).json({ message: "Rework IN already exists for this Serial Number" });
+      return res
+        .status(409)
+        .json({ message: "Rework IN already exists for this Serial Number" });
     }
 
     const insertQuery = `
@@ -113,21 +133,39 @@ export const createReworkInEntry = async (req, res) => {
 
     res.status(201).json({ message: "Rework IN completed successfully" });
   } catch (error) {
-    console.error("Rework IN Error:", error.message);
-    res.status(500).json({ message: "Failed to create Rework IN entry" });
+    throw new AppError(
+      `Failed to create the Rework In Entry data:${error.message}`,
+      500
+    );
   } finally {
-    if (pool) await pool.close();
+    await pool.close();
   }
-};
+});
 
 /* =========================================================
    REWORK OUT  → UPDATE EXISTING IN ROW
 ========================================================= */
-export const createReworkOutEntry = async (req, res) => {
-  const { AssemblySerial, RootCause, FailCategory, Origin, ContainmentAction, UserCode } = req.body;
+export const createReworkOutEntry = tryCatch(async (req, res) => {
+  const {
+    AssemblySerial,
+    RootCause,
+    FailCategory,
+    Origin,
+    ContainmentAction,
+    UserCode,
+  } = req.body;
 
-  if (!AssemblySerial || !RootCause || !FailCategory || !Origin || !ContainmentAction) {
-    return res.status(400).json({ message: "Missing required Rework OUT fields" });
+  if (
+    !AssemblySerial ||
+    !RootCause ||
+    !FailCategory ||
+    !Origin ||
+    !ContainmentAction
+  ) {
+    throw new AppError(
+      "Missing required fields: AssemblySerial, RootCause, FailCategory, Origin or ContainmentAction.",
+      400
+    );
   }
 
   let pool;
@@ -160,23 +198,34 @@ export const createReworkOutEntry = async (req, res) => {
       .query(updateQuery);
 
     if (result.rowsAffected[0] === 0) {
-      return res.status(404).json({ message: "No active Rework IN found for this Serial Number" });
+      return res
+        .status(404)
+        .json({ message: "No active Rework IN found for this Serial Number" });
     }
 
-    res.json({ message: "Rework OUT completed successfully" });
+    res.status(200).json({ message: "Rework OUT completed successfully" });
   } catch (error) {
-    console.error("Rework OUT Error:", error.message);
-    res.status(500).json({ message: "Failed to create Rework OUT entry" });
+    throw new AppError(
+      `Failed to create Rework Out Entry data:${error.message}`,
+      500
+    );
   } finally {
-    if (pool) await pool.close();
+    await pool.close();
   }
-};
+});
 
 /* =========================================================
    REWORK REPORT  → GET REWORK REPORT
 ========================================================= */
-export const getReworkReport = async (req, res) => {
+export const getReworkReport = tryCatch(async (req, res) => {
   const { stage, lineType, startTime, endTime } = req.query;
+
+  if (!stage || !lineType || !startTime || !endTime) {
+    throw new AppError(
+      "Missing required query parameters: starstage, lineType, startTime or endTime.",
+      400
+    );
+  }
 
   let pool;
   try {
@@ -220,11 +269,18 @@ export const getReworkReport = async (req, res) => {
 
     const result = await request.query(query);
 
-    res.json({ totalCount: result.recordset.length, data: result.recordset });
+    res.status(200).json({
+      success: true,
+      message: "Rework Report data retrieved successfully.",
+      totalCount: result.recordset.length,
+      data: result.recordset,
+    });
   } catch (error) {
-    console.error("Rework Report Error:", error.message);
-    res.status(500).json({ message: "Failed to fetch Rework Report" });
+    throw new AppError(
+      `Failed to fetch the Rework Report data:${error.message}`,
+      500
+    );
   } finally {
-    if (pool) await pool.close();
+    await pool.close();
   }
-};
+});

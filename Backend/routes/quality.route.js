@@ -6,39 +6,39 @@ import {
   getFpaCount,
   getFpaDefect,
   getFPQIDetails,
-} from "../controllers/quality/fpa.js";
+} from "../controllers/quality/fpa.controller.js";
 import {
   downloadDefectImage,
   getFpaDailyReport,
   getFpaMonthlyReport,
   getFpaReport,
   getFpaYearlyReport,
-} from "../controllers/quality/fpaReport.js";
-import {getFpaDefectReport} from "../controllers/quality/fpadefectReport.js";
+} from "../controllers/quality/fpaReport.controller.js";
+import { getFpaDefectReport } from "../controllers/quality/fpadefectReport.controller.js";
 import {
   addLptDefect,
   getLptAssetDetails,
   getLptDefectCategory,
   getLptDefectCount,
   getLptDefectReport,
-} from "../controllers/quality/lpt.js";
-import { getLptReport } from "../controllers/quality/lptReport.js";
+} from "../controllers/quality/lpt.controller.js";
+import { getLptReport } from "../controllers/quality/lptReport.controller.js";
 import {
   deleteLptRecipe,
   getLptRecipe,
   insertLptRecipe,
   updateLptRecipe,
-} from "../controllers/quality/lptRecipe.js";
+} from "../controllers/quality/lptRecipe.controller.js";
 import {
   getModlelName,
   holdCabinet,
   releaseCabinet,
-} from "../controllers/quality/dispatchHold.js";
+} from "../controllers/quality/dispatchHold.controller.js";
 import {
   getAssetTagDetails,
   newAssetTagUpdate,
   newCustomerQrUpdate,
-} from "../controllers/quality/tagUpdate.js";
+} from "../controllers/quality/tagUpdate.controller.js";
 
 import {
   handleMulterError,
@@ -52,15 +52,15 @@ import {
   deleteBisPdfFile,
   updateBisPdfFile,
   getBisReportStatus,
-} from "../controllers/quality/UploadBISReport.js";
-import { getDispatchHoldDetails } from "../controllers/quality/holdCabinetDetails.js";
-import { getCPTReport } from "../controllers/quality/cptReport.js";
+} from "../controllers/quality/UploadBISReport.controller.js";
+import { getDispatchHoldDetails } from "../controllers/quality/holdCabinetDetails.controller.js";
+import { getCPTReport } from "../controllers/quality/cptReport.controller.js";
 import {
   createReworkInEntry,
   createReworkOutEntry,
   getReworkEntryDetailsByAssemblySerial,
   getReworkReport,
-} from "../controllers/quality/rework.js";
+} from "../controllers/quality/rework.controller.js";
 const router = express.Router();
 
 // -----------------> CPT Routes

@@ -1,6 +1,9 @@
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-export const getFpaCount = async (_, res) => {
+export const getFpaCount = tryCatch(async (_, res) => {
   const now = new Date();
 
   // Set start date: today at 08:00:00
@@ -85,31 +88,41 @@ ORDER BY ModelCount;
 
   `;
 
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const result = await pool
       .request()
       .input("StartDate", sql.DateTime, istStart)
       .input("EndDate", sql.DateTime, istEnd)
       .query(query);
 
-    res.json(result.recordset);
+    res.status(200).json({
+      success: true,
+      message: "FPA Count data retrieved successfully.",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the FPA Count data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const getAssetDetails = async (req, res) => {
+export const getAssetDetails = tryCatch(async (req, res) => {
   const { AssemblySerial } = req.query;
 
   if (!AssemblySerial) {
-    return res.status(400).send("Missing AssemblySerial.");
+    throw new AppError(
+      "Missing required query parameters: assemblySerial.",
+      400
+    );
   }
 
-  try {
-    const query = `
+  const query = `
     SELECT 
       mb.Serial + '~' + mb.VSerial + '~' + m.Alias AS combinedserial
     FROM 
@@ -120,8 +133,9 @@ export const getAssetDetails = async (req, res) => {
       mb.Alias = @AssemblySerial;
   `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
+  try {
     const result = await pool
       .request()
       .input("AssemblySerial", sql.VarChar, AssemblySerial)
@@ -135,15 +149,24 @@ export const getAssetDetails = async (req, res) => {
 
     const [FGNo, AssetNo, ModelName] = combined.split("~");
 
-    res.json({ FGNo, AssetNo, ModelName });
+    res.status(200).json({
+      success: true,
+      message: "Asset Details data retrieved successfully.",
+      FGNo,
+      AssetNo,
+      ModelName,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the Asset Details data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ combinedserial: "~" + err.message });
   }
-};
+});
 
-export const getFPQIDetails = async (_, res) => {
+export const getFPQIDetails = tryCatch(async (_, res) => {
   const now = new Date();
   // Set start date: today at 08:00:00
   const startDate = new Date(
@@ -165,15 +188,10 @@ export const getFPQIDetails = async (_, res) => {
     0
   );
 
-  // Report date: just today's date
-  const reportDateStr = `${now.getFullYear()}-${String(
-    now.getMonth() + 1
-  ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
-    const query = `
+  const query = `
     SELECT 
       COUNT(DISTINCT FGSRNo) AS TotalFGSRNo,
       SUM(CASE WHEN Category = 'Critical' THEN 1 ELSE 0 END) AS NoOfCritical,
@@ -188,8 +206,9 @@ export const getFPQIDetails = async (_, res) => {
     WHERE Date Between @startDate and @endDate;
   `;
 
-    const pool = await sql.connect(dbConfig1);
+  const pool = await sql.connect(dbConfig1);
 
+  try {
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
@@ -206,16 +225,22 @@ export const getFPQIDetails = async (_, res) => {
       });
     }
 
-    res.json(result.recordset[0]);
-
+    res.status(200).json({
+      success: true,
+      message: "FPQI Details data retrieved successfully.",
+      data: result.recordset[0],
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the FPQI Details data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ error: err.message });
   }
-};
+});
 
-export const getFpaDefect = async (_, res) => {
+export const getFpaDefect = tryCatch(async (_, res) => {
   const now = new Date();
 
   // Set start date: today at 08:00:00
@@ -238,52 +263,64 @@ export const getFpaDefect = async (_, res) => {
     0
   );
 
-  // Report date: just today's date
-  const reportDateStr = `${now.getFullYear()}-${String(
-    now.getMonth() + 1
-  ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
-
-    const query = `
-    Select * from FPAReport where Date Between @StartDate and @EndDate
+  const query = `
+    Select * from FPAReport 
+    Where Date Between @StartDate and @EndDate
   `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
       .input("endDate", sql.DateTime, istEnd)
       .query(query);
 
-    res.json(result.recordset);
+    res.status(200).json({
+      success: true,
+      message: "FPA Defect data retrieved successfully.",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the FPA Defect data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const getDefectCategory = async (_, res) => {
-  try {
-    const query = `
+export const getDefectCategory = tryCatch(async (_, res) => {
+  const query = `
     Select Code, Name from DefectCodeMaster
   `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool.request().query(query);
 
-    res.json(result.recordset);
+    res.status(200).json({
+      success: true,
+      message: "Defect Category data retrieved successfully.",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the Defect Category data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const addDefect = async (req, res) => {
+export const addDefect = tryCatch(async (req, res) => {
   const {
     model,
     shift,
@@ -299,16 +336,17 @@ export const addDefect = async (req, res) => {
   const fileName = req.file?.filename || null;
 
   if (!model || !FGSerialNumber) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Required fields missing" });
+    throw new AppError(
+      "Missing required query parameters: model or fgSerialNumber.",
+      400
+    );
   }
 
   const currDate = new Date(new Date(currentDateTime).getTime() + 330 * 60000);
 
-  try {
-    const pool = await sql.connect(dbConfig1);
+  const pool = await sql.connect(dbConfig1);
 
+  try {
     const request = pool.request();
     request.input("Date", sql.DateTime, currDate);
     request.input("Model", sql.NVarChar, model?.trim() || null);
@@ -337,18 +375,15 @@ export const addDefect = async (req, res) => {
     }
 
     await request.query(insertQuery);
-    await pool.close();
 
     res.status(200).json({
       success: true,
       message: "Defect added successfully",
       fileUrl: fileName ? `/uploads/FpaDefectImages/${fileName}` : null,
     });
-  } catch (err) {
-    console.error("Error adding defect:", err.message);
-    res.status(500).json({
-      success: false,
-      error: err.message,
-    });
+  } catch (error) {
+    throw new AppError(`Failed to add the defect:${error.message}`, 500);
+  } finally {
+    await pool.close();
   }
-};
+});

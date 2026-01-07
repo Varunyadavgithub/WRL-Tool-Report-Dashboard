@@ -5,13 +5,13 @@ import {
   getPlanMonth,
   productionPlaningData,
   updateProductionPlaningData,
-} from "../controllers/planing/productionPlaning.js";
+} from "../controllers/planing/productionPlaning.controller.js";
 import {
-  uploadPlanningExcelFile,
-  getPlanningExcelFiles,
-  downloadPlanningExcelFile,
-  deletePlanningExcelFile,
-} from "../controllers/planing/fiveDaysPlaning.js";
+  uploadPlaningExcelFile,
+  getPlaningExcelFiles,
+  downloadPlaningExcelFile,
+  deletePlaningExcelFile,
+} from "../controllers/planing/fiveDaysPlaning.controller.js";
 import {
   handleMulterError,
   uploadFiveDaysPlanExcel,
@@ -19,7 +19,7 @@ import {
 import {
   addDailyPlans,
   fetchDailyPlans,
-} from "../controllers/planing/dailyPlan.js";
+} from "../controllers/planing/dailyPlan.controller.js";
 
 const router = express.Router();
 
@@ -35,11 +35,11 @@ router.post(
   "/upload-excel",
   uploadFiveDaysPlanExcel.single("file"),
   handleMulterError,
-  uploadPlanningExcelFile
+  uploadPlaningExcelFile
 );
-router.get("/files", getPlanningExcelFiles);
-router.get("/download/:filename", downloadPlanningExcelFile);
-router.delete("/delete/:filename", deletePlanningExcelFile);
+router.get("/files", getPlaningExcelFiles);
+router.get("/download/:filename", downloadPlaningExcelFile);
+router.delete("/delete/:filename", deletePlaningExcelFile);
 
 // -----------------> Daily Plan Routes
 router.post("/upload-daily-plan", addDailyPlans);

@@ -1,14 +1,19 @@
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-export const getLptAssetDetails = async (req, res) => {
+export const getLptAssetDetails = tryCatch(async (req, res) => {
   const { AssemblySerial } = req.query;
 
   if (!AssemblySerial) {
-    return res.status(400).send("Missing AssemblySerial.");
+    throw new AppError(
+      "Missing required query parameters: assemblySerial.",
+      400
+    );
   }
 
-  try {
-    const query = `
+  const query = `
 SELECT 
     m.Name as ModelName,
     r.MinTemp,
@@ -26,9 +31,11 @@ JOIN
 WHERE 
         mb.Serial = @AssemblySerial
         OR mb.Alias = @AssemblySerial;
-    `;
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  `;
 
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .input("AssemblySerial", sql.VarChar, AssemblySerial)
@@ -36,32 +43,48 @@ WHERE
 
     const data = result?.recordset[0] || null;
 
-    res.json({ success: true, data });
+    res.status(200).json({
+      success: true,
+      message: "LPT Asset Details data retrieved successfully.",
+      data,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the LPT Asset Details data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: "~" + err.message });
   }
-};
+});
 
-export const getLptDefectCategory = async (_, res) => {
+export const getLptDefectCategory = tryCatch(async (_, res) => {
+  const query = `
+    Select Code, Name from DefectCodeMaster 
+    Where DefectCategory = 104
+  `;
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    const query = `
-        Select Code, Name from DefectCodeMaster where DefectCategory = 104
-    `;
-
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const result = await pool.request().query(query);
 
-    res.json(result.recordset);
+    res.status(200).json({
+      success: true,
+      message: "Lpt Defect Category data retrieved successfully.",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch Lpt Defect Category data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const addLptDefect = async (req, res) => {
+export const addLptDefect = tryCatch(async (req, res) => {
   const {
     AssemblyNo,
     ModelName,
@@ -82,55 +105,55 @@ export const addLptDefect = async (req, res) => {
     shift,
   } = req.body;
 
-  try {
-    // Convert to IST (UTC+5:30)
-    const currDate = new Date(
-      new Date(currentDateTime).getTime() + 330 * 60000
-    );
+  // Convert to IST (UTC+5:30)
+  const currDate = new Date(new Date(currentDateTime).getTime() + 330 * 60000);
 
-    const query = `
+  const query = `
       INSERT INTO LPTReport
       (DateTime, Shift, ModelName, AssemblyNo, Defect, Remark, MinTemp, MaxTemp, ActualTemp, MinCurrent, MaxCurrent, ActualCurrent, MinPower, MaxPower, ActualPower, Performance)
       VALUES 
       (@DateTime, @Shift, @ModelName, @AssemblyNo, @Defect, @Remark, @MinTemp, @MaxTemp, @ActualTemp, @MinCurrent, @MaxCurrent, @ActualCurrent, @MinPower, @MaxPower, @ActualPower, @Performance)
-    `;
+  `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
-    const request = pool.request();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
-    request.input("DateTime", sql.DateTime, currDate);
-    request.input("Shift", sql.NVarChar, shift?.trim() || null);
-    request.input("ModelName", sql.NVarChar, ModelName?.trim() || null);
-    request.input("AssemblyNo", sql.NVarChar, AssemblyNo?.trim() || null);
-    request.input("Defect", sql.NVarChar, AddDefect?.trim() || null);
-    request.input("Remark", sql.NVarChar, Remark?.trim() || null);
-    request.input("MinTemp", sql.NVarChar, MinTemp ?? null);
-    request.input("MaxTemp", sql.NVarChar, MaxTemp ?? null);
-    request.input("ActualTemp", sql.NVarChar, ActualTemp ?? null);
-    request.input("MinCurrent", sql.NVarChar, MinCurrent ?? null);
-    request.input("MaxCurrent", sql.NVarChar, MaxCurrent ?? null);
-    request.input("ActualCurrent", sql.NVarChar, ActualCurrent ?? null);
-    request.input("MinPower", sql.NVarChar, MinPower ?? null);
-    request.input("MaxPower", sql.NVarChar, MaxPower ?? null);
-    request.input("ActualPower", sql.NVarChar, ActualPower ?? null);
-    request.input("Performance", sql.NVarChar, Performance ?? null);
-    request.input("Category", sql.NVarChar, Category?.trim() || null);
+  try {
+    const request = pool
+      .request()
+      .input("DateTime", sql.DateTime, currDate)
+      .input("Shift", sql.NVarChar, shift?.trim() || null)
+      .input("ModelName", sql.NVarChar, ModelName?.trim() || null)
+      .input("AssemblyNo", sql.NVarChar, AssemblyNo?.trim() || null)
+      .input("Defect", sql.NVarChar, AddDefect?.trim() || null)
+      .input("Remark", sql.NVarChar, Remark?.trim() || null)
+      .input("MinTemp", sql.NVarChar, MinTemp ?? null)
+      .input("MaxTemp", sql.NVarChar, MaxTemp ?? null)
+      .input("ActualTemp", sql.NVarChar, ActualTemp ?? null)
+      .input("MinCurrent", sql.NVarChar, MinCurrent ?? null)
+      .input("MaxCurrent", sql.NVarChar, MaxCurrent ?? null)
+      .input("ActualCurrent", sql.NVarChar, ActualCurrent ?? null)
+      .input("MinPower", sql.NVarChar, MinPower ?? null)
+      .input("MaxPower", sql.NVarChar, MaxPower ?? null)
+      .input("ActualPower", sql.NVarChar, ActualPower ?? null)
+      .input("Performance", sql.NVarChar, Performance ?? null)
+      .input("Category", sql.NVarChar, Category?.trim() || null);
 
     await request.query(query);
 
     res
       .status(200)
-      .json({ success: true, message: "Defect added successfully." });
-    await pool.close();
+      .json({ success: true, message: "LPT Defect added successfully." });
   } catch (error) {
-    console.error("Error inserting defect:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to add defect", error: error.message });
+    throw new AppError(
+      `Failed to add the LPT Defect data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});
 
-export const getLptDefectReport = async (req, res) => {
+export const getLptDefectReport = tryCatch(async (req, res) => {
   const now = new Date();
 
   // Set start date: today at 08:00:00
@@ -156,26 +179,35 @@ export const getLptDefectReport = async (req, res) => {
   const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
   const query = `
-    Select * from LPTReport WHERE DateTime BETWEEN @StartDate AND @EndDate
-    `;
+    Select * from LPTReport 
+    Where DateTime BETWEEN @StartDate AND @EndDate
+  `;
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
   try {
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const result = await pool
       .request()
       .input("StartDate", sql.DateTime, istStart)
       .input("EndDate", sql.DateTime, istEnd)
       .query(query);
 
-    res.json(result.recordset);
+    res.status(200).json({
+      success: true,
+      message: "LPT Defect Report data retrieved successfully.",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the LPT Defect Report data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const getLptDefectCount = async (req, res) => {
+export const getLptDefectCount = tryCatch(async (req, res) => {
   const now = new Date();
 
   // Set start date: today at 08:00:00
@@ -243,20 +275,28 @@ FROM FPA_COMPUTED f
 LEFT JOIN SAMPLE_INSPECTED s ON f.ModelName = s.ModelName
 WHERE f.LPT > 0
 ORDER BY f.ModelCount;
-    `;
+  `;
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
   try {
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const result = await pool
       .request()
       .input("StartDate", sql.DateTime, istStart)
       .input("EndDate", sql.DateTime, istEnd)
       .query(query);
 
-    res.json(result.recordset);
+    res.status(200).json({
+      success: true,
+      message: "Lpt Defect Count data retrieved successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the Lpt Defect Count data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});

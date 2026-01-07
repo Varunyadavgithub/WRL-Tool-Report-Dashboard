@@ -1,13 +1,16 @@
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-export const getAssetTagDetails = async (req, res) => {
+export const getAssetTagDetails = tryCatch(async (req, res) => {
   const { assemblyNumber } = req.query;
 
   if (!assemblyNumber) {
-    return res.status(400).json({
-      success: false,
-      message: "Assembly Number is required.",
-    });
+    throw new AppError(
+      "Missing required query parameters: assemblyNumber.",
+      400
+    );
   }
 
   const query = `
@@ -21,9 +24,9 @@ export const getAssetTagDetails = async (req, res) => {
       mb.Alias = @alias
   `;
 
-  try {
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
+  try {
     const result = await pool
       .request()
       .input("alias", sql.VarChar, assemblyNumber)
@@ -46,35 +49,41 @@ export const getAssetTagDetails = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      message: "Asset tag details data retrieved successfully.",
       FGNo,
       AssetNo,
       ModelName,
       Serial2,
     });
-
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the Asset tag details data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({
-      success: false,
-      error: err.message,
-    });
   }
-};
+});
 
-export const newAssetTagUpdate = async (req, res) => {
+export const newAssetTagUpdate = tryCatch(async (req, res) => {
   const { assemblyNumber, fgSerialNumber, newAssetNumber } = req.body;
 
   if (!assemblyNumber || !fgSerialNumber || !newAssetNumber) {
-    return res.status(400).send("All fields are required.");
+    throw new AppError(
+      "Missing required fields: assemblyNumber, fgSerialNumber or newAssetNumber.",
+      400
+    );
   }
 
   const query = `
-    update MaterialBarcode set VSerial=@newAssetNumber where Alias=@serial and Serial=@fgSerialNumber
+    Update MaterialBarcode 
+    Set VSerial=@newAssetNumber 
+    Where Alias=@serial and Serial=@fgSerialNumber
   `;
 
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const result = await pool
       .request()
       .input("serial", sql.NVarChar, assemblyNumber)
@@ -86,26 +95,35 @@ export const newAssetTagUpdate = async (req, res) => {
       success: true,
       message: "Asset Tag updated successfully.",
     });
+  } catch (error) {
+    throw new AppError(
+      `Failed to update the asset tag data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const newCustomerQrUpdate = async (req, res) => {
+export const newCustomerQrUpdate = tryCatch(async (req, res) => {
   const { assemblyNumber, fgSerialNumber, newCustomerQr } = req.body;
 
   if (!assemblyNumber || !fgSerialNumber || !newCustomerQr) {
-    return res.status(400).send("All fields are required.");
+    throw new AppError(
+      "Missing required fields: assemblyNumber, fgSerialNumber or newCustomerQr.",
+      400
+    );
   }
 
   const query = `
-    update MaterialBarcode set Serial2=@newCustomerQr where Alias=@assemblyserial and Serial=@fgSerialNumber
+    Update MaterialBarcode 
+    Set Serial2=@newCustomerQr 
+    Where Alias=@assemblyserial and Serial=@fgSerialNumber
   `;
 
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const result = await pool
       .request()
       .input("assemblyserial", sql.NVarChar, assemblyNumber)
@@ -117,9 +135,12 @@ export const newCustomerQrUpdate = async (req, res) => {
       success: true,
       message: "Customer QR updated successfully.",
     });
+  } catch (error) {
+    throw new AppError(
+      `Failed to update the Customer QR data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});

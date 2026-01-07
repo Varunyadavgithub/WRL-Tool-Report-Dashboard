@@ -1,14 +1,14 @@
 import express from "express";
-import { getComponentDetails } from "../controllers/production/componentDetails.js";
+import { getComponentDetails } from "../controllers/production/componentDetails.controller.js";
 import {
   componentTraceabilityExportData,
   generateReport,
-} from "../controllers/production/componentTraceabilityReport.js";
+} from "../controllers/production/componentTraceabilityReport.controller.js";
 import {
   getHourlyCategoryCount,
   getHourlyModelCount,
   getHourlySummary,
-} from "../controllers/production/hourlyReport.js";
+} from "../controllers/production/hourlyReport.controller.js";
 import {
   getFinalLoadingHPFrz,
   getFinalLoadingHPChoc,
@@ -25,30 +25,30 @@ import {
   getPostHPCAT,
   getPostHPFrz,
   getPostHPSUS,
-} from "../controllers/production/lineHourlyReport.js";
+} from "../controllers/production/lineHourlyReport.controller.js";
 import {
   getModelName,
   modelNameUpdate,
-} from "../controllers/production/modelNameUpdate.js";
+} from "../controllers/production/modelNameUpdate.controller.js";
 import {
   nfcReportExportData,
   getNfcReoprts,
   getQuickFiltersNfcReports,
-} from "../controllers/production/nfcReport.js";
+} from "../controllers/production/nfcReport.controller.js";
 import {
   productionReportExportData,
   fetchFGData,
   fetchQuickFiltersData,
-} from "../controllers/production/ProductionReport.js";
+} from "../controllers/production/ProductionReport.controller.js";
 import {
   getCurrentStageStatus,
   getLogisticStatus,
-} from "../controllers/production/stageHistoryReport.js";
+} from "../controllers/production/stageHistoryReport.controller.js";
 import {
   totalProductionExportData,
   getBarcodeDetails,
   getQuickFiltersBarcodeDetails,
-} from "../controllers/production/totalProduction.js";
+} from "../controllers/production/totalProduction.controller.js";
 
 const router = express.Router();
 

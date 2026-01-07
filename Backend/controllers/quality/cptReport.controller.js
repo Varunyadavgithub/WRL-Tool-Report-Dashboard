@@ -1,17 +1,22 @@
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-export const getCPTReport = async (req, res) => {
+export const getCPTReport = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate.",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    let query = `
+  let query = `
         DECLARE @RETURN_TBL TABLE ([Result_ID] [bigint] NULL,
 		    [DATE] [nvarchar](50) NULL,
 		    [TIME] [nvarchar](50) NULL,
@@ -126,9 +131,11 @@ export const getCPTReport = async (req, res) => {
 	    select  * from @RETURN_TBL where Result_ID not in (select Result_ID from GasChargeSUSDtls)
 	        --select * from @RETURN_TBL	
         END
-    `;
+  `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const request = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
@@ -137,11 +144,17 @@ export const getCPTReport = async (req, res) => {
     const result = await request.query(query);
     const data = result.recordset;
 
-    res.json({ data, success: true });
-
+    res.status(200).json({
+      success: true,
+      message: "CPT Report data retrieved successfully.",
+      data,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the CPT Report data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});

@@ -1,34 +1,41 @@
 import fs from "fs";
 import path from "path";
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
 // Path where defect images are uploaded
 const uploadDir = path.join(process.cwd(), "uploads/FpaDefectImages");
 
-export const getFpaReport = async (req, res) => {
+export const getFpaReport = tryCatch(async (req, res) => {
   const { startDate, endDate, model } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate or endDate.",
+      400
+    );
   }
 
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+
+  let query = `
+    SELECT * 
+    FROM FPAReport 
+    WHERE Date BETWEEN @startDate AND @endDate
+  `;
+
+  if (model) {
+    query += " AND Model=@model";
+  }
+
+  query += " ORDER BY Date DESC";
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
-
-    let query = `
-      SELECT * 
-      FROM FPAReport 
-      WHERE Date BETWEEN @startDate AND @endDate
-    `;
-
-    if (model) {
-      query += " AND Model=@model";
-    }
-
-    query += " ORDER BY Date DESC";
-
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const request = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
@@ -39,27 +46,36 @@ export const getFpaReport = async (req, res) => {
     }
 
     const result = await request.query(query);
-    res.json(result.recordset);
 
+    res.status(200).json({
+      success: true,
+      message: "FPA Report data retrieved successfully.",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the FPA Report data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const getFpaDailyReport = async (req, res) => {
+export const getFpaDailyReport = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate or endDate.",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    const query = `
+  const query = `
 WITH ShiftedData AS (
     SELECT 
         -- Adjust the shift date: if time is before 8 AM, subtract 1 day
@@ -102,35 +118,46 @@ SELECT
 FROM Summary
 ORDER BY ShiftDate DESC;
 
-    `;
+  `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
       .input("endDate", sql.DateTime, istEnd)
       .query(query);
 
-    res.json(result.recordset);
+    res.status(200).json({
+      success: true,
+      message: "FPA Daily Report data retrieved successfully.",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the FPA Daily Report data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const getFpaMonthlyReport = async (req, res) => {
+export const getFpaMonthlyReport = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate or endDate.",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    const query = `
+  const query = `
 WITH ShiftedData AS (
     SELECT 
         -- Adjust the shift date: if time is before 8 AM, subtract 1 day
@@ -174,35 +201,46 @@ SELECT
 FROM Summary
 ORDER BY MonthKey DESC;
 
-    `;
+  `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
       .input("endDate", sql.DateTime, istEnd)
       .query(query);
 
-    res.json(result.recordset);
+    res.status(200).json({
+      success: true,
+      message: "FPA Monthly Report data retrieved successfully.",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the FPA Monthly Report data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const getFpaYearlyReport = async (req, res) => {
+export const getFpaYearlyReport = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate or endDate.",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    const query = `
+  const query = `
 WITH ShiftedData AS (
     SELECT 
         -- Adjust the shift date: if time is before 8 AM, subtract 1 day
@@ -242,32 +280,41 @@ SELECT
     ) AS FPQI
 FROM Summary
 ORDER BY Year DESC;
-    `;
+  `;
 
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
       .input("endDate", sql.DateTime, istEnd)
       .query(query);
 
-    res.json(result.recordset);
+    res.status(200).json({
+      success: true,
+      message: "FPA Yearly Report data retrieved successfully.",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the FPA Yearly Report data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("SQL Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const downloadDefectImage = async (req, res) => {
-  const { fgSrNo } = req.params; // Identify record by FGSRNo
+export const downloadDefectImage = tryCatch(async (req, res) => {
+  const { fgSrNo } = req.params;
   const { filename } = req.query;
 
   if (!fgSrNo || !filename) {
-    return res.status(400).json({
-      success: false,
-      message: "FGSerialNumber and filename are required",
-    });
+    throw new AppError(
+      "Missing required query parameters: fGSerialNumber or filename.",
+      400
+    );
   }
 
   const filePath = path.join(uploadDir, filename);
@@ -316,14 +363,12 @@ export const downloadDefectImage = async (req, res) => {
         message: "Error streaming file",
       });
     });
-
-    await pool.close();
   } catch (error) {
-    console.error("Download error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error during file download",
-      error: error.message,
-    });
+    throw new AppError(
+      `Failed to download the Defect Image:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});

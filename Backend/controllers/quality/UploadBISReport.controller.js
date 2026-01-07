@@ -1,11 +1,14 @@
 import path from "path";
 import fs from "fs";
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
 const uploadDir = path.resolve("uploads", "BISReport");
 
 // Upload file controller
-export const uploadBisPdfFile = async (req, res) => {
+export const uploadBisPdfFile = tryCatch(async (req, res) => {
   const { modelName, year, month, testFrequency, description } = req.body;
   const fileName = req.file?.filename;
 
@@ -17,14 +20,17 @@ export const uploadBisPdfFile = async (req, res) => {
     !description ||
     !fileName
   ) {
-    return res.status(400).json({ success: false, message: "Missing fields" });
+    throw new AppError(
+      "Missing required fields: modelName, year, month, testFrequency, description or fileName.",
+      400
+    );
   }
 
   const uploadedAt = new Date(Date.now() + 330 * 60000);
 
-  try {
-    const pool = await sql.connect(dbConfig1);
+  const pool = await sql.connect(dbConfig1);
 
+  try {
     const query = `
       INSERT INTO BISUpload (ModelName, Year, Month, TestFrequency, Description, FileName, UploadAt)
       VALUES (@ModelName, @Year, @Month, @TestFrequency, @Description, @FileName, @UploadAt)
@@ -46,17 +52,21 @@ export const uploadBisPdfFile = async (req, res) => {
       fileUrl: `/uploads/BISReport/${req.file.filename}`,
       message: "Uploaded successfully",
     });
-    await pool.close();
   } catch (error) {
-    console.error("Upload error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    throw new AppError(
+      `Failed to upload the BIS Report data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});
 
 // Get files list controller
-export const getBisPdfFiles = async (_, res) => {
+export const getBisPdfFiles = tryCatch(async (_, res) => {
+  const pool = await sql.connect(dbConfig1);
+
   try {
-    const pool = await sql.connect(dbConfig1);
     const query = `
       SELECT * FROM BISUpload
       ORDER BY SrNo DESC
@@ -75,23 +85,28 @@ export const getBisPdfFiles = async (_, res) => {
       uploadAt: file.UploadAt,
     }));
 
-    res.status(200).json({ success: true, files });
-    await pool.close();
+    res.status(200).json({
+      success: true,
+      message: "BIS PDF Files retrieved successfully.",
+      files,
+    });
   } catch (error) {
-    console.error("Error reading files:", error.message);
-    res.status(500).json({ success: false, message: "Error reading files" });
+    throw new AppError(
+      `Failed to fetch the BIS PDF Files:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});
 
 // Download file controller
-export const downloadBisPdfFile = async (req, res) => {
+export const downloadBisPdfFile = tryCatch(async (req, res) => {
   const { srNo } = req.params;
   const { filename } = req.query;
+
   if (!srNo) {
-    return res.status(400).json({
-      success: false,
-      message: "SrNo is required",
-    });
+    throw new AppError("Missing required field: SrNo.", 400);
   }
 
   const filePath = path.join(uploadDir, filename);
@@ -141,26 +156,23 @@ export const downloadBisPdfFile = async (req, res) => {
         message: "Error streaming file",
       });
     });
-    await pool.close();
   } catch (error) {
-    console.error("Download error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error during file download",
-      error: error.message,
-    });
+    throw new AppError(
+      `Failed to download Bis Pdf File data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});
 
 // Delete file controller
-export const deleteBisPdfFile = async (req, res) => {
+export const deleteBisPdfFile = tryCatch(async (req, res) => {
   const { srNo } = req.params;
   const { filename } = req.query;
 
   if (!srNo) {
-    return res
-      .status(400)
-      .json({ success: false, message: "SrNo is required" });
+    throw new AppError("Missing required fields: SrNo.", 400);
   }
 
   const filePath = path.join(uploadDir, filename);
@@ -188,21 +200,27 @@ export const deleteBisPdfFile = async (req, res) => {
     res
       .status(200)
       .json({ success: true, message: "File deleted successfully" });
-    await pool.close();
   } catch (error) {
-    console.error("Delete error:", error.message);
-    res.status(500).json({ success: false, message: "Failed to delete file" });
+    throw new AppError(
+      `Failed to delete the BIS PDF file:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});
 
 // Update BIS File Controller
-export const updateBisPdfFile = async (req, res) => {
+export const updateBisPdfFile = tryCatch(async (req, res) => {
   const { srNo } = req.params;
   const { modelName, year, month, testFrequency, description } = req.body;
   const newFileName = req.file?.filename;
 
   if (!modelName || !year || !month || !testFrequency || !description) {
-    return res.status(400).json({ success: false, message: "Missing fields" });
+    throw new AppError(
+      "Missing required fields: modelName, year, month, testFrequency or description.",
+      400
+    );
   }
 
   try {
@@ -283,13 +301,12 @@ export const updateBisPdfFile = async (req, res) => {
       error: error.message,
     });
   }
-};
+});
 
-export const getBisReportStatus = async (_, res) => {
+export const getBisReportStatus = tryCatch(async (_, res) => {
+  const pool = await sql.connect(dbConfig1);
+
   try {
-    const pool = await sql.connect(dbConfig1);
-
-    // First, fetch the BIS Upload files
     const filesQuery = `
       SELECT * FROM BISUpload
       ORDER BY SrNo DESC
@@ -401,16 +418,15 @@ ORDER BY ModelName, Year;
 
     res.status(200).json({
       success: true,
+      message: "BIS Report status data retrieved successfully",
       ...combinedResult,
     });
-
-    await pool.close();
   } catch (error) {
-    console.error("Error reading files and status:", error.message);
-    res.status(500).json({
-      success: false,
-      message: "Error reading files and status",
-      error: error.message,
-    });
+    throw new AppError(
+      `Failed to fetch the BIS Report status data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});

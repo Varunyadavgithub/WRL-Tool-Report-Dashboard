@@ -1,10 +1,18 @@
-import sql, { dbConfig1 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-export const getLptRecipe = async (req, res) => {
+export const getLptRecipe = tryCatch(async (req, res) => {
   const { modelName } = req.query;
 
+  if (!modelName) {
+    throw new AppError("Missing required query parameters: modelName.", 400);
+  }
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const request = pool.request();
 
     let query = "SELECT * FROM LPTRecipe";
@@ -16,24 +24,31 @@ export const getLptRecipe = async (req, res) => {
 
     const result = await request.query(query);
 
-    res.status(200).json({ success: true, data: result.recordset });
-
+    res.status(200).json({
+      success: true,
+      message: "LPT Recipe data retrieved successfully.",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Failed to fetch the LPT Recipe data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("Get Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const deleteLptRecipe = async (req, res) => {
+export const deleteLptRecipe = tryCatch(async (req, res) => {
   const { modelName } = req.params;
 
   if (!modelName) {
-    return res.status(400).json({ error: "ModelName is required" });
+    throw new AppError("Missing required query parameters: modelName.", 400);
   }
 
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const request = pool.request().input("modelName", sql.VarChar, modelName);
 
     await request.query(`
@@ -43,15 +58,17 @@ export const deleteLptRecipe = async (req, res) => {
     res
       .status(200)
       .json({ success: true, message: "Recipe deleted successfully" });
-
+  } catch (error) {
+    throw new AppError(
+      `Failed to delete the LPT Recipe data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("Delete Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const insertLptRecipe = async (req, res) => {
+export const insertLptRecipe = tryCatch(async (req, res) => {
   const {
     matCode,
     modelName,
@@ -73,11 +90,15 @@ export const insertLptRecipe = async (req, res) => {
     !minPow ||
     !maxPow
   ) {
-    return res.status(400).json({ error: "All fields are required" });
+    throw new AppError(
+      "Missing required fields: matCode, modelName, minTemp, maxTemp, minCurr, maxCurr, minPow or maxPow.",
+      400
+    );
   }
 
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const request = pool
       .request()
       .input("matcode", sql.VarChar, matCode)
@@ -97,26 +118,30 @@ export const insertLptRecipe = async (req, res) => {
     res
       .status(201)
       .json({ success: true, message: "Recipe inserted successfully" });
-
+  } catch (error) {
+    throw new AppError(
+      `Failed to insert the LPT Recipe data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("Insert Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});
 
-export const updateLptRecipe = async (req, res) => {
+export const updateLptRecipe = tryCatch(async (req, res) => {
   const { modelName } = req.params;
   const { minTemp, maxTemp, minCurr, maxCurr, minPow, maxPow } = req.body;
 
   if (!minTemp || !maxTemp || !minCurr || !maxCurr || !minPow || !maxPow) {
-    return res.status(400).json({
-      error: "All fields are required",
-    });
+    throw new AppError(
+      "Missing required fields: minTemp, maxTemp, minCurr, maxCurr, minPow or maxPow.",
+      400
+    );
   }
 
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const request = pool
       .request()
       .input("modelName", sql.VarChar, modelName)
@@ -142,10 +167,12 @@ export const updateLptRecipe = async (req, res) => {
     res
       .status(200)
       .json({ success: true, message: "Recipe updated successfully" });
-
+  } catch (error) {
+    throw new AppError(
+      `Failed to update the LPT Recipe data:${error.message}`,
+      500
+    );
+  } finally {
     await pool.close();
-  } catch (err) {
-    console.error("Update Error:", err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
-};
+});

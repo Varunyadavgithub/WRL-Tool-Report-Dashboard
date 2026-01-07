@@ -6,16 +6,16 @@ import {
   getDispatchModelSummary,
   getDispatchVehicleSummary,
   getDispatchVehicleUPH,
-} from "../controllers/dispatch/performanceReport.js";
+} from "../controllers/dispatch/performanceReport.controller.js";
 import {
   getFgDispatch,
   getFgUnloading,
   getQuickFgDispatch,
   getQuickFgUnloading,
-} from "../controllers/dispatch/dispatchReport.js";
-import { getDispatchMasterBySession } from "../controllers/dispatch/fgCasting.js";
-import { sendMaterialGateEntryAlertEmail } from "../controllers/dispatch/gateEntry.js";
-import { getDispatchErrorLog } from "../controllers/dispatch/errorLog.js";
+} from "../controllers/dispatch/dispatchReport.controller.js";
+import { getDispatchMasterBySession } from "../controllers/dispatch/fgCasting.controller.js";
+import { sendMaterialGateEntryAlertEmail } from "../controllers/dispatch/gateEntry.controller.js";
+import { getDispatchErrorLog } from "../controllers/dispatch/errorLog.controller.js";
 
 const router = express.Router();
 
