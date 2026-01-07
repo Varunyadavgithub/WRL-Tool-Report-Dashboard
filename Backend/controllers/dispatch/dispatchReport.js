@@ -1,18 +1,23 @@
-import sql, { dbConfig2 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig2 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-export const getFgUnloading = async (req, res) => {
+export const getFgUnloading = tryCatch(async (req, res) => {
   const { startDate, endDate, page = 1, limit = 1000 } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate.",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const query = `
+  const query = `
       WITH UnloadingData AS (
         SELECT
           ROW_NUMBER() OVER (ORDER BY DateTime DESC) AS RowNum,
@@ -28,9 +33,11 @@ export const getFgUnloading = async (req, res) => {
         *
       FROM UnloadingData
       WHERE RowNum BETWEEN (@offset + 1) AND (@offset + @limit);
-    `;
+  `;
 
-    const pool = await new sql.ConnectionPool(dbConfig2).connect();
+  const pool = await new sql.ConnectionPool(dbConfig2).connect();
+
+  try {
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
@@ -41,23 +48,29 @@ export const getFgUnloading = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      message: "FG Unloading data retrieved successfully.",
       totalCount:
         result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
       data: result.recordset,
     });
-
-    await pool.close();
   } catch (error) {
-    console.error("SQL Error:", error);
-    res.status(500).json({ success: false, error: error.message });
+    throw new AppError(
+      `Failed to fetch FG Unloading data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});
 
-export const getFgDispatch = async (req, res) => {
+export const getFgDispatch = tryCatch(async (req, res) => {
   const { startDate, endDate, status, page = 1, limit = 1000 } = req.query;
 
   if (!startDate || !endDate || !status) {
-    return res.status(400).send("Missing startDate, endDate, or status.");
+    throw new AppError(
+      "Missing required query parameters: startDate, endDate or status.",
+      400
+    );
   }
 
   const lowerStatus = status.toLowerCase();
@@ -72,15 +85,14 @@ export const getFgDispatch = async (req, res) => {
     statusValue = "Open";
     additionalField = "";
   } else {
-    return res.status(400).send("Invalid status. Use 'Completed' or 'Open'.");
+    throw new AppError("Invalid status. Use 'Completed' or 'Open'.", 400);
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const query = `
+  const query = `
       WITH DispatchData AS (
         SELECT 
           ROW_NUMBER() OVER(ORDER BY DM.AddedOn DESC) AS RowNum,
@@ -106,9 +118,11 @@ export const getFgDispatch = async (req, res) => {
         *
       FROM DispatchData
       WHERE RowNum > @offset AND RowNum <= (@offset + @limit);
-    `;
+  `;
 
-    const pool = await new sql.ConnectionPool(dbConfig2).connect();
+  const pool = await new sql.ConnectionPool(dbConfig2).connect();
+
+  try {
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
@@ -120,40 +134,47 @@ export const getFgDispatch = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      totalCount: result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
+      message: "FG Dispatch data retrieved successfully.",
+      totalCount:
+        result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
       data: result.recordset,
     });
-
-    await pool.close();
   } catch (error) {
-    console.error("SQL Error:", error);
-    res.status(500).json({ success: false, error: error.message });
+    throw new AppError(
+      `Failed to fetch FG Dispatch data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
-
+});
 
 // Quick Filters
-export const getQuickFgUnloading = async (req, res) => {
+export const getQuickFgUnloading = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate.",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    const query = `
+  const query = `
       SELECT 
         *,
         (SELECT COUNT(*) FROM DispatchUnloading WHERE DateTime BETWEEN @startDate AND @endDate) AS totalCount
       FROM DispatchUnloading
       WHERE DateTime BETWEEN @startDate AND @endDate
       ORDER BY DateTime DESC;
-    `;
+  `;
 
-    const pool = await new sql.ConnectionPool(dbConfig2).connect();
+  const pool = await new sql.ConnectionPool(dbConfig2).connect();
+
+  try {
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
@@ -162,23 +183,29 @@ export const getQuickFgUnloading = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      message: "Quick Filter FG Unloading data retrieved successfully.",
       data: result.recordset,
       totalCount:
         result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
     });
-
-    await pool.close();
   } catch (error) {
-    console.error("SQL Error:", error.message);
-    res.status(500).json({ success: false, error: error.message });
+    throw new AppError(
+      `Failed to fetch Quick Filter FG Unloading data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});
 
-export const getQuickFgDispatch = async (req, res) => {
+export const getQuickFgDispatch = tryCatch(async (req, res) => {
   const { startDate, endDate, status } = req.query;
 
   if (!startDate || !endDate || !status) {
-    return res.status(400).send("Missing startDate, endDate, or status.");
+    throw new AppError(
+      "Missing required query parameters: startDate, endDate or status.",
+      400
+    );
   }
 
   const lowerStatus = status.toLowerCase();
@@ -192,14 +219,13 @@ export const getQuickFgDispatch = async (req, res) => {
     statusValue = "Open";
     additionalField = "";
   } else {
-    return res.status(400).send("Invalid status. Use 'Completed' or 'Open'.");
+    throw new AppError("Invalid status. Use 'Completed' or 'Open'.", 400);
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    const query = `
+  const query = `
       SELECT 
         DM.ModelName, 
         DM.FGSerialNo, 
@@ -225,9 +251,11 @@ export const getQuickFgDispatch = async (req, res) => {
       WHERE DM.AddedOn BETWEEN @startDate AND @endDate
         AND TD.LatestStatus = @StatusValue
       ORDER BY DM.AddedOn DESC;
-    `;
+  `;
 
-    const pool = await new sql.ConnectionPool(dbConfig2).connect();
+  const pool = await new sql.ConnectionPool(dbConfig2).connect();
+
+  try {
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
@@ -237,14 +265,17 @@ export const getQuickFgDispatch = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      message: "Quick Filter FG Dispatch data retrieved successfully.",
       data: result.recordset,
       totalCount:
         result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
     });
-
-    await pool.close();
   } catch (error) {
-    console.error("SQL Error:", error.message);
-    res.status(500).json({ success: false, error: error.message });
+    throw new AppError(
+      `Failed to fetch Quick Filter FG Dispatch data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});

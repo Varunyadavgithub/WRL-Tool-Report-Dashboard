@@ -1,18 +1,23 @@
-import sql, { dbConfig2 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig2 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
 // <------- Vehicle ------->
-export const getDispatchVehicleUPH = async (req, res) => {
+export const getDispatchVehicleUPH = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate.",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    const query = `
+  const query = `
     WITH UniqueSessions AS (
     SELECT DISTINCT session_ID
     FROM DispatchMaster
@@ -41,33 +46,44 @@ FROM HourlySummary
 ORDER BY TIMEHOUR;
   `;
 
-    const pool = await new sql.ConnectionPool(dbConfig2).connect();
+  const pool = await new sql.ConnectionPool(dbConfig2).connect();
+
+  try {
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
       .input("endDate", sql.DateTime, istEnd)
       .query(query);
 
-    res.json(result.recordset);
-    await pool.close();
+    res.json({
+      success: true,
+      message: "Dispatch Vehicle UPH data retrieved successfully.",
+      data: result.recordset,
+    });
   } catch (error) {
-    console.error("SQL Error:", error.message);
-    res.status(500).json({ success: false, error: error.message });
+    throw new AppError(
+      `Failed to fetch Dispatch Vehicle UPH data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});
 
-export const getDispatchVehicleSummary = async (req, res) => {
+export const getDispatchVehicleSummary = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate.",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    const query = `
+  const query = `
     WITH UniqueSessions AS (
     -- Get distinct session_IDs within the given time range
     SELECT DISTINCT session_ID
@@ -124,34 +140,46 @@ SELECT HOUR_NUMBER, TIMEHOUR, session_ID, Model_Count FROM (
 ) AS FinalResult
 ORDER BY SortOrder, TIMEHOUR, session_ID;
   `;
-    const pool = await new sql.ConnectionPool(dbConfig2).connect();
+
+  const pool = await new sql.ConnectionPool(dbConfig2).connect();
+
+  try {
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
       .input("endDate", sql.DateTime, istEnd)
       .query(query);
 
-    res.json(result.recordset);
-    await pool.close();
+    res.json({
+      success: true,
+      message: "Dispatch Vehicle Summary data retrieved successfully.",
+      data: result.recordset,
+    });
   } catch (error) {
-    console.error("SQL Error:", error.message);
-    res.status(500).json({ success: false, error: error.message });
+    throw new AppError(
+      `Failed to fetch Dispatch Vehicle Summary data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});
 
 // <------- Model ------->
-export const getDispatchModelCount = async (req, res) => {
+export const getDispatchModelCount = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate.",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    const query = `
+  const query = `
       WITH ProductionDetails AS (
     -- Extract TIMEHOUR for all records within the time range
     SELECT 
@@ -181,33 +209,44 @@ FROM HourlySummary
 ORDER BY TIMEHOUR;
   `;
 
-    const pool = await new sql.ConnectionPool(dbConfig2).connect();
+  const pool = await new sql.ConnectionPool(dbConfig2).connect();
+
+  try {
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
       .input("endDate", sql.DateTime, istEnd)
       .query(query);
 
-    res.json(result.recordset);
-    await pool.close();
+    res.json({
+      success: true,
+      message: "Dispatch Model Count data retrieved successfully.",
+      data: result.recordset,
+    });
   } catch (error) {
-    console.error("SQL Error:", error.message);
-    res.status(500).json({ success: false, error: error.message });
+    throw new AppError(
+      `Failed to fetch Dispatch Model Count data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});
 
-export const getDispatchModelSummary = async (req, res) => {
+export const getDispatchModelSummary = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate.",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    const query = `
+  const query = `
       WITH ProductionDetails AS (
     -- Extract TIMEHOUR and ModelName for all records within the time range
     SELECT 
@@ -232,36 +271,47 @@ SELECT
     Loading_Count AS COUNT
 FROM HourlySummary
 ORDER BY TIMEHOUR, ModelName;   
-    `;
+  `;
 
-    const pool = await new sql.ConnectionPool(dbConfig2).connect();
+  const pool = await new sql.ConnectionPool(dbConfig2).connect();
+
+  try {
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
       .input("endDate", sql.DateTime, istEnd)
       .query(query);
 
-    res.json(result.recordset);
-    await pool.close();
+    res.json({
+      success: true,
+      message: "Dispatch Model Summary data retrieved successfully.",
+      data: result.recordset,
+    });
   } catch (error) {
-    console.error("SQL Error:", error.message);
-    res.status(500).json({ success: false, error: error.message });
+    throw new AppError(
+      `Failed to fetch Dispatch Model Summary data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});
 
 // <------- Category ------->
-export const getDispatchCategoryModelCount = async (req, res) => {
+export const getDispatchCategoryModelCount = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate.",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    const query = `
+  const query = `
      WITH ProductionDetails AS (
      -- Extract TIMEHOUR for all records within the time range
      SELECT 
@@ -291,33 +341,44 @@ export const getDispatchCategoryModelCount = async (req, res) => {
  ORDER BY TIMEHOUR;
   `;
 
-    const pool = await new sql.ConnectionPool(dbConfig2).connect();
+  const pool = await new sql.ConnectionPool(dbConfig2).connect();
+
+  try {
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
       .input("endDate", sql.DateTime, istEnd)
       .query(query);
 
-    res.json(result.recordset);
-    await pool.close();
+    res.json({
+      success: true,
+      message: "Dispatch Category Model Count data retrieved successfully.",
+      data: result.recordset,
+    });
   } catch (error) {
-    console.error("SQL Error:", error.message);
-    res.status(500).json({ success: false, error: error.message });
+    throw new AppError(
+      `Failed to fetch Dispatch Category Model Count data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});
 
-export const getDispatchCategorySummary = async (req, res) => {
+export const getDispatchCategorySummary = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
 
   if (!startDate || !endDate) {
-    return res.status(400).send("Missing startDate or endDate.");
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate.",
+      400
+    );
   }
 
-  try {
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
 
-    const query = `
+  const query = `
      WITH ProductionDetails AS (
     -- Extract ModelName for all records within the time range
     SELECT  
@@ -341,17 +402,26 @@ FROM ModelSummary
 ORDER BY ModelName;
   `;
 
-    const pool = await new sql.ConnectionPool(dbConfig2).connect();
+  const pool = await new sql.ConnectionPool(dbConfig2).connect();
+
+  try {
     const result = await pool
       .request()
       .input("startDate", sql.DateTime, istStart)
       .input("endDate", sql.DateTime, istEnd)
       .query(query);
 
-    res.json(result.recordset);
-    await pool.close();
+    res.json({
+      success: true,
+      message: "Dispatch Category Summary data retrieved successfully.",
+      data: result.recordset,
+    });
   } catch (error) {
-    console.error("SQL Error:", error.message);
-    res.status(500).json({ success: false, error: error.message });
+    throw new AppError(
+      `Failed to fetch Dispatch Category Summary data:${error.message}`,
+      500
+    );
+  } finally {
+    await pool.close();
   }
-};
+});

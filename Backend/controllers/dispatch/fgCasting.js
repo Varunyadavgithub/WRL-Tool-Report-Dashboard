@@ -1,13 +1,16 @@
-import sql, { dbConfig2 } from "../../config/db.js";
+import sql from "mssql";
+import { dbConfig2 } from "../../config/db.js";
+import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-export const getDispatchMasterBySession = async (req, res) => {
+export const getDispatchMasterBySession = tryCatch(async (req, res) => {
   const { sessionId } = req.query;
+
   if (!sessionId) {
-    return res.status(400).send("Missing sessionId.");
+    throw new AppError("Missing required query parameters: sessionId.", 400);
   }
 
-  try {
-    const query = `
+  const query = `
    /*----------------------------------------------------
       STEP 1 : Collect FG Serials
     ----------------------------------------------------*/
@@ -77,19 +80,24 @@ export const getDispatchMasterBySession = async (req, res) => {
     WHERE dm.Session_ID = ''' + @SessionId + ''';';
 
     EXEC (@sql);
-    `;
+  `;
 
-    const pool = await new sql.ConnectionPool(dbConfig2).connect();
+  const pool = await new sql.ConnectionPool(dbConfig2).connect();
 
+  try {
     const result = await pool
       .request()
       .input("SessionId", sql.VarChar, sessionId)
       .query(query);
 
-    res.json(result.recordset);
-    await pool.close();
+    res.json({
+      success: true,
+      message: "FG Casting data retrieved successfully.",
+      data: result.recordset,
+    });
   } catch (error) {
-    console.error("SQL Error:", error.message);
-    res.status(500).json({ success: false, error: error.message });
+    throw new AppError(`Failed to fetch FG Casting data:${error.message}`, 500);
+  } finally {
+    await pool.close();
   }
-};
+});

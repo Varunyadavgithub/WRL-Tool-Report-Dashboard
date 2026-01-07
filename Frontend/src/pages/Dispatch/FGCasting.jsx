@@ -35,7 +35,7 @@ const FGCasting = () => {
       const res = await axios.get(`${baseURL}dispatch/fg-casting`, {
         params: { sessionId: serialNumber },
       });
-      const data = res.data;
+      const data = res?.data?.data;
       setFetchFgCastingData(data);
     } catch (error) {
       console.error("Failed to fetch Fg Casting data:", error);
@@ -258,9 +258,7 @@ const FGCasting = () => {
                           className="hover:bg-gray-100 text-center"
                         >
                           <td className="px-1 py-1 border">{item.ModelName}</td>
-                          <td className="px-1 py-1 border">
-                            {item.FG_Serial}
-                          </td>
+                          <td className="px-1 py-1 border">{item.FG_Serial}</td>
                           <td className="px-1 py-1 border">{item.VSerial}</td>
                           <td className="px-1 py-1 border">
                             {item.CustomerQR}

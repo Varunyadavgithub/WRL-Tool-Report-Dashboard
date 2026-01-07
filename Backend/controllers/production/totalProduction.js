@@ -1,6 +1,7 @@
 import sql from "mssql";
 import { dbConfig1 } from "../../config/db.js";
 import { tryCatch } from "../../config/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
 export const getBarcodeDetails = tryCatch(async (req, res) => {
   const {
