@@ -34,32 +34,32 @@ const DispatchPerformanceReport = () => {
         const res = await axios.get(`${baseURL}dispatch/vehicle-uph`, {
           params,
         });
-        setDispatchData(res.data);
+        setDispatchData(res?.data?.data);
 
         const summRes = await axios.get(`${baseURL}dispatch/vehicle-summary`, {
           params,
         });
-        setDispatchSummaryData(summRes.data);
+        setDispatchSummaryData(summRes?.data?.data);
       } else if (dispatchType === "modelUph") {
         const res = await axios.get(`${baseURL}dispatch/model-count`, {
           params,
         });
-        setDispatchData(res.data);
+        setDispatchData(res?.data?.data);
 
         const summRes = await axios.get(`${baseURL}dispatch/model-summary`, {
           params,
         });
-        setDispatchSummaryData(summRes.data);
+        setDispatchSummaryData(summRes?.data?.data);
       } else if (dispatchType === "categoryUph") {
         const res = await axios.get(`${baseURL}dispatch/category-model-count`, {
           params,
         });
-        setDispatchData(res.data);
+        setDispatchData(res?.data?.data);
 
         const summRes = await axios.get(`${baseURL}dispatch/category-summary`, {
           params,
         });
-        setDispatchSummaryData(summRes.data);
+        setDispatchSummaryData(summRes?.data?.data);
       } else {
         toast.error("Please select the Report Type.");
         return;
@@ -111,32 +111,32 @@ const DispatchPerformanceReport = () => {
         const res = await axios.get(`${baseURL}dispatch/vehicle-uph`, {
           params,
         });
-        setDispatchData(res.data);
+        setDispatchData(res?.data?.data);
 
         const summRes = await axios.get(`${baseURL}dispatch/vehicle-summary`, {
           params,
         });
-        setDispatchSummaryData(summRes.data);
+        setDispatchSummaryData(summRes?.data?.data);
       } else if (dispatchType === "modelUph") {
         const res = await axios.get(`${baseURL}dispatch/model-count`, {
           params,
         });
-        setDispatchData(res.data);
+        setDispatchData(res?.data?.data);
 
         const summRes = await axios.get(`${baseURL}dispatch/model-summary`, {
           params,
         });
-        setDispatchSummaryData(summRes.data);
+        setDispatchSummaryData(summRes?.data?.data);
       } else if (dispatchType === "categoryUph") {
         const res = await axios.get(`${baseURL}dispatch/category-model-count`, {
           params,
         });
-        setDispatchData(res.data);
+        setDispatchData(res?.data?.data);
 
         const summRes = await axios.get(`${baseURL}dispatch/category-summary`, {
           params,
         });
-        setDispatchSummaryData(summRes.data);
+        setDispatchSummaryData(summRes?.data?.data);
       } else {
         toast.error("Please select the Report Type.");
         return;
@@ -188,32 +188,32 @@ const DispatchPerformanceReport = () => {
         const res = await axios.get(`${baseURL}dispatch/vehicle-uph`, {
           params,
         });
-        setDispatchData(res.data);
+        setDispatchData(res?.data?.data);
 
         const summRes = await axios.get(`${baseURL}dispatch/vehicle-summary`, {
           params,
         });
-        setDispatchSummaryData(summRes.data);
+        setDispatchSummaryData(summRes?.data?.data);
       } else if (dispatchType === "modelUph") {
         const res = await axios.get(`${baseURL}dispatch/model-count`, {
           params,
         });
-        setDispatchData(res.data);
+        setDispatchData(res?.data?.data);
 
         const summRes = await axios.get(`${baseURL}dispatch/model-summary`, {
           params,
         });
-        setDispatchSummaryData(summRes.data);
+        setDispatchSummaryData(summRes?.data?.data);
       } else if (dispatchType === "categoryUph") {
         const res = await axios.get(`${baseURL}dispatch/category-model-count`, {
           params,
         });
-        setDispatchData(res.data);
+        setDispatchData(res?.data?.data);
 
         const summRes = await axios.get(`${baseURL}dispatch/category-summary`, {
           params,
         });
-        setDispatchSummaryData(summRes.data);
+        setDispatchSummaryData(summRes?.data?.data);
       } else {
         toast.error("Please select the Report Type.");
         return;
@@ -270,32 +270,32 @@ const DispatchPerformanceReport = () => {
         const res = await axios.get(`${baseURL}dispatch/vehicle-uph`, {
           params,
         });
-        setDispatchData(res.data);
+        setDispatchData(res?.data?.data);
 
         const summRes = await axios.get(`${baseURL}dispatch/vehicle-summary`, {
           params,
         });
-        setDispatchSummaryData(summRes.data);
+        setDispatchSummaryData(summRes?.data?.data);
       } else if (dispatchType === "modelUph") {
         const res = await axios.get(`${baseURL}dispatch/model-count`, {
           params,
         });
-        setDispatchData(res.data);
+        setDispatchData(res?.data?.data);
 
         const summRes = await axios.get(`${baseURL}dispatch/model-summary`, {
           params,
         });
-        setDispatchSummaryData(summRes.data);
+        setDispatchSummaryData(summRes?.data?.data);
       } else if (dispatchType === "categoryUph") {
         const res = await axios.get(`${baseURL}dispatch/category-model-count`, {
           params,
         });
-        setDispatchData(res.data);
+        setDispatchData(res?.data?.data);
 
         const summRes = await axios.get(`${baseURL}dispatch/category-summary`, {
           params,
         });
-        setDispatchSummaryData(summRes.data);
+        setDispatchSummaryData(summRes?.data?.data);
       } else {
         toast.error("Please select the Report Type.");
         return;

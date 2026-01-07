@@ -1,6 +1,4 @@
 import express from "express";
-import multer from "multer";
-
 import {
   getAllAssets,
   addAsset,
@@ -9,33 +7,30 @@ import {
   getCertificates,
   uploadCertificate,
   uploadCalibrationReport,
-} from "../controllers/compliance/calibiration.js";
+} from "../controllers/compliance/calibiration.controller.js";
+import { getCalibrationUsers } from "../controllers/compliance/calibrationUsers.controller.js";
 
-import { getCalibrationUsers } from "../controllers/compliance/users.controller.js";
+import {
+  uploadCalibrationReport as uploadCalibration,
+  handleMulterError,
+} from "../middlewares/uploadMiddleware.js";
 
 const router = express.Router();
 
-/* ---------- MULTER CONFIG ---------- */
-const storage = multer.diskStorage({
-  destination: "uploads/calibration/",
-  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
-});
+/* ===================== ROUTES ===================== */
 
-const upload = multer({ storage });
-
-/* ---------- ROUTES ---------- */
-
-// ✅ ADD or UPDATE ASSET + PDF
+// ✅ ADD or UPDATE ASSET + FILE
 router.post(
   "/addAsset",
-  upload.single("file"), // ✅ only ONE multer usage
+  uploadCalibration.single("file"),
+  handleMulterError,
   addAsset
 );
 
 // ✅ GET ALL ASSETS
 router.get("/assets", getAllAssets);
 
-// ✅ ADD NEW CALIBRATION CYCLE
+// ✅ ADD NEW CALIBRATION CYCLE (NO FILE)
 router.post("/addCycle", addCalibrationRecord);
 
 // ✅ GET ASSET + HISTORY
@@ -45,14 +40,22 @@ router.get("/asset/:id", getAssetWithHistory);
 router.get("/certs/:id", getCertificates);
 
 // ✅ UPLOAD CERTIFICATE ONLY
-router.post("/uploadCert/:id", upload.single("file"), uploadCertificate);
+router.post(
+  "/uploadCert/:id",
+  uploadCalibration.single("file"),
+  handleMulterError,
+  uploadCertificate
+);
 
+// ✅ UPLOAD CALIBRATION REPORT
 router.post(
   "/uploadReport/:id",
-  upload.single("file"),
+  uploadCalibration.single("file"),
+  handleMulterError,
   uploadCalibrationReport
 );
 
+// ✅ GET CALIBRATION USERS
 router.get("/users/calibration", getCalibrationUsers);
 
 export default router;

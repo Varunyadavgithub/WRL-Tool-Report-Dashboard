@@ -106,7 +106,7 @@ export default function Calibration() {
   const loadUsers = async () => {
     try {
       const res = await axios.get(baseURL + "compliance/users/calibration");
-      setUsers(res.data);
+      setUsers(res?.data?.data);
     } catch {
       toast.error("Failed to load users");
     }

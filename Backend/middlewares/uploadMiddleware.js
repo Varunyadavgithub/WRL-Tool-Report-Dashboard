@@ -2,20 +2,26 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
+/* ===================== BASE UPLOADS DIR ===================== */
+
 // Create uploads directory if not exists
 const uploadsDir = path.resolve("uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
-// Ensure subdirectories exist
+/* ===================== SUB DIRECTORIES ===================== */
+
 const fiveDaysPlanDir = path.resolve(uploadsDir, "FiveDaysPlan");
 const bisReportDir = path.resolve(uploadsDir, "BISReport");
 const fpaDefectImagesDir = path.resolve(uploadsDir, "FpaDefectImages");
+const calibrationDir = path.resolve(uploadsDir, "Calibration");
 
 if (!fs.existsSync(fiveDaysPlanDir)) fs.mkdirSync(fiveDaysPlanDir);
 if (!fs.existsSync(bisReportDir)) fs.mkdirSync(bisReportDir);
 if (!fs.existsSync(fpaDefectImagesDir)) fs.mkdirSync(fpaDefectImagesDir);
+if (!fs.existsSync(calibrationDir)) fs.mkdirSync(calibrationDir);
 
-// Generic storage configuration
+/* ===================== STORAGE FACTORY ===================== */
+
 const createStorage = (folder) => {
   return multer.diskStorage({
     destination: (req, file, cb) => {
@@ -24,7 +30,10 @@ const createStorage = (folder) => {
     },
     filename: (req, file, cb) => {
       const ext = path.extname(file.originalname);
-      const baseFileName = path.basename(file.originalname, ext);
+      const baseFileName = path
+        .basename(file.originalname, ext)
+        .replace(/\s+/g, "_")
+        .replace(/[^a-zA-Z0-9_-]/g, "");
 
       let uniqueFilename;
 
@@ -36,7 +45,6 @@ const createStorage = (folder) => {
         }
         uniqueFilename = `${FGSerialNumber}-${Date.now()}${ext}`;
       } else {
-        // Default random number for other uploads
         const uniqueValue = Math.floor(
           100000 + Math.random() * 900000
         ).toString();
@@ -48,7 +56,8 @@ const createStorage = (folder) => {
   });
 };
 
-// File type configurations
+/* ===================== FILE TYPE CONFIGS ===================== */
+
 const fileTypes = {
   excel: {
     allowedTypes: [
@@ -65,14 +74,30 @@ const fileTypes = {
   },
 };
 
-// Image file settings
+/* ===================== IMAGE CONFIG ===================== */
+
 const imageFileTypes = {
   allowedTypes: ["image/jpeg", "image/jpg", "image/png"],
   maxSize: 5 * 1024 * 1024, // 5MB
   errorMessage: "Only JPG, JPEG, PNG images under 5MB are allowed",
 };
 
-// Generic file filter
+/* ===================== CALIBRATION CONFIG ===================== */
+
+const calibrationFileTypes = {
+  allowedTypes: [
+    "application/pdf",
+    "application/x-pdf",
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+  ],
+  errorMessage: "Only PDF or image files are allowed for calibration",
+  maxSize: 10 * 1024 * 1024, // 10MB
+};
+
+/* ===================== FILE FILTERS ===================== */
+
 const createFileFilter = (fileType) => (_, file, cb) => {
   const config = fileTypes[fileType];
   if (config.allowedTypes.includes(file.mimetype)) {
@@ -82,7 +107,6 @@ const createFileFilter = (fileType) => (_, file, cb) => {
   }
 };
 
-// Image file filter
 const imageFileFilter = (_, file, cb) => {
   if (imageFileTypes.allowedTypes.includes(file.mimetype)) {
     cb(null, true);
@@ -91,27 +115,46 @@ const imageFileFilter = (_, file, cb) => {
   }
 };
 
-// Upload middlewares
+const calibrationFileFilter = (_, file, cb) => {
+  if (calibrationFileTypes.allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error(calibrationFileTypes.errorMessage), false);
+  }
+};
+
+/* ===================== UPLOAD MIDDLEWARES ===================== */
+
+// Five Days Plan Excel
 export const uploadFiveDaysPlanExcel = multer({
   storage: createStorage("FiveDaysPlan"),
   fileFilter: createFileFilter("excel"),
   limits: { fileSize: fileTypes.excel.maxSize },
 });
 
+// BIS Report PDF
 export const uploadBISReportPDF = multer({
   storage: createStorage("BISReport"),
   fileFilter: createFileFilter("pdf"),
   limits: { fileSize: fileTypes.pdf.maxSize },
 });
 
-// FPA Defect Image Upload Middleware (FGSerialNumber-based filename)
+// FPA Defect Images
 export const uploadFpaDefectImage = multer({
   storage: createStorage("FpaDefectImages"),
   fileFilter: imageFileFilter,
   limits: { fileSize: imageFileTypes.maxSize },
 });
 
-// Error handling middleware
+// ✅ Calibration Report Upload
+export const uploadCalibrationReport = multer({
+  storage: createStorage("Calibration"),
+  fileFilter: calibrationFileFilter,
+  limits: { fileSize: calibrationFileTypes.maxSize },
+});
+
+/* ===================== ERROR HANDLER ===================== */
+
 export const handleMulterError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     return res
