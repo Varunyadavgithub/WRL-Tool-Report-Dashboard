@@ -32,7 +32,7 @@ function StageHistoryReport() {
       ]);
 
       // Stage history
-      const stageData = stageRes.data?.result?.recordsets[0] || [];
+      const stageData = stageRes.data?.data?.recordsets[0] || [];
       setStageHistoryData(stageData);
 
       if (stageData.length > 0 && stageData[0].MaterialName) {

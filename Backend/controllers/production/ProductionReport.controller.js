@@ -217,13 +217,6 @@ export const productionReportExportData = tryCatch(async (req, res) => {
 export const fetchQuickFiltersData = tryCatch(async (req, res) => {
   const { startTime, endTime, model, stationCode } = req.query;
 
-  if (!startTime || !endTime || !stationCode) {
-    throw new AppError(
-      "Missing required query parameters: startDate, endDate and stationCode",
-      400
-    );
-  }
-
   const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
   const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
 
