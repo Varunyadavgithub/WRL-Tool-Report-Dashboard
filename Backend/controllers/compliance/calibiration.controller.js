@@ -200,7 +200,7 @@ export const uploadCalibrationReport = tryCatch(async (req, res) => {
 
   try {
     const asset = await pool.request().input("ID", sql.Int, assetId).query(`
-        SELECT LastCalibrationDate, FrequencyMonths
+        SELECT FrequencyMonths
         FROM CalibrationAssets
         WHERE ID=@ID
       `);
@@ -236,12 +236,26 @@ export const uploadCalibrationReport = tryCatch(async (req, res) => {
 
     await pool
       .request()
-      .input("ID", assetId)
+      .input("ID", sql.Int, assetId)
       .input("Status", result === "Fail" ? "Out of Calibration" : "Calibrated")
-      .query(`
+      .input("LastCalibrationDate", calibratedOn)
+      .input("NextCalibrationDate", nextDate).query(`
         UPDATE CalibrationAssets
-        SET Status=@Status
-        WHERE ID=@ID
+        SET
+          Status = @Status,
+          LastCalibrationDate = @LastCalibrationDate,
+          NextCalibrationDate = @NextCalibrationDate,
+          EscalationLevel = NULL,
+          LastEscalationSentOn = NULL
+        WHERE ID = @ID
+      `);
+
+    await pool.request().input("AssetID", sql.Int, assetId).query(`
+        UPDATE CalibrationEscalationLog
+        SET Remarks = 'Resolved by new calibration',
+            TriggeredBy = 'SYSTEM'
+        WHERE AssetID = @AssetID
+          AND Remarks IS NULL
       `);
 
     res.status(200).json({
@@ -337,17 +351,47 @@ export const addCalibrationRecord = tryCatch(async (req, res) => {
 /* ===================== GET CERTIFICATES ===================== */
 export const getCertificates = tryCatch(async (req, res) => {
   const query = `
-    SELECT
-      FilePath, CalibratedOn, ValidTill, Result,
-      U.name AS EmployeeName,
-      D.department_name,
-      CalibrationAgency,
-      CreatedAt
+    SELECT 
+      CH.ID, 
+      CH.AssetID, 
+      CH.CreatedAt        AS EventTime, 
+      'CALIBRATION'       AS EventType, 
+      CH.Result, 
+      CH.FilePath, 
+      U.name              AS EmployeeName, 
+      D.department_name, 
+      NULL                AS EscalationLevel, 
+      NULL                AS MailTo, 
+      NULL                AS MailCC, 
+      CH.CalibrationAgency, 
+      CH.ValidTill
     FROM CalibrationHistory CH
-    LEFT JOIN users U ON U.employee_id = CH.PerformedBy
-    LEFT JOIN departments D ON D.DeptCode = U.department_id
-    WHERE AssetID=@id
-    ORDER BY CreatedAt DESC
+    LEFT JOIN users U
+      ON U.employee_id = CH.PerformedBy
+    LEFT JOIN departments D
+      ON D.DeptCode = U.department_id
+    WHERE CH.AssetID = @id
+
+    UNION ALL
+
+    SELECT
+      EL.ID,
+      EL.AssetID,
+      EL.TriggeredOn      AS EventTime,
+      'ESCALATION'        AS EventType,
+      NULL                AS Result,
+      NULL                AS FilePath,
+      NULL                AS EmployeeName,
+      NULL                AS department_name,
+      CONCAT('L', EL.EscalationLevel) AS EscalationLevel,
+      EL.MailTo,
+      EL.MailCC,
+      NULL                AS CalibrationAgency,
+      NULL                AS ValidTill
+    FROM CalibrationEscalationLog EL
+    WHERE EL.AssetID = @id
+
+    ORDER BY EventTime DESC
   `;
 
   const pool = await sql.connect(dbConfig3);

@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from "react";
-import Title from "../../components/common/Title";
-import InputField from "../../components/common/InputField";
-import SelectField from "../../components/common/SelectField";
+import Title from "../../components/ui/Title";
+import InputField from "../../components/ui/InputField";
+import SelectField from "../../components/ui/SelectField";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { useSelector } from "react-redux";

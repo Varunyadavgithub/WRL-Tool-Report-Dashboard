@@ -1,6 +1,6 @@
-import Title from "../../components/common/Title";
-import InputField from "../../components/common/InputField";
-import Button from "../../components/common/Button";
+import Title from "../../components/ui/Title";
+import InputField from "../../components/ui/InputField";
+import Button from "../../components/ui/Button";
 import { useState } from "react";
 import ExcelJS from "exceljs";
 import toast from "react-hot-toast";

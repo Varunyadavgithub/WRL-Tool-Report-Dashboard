@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
-import Title from "../../components/common/Title";
-import SelectField from "../../components/common/SelectField";
-import DateTimePicker from "../../components/common/DateTimePicker";
-import Button from "../../components/common/Button";
-import Loader from "../../components/common/Loader";
+import Title from "../../components/ui/Title";
+import SelectField from "../../components/ui/SelectField";
+import DateTimePicker from "../../components/ui/DateTimePicker";
+import Button from "../../components/ui/Button";
+import Loader from "../../components/ui/Loader";
 import toast from "react-hot-toast";
-import ExportButton from "../../components/common/ExportButton";
+import ExportButton from "../../components/ui/ExportButton";
 import { baseURL } from "../../assets/assets";
 
 const DispatchReport = () => {

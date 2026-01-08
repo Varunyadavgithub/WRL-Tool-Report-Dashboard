@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import Title from "../../components/common/Title";
-import Button from "../../components/common/Button";
+import Title from "../../components/ui/Title";
+import Button from "../../components/ui/Button";
 import {
   Chart as ChartJS,
   BarElement,
@@ -9,14 +9,10 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-import DateTimePicker from "../../components/common/DateTimePicker";
+import DateTimePicker from "../../components/ui/DateTimePicker";
 import axios from "axios";
 import toast from "react-hot-toast";
-import Loader from "../../components/common/Loader";
-import FinalLoadingFreezer from "../../components/lineHourly/FinalLoading/FinalLoadingFreezer.jsx";
-import FinalLoadingChoc from "../../components/lineHourly/FinalLoading/FinalLoadingChoc.jsx";
-import FinalLoadingSUS from "../../components/lineHourly/FinalLoading/FinalLoadingSUS.jsx";
-import FinalCategoryLoadingCount from "../../components/lineHourly/FinalLine/FinalCategoryCount.jsx";
+import Loader from "../../components/ui/Loader";
 import FinalFreezer from "../../components/lineHourly/FinalLine/FinalFreezer";
 import FinalChoc from "../../components/lineHourly/FinalLine/FinalChoc";
 import FinalSUS from "../../components/lineHourly/FinalLine/FinalSUS";

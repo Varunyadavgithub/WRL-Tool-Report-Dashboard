@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import Title from "../../components/common/Title";
-import Button from "../../components/common/Button";
+import Title from "../../components/ui/Title";
+import Button from "../../components/ui/Button";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";

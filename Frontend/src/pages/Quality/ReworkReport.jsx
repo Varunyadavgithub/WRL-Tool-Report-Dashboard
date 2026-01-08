@@ -1,10 +1,10 @@
-import Title from "../../components/common/Title";
-import Loader from "../../components/common/Loader";
+import Title from "../../components/ui/Title";
+import Loader from "../../components/ui/Loader";
 import { useState } from "react";
-import SelectField from "../../components/common/SelectField";
-import DateTimePicker from "../../components/common/DateTimePicker";
-import Button from "../../components/common/Button";
-import ExportButton from "../../components/common/ExportButton";
+import SelectField from "../../components/ui/SelectField";
+import DateTimePicker from "../../components/ui/DateTimePicker";
+import Button from "../../components/ui/Button";
+import ExportButton from "../../components/ui/ExportButton";
 
 const ReworkReport = () => {
   const [loading, setLoading] = useState(false);

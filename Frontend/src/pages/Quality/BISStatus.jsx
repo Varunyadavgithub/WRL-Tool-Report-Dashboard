@@ -1,7 +1,7 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import Title from "../../components/common/Title";
+import Title from "../../components/ui/Title";
 import { FaClockRotateLeft, FaDownload } from "react-icons/fa6";
 import { baseURL } from "../../assets/assets";
 

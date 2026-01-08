@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import Button from "../../components/common/Button";
-import InputField from "../../components/common/InputField";
-import Title from "../../components/common/Title";
-import Loader from "../../components/common/Loader";
-import SelectField from "../../components/common/SelectField";
+import Button from "../../components/ui/Button";
+import InputField from "../../components/ui/InputField";
+import Title from "../../components/ui/Title";
+import Loader from "../../components/ui/Loader";
+import SelectField from "../../components/ui/SelectField";
 import { WiThermometer } from "react-icons/wi";
 import { FaBolt } from "react-icons/fa";
 import { MdPowerSettingsNew } from "react-icons/md";
@@ -34,7 +34,7 @@ const LPT = () => {
       setLoading(true);
 
       const res = await axios.get(`${baseURL}quality/lpt-defect-report`);
-      setLptDefectReport(res?.data);
+      setLptDefectReport(res?.data?.data);
     } catch (error) {
       console.error("Failed to fetch Lpt Defect data:", error);
       toast.error("Failed to fetch Lpt Defect data.");
@@ -93,7 +93,7 @@ const LPT = () => {
   const getLptDefectCategory = async () => {
     try {
       const res = await axios.get(`${baseURL}quality/lpt-defect-category`);
-      const formatted = res?.data.map((item) => ({
+      const formatted = res?.data?.data.map((item) => ({
         label: item.Name,
         value: item.Code.toString(),
       }));

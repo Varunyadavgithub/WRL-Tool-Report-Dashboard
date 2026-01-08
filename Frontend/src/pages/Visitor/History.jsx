@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import Title from "../../components/common/Title";
-import Button from "../../components/common/Button";
+import Title from "../../components/ui/Title";
+import Button from "../../components/ui/Button";
 import { CgProfile } from "react-icons/cg";
 import { FaEye } from "react-icons/fa";
 import { baseURL } from "../../assets/assets";
-import Loader from "../../components/common/Loader";
+import Loader from "../../components/ui/Loader";
 
 const History = () => {
   const [allVisitors, setAllVisitors] = useState([]);

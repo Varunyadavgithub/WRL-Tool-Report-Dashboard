@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import Title from "../../components/common/Title";
-import InputField from "../../components/common/InputField";
-import SelectField from "../../components/common/SelectField";
-import Button from "../../components/common/Button";
+import Title from "../../components/ui/Title";
+import InputField from "../../components/ui/InputField";
+import SelectField from "../../components/ui/SelectField";
+import Button from "../../components/ui/Button";
 import toast from "react-hot-toast";
 import axios from "axios";
 import { FaEdit } from "react-icons/fa";

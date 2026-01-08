@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { FaFilePdf, FaDownload } from "react-icons/fa";
-import Title from "../../components/common/Title";
+import Title from "../../components/ui/Title";
 import { baseURL } from "../../assets/assets";
 
 const BISReports = () => {

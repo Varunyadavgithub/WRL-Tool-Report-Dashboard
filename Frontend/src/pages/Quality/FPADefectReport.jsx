@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import Title from "../../components/common/Title";
-import Button from "../../components/common/Button";
-import SelectField from "../../components/common/SelectField";
-import DateTimePicker from "../../components/common/DateTimePicker";
-import ExportButton from "../../components/common/ExportButton";
+import Title from "../../components/ui/Title";
+import Button from "../../components/ui/Button";
+import SelectField from "../../components/ui/SelectField";
+import DateTimePicker from "../../components/ui/DateTimePicker";
+import ExportButton from "../../components/ui/ExportButton";
 import FpaBarGraph from "../../components/graphs/FpaReportsBarGraph";
-import Loader from "../../components/common/Loader";
+import Loader from "../../components/ui/Loader";
 import { baseURL } from "../../assets/assets";
 
 // Chart Register

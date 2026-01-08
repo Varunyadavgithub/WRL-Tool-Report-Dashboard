@@ -1,4 +1,4 @@
-import Title from "../../components/common/Title";
+import Title from "../../components/ui/Title";
 import {
   Chart as ChartJS,
   ArcElement,

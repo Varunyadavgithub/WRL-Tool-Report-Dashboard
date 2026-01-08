@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import Button from "../../components/common/Button";
-import Title from "../../components/common/Title";
-import DateTimePicker from "../../components/common/DateTimePicker";
-import SelectField from "../../components/common/SelectField";
-import InputField from "../../components/common/InputField";
+import Button from "../../components/ui/Button";
+import Title from "../../components/ui/Title";
+import DateTimePicker from "../../components/ui/DateTimePicker";
+import SelectField from "../../components/ui/SelectField";
+import InputField from "../../components/ui/InputField";
 import axios from "axios";
 import toast from "react-hot-toast";
-import ExportButton from "../../components/common/ExportButton";
+import ExportButton from "../../components/ui/ExportButton";
 import { baseURL } from "../../assets/assets";
-import Loader from "../../components/common/Loader";
+import Loader from "../../components/ui/Loader";
+import { useGetModelVariantsQuery } from "../../redux/apis/common/commonApi";
 
 const LPTReport = () => {
   const [loading, setLoading] = useState(false);
@@ -17,25 +18,21 @@ const LPTReport = () => {
   const [monthLoading, setMonthLoading] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [variants, setVariants] = useState([]);
-  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [selectedModelVariant, setSelectedModelVariant] = useState(null);
   const [reportData, setReportData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [details, setDetails] = useState("");
 
-  const fetchModelVariants = async () => {
-    try {
-      const res = await axios.get(`${baseURL}shared/model-variants`);
-      const formatted = res?.data.map((item) => ({
-        label: item.MaterialName,
-        value: item.MatCode.toString(),
-      }));
-      setVariants(formatted);
-    } catch (error) {
-      console.error("Failed to fetch model variants:", error);
-      toast.error("Failed to fetch model variants.");
-    }
-  };
+  /* ===================== RTK QUERY ===================== */
+  const {
+    data: variants = [],
+    isLoading: variantsLoading,
+    error: variantsError,
+  } = useGetModelVariantsQuery();
+
+  useEffect(() => {
+    if (variantsError) toast.error("Failed to load model variants");
+  }, [variantsError]);
 
   const handleQuery = async () => {
     if (!startTime || !endTime) {
@@ -214,16 +211,14 @@ const LPTReport = () => {
   }, [reportData]);
 
   useEffect(() => {
-    fetchModelVariants();
-  }, []);
-
-  useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       setDetails(searchTerm);
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
+
+  if (variantsLoading) return <Loader />;
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
@@ -248,12 +243,13 @@ const LPTReport = () => {
           <SelectField
             label="Model Variant"
             options={variants}
-            value={selectedVariant?.value || ""}
+            value={selectedModelVariant?.value || ""}
             onChange={(e) =>
-              setSelectedVariant(
-                variants.find((opt) => opt.value === e.target.value) || 0
+              setSelectedModelVariant(
+                variants.find((opt) => opt.value === e.target.value) || null
               )
             }
+            className="max-w-64"
           />
           <InputField
             label="Search"

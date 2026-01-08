@@ -1,9 +1,9 @@
 import axios from "axios";
-import Title from "../../components/common/Title";
+import Title from "../../components/ui/Title";
 import { useState, useEffect } from "react";
-import InputField from "../../components/common/InputField";
-import Button from "../../components/common/Button";
-import Loader from "../../components/common/Loader";
+import InputField from "../../components/ui/InputField";
+import Button from "../../components/ui/Button";
+import Loader from "../../components/ui/Loader";
 import toast from "react-hot-toast";
 import ExcelJS from "exceljs";
 import { baseURL } from "../../assets/assets";

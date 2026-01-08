@@ -1,10 +1,10 @@
 import axios from "axios";
-import SelectField from "../../components/common/SelectField";
-import Title from "../../components/common/Title";
+import SelectField from "../../components/ui/SelectField";
+import Title from "../../components/ui/Title";
 import { useState } from "react";
-import InputField from "../../components/common/InputField";
-import Button from "../../components/common/Button";
-import Loader from "../../components/common/Loader";
+import InputField from "../../components/ui/InputField";
+import Button from "../../components/ui/Button";
+import Loader from "../../components/ui/Loader";
 import toast from "react-hot-toast";
 import ExcelJS from "exceljs";
 import { useSelector } from "react-redux";

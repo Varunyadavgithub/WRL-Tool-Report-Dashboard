@@ -14,7 +14,7 @@ import {
 import axios from "axios";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets";
-import SelectField from "../../components/common/SelectField";
+import SelectField from "../../components/ui/SelectField";
 
 // Register Chart.js components
 Chart.register(

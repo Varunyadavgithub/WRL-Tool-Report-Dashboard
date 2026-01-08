@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import Title from "../../components/common/Title";
-import InputField from "../../components/common/InputField";
-import Button from "../../components/common/Button";
+import Title from "../../components/ui/Title";
+import InputField from "../../components/ui/InputField";
+import Button from "../../components/ui/Button";
 import {
   FaCloudUploadAlt,
   FaFileUpload,
@@ -13,7 +13,7 @@ import {
 import toast from "react-hot-toast";
 import axios from "axios";
 import { Link } from "react-router-dom";
-import PopupModal from "../../components/common/PopupModal";
+import PopupModal from "../../components/ui/PopupModal";
 import { MdDeleteForever } from "react-icons/md";
 import { baseURL } from "../../assets/assets";
 

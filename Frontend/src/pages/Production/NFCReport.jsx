@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import Title from "../../components/common/Title";
-import Button from "../../components/common/Button";
-import DateTimePicker from "../../components/common/DateTimePicker";
-import ExportButton from "../../components/common/ExportButton";
+import Title from "../../components/ui/Title";
+import Button from "../../components/ui/Button";
+import DateTimePicker from "../../components/ui/DateTimePicker";
+import ExportButton from "../../components/ui/ExportButton";
 import axios from "axios";
 import toast from "react-hot-toast";
-import Loader from "../../components/common/Loader";
+import Loader from "../../components/ui/Loader";
 import { FaCaretUp, FaCaretDown } from "react-icons/fa";
 import { baseURL } from "../../assets/assets";
 

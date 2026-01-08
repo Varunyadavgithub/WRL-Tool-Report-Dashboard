@@ -3,8 +3,9 @@ import axios from "axios";
 import { baseURL } from "../../assets/assets";
 import { toast } from "react-hot-toast";
 import HistoryTable from "./HistoryTable";
-import Button from "../../components/common/Button";
-import InputField from "../../components/common/InputField";
+import Button from "../../components/ui/Button";
+import InputField from "../../components/ui/InputField";
+import SelectField from "../../components/ui/SelectField";
 import * as XLSX from "xlsx";
 import {
   FaTools,
@@ -80,6 +81,7 @@ export default function Calibration() {
     performedByEmpId: "",
     performedByName: "",
     departmentId: "",
+    departmentName: "",
     employeeEmail: "",
     managerEmail: "",
     result: "Pass",
@@ -97,7 +99,7 @@ export default function Calibration() {
   const loadAssets = async () => {
     try {
       const res = await axios.get(baseURL + "compliance/assets");
-      setAssets(res.data);
+      setAssets(res?.data?.data);
     } catch {
       toast.error("Failed to load records");
     }
@@ -693,8 +695,13 @@ export default function Calibration() {
               Performed By
             </label>
 
-            <select
-              className="border rounded-lg px-3 py-2 w-full"
+            <SelectField
+              label="Performed By"
+              name="performedByEmpId"
+              options={users.map((u) => ({
+                value: u.employee_id,
+                label: `${u.name} (${u.employee_id})`,
+              }))}
               value={form.performedByEmpId}
               onChange={(e) => {
                 const u = users.find((x) => x.employee_id === e.target.value);
@@ -708,14 +715,7 @@ export default function Calibration() {
                   managerEmail: u.manager_email,
                 });
               }}
-            >
-              <option value="">Select Employee</option>
-              {users.map((u) => (
-                <option key={u.employee_id} value={u.employee_id}>
-                  {u.name} ({u.employee_id})
-                </option>
-              ))}
-            </select>
+            />
 
             <InputField
               label="Department"
@@ -845,8 +845,13 @@ export default function Calibration() {
             Performed By
           </label>
 
-          <select
-            className="border rounded-lg px-3 py-2 w-full"
+          <SelectField
+            label="Performed By"
+            name="performedByEmpId"
+            options={users.map((u) => ({
+              value: u.employee_id,
+              label: `${u.name} (${u.employee_id})`,
+            }))}
             value={form.performedByEmpId}
             onChange={(e) => {
               const u = users.find((x) => x.employee_id === e.target.value);
@@ -860,14 +865,7 @@ export default function Calibration() {
                 managerEmail: u.manager_email,
               });
             }}
-          >
-            <option value="">Select Employee</option>
-            {users.map((u) => (
-              <option key={u.employee_id} value={u.employee_id}>
-                {u.name} ({u.employee_id})
-              </option>
-            ))}
-          </select>
+          />
 
           <InputField label="Department" value={form.departmentName} disabled />
           <InputField

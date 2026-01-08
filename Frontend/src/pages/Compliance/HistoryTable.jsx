@@ -9,7 +9,37 @@ import {
   FaUser,
   FaBuilding,
   FaCalendarAlt,
+  FaExclamationTriangle,
+  FaInfoCircle,
+  FaBell,
 } from "react-icons/fa";
+
+const ESCALATION_META = {
+  L0: {
+    label: "Info",
+    dot: "bg-blue-500 border-blue-200",
+    text: "text-blue-700",
+    icon: <FaInfoCircle />,
+  },
+  L1: {
+    label: "Warning",
+    dot: "bg-yellow-500 border-yellow-200",
+    text: "text-yellow-700",
+    icon: <FaExclamationTriangle />,
+  },
+  L2: {
+    label: "Critical",
+    dot: "bg-orange-500 border-orange-200",
+    text: "text-orange-700",
+    icon: <FaBell />,
+  },
+  L3: {
+    label: "Audit Risk",
+    dot: "bg-red-500 border-red-200",
+    text: "text-red-700",
+    icon: <FaTimesCircle />,
+  },
+};
 
 export default function HistoryTable({ id }) {
   const [history, setHistory] = useState([]);
@@ -17,14 +47,14 @@ export default function HistoryTable({ id }) {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [id]);
 
   const load = async () => {
     try {
       const res = await axios.get(baseURL + "compliance/certs/" + id);
-      setHistory(res.data);
+      setHistory(res?.data?.data);
     } catch {
-      toast.error("Failed to load calibration history");
+      toast.error("Failed to load timeline");
     } finally {
       setLoading(false);
     }
@@ -32,86 +62,137 @@ export default function HistoryTable({ id }) {
 
   if (loading)
     return (
-      <div className="py-6 text-center text-gray-500 italic">
-        Loading calibration timeline…
+      <div className="py-6 text-center italic text-gray-500">
+        Loading timeline…
       </div>
     );
 
-  if (history.length === 0)
+  if (!history.length)
     return (
-      <div className="py-6 text-center text-gray-400 italic">
-        No calibration history found
+      <div className="py-6 text-center italic text-gray-400">
+        No timeline available
       </div>
     );
 
   return (
-    <div className="mt-4 bg-gray-50 border border-dashed border-gray-300 rounded-xl p-5">
-      <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">
-        Calibration Timeline
+    <div className="mt-4 bg-gray-50 border border-dashed rounded-xl p-5">
+      <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase">
+        Calibration & Escalation Timeline
       </h3>
 
       <div className="relative border-l-2 border-gray-300 ml-4 space-y-6">
         {history.map((h, i) => {
-          const isPass = h.Result === "Pass";
+          const isEscalation = h.EventType === "ESCALATION";
+          const esc = isEscalation ? ESCALATION_META[h.EscalationLevel] : null;
 
           return (
             <div key={i} className="relative pl-6">
               {/* DOT */}
               <span
-                className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-4 ${
-                  isPass
-                    ? "bg-green-500 border-green-200"
-                    : "bg-red-500 border-red-200"
-                }`}
+                className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-4
+                  ${
+                    isEscalation
+                      ? esc.dot
+                      : h.Result === "Pass"
+                      ? "bg-green-500 border-green-200"
+                      : "bg-red-500 border-red-200"
+                  }
+                `}
               />
 
               {/* CARD */}
               <div className="bg-white rounded-lg shadow p-4">
+                {/* HEADER */}
                 <div className="flex justify-between items-center mb-2">
                   <div className="flex items-center gap-2 text-sm font-semibold">
-                    {isPass ? (
-                      <FaCheckCircle className="text-green-600" />
+                    {isEscalation ? (
+                      <>
+                        {esc.icon}
+                        <span className={esc.text}>
+                          Escalation {h.EscalationLevel} – {esc.label}
+                        </span>
+                      </>
+                    ) : h.Result === "Pass" ? (
+                      <>
+                        <FaCheckCircle className="text-green-600" />
+                        <span className="text-green-700">
+                          Calibration Passed
+                        </span>
+                      </>
                     ) : (
-                      <FaTimesCircle className="text-red-600" />
+                      <>
+                        <FaTimesCircle className="text-red-600" />
+                        <span className="text-red-700">Calibration Failed</span>
+                      </>
                     )}
-                    <span
-                      className={isPass ? "text-green-700" : "text-red-700"}
-                    >
-                      {h.Result || "Result N/A"}
-                    </span>
                   </div>
 
                   <span className="text-xs text-gray-500 flex items-center gap-1">
                     <FaCalendarAlt />
-                    {h.CalibratedOn?.slice(0, 10)}
+                    {h.EventTime?.slice(0, 10)}
                   </span>
                 </div>
 
+                {/* DETAILS */}
                 <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
-                  <div className="flex items-center gap-1">
-                    <FaUser />
-                    <span>
-                      <b>Performed By:</b> {h.EmployeeName || "—"}
-                    </span>
-                  </div>
+                  {!isEscalation && (
+                    <>
+                      <div className="flex items-center gap-1">
+                        <FaUser />
+                        <b>Employee:</b> {h.EmployeeName || "—"}
+                      </div>
 
-                  <div>
-                    <b>Department:</b> {h.department_name || "—"}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <FaBuilding />
-                    <span>
-                      <b>Agency:</b> {h.CalibrationAgency || "—"}
-                    </span>
-                  </div>
+                      <div className="flex items-center gap-1">
+                        <FaBuilding />
+                        <b>Department:</b> {h.department_name || "—"}
+                      </div>
 
-                  <div>
-                    <b>Valid Till:</b> {h.ValidTill?.slice(0, 10) || "—"}
-                  </div>
+                      <div>
+                        <b>Agency:</b> {h.CalibrationAgency || "—"}
+                      </div>
+
+                      <div>
+                        <b>Valid Till:</b> {h.ValidTill?.slice(0, 10) || "—"}
+                      </div>
+                    </>
+                  )}
+
+                  {isEscalation &&
+                    (() => {
+                      const ccList = h.MailCC
+                        ? h.MailCC.split(",").map((e) => e.trim())
+                        : [];
+
+                      return (
+                        <>
+                          <div>
+                            <b>Emplyee:</b> {h.MailTo || "—"}
+                          </div>
+
+                          <div>
+                            <b>Mail CC:</b>
+                            <div className="ml-2 mt-1 space-y-1">
+                              {ccList[0] && (
+                                <div>
+                                  <b>Manager:</b> {ccList[0]}
+                                </div>
+                              )}
+                              {ccList[1] && (
+                                <div>
+                                  <b>Plant Head:</b> {ccList[1]}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
                 </div>
 
+                {/* PDF */}
                 {h.FilePath && (
-                  <div className="mt-3">
+                  <div className="mt-3 flex items-center gap-2">
+                    <FaFilePdf className="text-red-600" />
                     <a
                       href={
                         baseURL.replace(/\/api\/v1\/?$/, "") +
@@ -120,9 +201,9 @@ export default function HistoryTable({ id }) {
                       }
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 underline hover:text-blue-800"
+                      className="text-blue-600 underline"
                     >
-                      View PDF
+                      View Report
                     </a>
                   </div>
                 )}

@@ -1,15 +1,16 @@
-import Title from "../../components/common/Title";
-import Button from "../../components/common/Button";
-import DateTimePicker from "../../components/common/DateTimePicker";
+import Title from "../../components/ui/Title";
+import Button from "../../components/ui/Button";
+import DateTimePicker from "../../components/ui/DateTimePicker";
 import { useEffect, useState } from "react";
-import SelectField from "../../components/common/SelectField";
-import InputField from "../../components/common/InputField";
+import SelectField from "../../components/ui/SelectField";
+import InputField from "../../components/ui/InputField";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { useMemo } from "react";
-import ExportButton from "../../components/common/ExportButton";
+import ExportButton from "../../components/ui/ExportButton";
 import { baseURL } from "../../assets/assets";
-import Loader from "../../components/common/Loader";
+import { useGetModelVariantsQuery } from "../../redux/apis/common/commonApi";
+import Loader from "../../components/ui/Loader";
 import FpaBarGraph from "../../components/graphs/FpaReportsBarGraph";
 import { FaDownload } from "react-icons/fa";
 import {
@@ -46,26 +47,22 @@ const FPAReports = () => {
   const [monthLoading, setMonthLoading] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [variants, setVariants] = useState([]);
-  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [selectedModelVariant, setSelectedModelVariant] = useState(null);
   const [reportType, setReportType] = useState("fpaReport");
   const [reportData, setReportData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [details, setDetails] = useState("");
 
-  const fetchModelVariants = async () => {
-    try {
-      const res = await axios.get(`${baseURL}shared/model-variants`);
-      const formatted = res?.data.map((item) => ({
-        label: item.MaterialName,
-        value: item.MatCode.toString(),
-      }));
-      setVariants(formatted);
-    } catch (error) {
-      console.error("Failed to fetch model variants:", error);
-      toast.error("Failed to fetch model variants.");
-    }
-  };
+  /* ===================== RTK QUERY ===================== */
+  const {
+    data: variants = [],
+    isLoading: variantsLoading,
+    error: variantsError,
+  } = useGetModelVariantsQuery();
+
+  useEffect(() => {
+    if (variantsError) toast.error("Failed to load model variants");
+  }, [variantsError]);
 
   const handleQuery = async () => {
     if (!startTime || !endTime) {
@@ -289,10 +286,6 @@ const FPAReports = () => {
   }, [reportData]);
 
   useEffect(() => {
-    fetchModelVariants();
-  }, []);
-
-  useEffect(() => {
     setReportData([]);
   }, [reportType]);
 
@@ -362,6 +355,8 @@ const FPAReports = () => {
     };
   };
 
+  if (variantsLoading) return <Loader />;
+
   return (
     <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="FPA Reports" align="center" />
@@ -386,12 +381,13 @@ const FPAReports = () => {
               <SelectField
                 label="Model Variant"
                 options={variants}
-                value={selectedVariant?.value || ""}
+                value={selectedModelVariant?.value || ""}
                 onChange={(e) =>
-                  setSelectedVariant(
-                    variants.find((opt) => opt.value === e.target.value) || 0
+                  setSelectedModelVariant(
+                    variants.find((opt) => opt.value === e.target.value) || null
                   )
                 }
+                className="max-w-64"
               />
               <InputField
                 label="Search"

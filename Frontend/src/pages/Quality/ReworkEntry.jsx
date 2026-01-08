@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useSelector } from "react-redux";
 import axios from "axios";
 import toast from "react-hot-toast";
-import Button from "../../components/common/Button";
-import InputField from "../../components/common/InputField";
-import Title from "../../components/common/Title";
+import Button from "../../components/ui/Button";
+import InputField from "../../components/ui/InputField";
+import Title from "../../components/ui/Title";
 import { baseURL } from "../../assets/assets.js";
 
 const ReworkEntry = () => {

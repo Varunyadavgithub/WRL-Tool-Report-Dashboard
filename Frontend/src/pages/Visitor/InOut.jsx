@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
-import Title from "../../components/common/Title";
-import Button from "../../components/common/Button";
+import Title from "../../components/ui/Title";
+import Button from "../../components/ui/Button";
 import {
   FaSignInAlt,
   FaSignOutAlt,

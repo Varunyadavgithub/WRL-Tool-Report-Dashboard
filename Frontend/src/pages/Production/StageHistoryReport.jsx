@@ -1,10 +1,10 @@
-import Title from "../../components/common/Title";
-import InputField from "../../components/common/InputField";
-import Button from "../../components/common/Button";
+import Title from "../../components/ui/Title";
+import InputField from "../../components/ui/InputField";
+import Button from "../../components/ui/Button";
 import { useState } from "react";
 import axios from "axios";
-import Loader from "../../components/common/Loader";
-import ExportButton from "../../components/common/ExportButton";
+import Loader from "../../components/ui/Loader";
+import ExportButton from "../../components/ui/ExportButton";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets";
 

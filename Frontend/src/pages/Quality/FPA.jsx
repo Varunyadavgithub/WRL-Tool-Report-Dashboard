@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import Title from "../../components/common/Title";
-import InputField from "../../components/common/InputField";
-import Button from "../../components/common/Button";
-import SelectField from "../../components/common/SelectField";
-import Loader from "../../components/common/Loader";
+import Title from "../../components/ui/Title";
+import InputField from "../../components/ui/InputField";
+import Button from "../../components/ui/Button";
+import SelectField from "../../components/ui/SelectField";
+import Loader from "../../components/ui/Loader";
 import { getFormattedISTDate } from "../../utils/dateUtils.js";
 import { baseURL } from "../../assets/assets.js";
 import { Bar } from "react-chartjs-2";
@@ -76,7 +76,7 @@ const FPA = () => {
       setLoading(true);
 
       const res = await axios.get(`${baseURL}quality/fpa-count`);
-      setFpaCountData(res?.data);
+      setFpaCountData(res?.data?.data);
     } catch (error) {
       console.error("Failed to fetch FPA Count data:", error);
       toast.error("Failed to fetch FPA Count data.");
@@ -112,7 +112,7 @@ const FPA = () => {
   const getFPQIDetails = async () => {
     try {
       const res = await axios.get(`${baseURL}quality/fpqi-details`);
-      setFpqiDetails(res?.data);
+      setFpqiDetails(res?.data?.data);
     } catch (error) {
       console.error("Failed to fetch FPQI Details data:", error);
       toast.error("Failed to fetch FPQI Details data.");
@@ -132,7 +132,7 @@ const FPA = () => {
   const getFpaDefectCategory = async () => {
     try {
       const res = await axios.get(`${baseURL}quality/fpa-defect-category`);
-      const formatted = res?.data.map((item) => ({
+      const formatted = res?.data?.data.map((item) => ({
         label: item.Name,
         value: item.Code.toString(),
       }));

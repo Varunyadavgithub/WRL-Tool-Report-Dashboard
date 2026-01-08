@@ -1,30 +1,28 @@
-import Title from "../../components/common/Title";
-import SelectField from "../../components/common/SelectField";
-import InputField from "../../components/common/InputField";
-import Button from "../../components/common/Button";
+import Title from "../../components/ui/Title";
+import SelectField from "../../components/ui/SelectField";
+import InputField from "../../components/ui/InputField";
+import Button from "../../components/ui/Button";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { useEffect, useState } from "react";
 import { FaEdit } from "react-icons/fa";
 import { MdDeleteForever } from "react-icons/md";
-import PopupModal from "../../components/common/PopupModal";
+import PopupModal from "../../components/ui/PopupModal";
 import { WiThermometer } from "react-icons/wi";
 import { FaBolt } from "react-icons/fa";
 import { MdPowerSettingsNew } from "react-icons/md";
 import { baseURL } from "../../assets/assets";
+import { useGetModelVariantsQuery } from "../../redux/apis/common/commonApi";
 
 const LPTRecipe = () => {
   const [loading, setLoading] = useState(false);
-  const [variants, setVariants] = useState([]);
   const [minTemp, setMinTemp] = useState("");
   const [maxTemp, setMaxTemp] = useState("");
-  const [actualTemp, setActualTemp] = useState("");
   const [minCurr, setMinCurr] = useState("");
   const [maxCurr, setMaxCurr] = useState("");
-  const [actualCurr, setActualCurr] = useState("");
   const [minPow, setMinPow] = useState("");
   const [maxPow, setMaxPow] = useState("");
-  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [selectedModelVariant, setSelectedModelVariant] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -39,33 +37,24 @@ const LPTRecipe = () => {
     minPow: "",
     maxPow: "",
   });
-
   const [recipes, setRecipes] = useState([]);
 
-  useEffect(() => {
-    fetchModelVariants();
-    fetchRecipes();
-  }, []);
+  /* ===================== RTK QUERY ===================== */
+  const {
+    data: variants = [],
+    isLoading: variantsLoading,
+    error: variantsError,
+  } = useGetModelVariantsQuery();
 
-  const fetchModelVariants = async () => {
-    try {
-      const res = await axios.get(`${baseURL}shared/model-variants`);
-      const formatted = res?.data.map((item) => ({
-        label: item.MaterialName,
-        value: item.MatCode.toString(),
-      }));
-      setVariants(formatted);
-    } catch (error) {
-      console.error("Failed to fetch model variants:", error);
-      toast.error("Failed to fetch model variants.");
-    }
-  };
+  useEffect(() => {
+    if (variantsError) toast.error("Failed to load model variants");
+  }, [variantsError]);
 
   const fetchRecipes = async () => {
     try {
       const res = await axios.get(`${baseURL}quality/lpt-recipe`);
       if (res?.data?.success) {
-        setRecipes(res.data.data);
+        setRecipes(res?.data);
       }
     } catch (error) {
       console.error("Failed to fetch recipes:", error);
@@ -73,9 +62,13 @@ const LPTRecipe = () => {
     }
   };
 
+  useEffect(() => {
+    fetchRecipes();
+  }, []);
+
   const handleAddRecipe = async () => {
     if (
-      !selectedVariant ||
+      !selectedModelVariant ||
       !minTemp ||
       !maxTemp ||
       !minCurr ||
@@ -198,6 +191,8 @@ const LPTRecipe = () => {
     }
   };
 
+  if (variantsLoading) return <Loader />;
+
   return (
     <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
       <Title title="LPT Recipe" align="center" />
@@ -208,12 +203,13 @@ const LPTRecipe = () => {
           <SelectField
             label="Model Variant"
             options={variants}
-            value={selectedVariant?.value || ""}
+            value={selectedModelVariant?.value || ""}
             onChange={(e) =>
-              setSelectedVariant(
-                variants.find((opt) => opt.value === e.target.value) || 0
+              setSelectedModelVariant(
+                variants.find((opt) => opt.value === e.target.value) || null
               )
             }
+            className="max-w-64"
           />
           <div className="flex flex-col gap-4 p-5 bg-red-50 shadow-md border border-red-200 rounded-xl min-w-[220px]">
             <h1 className="text-lg font-bold text-center text-red-700 flex items-center justify-center gap-2">

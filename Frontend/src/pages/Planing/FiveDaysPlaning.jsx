@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
-import Title from "../../components/common/Title";
-import Loader from "../../components/common/Loader";
+import Title from "../../components/ui/Title";
+import Loader from "../../components/ui/Loader";
 import toast from "react-hot-toast";
 import { BsEye, BsDownload, BsTrash } from "react-icons/bs";
 import { useSelector } from "react-redux";
-import PopupModal from "../../components/common/PopupModal";
+import PopupModal from "../../components/ui/PopupModal";
 import { MdDeleteForever } from "react-icons/md";
 import { baseURL } from "../../assets/assets";
 

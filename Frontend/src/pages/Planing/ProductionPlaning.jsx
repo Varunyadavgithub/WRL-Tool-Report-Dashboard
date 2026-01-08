@@ -1,8 +1,8 @@
-import Button from "../../components/common/Button";
-import InputField from "../../components/common/InputField";
-import SelectField from "../../components/common/SelectField";
-import Title from "../../components/common/Title";
-import Loader from "../../components/common/Loader";
+import Button from "../../components/ui/Button";
+import InputField from "../../components/ui/InputField";
+import SelectField from "../../components/ui/SelectField";
+import Title from "../../components/ui/Title";
+import Loader from "../../components/ui/Loader";
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { useSelector } from "react-redux";
