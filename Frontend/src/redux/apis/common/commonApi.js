@@ -37,6 +37,18 @@ export const commonApi = createApi({
         })),
       providesTags: ["Common"],
     }),
+
+    getEmployeesWithDepartments: builder.query({
+      query: () => "shared/employees-with-departments",
+      transformResponse: (response) =>
+        response.map((emp) => ({
+          label: emp.name,
+          value: emp.employee_id.toString(),
+          departmentName: emp.department_name,
+          departmentCode: emp.deptCode,
+        })),
+      providesTags: ["Common"],
+    }),
   }),
 });
 
@@ -44,4 +56,5 @@ export const {
   useGetModelVariantsQuery,
   useGetStagesQuery,
   useGetComponentTypesQuery,
+  useGetEmployeesWithDepartmentsQuery,
 } = commonApi;

@@ -11,7 +11,7 @@ import {
   FaClipboardList,
 } from "react-icons/fa";
 import {
-  MdNotificationsActive,
+  MdOutlineNotificationsActive,
   MdOutlineDisplaySettings,
 } from "react-icons/md";
 import { FaUserShield } from "react-icons/fa6";
@@ -239,6 +239,23 @@ const MENU_CONFIG = [
       {
         path: "/compliance/calibiration",
         label: "calibiration",
+        roles: ["admin"],
+      },
+    ],
+  },
+  {
+    key: "Task Reminders",
+    icon: MdOutlineNotificationsActive,
+    label: "Task Reminders",
+    items: [
+      {
+        path: "/reminder/tasks",
+        label: "Manage Tasks",
+        roles: ["admin"],
+      },
+      {
+        path: "/reminder/overview",
+        label: "Task Overview",
         roles: ["admin"],
       },
     ],

@@ -1,5 +1,5 @@
 import sql from "mssql";
-import { dbConfig1 } from "../config/db.js";
+import { dbConfig1, dbConfig3 } from "../config/db.js";
 import { tryCatch } from "../config/tryCatch.js";
 import { AppError } from "../utils/AppError.js";
 
@@ -96,6 +96,36 @@ export const getDepartments = tryCatch(async (_, res) => {
     });
   } catch (error) {
     throw new AppError("Failed to fetch departments", 500);
+  } finally {
+    await pool.close();
+  }
+});
+
+// Fetches a list of all employees along with their department information.
+export const getEmployeesWithDepartments = tryCatch(async (_, res) => {
+  const query = `
+    SELECT 
+      u.name,
+      u.employee_id,
+      dpt.department_name,
+      dpt.deptCode
+    FROM users AS u
+    INNER JOIN departments AS dpt
+      ON u.department_id = dpt.deptCode;
+  `;
+
+  const pool = await new sql.ConnectionPool(dbConfig3).connect();
+
+  try {
+    const result = await pool.request().query(query);
+
+    res.status(200).json({
+      success: true,
+      message: "Employees with departments fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError("Failed to fetch employees with departments", 500);
   } finally {
     await pool.close();
   }
