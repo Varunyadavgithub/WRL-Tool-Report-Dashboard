@@ -88,6 +88,9 @@ const LogisticsDisplay = lazy(() =>
 
 const Calibiration = lazy(() => import("./pages/Compliance/Calibration"));
 
+const ManageTasks = lazy(() => import("./pages/TaskReminders/ManageTasks"));
+const TaskOverview = lazy(() => import("./pages/TaskReminders/TaskOverview"));
+
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 function App() {
@@ -314,6 +317,13 @@ function App() {
                 path="/compliance/calibiration"
                 element={<Calibiration />}
               />
+            )}
+            {/*-------------------------------------------------------------- Task Reminders --------------------------------------------------------------*/}
+            {canAccess(["admin"]) && (
+              <Route path="/reminder/tasks" element={<ManageTasks />} />
+            )}
+            {canAccess(["admin"]) && (
+              <Route path="/reminder/overview" element={<TaskOverview />} />
             )}
             {/*-------------------------------------------------------------- Catch All --------------------------------------------------------------*/}
             <Route path="*" element={<NotFound />} />

@@ -31,26 +31,6 @@ export const fetchDepartments = async (req, res) => {
   }
 };
 
-// Get Employee by Department
-export const getEmployee = async (_, res) => {
-  try {
-    const query = `Select u.name, u.employee_id, dpt.department_name, dpt.deptCode from users as u
-inner join departments  dpt on u.department_id = dpt.deptCode;
-    `;
-
-    const pool = await new sql.ConnectionPool(dbConfig3).connect();
-    const result = await pool.request().query(query);
-    res.json(result.recordset);
-    await pool.close();
-  } catch (error) {
-    console.error("Error fetching employee list:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to retrieve employee information",
-    });
-  }
-};
-
 // Generate Visitor Pass with Phone Number Check
 export const generateVisitorPass = async (req, res) => {
   const {
@@ -223,7 +203,7 @@ export const generateVisitorPass = async (req, res) => {
       )
     `);
 
-     await pool.close();
+    await pool.close();
 
     res.status(201).json({
       success: true,
