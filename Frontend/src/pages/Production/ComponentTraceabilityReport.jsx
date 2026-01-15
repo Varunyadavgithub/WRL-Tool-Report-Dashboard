@@ -11,7 +11,7 @@ import { baseURL } from "../../assets/assets";
 import {
   useGetModelVariantsQuery,
   useGetComponentTypesQuery,
-} from "../../redux/apis/common/commonApi";
+} from "../../redux/api/commonApi.js";
 
 const ComponentTraceabilityReport = () => {
   const [loading, setLoading] = useState(false);

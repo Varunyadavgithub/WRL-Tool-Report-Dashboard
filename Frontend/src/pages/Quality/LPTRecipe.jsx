@@ -12,7 +12,7 @@ import { WiThermometer } from "react-icons/wi";
 import { FaBolt } from "react-icons/fa";
 import { MdPowerSettingsNew } from "react-icons/md";
 import { baseURL } from "../../assets/assets";
-import { useGetModelVariantsQuery } from "../../redux/apis/common/commonApi";
+import { useGetModelVariantsQuery } from "../../redux/api/commonApi.js";
 
 const LPTRecipe = () => {
   const [loading, setLoading] = useState(false);

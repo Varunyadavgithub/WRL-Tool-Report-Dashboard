@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 import ExportButton from "../../components/ui/ExportButton";
 import { baseURL } from "../../assets/assets";
 import Loader from "../../components/ui/Loader";
-import { useGetModelVariantsQuery } from "../../redux/apis/common/commonApi";
+import { useGetModelVariantsQuery } from "../../redux/api/commonApi.js";
 
 const LPTReport = () => {
   const [loading, setLoading] = useState(false);

@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 import Loader from "../../components/ui/Loader";
 import { FaCaretUp, FaCaretDown } from "react-icons/fa";
 import { baseURL } from "../../assets/assets";
-import { useGetModelVariantsQuery } from "../../redux/apis/common/commonApi";
+import { useGetModelVariantsQuery } from "../../redux/api/commonApi.js";
 
 const TotalProduction = () => {
   const [loading, setLoading] = useState(false);

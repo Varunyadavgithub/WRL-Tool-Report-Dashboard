@@ -1,6 +1,7 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import authSlice from "./authSlice";
-import { commonApi } from "./apis/common/commonApi";
+import { commonApi } from "./api/commonApi.js";
+import { taskReminderApi } from "./api/taskReminder.js";
 import {
   persistReducer,
   FLUSH,
@@ -21,6 +22,7 @@ const persistConfig = {
 const rootReducer = combineReducers({
   auth: authSlice,
   [commonApi.reducerPath]: commonApi.reducer,
+  [taskReminderApi.reducerPath]: taskReminderApi.reducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
@@ -32,7 +34,7 @@ const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }).concat(commonApi.middleware),
+    }).concat(commonApi.middleware, taskReminderApi.middleware),
 });
 
 export default store;

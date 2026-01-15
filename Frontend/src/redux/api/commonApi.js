@@ -1,5 +1,5 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import { baseURL } from "../../../assets/assets";
+import { baseURL } from "../../assets/assets.js";
 
 export const commonApi = createApi({
   reducerPath: "commonApi",
@@ -41,7 +41,7 @@ export const commonApi = createApi({
     getEmployeesWithDepartments: builder.query({
       query: () => "shared/employees-with-departments",
       transformResponse: (response) =>
-        response.map((emp) => ({
+        response.data.map((emp) => ({
           label: emp.name,
           value: emp.employee_id.toString(),
           departmentName: emp.department_name,

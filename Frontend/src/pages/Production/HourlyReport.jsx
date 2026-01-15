@@ -20,7 +20,7 @@ import { baseURL } from "../../assets/assets.js";
 import {
   useGetModelVariantsQuery,
   useGetStagesQuery,
-} from "../../redux/apis/common/commonApi";
+} from "../../redux/api/commonApi.js";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 // Map Categories with TIMEHOUR grouping

@@ -11,7 +11,7 @@ import { baseURL } from "../../assets/assets";
 import {
   useGetModelVariantsQuery,
   useGetStagesQuery,
-} from "../../redux/apis/common/commonApi";
+} from "../../redux/api/commonApi.js";
 
 const Overview = () => {
   const [loading, setLoading] = useState(false);

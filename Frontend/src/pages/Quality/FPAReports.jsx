@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 import { useMemo } from "react";
 import ExportButton from "../../components/ui/ExportButton";
 import { baseURL } from "../../assets/assets";
-import { useGetModelVariantsQuery } from "../../redux/apis/common/commonApi";
+import { useGetModelVariantsQuery } from "../../redux/api/commonApi.js";
 import Loader from "../../components/ui/Loader";
 import FpaBarGraph from "../../components/graphs/FpaReportsBarGraph";
 import { FaDownload } from "react-icons/fa";

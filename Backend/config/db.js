@@ -38,6 +38,17 @@ export const dbConfig3 = {
   },
 };
 
+// Config for Server 4
+export const dbConfig4 = {
+  user: process.env.DB_USER4,
+  password: process.env.DB_PASSWORD4,
+  server: process.env.DB_SERVER4,
+  database: process.env.DB_NAME4,
+  options: {
+    encrypt: true,
+    trustServerCertificate: true,
+  },
+};
 // Function to connect to any given config
 const pools = new Map();
 

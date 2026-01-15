@@ -3,7 +3,8 @@ import Title from "../../components/ui/Title";
 import SelectField from "../../components/ui/SelectField";
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import Badge from "../../components/ui/Badge";
-import { useGetEmployeesWithDepartmentsQuery } from "../../redux/apis/common/commonApi";
+import { useGetEmployeesWithDepartmentsQuery } from "../../redux/api/commonApi.js";
+import { useCreateTaskMutation } from "../../redux/api/taskReminder.js";
 import toast from "react-hot-toast";
 
 /* ---------------- OPTIONS ---------------- */
@@ -16,16 +17,26 @@ const reminderOptions = [
   { label: "Immediately + After 15 Days", value: "15_day" },
 ];
 
+// Map the reminder value to a numeric count for backend
+const reminderValueMap = {
+  none: 0,
+  "1_day": 1,
+  "5_day": 5,
+  "15_day": 15,
+};
+
 const ManageTasks = () => {
   const [task, setTask] = useState({
     title: "",
     description: "",
     assignedTo: "",
-    department: "", // Added to store the department
+    department: "", // auto-filled
     priority: "Medium",
     dueDate: "",
-    reminderCount: 0,
+    reminderCount: "none", // store as string for select
   });
+
+  const [createTask, { isLoading }] = useCreateTaskMutation();
 
   const {
     data: employees = [],
@@ -41,7 +52,6 @@ const ManageTasks = () => {
 
   const handleAssignmentChange = (e) => {
     const selectedValue = e?.target?.value || e?.value || "";
-
     const selectedEmp = employees.find((emp) => emp.value === selectedValue);
 
     setTask((prev) => ({
@@ -51,15 +61,36 @@ const ManageTasks = () => {
     }));
   };
 
-  // Generic handler for simple inputs
   const handleChange = (e) => {
     const { name, value } = e.target;
     setTask((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Task Created:", task);
+
+    // Convert reminderCount to numeric for backend
+    const payload = {
+      ...task,
+      reminderCount: reminderValueMap[task.reminderCount] || 0,
+    };
+
+    try {
+      await createTask(payload).unwrap();
+      toast.success("Task created & email sent.");
+
+      setTask({
+        title: "",
+        description: "",
+        assignedTo: "",
+        department: "",
+        priority: "Medium",
+        dueDate: "",
+        reminderCount: "none",
+      });
+    } catch (error) {
+      toast.error(error?.data?.message || "Failed to create task.");
+    }
   };
 
   return (
@@ -84,7 +115,6 @@ const ManageTasks = () => {
         <div className="px-8 py-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* LEFT – FORM */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Title */}
             <div>
               <label className="block text-sm font-medium text-slate-700">
                 Task Title
@@ -100,7 +130,6 @@ const ManageTasks = () => {
               />
             </div>
 
-            {/* Description */}
             <div>
               <label className="block text-sm font-medium text-slate-700">
                 Description
@@ -115,9 +144,7 @@ const ManageTasks = () => {
               />
             </div>
 
-            {/* Assign & Priority */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Employee Selection */}
               <div className="w-full">
                 <SelectField
                   label="Assign To"
@@ -131,7 +158,6 @@ const ManageTasks = () => {
                 />
               </div>
 
-              {/* Read-Only Department View */}
               <div className="w-full">
                 <label className="block font-semibold mb-1 text-sm text-slate-700">
                   Department
@@ -145,7 +171,6 @@ const ManageTasks = () => {
                 </div>
               </div>
 
-              {/* Priority */}
               <SelectField
                 label="Priority"
                 name="priority"
@@ -153,6 +178,7 @@ const ManageTasks = () => {
                 value={task.priority}
                 onChange={handleChange}
               />
+
               <SelectField
                 label="Email Reminder"
                 name="reminderCount"
@@ -178,8 +204,6 @@ const ManageTasks = () => {
 
             <SummaryItem label="Title" value={task.title} />
             <SummaryItem label="Assigned To" value={task.assignedTo} />
-
-            {/* Show department in summary if selected */}
             {task.department && (
               <SummaryItem label="Department" value={task.department} />
             )}
@@ -202,8 +226,8 @@ const ManageTasks = () => {
             <SummaryItem
               label="Reminder Emails"
               value={
-                task.reminderCount > 0
-                  ? `${task.reminderCount} time(s)`
+                task.reminderCount !== "none"
+                  ? `${reminderValueMap[task.reminderCount]} time(s)`
                   : "No reminder"
               }
             />
@@ -220,9 +244,16 @@ const ManageTasks = () => {
           </button>
           <button
             type="submit"
-            className="px-6 py-2 rounded-lg bg-sky-600 text-white font-medium hover:bg-sky-700"
+            disabled={isLoading}
+            className={`px-6 py-2 rounded-lg text-white font-medium
+              ${
+                isLoading
+                  ? "bg-slate-400 cursor-not-allowed"
+                  : "bg-sky-600 hover:bg-sky-700"
+              }
+            `}
           >
-            Create Task
+            {isLoading ? "Creating..." : "Create Task"}
           </button>
         </div>
       </form>

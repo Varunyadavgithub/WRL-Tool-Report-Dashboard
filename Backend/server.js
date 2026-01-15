@@ -5,7 +5,13 @@ dotenv.config();
 import path from "path";
 import cookieParser from "cookie-parser";
 import routes from "./routes/index.js";
-import { connectToDB, dbConfig1, dbConfig2, dbConfig3 } from "./config/db.js";
+import {
+  connectToDB,
+  dbConfig1,
+  dbConfig2,
+  dbConfig3,
+  dbConfig4,
+} from "./config/db.js";
 import { startCalibrationCron } from "./cron/calibrationEscalation.js";
 import { globalErrorHandler } from "./middlewares/errorHandler.js";
 // const _dirname = path.resolve();
@@ -13,12 +19,21 @@ import { globalErrorHandler } from "./middlewares/errorHandler.js";
 const app = express();
 
 // <------------------------------------------------------------- Middlewares ------------------------------------------------------------->
+const allowedOrigins = process.env.CORS_ORIGIN.split(",");
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("CORS not allowed"));
+      }
+    },
     credentials: true,
   })
 );
+
 app.use(express.json());
 app.use(cookieParser());
 app.use("/uploads", express.static(path.resolve("uploads"))); // Static files
@@ -29,6 +44,7 @@ app.use("/uploads", express.static(path.resolve("uploads"))); // Static files
     global.pool1 = await connectToDB(dbConfig1);
     global.pool2 = await connectToDB(dbConfig2);
     global.pool3 = await connectToDB(dbConfig3);
+    global.pool4 = await connectToDB(dbConfig4);
     console.log("Database connected");
   } catch (error) {
     console.error("Database connection failed:", error);

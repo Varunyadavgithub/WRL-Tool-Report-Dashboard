@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { useSelector } from "react-redux";
 import { baseURL } from "../../assets/assets";
 import { useNavigate } from "react-router-dom";
-import { useGetEmployeesWithDepartmentsQuery } from "../../redux/apis/common/commonApi";
+import { useGetEmployeesWithDepartmentsQuery } from "../../redux/api/commonApi.js";
 
 const GeneratePass = () => {
   const { user } = useSelector((store) => store.auth);
