@@ -154,13 +154,18 @@ const FPA = () => {
       return;
     }
 
-    const defectToAdd = addManually
-      ? manualCategory?.trim()
-      : selectedFpaDefectCategory.label;
+    let defectToAdd = "";
+    if (selectedDefectCategory.value === "no-defect") {
+      defectToAdd = "No Defect";
+    } else {
+      defectToAdd = addManually
+        ? manualCategory?.trim()
+        : selectedFpaDefectCategory?.label;
 
-    if (!defectToAdd) {
-      toast.error("Please select or enter a defect.");
-      return;
+      if (!defectToAdd) {
+        toast.error("Please select or enter a defect.");
+        return;
+      }
     }
 
     try {
