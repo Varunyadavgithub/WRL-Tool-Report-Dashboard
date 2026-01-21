@@ -53,28 +53,33 @@ const TagUpdate = () => {
       toast.error("New Asset Number is required");
       return;
     }
-    if (!assemblyNumber && !fgSerialNumber) {
+
+    if (!assemblyNumber || !fgSerialNumber) {
       toast.error("Assembly Number and FGSerialNumber fields are required");
       return;
     }
+
     try {
       setLoading(true);
 
-      const payload = {
-        assemblyNumber,
-        fgSerialNumber,
-        newAssetNumber,
-      };
+      const payload = { assemblyNumber, fgSerialNumber, newAssetNumber };
 
       const res = await axios.put(`${baseURL}quality/new-asset-tag`, payload);
+
+      // Use backend message for both success and failure
       if (res.data.success) {
         toast.success(res.data.message);
       } else {
-        toast.error("Failed to update New Asset Number.");
+        toast.error(res.data.message || "Failed to update New Asset Number.");
       }
     } catch (error) {
       console.error("Failed to update the New Asset Number Data:", error);
-      toast.error("Failed to update the New Asset Number Data.");
+      // Show backend message if available
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error("Failed to update the New Asset Number Data.");
+      }
     } finally {
       setLoading(false);
     }
@@ -85,28 +90,31 @@ const TagUpdate = () => {
       toast.error("New Customer QR is required");
       return;
     }
-    if (!assemblyNumber && !fgSerialNumber) {
+
+    if (!assemblyNumber || !fgSerialNumber) {
       toast.error("Assembly Number and FGSerialNumber fields are required");
       return;
     }
+
     try {
       setLoading(true);
 
-      const payload = {
-        assemblyNumber,
-        fgSerialNumber,
-        newCustomerQr,
-      };
+      const payload = { assemblyNumber, fgSerialNumber, newCustomerQr };
 
       const res = await axios.put(`${baseURL}quality/new-customer-qr`, payload);
+
       if (res.data.success) {
         toast.success(res.data.message);
       } else {
-        toast.error("Failed to update New Customer QR.");
+        toast.error(res.data.message || "Failed to update New Customer QR.");
       }
     } catch (error) {
       console.error("Failed to update the New Customer QR data:", error);
-      toast.error("Failed to update the New Customer QR data.");
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error("Failed to update the New Customer QR data.");
+      }
     } finally {
       setLoading(false);
     }
@@ -158,7 +166,7 @@ const TagUpdate = () => {
                   value={selectedToUpdate?.value || ""}
                   onChange={(e) => {
                     const selected = updateOption.find(
-                      (opt) => opt.value === e.target.value
+                      (opt) => opt.value === e.target.value,
                     );
                     if (selected) {
                       setSelectedToUpdate(selected);

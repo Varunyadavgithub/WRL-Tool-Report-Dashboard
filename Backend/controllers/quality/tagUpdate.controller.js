@@ -9,7 +9,7 @@ export const getAssetTagDetails = tryCatch(async (req, res) => {
   if (!assemblyNumber) {
     throw new AppError(
       "Missing required query parameters: assemblyNumber.",
-      400
+      400,
     );
   }
 
@@ -58,7 +58,7 @@ export const getAssetTagDetails = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch the Asset tag details data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -71,25 +71,50 @@ export const newAssetTagUpdate = tryCatch(async (req, res) => {
   if (!assemblyNumber || !fgSerialNumber || !newAssetNumber) {
     throw new AppError(
       "Missing required fields: assemblyNumber, fgSerialNumber or newAssetNumber.",
-      400
+      400,
     );
   }
-
-  const query = `
-    Update MaterialBarcode 
-    Set VSerial=@newAssetNumber 
-    Where Alias=@serial and Serial=@fgSerialNumber
-  `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
   try {
+    // 1️⃣ Check if newAssetNumber already exists
+    const checkQuery = `
+      SELECT COUNT(*) AS count
+      FROM MaterialBarcode
+      WHERE VSerial = @newAssetNumber
+    `;
+    const checkResult = await pool
+      .request()
+      .input("newAssetNumber", sql.NVarChar, newAssetNumber)
+      .query(checkQuery);
+
+    if (checkResult.recordset[0].count > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Asset number already exists.",
+      });
+    }
+
+    // 2️⃣ Proceed to update if it doesn't exist
+    const updateQuery = `
+      UPDATE MaterialBarcode 
+      SET VSerial = @newAssetNumber
+      WHERE Alias = @serial AND Serial = @fgSerialNumber
+    `;
     const result = await pool
       .request()
       .input("serial", sql.NVarChar, assemblyNumber)
       .input("fgSerialNumber", sql.NVarChar, fgSerialNumber)
       .input("newAssetNumber", sql.NVarChar, newAssetNumber)
-      .query(query);
+      .query(updateQuery);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No matching record found to update.",
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -97,8 +122,8 @@ export const newAssetTagUpdate = tryCatch(async (req, res) => {
     });
   } catch (error) {
     throw new AppError(
-      `Failed to update the asset tag data:${error.message}`,
-      500
+      `Failed to update the asset tag data: ${error.message}`,
+      500,
     );
   } finally {
     await pool.close();
@@ -111,25 +136,50 @@ export const newCustomerQrUpdate = tryCatch(async (req, res) => {
   if (!assemblyNumber || !fgSerialNumber || !newCustomerQr) {
     throw new AppError(
       "Missing required fields: assemblyNumber, fgSerialNumber or newCustomerQr.",
-      400
+      400,
     );
   }
-
-  const query = `
-    Update MaterialBarcode 
-    Set Serial2=@newCustomerQr 
-    Where Alias=@assemblyserial and Serial=@fgSerialNumber
-  `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
   try {
+    // 1️⃣ Check if newCustomerQr already exists
+    const checkQuery = `
+      SELECT COUNT(*) AS count
+      FROM MaterialBarcode
+      WHERE Serial2 = @newCustomerQr
+    `;
+    const checkResult = await pool
+      .request()
+      .input("newCustomerQr", sql.NVarChar, newCustomerQr)
+      .query(checkQuery);
+
+    if (checkResult.recordset[0].count > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer QR already exists.",
+      });
+    }
+
+    // 2️⃣ Proceed to update if it doesn't exist
+    const updateQuery = `
+      UPDATE MaterialBarcode
+      SET Serial2 = @newCustomerQr
+      WHERE Alias = @assemblyserial AND Serial = @fgSerialNumber
+    `;
     const result = await pool
       .request()
       .input("assemblyserial", sql.NVarChar, assemblyNumber)
       .input("fgSerialNumber", sql.NVarChar, fgSerialNumber)
       .input("newCustomerQr", sql.NVarChar, newCustomerQr)
-      .query(query);
+      .query(updateQuery);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No matching record found to update.",
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -137,8 +187,8 @@ export const newCustomerQrUpdate = tryCatch(async (req, res) => {
     });
   } catch (error) {
     throw new AppError(
-      `Failed to update the Customer QR data:${error.message}`,
-      500
+      `Failed to update the Customer QR data: ${error.message}`,
+      500,
     );
   } finally {
     await pool.close();
