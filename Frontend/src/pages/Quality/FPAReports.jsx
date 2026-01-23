@@ -37,8 +37,14 @@ ChartJS.register(
   LineController, // ✅ Required
   ChartTitle,
   Tooltip,
-  Legend
+  Legend,
 );
+
+const normalizeArray = (data) => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
 
 const FPAReports = () => {
   const [loading, setLoading] = useState(false);
@@ -77,31 +83,31 @@ const FPAReports = () => {
       };
 
       if (reportType === "fpaReport") {
-        if (selectedVariant && selectedVariant.value) {
+        if (selectedModelVariant && selectedModelVariant.value) {
           params = {
             ...params,
-            model: selectedVariant.label,
+            model: selectedModelVariant.label,
           };
         }
 
         const res = await axios.get(`${baseURL}quality/fpa-report`, { params });
-        setReportData(res.data);
-        setSelectedVariant(null);
+        setReportData(normalizeArray(res.data));
+        setSelectedModelVariant(null);
       } else if (reportType === "dailyFpaReport") {
         const res = await axios.get(`${baseURL}quality/fpa-daily-report`, {
           params,
         });
-        setReportData(res.data);
+        setReportData(normalizeArray(res.data));
       } else if (reportType === "monthlyFpaReport") {
         const res = await axios.get(`${baseURL}quality/fpa-monthly-report`, {
           params,
         });
-        setReportData(res.data);
+        setReportData(normalizeArray(res.data));
       } else if (reportType === "yearlyFpaReport") {
         const res = await axios.get(`${baseURL}quality/fpa-yearly-report`, {
           params,
         });
-        setReportData(res.data);
+        setReportData(normalizeArray(res.data));
       } else {
         alert("Please select the Report Type.");
         return;
@@ -126,7 +132,7 @@ const FPAReports = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -137,7 +143,7 @@ const FPAReports = () => {
       setYdayLoading(true);
 
       setReportData([]);
-      setSelectedVariant(null);
+      setSelectedModelVariant(null);
 
       let params = {
         startDate: formattedStart,
@@ -145,16 +151,16 @@ const FPAReports = () => {
       };
 
       if (reportType === "fpaReport") {
-        if (selectedVariant && selectedVariant.value) {
+        if (selectedModelVariant && selectedModelVariant.value) {
           params = {
             ...params,
-            model: selectedVariant.label,
+            model: selectedModelVariant.label,
           };
         }
 
         const res = await axios.get(`${baseURL}quality/fpa-report`, { params });
-        setReportData(res.data);
-        setSelectedVariant(null);
+        setReportData(normalizeArray(res.data));
+        setSelectedModelVariant(null);
       }
     } catch (error) {
       console.error("Failed to fetch Yesterday FPA Report:", error);
@@ -172,7 +178,7 @@ const FPAReports = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -183,7 +189,7 @@ const FPAReports = () => {
       setTodayLoading(true);
 
       setReportData([]);
-      setSelectedVariant(null);
+      setSelectedModelVariant(null);
 
       let params = {
         startDate: formattedStart,
@@ -191,16 +197,16 @@ const FPAReports = () => {
       };
 
       if (reportType === "fpaReport") {
-        if (selectedVariant && selectedVariant.value) {
+        if (selectedModelVariant && selectedModelVariant.value) {
           params = {
             ...params,
-            model: selectedVariant.label,
+            model: selectedModelVariant.label,
           };
         }
 
         const res = await axios.get(`${baseURL}quality/fpa-report`, { params });
-        setReportData(res.data);
-        setSelectedVariant(null);
+        setReportData(normalizeArray(res.data));
+        setSelectedModelVariant(null);
       } else {
         alert("Please select only FPA Report Type.");
         return;
@@ -221,13 +227,13 @@ const FPAReports = () => {
       1,
       8,
       0,
-      0
+      0,
     ); // 1st day at 08:00 AM
 
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -238,7 +244,7 @@ const FPAReports = () => {
       setMonthLoading(true);
 
       setReportData([]);
-      setSelectedVariant(null);
+      setSelectedModelVariant(null);
 
       let params = {
         startDate: formattedStart,
@@ -246,29 +252,29 @@ const FPAReports = () => {
       };
 
       if (reportType === "fpaReport") {
-        if (selectedVariant && selectedVariant.value) {
+        if (selectedModelVariant && selectedModelVariant.value) {
           params = {
             ...params,
-            model: selectedVariant.label,
+            model: selectedModelVariant.label,
           };
         }
 
         const res = await axios.get(`${baseURL}quality/fpa-report`, { params });
-        setReportData(res.data);
-        setSelectedVariant(null);
+        setReportData(normalizeArray(res.data));
+        setSelectedModelVariant(null);
       } else if (reportType === "dailyFpaReport") {
-        if (selectedVariant && selectedVariant.value) {
+        if (selectedModelVariant && selectedModelVariant.value) {
           params = {
             ...params,
-            model: selectedVariant.label,
+            model: selectedModelVariant.label,
           };
         }
 
         const res = await axios.get(`${baseURL}quality/fpa-daily-report`, {
           params,
         });
-        setReportData(res.data);
-        setSelectedVariant(null);
+        setReportData(normalizeArray(res.data));
+        setSelectedModelVariant(null);
       } else {
         alert("Please select only FPA and Daily Report Type.");
         return;
@@ -282,6 +288,7 @@ const FPAReports = () => {
   };
 
   const uniqueFGSRNoCount = useMemo(() => {
+    if (!Array.isArray(reportData)) return 0;
     return new Set(reportData.map((item) => item.FGSRNo)).size;
   }, [reportData]);
 
@@ -298,7 +305,7 @@ const FPAReports = () => {
   }, [searchTerm]);
 
   const getChartConfig = () => {
-    if (!reportData || reportData.length === 0) return null;
+    if (!Array.isArray(reportData) || reportData.length === 0) return null;
 
     let sortedData = [...reportData];
 
@@ -384,7 +391,8 @@ const FPAReports = () => {
                 value={selectedModelVariant?.value || ""}
                 onChange={(e) =>
                   setSelectedModelVariant(
-                    variants.find((opt) => opt.value === e.target.value) || null
+                    variants.find((opt) => opt.value === e.target.value) ||
+                      null,
                   )
                 }
                 className="max-w-64"
@@ -545,7 +553,7 @@ const FPAReports = () => {
 
         {/* ✅ COMMON DRY GRAPH – RIGHT SIDE OF QUICK FILTER */}
         {["dailyFpaReport", "monthlyFpaReport", "yearlyFpaReport"].includes(
-          reportType
+          reportType,
         ) &&
           reportData.length > 0 && (
             <div className="mt-4">
@@ -554,8 +562,8 @@ const FPAReports = () => {
                   reportType === "dailyFpaReport"
                     ? "Daily FPA Trend"
                     : reportType === "monthlyFpaReport"
-                    ? "Monthly FPA Trend"
-                    : "Yearly FPA Trend"
+                      ? "Monthly FPA Trend"
+                      : "Yearly FPA Trend"
                 }
                 labels={getChartConfig()?.labels}
                 datasets={getChartConfig()?.datasets}
@@ -573,12 +581,12 @@ const FPAReports = () => {
                 details
                   ? item.Model?.toLowerCase().includes(details.toLowerCase()) ||
                     item.FGSRNo?.toLowerCase().includes(
-                      details.toLocaleLowerCase()
+                      details.toLocaleLowerCase(),
                     ) ||
                     item.AddDefect?.toLowerCase().includes(
-                      details.toLowerCase()
+                      details.toLowerCase(),
                     )
-                  : true
+                  : true,
               )}
             />
           )}
@@ -712,7 +720,7 @@ const DailyFpaReportTable = ({ data }) => {
             data.map((row, index) => (
               <tr key={index} className="hover:bg-gray-100 text-center">
                 <td className="px-1 py-1 border">
-                  {row.ShiftDate.slice(0, 10)}
+                  {row.ShiftDate ? row.ShiftDate.slice(0, 10) : "-"}
                 </td>
                 <td className="px-1 py-1 border">{row.Month}</td>
                 <td className="px-1 py-1 border">{row.NoOfCritical}</td>
