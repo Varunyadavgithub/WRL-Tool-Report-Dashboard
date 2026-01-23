@@ -14,7 +14,7 @@ export const getFpaReport = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate or endDate.",
-      400
+      400,
     );
   }
 
@@ -55,7 +55,7 @@ export const getFpaReport = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch the FPA Report data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -68,7 +68,7 @@ export const getFpaDailyReport = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate or endDate.",
-      400
+      400,
     );
   }
 
@@ -137,7 +137,7 @@ ORDER BY ShiftDate DESC;
   } catch (error) {
     throw new AppError(
       `Failed to fetch the FPA Daily Report data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -150,7 +150,7 @@ export const getFpaMonthlyReport = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate or endDate.",
-      400
+      400,
     );
   }
 
@@ -220,7 +220,7 @@ ORDER BY MonthKey DESC;
   } catch (error) {
     throw new AppError(
       `Failed to fetch the FPA Monthly Report data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -233,7 +233,7 @@ export const getFpaYearlyReport = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate or endDate.",
-      400
+      400,
     );
   }
 
@@ -299,7 +299,7 @@ ORDER BY Year DESC;
   } catch (error) {
     throw new AppError(
       `Failed to fetch the FPA Yearly Report data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -311,64 +311,54 @@ export const downloadDefectImage = tryCatch(async (req, res) => {
   const { filename } = req.query;
 
   if (!fgSrNo || !filename) {
-    throw new AppError(
-      "Missing required query parameters: fGSerialNumber or filename.",
-      400
-    );
+    throw new AppError("Missing required parameters: fgSrNo or filename", 400);
   }
 
-  const filePath = path.join(uploadDir, filename);
+  const safeFileName = path.basename(filename);
+  const filePath = path.join(uploadDir, safeFileName);
+
+  if (!fs.existsSync(filePath)) {
+    throw new AppError("File not found on server", 404);
+  }
+
+  let pool;
 
   try {
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        success: false,
-        message: "File not found on server",
-      });
-    }
+    pool = await sql.connect(dbConfig1);
 
-    // Verify file in database
-    const pool = await sql.connect(dbConfig1);
-    const query = `
-      SELECT DefectImage
-      FROM FPAReport
-      WHERE FGSRNo = @FGSRNo AND DefectImage = @FileName
-    `;
     const result = await pool
       .request()
       .input("FGSRNo", sql.NVarChar, fgSrNo.trim())
-      .input("FileName", sql.NVarChar, filename)
-      .query(query);
+      .input("FileName", sql.NVarChar, safeFileName).query(`
+        SELECT 1
+        FROM FPAReport
+        WHERE FGSRNo = @FGSRNo
+          AND DefectImage = @FileName
+      `);
 
     if (result.recordset.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "File record not found in database",
-      });
+      throw new AppError("File record not found in database", 404);
     }
 
-    // Set headers for download
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${safeFileName}"`,
+    );
     res.setHeader("Content-Type", "application/octet-stream");
 
-    // Stream the file
     const fileStream = fs.createReadStream(filePath);
-    fileStream.pipe(res);
 
-    fileStream.on("error", (error) => {
-      console.error("File streaming error:", error);
-      res.status(500).json({
-        success: false,
-        message: "Error streaming file",
-      });
+    fileStream.on("error", (err) => {
+      console.error("File streaming error:", err);
+      if (!res.headersSent) {
+        res.end();
+      }
     });
-  } catch (error) {
-    throw new AppError(
-      `Failed to download the Defect Image:${error.message}`,
-      500
-    );
+
+    fileStream.pipe(res);
   } finally {
-    await pool.close();
+    if (pool) {
+      await pool.close();
+    }
   }
 });

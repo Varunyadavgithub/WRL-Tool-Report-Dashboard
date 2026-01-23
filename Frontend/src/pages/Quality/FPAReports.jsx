@@ -609,17 +609,22 @@ const FpaReportTable = ({ data }) => {
   // Download defect image handler
   const handleDownloadImage = async (fgSrNo, fileName) => {
     if (!fgSrNo || !fileName) {
-      toast.error("No image available for this record.");
+      toast.warning("No image available for this record.");
       return;
     }
 
     try {
       const response = await axios({
-        url: `${baseURL}quality/download-fpa-defect-image/${fgSrNo}`, // use fgSrNo
+        url: `${baseURL}quality/download-fpa-defect-image/${fgSrNo}`,
         method: "GET",
         responseType: "blob",
-        params: { filename: fileName }, // send filename as query param
+        params: { filename: fileName },
       });
+
+      if (!response.data || response.data.size === 0) {
+        toast.info("The file is empty or unavailable.");
+        return;
+      }
 
       // Create a blob link to download
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -633,10 +638,17 @@ const FpaReportTable = ({ data }) => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      toast.success("File download started");
+      toast.success(`Download started: "${fileName}"`);
     } catch (error) {
       console.error("Download error:", error);
-      toast.error("Failed to download file");
+
+      if (error.response?.status === 404) {
+        toast.error("File not found on the server.");
+      } else if (error.message.includes("Network")) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        toast.error(`Failed to download file: ${error.message}`);
+      }
     }
   };
 
