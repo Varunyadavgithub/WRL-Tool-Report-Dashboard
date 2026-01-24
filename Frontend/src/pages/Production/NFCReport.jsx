@@ -39,7 +39,7 @@ const NFCReport = () => {
       });
       if (node) observer.current.observe(node);
     },
-    [loading, hasMore]
+    [loading, hasMore],
   );
 
   const fetchNFCReportData = async (pageNumber = 1) => {
@@ -63,7 +63,7 @@ const NFCReport = () => {
         setNfcReportData((prev) => {
           const existing = new Set(prev.map((d) => d.FG_SR));
           const uniqueNew = res.data.data.filter(
-            (item) => !existing.has(item.FG_SR)
+            (item) => !existing.has(item.FG_SR),
           );
           return [...prev, ...uniqueNew];
         });
@@ -115,7 +115,7 @@ const NFCReport = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -157,7 +157,7 @@ const NFCReport = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -198,13 +198,13 @@ const NFCReport = () => {
       1,
       8,
       0,
-      0
+      0,
     ); // 1st day at 08:00 AM
 
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -265,7 +265,7 @@ const NFCReport = () => {
 
   const handleModelRowClick = (modelName) => {
     setSelectedModelName((prevSelectedModel) =>
-      prevSelectedModel === modelName ? null : modelName
+      prevSelectedModel === modelName ? null : modelName,
     );
   };
 
@@ -292,43 +292,45 @@ const NFCReport = () => {
   };
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
+    <div className="p-4 md:p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="NFC Report" align="center" />
 
-      {/* Filters Section */}
-      <div className="flex gap-4">
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
-          <div className="flex flex-wrap gap-4 mt-4">
+      {/* ================= FILTERS SECTION ================= */}
+      <div className="flex flex-col lg:flex-row gap-4 mt-4">
+        {/* Date Filters */}
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl w-full lg:w-auto">
+          <div className="flex flex-col sm:flex-row gap-4">
             <DateTimePicker
               label="Start Time"
               name="startTime"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
-              className="max-w-64"
+              className="w-full sm:max-w-64"
             />
             <DateTimePicker
               label="End Time"
               name="endTime"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
-              className="max-w-64"
+              className="w-full sm:max-w-64"
             />
           </div>
         </div>
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit items-center">
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex items-center gap-2 mt-4">
+
+        {/* Query + Export */}
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl w-full lg:w-auto">
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex gap-2 flex-wrap justify-center">
               <Button
                 onClick={handleQuery}
                 bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
-                textColor={loading ? "text-white" : "text-black"}
-                className={`font-semibold ${
-                  loading ? "cursor-not-allowed" : ""
-                }`}
+                textColor="text-black"
+                className={`font-semibold ${loading ? "cursor-not-allowed" : ""}`}
                 disabled={loading}
               >
                 Query
               </Button>
+
               {nfcReportData.length > 0 && (
                 <ExportButton
                   fetchData={fetchExportData}
@@ -336,44 +338,53 @@ const NFCReport = () => {
                 />
               )}
             </div>
+
+            <div className="font-bold text-lg">
+              COUNT: <span className="text-blue-700">{sortedData.length}</span>
+            </div>
           </div>
         </div>
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
+
+        {/* Quick Filters */}
+        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl w-full lg:w-auto">
+          <h2 className="text-lg font-semibold text-center mb-3">
             Quick Filters
           </h2>
-          <div className="flex flex-wrap items-center justify-center gap-3">
+
+          <div className="flex flex-wrap gap-3 justify-center">
             <Button
               bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
               textColor={ydayLoading ? "text-white" : "text-black"}
               className={`font-semibold ${
                 ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
               }`}
-              onClick={() => fetchYesterdaynfcReportData()}
+              onClick={fetchYesterdaynfcReportData}
               disabled={ydayLoading}
             >
               YDAY
             </Button>
             {ydayLoading && <Loader />}
+
             <Button
               bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
               textColor={todayLoading ? "text-white" : "text-black"}
               className={`font-semibold ${
                 todayLoading ? "cursor-not-allowed" : "cursor-pointer"
               }`}
-              onClick={() => fetchTodaynfcReportData()}
+              onClick={fetchTodaynfcReportData}
               disabled={todayLoading}
             >
               TDAY
             </Button>
             {todayLoading && <Loader />}
+
             <Button
               bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
               textColor={monthLoading ? "text-white" : "text-black"}
               className={`font-semibold ${
                 monthLoading ? "cursor-not-allowed" : "cursor-pointer"
               }`}
-              onClick={() => fetchMTDnfcReportData()}
+              onClick={fetchMTDnfcReportData}
               disabled={monthLoading}
             >
               MTD
@@ -384,147 +395,116 @@ const NFCReport = () => {
       </div>
 
       {/* ================= NFC REPORT SUMMARY ================= */}
-      <section className="mt-6">
-        <div className="rounded-xl border border-purple-300 bg-gradient-to-br from-purple-50 to-white p-5 shadow-sm">
-          {/* Header */}
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-purple-800">
-              NFC Report Summary
-            </h2>
-            <span className="text-xs text-gray-500">
-              Total Records: {sortedData.length}
-            </span>
-          </div>
-
-          {/* Content */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-            {/* ================= Main NFC Table ================= */}
-            <div className="xl:col-span-2 bg-white rounded-lg border shadow-sm overflow-hidden">
-              <div className="max-h-[600px] overflow-auto">
-                <table className="w-full table-auto text-xs">
-                  <thead className="sticky top-0 z-10 bg-gray-100 shadow-sm">
-                    <tr className="text-center text-gray-700">
-                      {[
-                        { label: "Model Name", key: "Model_Name" },
-                        { label: "FG Serial No.", key: "FG_SR" },
-                        { label: "Asset Tag", key: "Asset_tag" },
-                        { label: "Customer QR", key: "CustomerQR" },
-                        { label: "NFC UID", key: "NFC_UID" },
-                        { label: "CreatedOn", key: "CreatedOn" },
-                      ].map((col) => (
-                        <th
-                          key={col.key}
-                          onClick={() => requestSort(col.key)}
-                          className="px-3 py-2 border cursor-pointer select-none hover:bg-gray-200"
-                        >
-                          <div className="flex items-center justify-center gap-1">
-                            {col.label}
-                            {sortConfig.key === col.key ? (
-                              sortConfig.direction === "asc" ? (
-                                <FaCaretUp />
-                              ) : (
-                                <FaCaretDown />
-                              )
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-6 rounded-xl">
+        <div className="bg-white border border-gray-300 rounded-md p-4">
+          {/* Responsive Tables Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* MAIN NFC TABLE */}
+            <div className="lg:col-span-2 overflow-x-auto max-h-[600px]">
+              <table className="min-w-[900px] w-full border bg-white text-xs rounded-lg">
+                <thead className="bg-gray-200 sticky top-0 z-10">
+                  <tr className="text-center">
+                    {[
+                      { label: "Model Name", key: "Model_Name" },
+                      { label: "FG Serial No.", key: "FG_SR" },
+                      { label: "Asset Tag", key: "Asset_tag" },
+                      { label: "Customer QR", key: "CustomerQR" },
+                      { label: "NFC UID", key: "NFC_UID" },
+                      { label: "Created On", key: "CreatedOn" },
+                    ].map((col) => (
+                      <th
+                        key={col.key}
+                        onClick={() => requestSort(col.key)}
+                        className="px-2 py-2 border cursor-pointer whitespace-nowrap"
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          {col.label}
+                          {sortConfig.key === col.key ? (
+                            sortConfig.direction === "asc" ? (
+                              <FaCaretUp />
                             ) : (
-                              <FaCaretUp className="opacity-30" />
-                            )}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
+                              <FaCaretDown />
+                            )
+                          ) : (
+                            <FaCaretUp className="opacity-30" />
+                          )}
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
 
-                  <tbody>
-                    {sortedData.map((item, index) => {
-                      const isLast = index === sortedData.length - 1;
-                      return (
-                        <tr
-                          key={index}
-                          ref={isLast ? lastRowRef : null}
-                          className="text-center hover:bg-purple-50 transition"
-                        >
-                          <td className="px-2 py-1 border">
-                            {item.Model_Name}
-                          </td>
-                          <td className="px-2 py-1 border">{item.FG_SR}</td>
-                          <td className="px-2 py-1 border">{item.Asset_tag}</td>
-                          <td className="px-2 py-1 border">
-                            {item.CustomerQR}
-                          </td>
-                          <td className="px-2 py-1 border font-mono">
-                            {item.NFC_UID}
-                          </td>
-                          <td className="px-2 py-1 border font-mono">
-                            {item.CreatedOn &&
-                              item.CreatedOn.replace("T", " ").replace("Z","")}
-                          </td>
-                        </tr>
-                      );
-                    })}
-
-                    {!loading && sortedData.length === 0 && (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="py-6 text-center text-gray-500"
-                        >
-                          No data found
+                <tbody>
+                  {sortedData.map((item, index) => {
+                    const isLast = index === sortedData.length - 1;
+                    return (
+                      <tr
+                        key={index}
+                        ref={isLast ? lastRowRef : null}
+                        className="hover:bg-gray-100 text-center"
+                      >
+                        <td className="px-2 py-1 border">{item.Model_Name}</td>
+                        <td className="px-2 py-1 border">{item.FG_SR}</td>
+                        <td className="px-2 py-1 border">{item.Asset_tag}</td>
+                        <td className="px-2 py-1 border">{item.CustomerQR}</td>
+                        <td className="px-2 py-1 border">{item.NFC_UID}</td>
+                        <td className="px-2 py-1 border whitespace-nowrap">
+                          {item.CreatedOn?.replace("T", " ").replace("Z", "")}
                         </td>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    );
+                  })}
+
+                  {!loading && sortedData.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-4 text-center">
+                        No data found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
 
               {loading && (
-                <div className="py-4 flex justify-center text-gray-500 text-sm">
+                <div className="py-4 flex justify-center">
                   <Loader />
                 </div>
               )}
             </div>
 
-            {/* ================= Model Count Table ================= */}
-            <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b bg-gray-50">
-                <h3 className="text-sm font-semibold text-gray-700">
-                  Model-wise Count
-                </h3>
-              </div>
+            {/* MODEL COUNT TABLE */}
+            <div className="overflow-x-auto max-h-[500px]">
+              <table className="w-full border bg-white text-xs rounded-lg">
+                <thead className="sticky top-0 bg-gray-100">
+                  <tr className="text-center">
+                    <th className="px-3 py-2 border">Model Name</th>
+                    <th className="px-3 py-2 border">Count</th>
+                  </tr>
+                </thead>
 
-              <div className="max-h-[500px] overflow-auto">
-                <table className="w-full table-auto text-xs">
-                  <thead className="sticky top-0 bg-gray-100">
-                    <tr className="text-center text-gray-700">
-                      <th className="px-3 py-2 border">Model Name</th>
-                      <th className="px-3 py-2 border">Count</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {Object.entries(getModelNameCount(nfcReportData)).map(
-                      ([modelName, count]) => (
-                        <tr
-                          key={modelName}
-                          onClick={() => handleModelRowClick(modelName)}
-                          className={`cursor-pointer text-center transition
-                      ${
-                        selectedModelName === modelName
-                          ? "bg-blue-100 font-semibold"
-                          : "hover:bg-gray-100"
-                      }`}
-                        >
-                          <td className="px-2 py-1 border">{modelName}</td>
-                          <td className="px-2 py-1 border">{count}</td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                <tbody>
+                  {Object.entries(getModelNameCount(nfcReportData)).map(
+                    ([modelName, count]) => (
+                      <tr
+                        key={modelName}
+                        onClick={() => handleModelRowClick(modelName)}
+                        className={`cursor-pointer text-center transition ${
+                          selectedModelName === modelName
+                            ? "bg-blue-100 font-semibold"
+                            : "hover:bg-gray-100"
+                        }`}
+                      >
+                        <td className="px-2 py-1 border">{modelName}</td>
+                        <td className="px-2 py-1 border">{count}</td>
+                      </tr>
+                    ),
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
-      </section>
+      </div>
     </div>
   );
 };
