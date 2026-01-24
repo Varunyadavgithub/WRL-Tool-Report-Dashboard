@@ -121,140 +121,122 @@ const TagUpdate = () => {
   };
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
+    <div className="p-4 md:p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title title="Tag Update" align="center" />
 
-      {/* Filters */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 max-w-fit rounded-md">
-        <div className="">
-          <fieldset className="border border-black p-4 rounded-md">
-            <legend className="font-semibold text-gray-700 px-2">
-              Asset Tag Update
-            </legend>
-            <div className="flex flex-wrap gap-8">
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-center gap-4">
-                  <InputField
-                    label="Assembly Number"
-                    type="text"
-                    placeholder="Enter Assembly Number"
-                    className="max-w-4xl"
-                    name="assemblyNumber"
-                    value={assemblyNumber}
-                    onChange={(e) => {
-                      setAssemblyNumber(e.target.value);
-                    }}
-                  />
-                  <div>
-                    <Button
-                      bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
-                      textColor={loading ? "text-white" : "text-black"}
-                      className={`font-semibold ${
-                        loading ? "cursor-not-allowed" : ""
-                      }`}
-                      onClick={() => fetchAssetDetails()}
-                      disabled={loading}
-                    >
-                      Query
-                    </Button>
-                  </div>
-                </div>
+      {/* ================= TAG UPDATE ================= */}
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-lg max-w-fit mx-auto">
+        <fieldset className="border border-black p-4 rounded-md">
+          <legend className="font-semibold text-gray-700 px-2">
+            Tag Update
+          </legend>
 
-                <SelectField
-                  label="Select to Update"
-                  options={updateOption}
-                  value={selectedToUpdate?.value || ""}
-                  onChange={(e) => {
-                    const selected = updateOption.find(
-                      (opt) => opt.value === e.target.value,
-                    );
-                    if (selected) {
-                      setSelectedToUpdate(selected);
-                    }
-                  }}
-                  className="max-w-2xl"
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* LEFT: INPUTS */}
+            <div className="flex flex-col gap-6">
+              {/* Assembly Number */}
+              <div className="flex flex-col sm:flex-row gap-4 items-end">
+                <InputField
+                  label="Assembly Number"
+                  type="text"
+                  placeholder="Enter Assembly Number"
+                  name="assemblyNumber"
+                  value={assemblyNumber}
+                  onChange={(e) => setAssemblyNumber(e.target.value)}
+                  className="w-full max-w-md"
                 />
-                {selectedToUpdate?.value === "newassetnumber" ? (
-                  <div className="flex items-center justify-center gap-4">
-                    <InputField
-                      label="New Asset No."
-                      type="text"
-                      placeholder="Enter New Asset No."
-                      className="max-w-4xl"
-                      name="newAssetNumber"
-                      value={newAssetNumber}
-                      onChange={(e) => setNewAssetNumber(e.target.value)}
-                    />
-                    <div>
-                      <Button
-                        bgColor={loading ? "bg-gray-400" : "bg-green-600"}
-                        textColor={loading ? "text-white" : "text-black"}
-                        className={`font-semibold ${
-                          loading ? "cursor-not-allowed" : "cursor-pointer"
-                        }`}
-                        onClick={() => handleUpdateNewAsset()}
-                        disabled={loading}
-                      >
-                        Update
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center gap-4">
-                    <InputField
-                      label="New Customer QR"
-                      type="text"
-                      placeholder="Enter New Customer QR"
-                      className="max-w-4xl"
-                      name="newCustomerQr"
-                      value={newCustomerQr}
-                      onChange={(e) => setNewCustomerQr(e.target.value)}
-                    />
-                    <div>
-                      <Button
-                        bgColor={loading ? "bg-gray-400" : "bg-green-600"}
-                        textColor={loading ? "text-white" : "text-black"}
-                        className={`font-semibold ${
-                          loading ? "cursor-not-allowed" : ""
-                        }`}
-                        onClick={() => handleUpdateNewCustomerQr()}
-                        disabled={loading}
-                      >
-                        Update
-                      </Button>
-                    </div>
-                  </div>
-                )}
+
+                <Button
+                  bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
+                  textColor="text-black"
+                  className={`font-semibold ${loading ? "cursor-not-allowed" : ""}`}
+                  onClick={fetchAssetDetails}
+                  disabled={loading}
+                >
+                  Query
+                </Button>
               </div>
 
-              <div className="flex flex-col items-center justify-center gap-4">
-                <h1 className="font-semibold text-xl">
-                  Asset No.{" "}
-                  <span className="text-blue-700 text-md">
-                    {assetNumber || 0}
-                  </span>
-                </h1>
+              {/* Update Selector */}
+              <SelectField
+                label="Select to Update"
+                options={updateOption}
+                value={selectedToUpdate?.value || ""}
+                onChange={(e) => {
+                  const selected = updateOption.find(
+                    (opt) => opt.value === e.target.value,
+                  );
+                  if (selected) setSelectedToUpdate(selected);
+                }}
+                className="w-full max-w-md"
+              />
 
-                <h1 className="font-semibold text-xl">
-                  FG Sr.No.{" "}
-                  <span className="text-blue-700 text-md">
-                    {fgSerialNumber || 0}
-                  </span>
-                </h1>
-                <h1 className="font-semibold text-xl">
-                  Model Name{" "}
-                  <span className="text-blue-700 text-md">
-                    {modelName || 0}
-                  </span>
-                </h1>
-                <h1 className="font-semibold text-xl">
-                  Customer QR{" "}
-                  <span className="text-blue-700 text-md">{serial2 || 0}</span>
-                </h1>
-              </div>
+              {/* Conditional Update Fields */}
+              {selectedToUpdate?.value === "newassetnumber" ? (
+                <div className="flex flex-col sm:flex-row gap-4 items-end">
+                  <InputField
+                    label="New Asset No."
+                    type="text"
+                    placeholder="Enter New Asset No."
+                    name="newAssetNumber"
+                    value={newAssetNumber}
+                    onChange={(e) => setNewAssetNumber(e.target.value)}
+                    className="w-full max-w-md"
+                  />
+
+                  <Button
+                    bgColor={loading ? "bg-gray-400" : "bg-green-600"}
+                    textColor="text-black"
+                    className={`font-semibold ${loading ? "cursor-not-allowed" : ""}`}
+                    onClick={handleUpdateNewAsset}
+                    disabled={loading}
+                  >
+                    Update
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row gap-4 items-end">
+                  <InputField
+                    label="New Customer QR"
+                    type="text"
+                    placeholder="Enter New Customer QR"
+                    name="newCustomerQr"
+                    value={newCustomerQr}
+                    onChange={(e) => setNewCustomerQr(e.target.value)}
+                    className="w-full max-w-md"
+                  />
+
+                  <Button
+                    bgColor={loading ? "bg-gray-400" : "bg-green-600"}
+                    textColor="text-black"
+                    className={`font-semibold ${loading ? "cursor-not-allowed" : ""}`}
+                    onClick={handleUpdateNewCustomerQr}
+                    disabled={loading}
+                  >
+                    Update
+                  </Button>
+                </div>
+              )}
             </div>
-          </fieldset>
-        </div>
+
+            {/* RIGHT: DETAILS */}
+            <div className="flex flex-col justify-center gap-4 bg-white border rounded-lg p-4">
+              {[
+                { label: "Asset No.", value: assetNumber },
+                { label: "FG Sr. No.", value: fgSerialNumber },
+                { label: "Model Name", value: modelName },
+                { label: "Customer QR", value: serial2 },
+              ].map(({ label, value }) => (
+                <div key={label} className="text-lg font-semibold">
+                  {label}{" "}
+                  <span className="text-blue-700 font-medium">
+                    {value || 0}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </fieldset>
       </div>
     </div>
   );
