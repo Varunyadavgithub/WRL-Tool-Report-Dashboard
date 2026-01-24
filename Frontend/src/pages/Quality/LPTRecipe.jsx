@@ -39,7 +39,6 @@ const LPTRecipe = () => {
   });
   const [recipes, setRecipes] = useState([]);
 
-  /* ===================== RTK QUERY ===================== */
   const {
     data: variants = [],
     isLoading: variantsLoading,
@@ -54,7 +53,7 @@ const LPTRecipe = () => {
     try {
       const res = await axios.get(`${baseURL}quality/lpt-recipe`);
       if (res?.data?.success) {
-        setRecipes(res?.data);
+        setRecipes(res?.data?.data);
       }
     } catch (error) {
       console.error("Failed to fetch recipes:", error);
@@ -82,8 +81,8 @@ const LPTRecipe = () => {
     try {
       setLoading(true);
       await axios.post(`${baseURL}quality/lpt-recipe`, {
-        matCode: selectedVariant.value,
-        modelName: selectedVariant.label,
+        matCode: selectedModelVariant.value,
+        modelName: selectedModelVariant.label,
         minTemp,
         maxTemp,
         minCurr,
@@ -94,7 +93,7 @@ const LPTRecipe = () => {
 
       toast.success("Recipe added successfully.");
       fetchRecipes();
-      setSelectedVariant(null);
+      setSelectedModelVariant(null);
       setMinTemp("");
       setMaxTemp("");
       setMinCurr("");
@@ -148,7 +147,7 @@ const LPTRecipe = () => {
           maxCurr: updateFields.maxCurr,
           minPow: updateFields.minPow,
           maxPow: updateFields.maxPow,
-        }
+        },
       );
 
       // Check response status
@@ -162,7 +161,7 @@ const LPTRecipe = () => {
     } catch (err) {
       console.error(err);
       toast.error(
-        err.res?.data?.error || "Failed to update recipe. Please try again."
+        err.res?.data?.error || "Failed to update recipe. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -178,7 +177,7 @@ const LPTRecipe = () => {
     try {
       setLoading(true);
       await axios.delete(
-        `${baseURL}quality/lpt-recipe/${itemToDelete.ModelName}`
+        `${baseURL}quality/lpt-recipe/${itemToDelete.ModelName}`,
       );
       toast.success("Recipe deleted successfully.");
       fetchRecipes();
@@ -206,7 +205,7 @@ const LPTRecipe = () => {
             value={selectedModelVariant?.value || ""}
             onChange={(e) =>
               setSelectedModelVariant(
-                variants.find((opt) => opt.value === e.target.value) || null
+                variants.find((opt) => opt.value === e.target.value) || null,
               )
             }
             className="max-w-64"

@@ -6,10 +6,6 @@ import { AppError } from "../../utils/AppError.js";
 export const getLptRecipe = tryCatch(async (req, res) => {
   const { modelName } = req.query;
 
-  if (!modelName) {
-    throw new AppError("Missing required query parameters: modelName.", 400);
-  }
-
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
   try {
@@ -32,7 +28,7 @@ export const getLptRecipe = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch the LPT Recipe data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -61,7 +57,7 @@ export const deleteLptRecipe = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to delete the LPT Recipe data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -92,7 +88,7 @@ export const insertLptRecipe = tryCatch(async (req, res) => {
   ) {
     throw new AppError(
       "Missing required fields: matCode, modelName, minTemp, maxTemp, minCurr, maxCurr, minPow or maxPow.",
-      400
+      400,
     );
   }
 
@@ -121,7 +117,7 @@ export const insertLptRecipe = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to insert the LPT Recipe data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -135,7 +131,7 @@ export const updateLptRecipe = tryCatch(async (req, res) => {
   if (!minTemp || !maxTemp || !minCurr || !maxCurr || !minPow || !maxPow) {
     throw new AppError(
       "Missing required fields: minTemp, maxTemp, minCurr, maxCurr, minPow or maxPow.",
-      400
+      400,
     );
   }
 
@@ -170,7 +166,7 @@ export const updateLptRecipe = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to update the LPT Recipe data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();

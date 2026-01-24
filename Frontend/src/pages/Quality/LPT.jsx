@@ -34,7 +34,9 @@ const LPT = () => {
       setLoading(true);
 
       const res = await axios.get(`${baseURL}quality/lpt-defect-report`);
-      setLptDefectReport(res?.data?.data);
+      if (res?.data?.success) {
+        setLptDefectReport(res?.data?.data);
+      }
     } catch (error) {
       console.error("Failed to fetch Lpt Defect data:", error);
       toast.error("Failed to fetch Lpt Defect data.");
@@ -48,7 +50,9 @@ const LPT = () => {
       setLoading(true);
 
       const res = await axios.get(`${baseURL}quality/lpt-defect-count`);
-      setLptDefectCount(res?.data);
+      if (res?.data?.success) {
+        setLptDefectCount(res?.data?.data);
+      }
     } catch (error) {
       console.error("Failed to fetch Lpt Defect data:", error);
       toast.error("Failed to fetch Lpt Defect data.");
@@ -65,23 +69,27 @@ const LPT = () => {
 
     try {
       setLoading(true);
+
       const params = {
         AssemblySerial: barcodeNumber,
       };
+
       const res = await axios.get(`${baseURL}quality/lpt-asset-details`, {
         params,
       });
-      const assetData = res?.data?.data;
 
-      if (!assetData) {
-        toast.error(
-          "No Mode Name found for this Serial Number. Please add Recipe for this Model."
-        );
-        setAssetDetails(null); // Optional: clear old data
-        return;
+      if (res?.data?.success) {
+        const assetData = res?.data?.data;
+
+        if (!assetData) {
+          toast.error(
+            "No Mode Name found for this Serial Number. Please add Recipe for this Model.",
+          );
+          setAssetDetails(null);
+          return;
+        }
+        setAssetDetails(assetData);
       }
-
-      setAssetDetails(assetData);
     } catch (error) {
       console.error("Failed to fetch Asset Details data:", error);
       toast.error("Failed to fetch Asset Details data.");
@@ -93,11 +101,13 @@ const LPT = () => {
   const getLptDefectCategory = async () => {
     try {
       const res = await axios.get(`${baseURL}quality/lpt-defect-category`);
-      const formatted = res?.data?.data.map((item) => ({
-        label: item.Name,
-        value: item.Code.toString(),
-      }));
-      setLptDefectCategory(formatted);
+      if (res?.data?.success) {
+        const formatted = res?.data?.data.map((item) => ({
+          label: item.Name,
+          value: item.Code.toString(),
+        }));
+        setLptDefectCategory(formatted);
+      }
     } catch (error) {
       console.error("Failed to fetch Lpt Defect Category data:", error);
       toast.error("Failed to fetch Lpt Defect Category data.");
@@ -125,7 +135,7 @@ const LPT = () => {
     assetDetails,
     actualTemp,
     actualCurrent,
-    actualPower
+    actualPower,
   ) => {
     const minTemp = Number(assetDetails?.MinTemp);
     const maxTemp = Number(assetDetails?.MaxTemp);
@@ -159,7 +169,7 @@ const LPT = () => {
       assetDetails,
       actualTemp,
       actualCurrent,
-      actualPower
+      actualPower,
     );
 
     let defectToAdd = "";
@@ -403,7 +413,7 @@ const LPT = () => {
                     !assetDetails
                   ) {
                     toast.error(
-                      "Please enter all actual values and fetch asset details."
+                      "Please enter all actual values and fetch asset details.",
                     );
                     return;
                   }
@@ -412,7 +422,7 @@ const LPT = () => {
                     assetDetails,
                     actualTemp,
                     actualCurrent,
-                    actualPower
+                    actualPower,
                   );
                   setPerformanceRes(res);
                 }}
@@ -479,7 +489,7 @@ const LPT = () => {
                       value={selectedLptDefectCategory?.value || ""}
                       onChange={(e) => {
                         const selected = lptDefectCategory.find(
-                          (option) => option.value === e.target.value
+                          (option) => option.value === e.target.value,
                         );
                         setSelectedLptDefectCategory(selected);
                       }}
@@ -577,7 +587,7 @@ const LPT = () => {
                               {item.DateTime &&
                                 item.DateTime.replace("T", " ").replace(
                                   "Z",
-                                  ""
+                                  "",
                                 )}
                             </td>
                             <td className="px-1 py-1 border">

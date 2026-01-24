@@ -23,7 +23,6 @@ const LPTReport = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [details, setDetails] = useState("");
 
-  /* ===================== RTK QUERY ===================== */
   const {
     data: variants = [],
     isLoading: variantsLoading,
@@ -47,15 +46,17 @@ const LPTReport = () => {
         endDate: endTime,
       };
 
-      if (selectedVariant && selectedVariant.value) {
+      if (selectedModelVariant && selectedModelVariant.value) {
         params = {
           ...params,
-          model: selectedVariant.label,
+          model: selectedModelVariant.label,
         };
       }
       const res = await axios.get(`${baseURL}quality/lpt-report`, { params });
-      setReportData(res.data);
-      setSelectedVariant(null);
+      if (res?.data?.success) {
+        setReportData(res?.data?.data);
+        setSelectedModelVariant(null);
+      }
     } catch (error) {
       console.error("Failed to fetch LPT Report:", error);
       toast.error("Failed to fetch LPT Report.");
@@ -76,7 +77,7 @@ const LPTReport = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -87,23 +88,25 @@ const LPTReport = () => {
       setYdayLoading(true);
 
       setReportData([]);
-      setSelectedVariant(null);
+      setSelectedModelVariant(null);
 
       let params = {
         startDate: formattedStart,
         endDate: formattedEnd,
       };
 
-      if (selectedVariant && selectedVariant.value) {
+      if (selectedModelVariant && selectedModelVariant.value) {
         params = {
           ...params,
-          model: selectedVariant.label,
+          model: selectedModelVariant.label,
         };
       }
 
       const res = await axios.get(`${baseURL}quality/lpt-report`, { params });
-      setReportData(res.data);
-      setSelectedVariant(null);
+      if (res?.data?.success) {
+        setReportData(res?.data?.data);
+        setSelectedModelVariant(null);
+      }
     } catch (error) {
       console.error("Failed to fetch Yesterday LPT Report:", error);
       toast.error("Failed to fetch Yesterday LPT Report.");
@@ -120,7 +123,7 @@ const LPTReport = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -131,23 +134,25 @@ const LPTReport = () => {
       setTodayLoading(true);
 
       setReportData([]);
-      setSelectedVariant(null);
+      setSelectedModelVariant(null);
 
       let params = {
         startDate: formattedStart,
         endDate: formattedEnd,
       };
 
-      if (selectedVariant && selectedVariant.value) {
+      if (selectedModelVariant && selectedModelVariant.value) {
         params = {
           ...params,
-          model: selectedVariant.label,
+          model: selectedModelVariant.label,
         };
       }
 
       const res = await axios.get(`${baseURL}quality/lpt-report`, { params });
-      setReportData(res.data);
-      setSelectedVariant(null);
+      if (res?.data?.success) {
+        setReportData(res?.data?.data);
+        setSelectedModelVariant(null);
+      }
     } catch (error) {
       console.error("Failed to fetch Today LPT Report:", error);
       toast.error("Failed to fetch Today LPT Report.");
@@ -164,13 +169,13 @@ const LPTReport = () => {
       1,
       8,
       0,
-      0
+      0,
     ); // 1st day at 08:00 AM
 
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -181,23 +186,25 @@ const LPTReport = () => {
       setMonthLoading(true);
 
       setReportData([]);
-      setSelectedVariant(null);
+      setSelectedModelVariant(null);
 
       let params = {
         startDate: formattedStart,
         endDate: formattedEnd,
       };
 
-      if (selectedVariant && selectedVariant.value) {
+      if (selectedModelVariant && selectedModelVariant.value) {
         params = {
           ...params,
-          model: selectedVariant.label,
+          model: selectedModelVariant.label,
         };
       }
 
       const res = await axios.get(`${baseURL}quality/lpt-report`, { params });
-      setReportData(res.data);
-      setSelectedVariant(null);
+      if (res?.data?.success) {
+        setReportData(res?.data?.data);
+        setSelectedModelVariant(null);
+      }
     } catch (error) {
       console.error("Failed to fetch Month LPT Report:", error);
       toast.error("Failed to fetch Month LPT Report.");
@@ -246,7 +253,7 @@ const LPTReport = () => {
             value={selectedModelVariant?.value || ""}
             onChange={(e) =>
               setSelectedModelVariant(
-                variants.find((opt) => opt.value === e.target.value) || null
+                variants.find((opt) => opt.value === e.target.value) || null,
               )
             }
             className="max-w-64"
@@ -346,12 +353,12 @@ const LPTReport = () => {
                 data={reportData.filter((item) =>
                   details
                     ? item.ModelName?.toLowerCase().includes(
-                        details.toLowerCase()
+                        details.toLowerCase(),
                       ) ||
                       item.AssemblyNo?.toLowerCase().includes(
-                        details.toLocaleLowerCase()
+                        details.toLocaleLowerCase(),
                       )
-                    : true
+                    : true,
                 )}
               />
             </div>
