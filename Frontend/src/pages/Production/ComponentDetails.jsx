@@ -10,21 +10,25 @@ import { baseURL } from "../../assets/assets";
 
 const ComponentDetails = () => {
   const [loading, setLoading] = useState(false);
-  const [serialNumber, setSerialNumber] = useState("");
+  const [componentIdentifier, setComponentIdentifier] = useState("");
   const [componentDetailsData, setComponentDetailsData] = useState([]);
 
   const fetchComponentDetailsData = async () => {
-    if (!serialNumber) {
-      toast.error("Please select Serial Number.");
+    if (!componentIdentifier) {
+      toast.error("Please enter the Serial Number or FG Number.");
       return;
     }
+
     try {
       setLoading(true);
       const res = await axios.get(`${baseURL}prod/component-details`, {
-        params: { serialNumber },
+        params: { componentIdentifier },
       });
-      const data = res?.data?.data || [];
-      setComponentDetailsData(data);
+
+      if (res?.data?.success) {
+        const data = res?.data?.data || [];
+        setComponentDetailsData(data);
+      }
     } catch (error) {
       console.error("Failed to fetch Component Details Data:", error);
       toast.error("Failed to fetch Component Details Data.");
@@ -41,13 +45,13 @@ const ComponentDetails = () => {
       <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 max-w-fit rounded-xl">
         <div className="flex flex-wrap items-center gap-4">
           <InputField
-            label="Serial Number"
+            label="Serial Number / FG No."
             type="text"
             placeholder="Enter details"
             className="w-64"
-            name="serialNumber"
-            value={serialNumber}
-            onChange={(e) => setSerialNumber(e.target.value)}
+            name="componentIdentifier "
+            value={componentIdentifier}
+            onChange={(e) => setComponentIdentifier(e.target.value)}
           />
           <div className="flex items-center justify-center gap-4">
             <Button

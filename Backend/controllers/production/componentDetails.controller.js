@@ -5,10 +5,15 @@ import { AppError } from "../../utils/AppError.js";
 
 // Fetches detailed information about components based on a provided serial number.
 export const getComponentDetails = tryCatch(async (req, res) => {
-  const { serialNumber } = req.query;
+  const { componentIdentifier } = req.query;
 
-  if (!serialNumber) {
-    throw new AppError("Missing required query parameter: serialNumber", 400);
+  if (!componentIdentifier) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "Missing required query parameter: serialNumber or FG serialNumber",
+      data: [],
+    });
   }
 
   const query = `
@@ -30,7 +35,7 @@ export const getComponentDetails = tryCatch(async (req, res) => {
     INNER JOIN ProdHeader d ON a.PRODNo = d.PRODNo
     INNER JOIN MaterialCategory MatCat ON MatCat.CategoryCode = mat.Category, MaterialBarcode matb
     LEFT JOIN Material MATBM ON MATBM.MatCode = matb.Material
-    WHERE matb.DocNo = a.PSNo AND matb.Serial = @serial
+    WHERE matb.DocNo = a.PSNo AND (matb.Alias = @componentIdentifier or matb.Serial = @componentIdentifier)
     ORDER BY b.PSNo
   `;
 
@@ -39,14 +44,15 @@ export const getComponentDetails = tryCatch(async (req, res) => {
   try {
     const result = await pool
       .request()
-      .input("serial", sql.VarChar, serialNumber)
+      .input("componentIdentifier", sql.VarChar, componentIdentifier)
       .query(query);
 
     if (!result.recordset.length) {
-      throw new AppError(
-        "No component details found for the given serial number",
-        404
-      );
+      return res.status(404).json({
+        success: false,
+        message: "No component details found for the given serial number",
+        data: [],
+      });
     }
 
     res.status(200).json({
@@ -57,7 +63,7 @@ export const getComponentDetails = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch component details: ${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
