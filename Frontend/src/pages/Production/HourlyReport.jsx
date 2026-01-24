@@ -119,7 +119,10 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-summary`, {
         params,
       });
-      setHourData(res?.data?.data);
+
+      if (res?.data?.success) {
+        setHourData(res?.data?.data);
+      }
     } catch (error) {
       console.error("Error fetching hourly production data:", error);
       toast.error("Error fetching hourly production data.");
@@ -140,9 +143,11 @@ const HourlyReport = () => {
         startDate: startTime,
         endDate: endTime,
       };
+
       if (selectedModel?.value && selectedModel.value !== "0") {
         params.model = selectedModel.value;
       }
+
       if (lineType) {
         params.line = lineType;
       }
@@ -150,7 +155,10 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-model-count`, {
         params,
       });
-      setHourlyModelCount(res?.data?.data);
+
+      if (res?.data?.success) {
+        setHourlyModelCount(res?.data?.data);
+      }
     } catch (error) {
       console.error("Error fetching hourly model count data:", error);
       toast.error("Error fetching hourly model count data.");
@@ -172,9 +180,11 @@ const HourlyReport = () => {
         startDate: startTime,
         endDate: endTime,
       };
+
       if (selectedModel?.value && selectedModel.value !== "0") {
         params.model = selectedModel.value;
       }
+
       if (lineType) {
         params.line = lineType;
       }
@@ -182,8 +192,11 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-category-count`, {
         params,
       });
-      const data = await mapCategory(res?.data?.data);
-      setHourlyCategoryCount(data);
+
+      if (res?.data?.success) {
+        const data = await mapCategory(res?.data?.data);
+        setHourlyCategoryCount(data);
+      }
     } catch (error) {
       console.error("Error fetching hourly Category count data:", error);
       toast.error("Error fetching hourly Category count data.");
@@ -208,7 +221,7 @@ const HourlyReport = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -227,6 +240,7 @@ const HourlyReport = () => {
       if (selectedModel?.value && selectedModel.value !== "0") {
         params.model = selectedModel.value;
       }
+
       if (lineType) {
         params.line = lineType;
       }
@@ -234,7 +248,10 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-summary`, {
         params,
       });
-      setHourData(res?.data?.data);
+
+      if (res?.data?.success) {
+        setHourData(res?.data?.data);
+      }
     } catch (error) {
       console.error("Error fetching Yesterday hourly production data:", error);
       toast.error("Error fetching Yesterday hourly production data.");
@@ -258,7 +275,7 @@ const HourlyReport = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -285,7 +302,10 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-model-count`, {
         params,
       });
-      setHourlyModelCount(res?.data?.data);
+
+      if (res?.data?.success) {
+        setHourlyModelCount(res?.data?.data);
+      }
     } catch (error) {
       console.error("Error fetching Yesterday hourly model count data:", error);
       toast.error("Error fetching Yesterday hourly model count data.");
@@ -310,7 +330,7 @@ const HourlyReport = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -327,9 +347,11 @@ const HourlyReport = () => {
         startDate: formattedStart,
         endDate: formattedEnd,
       };
+
       if (selectedModel?.value && selectedModel.value !== "0") {
         params.model = selectedModel.value;
       }
+
       if (lineType) {
         params.line = lineType;
       }
@@ -337,12 +359,15 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-category-count`, {
         params,
       });
-      const data = await mapCategory(res?.data?.data);
-      setHourlyCategoryCount(data);
+
+      if (res?.data?.success) {
+        const data = await mapCategory(res?.data?.data);
+        setHourlyCategoryCount(data);
+      }
     } catch (error) {
       console.error(
         "Error fetching Yesterday hourly Category count data:",
-        error
+        error,
       );
       toast.error("Error fetching Yesterday hourly Category count data.");
     } finally {
@@ -362,7 +387,7 @@ const HourlyReport = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -383,6 +408,7 @@ const HourlyReport = () => {
       if (selectedModel?.value && selectedModel.value !== "0") {
         params.model = selectedModel.value;
       }
+
       if (lineType) {
         params.line = lineType;
       }
@@ -390,7 +416,10 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-summary`, {
         params,
       });
-      setHourData(res?.data?.data);
+
+      if (res?.data?.success) {
+        setHourData(res?.data?.data);
+      }
     } catch (error) {
       console.error("Error fetching Today hourly production data:", error);
       toast.error("Error fetching Today hourly production data.");
@@ -411,7 +440,7 @@ const HourlyReport = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -428,9 +457,11 @@ const HourlyReport = () => {
         startDate: formattedStart,
         endDate: formattedEnd,
       };
+
       if (selectedModel?.value && selectedModel.value !== "0") {
         params.model = selectedModel.value;
       }
+
       if (lineType) {
         params.line = lineType;
       }
@@ -438,7 +469,10 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-model-count`, {
         params,
       });
-      setHourlyModelCount(res?.data?.data);
+
+      if (res?.data?.success) {
+        setHourlyModelCount(res?.data?.data);
+      }
     } catch (error) {
       console.error("Error fetching Today hourly model count data:", error);
       toast.error("Error fetching Today hourly model count data.");
@@ -460,7 +494,7 @@ const HourlyReport = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -477,9 +511,11 @@ const HourlyReport = () => {
         startDate: formattedStart,
         endDate: formattedEnd,
       };
+
       if (selectedModel?.value && selectedModel.value !== "0") {
         params.model = selectedModel.value;
       }
+
       if (lineType) {
         params.line = lineType;
       }
@@ -487,8 +523,11 @@ const HourlyReport = () => {
       const res = await axios.get(`${baseURL}prod/hourly-category-count`, {
         params,
       });
-      const data = await mapCategory(res?.data?.data);
-      setHourlyCategoryCount(data);
+
+      if (res?.data?.success) {
+        const data = await mapCategory(res?.data?.data);
+        setHourlyCategoryCount(data);
+      }
     } catch (error) {
       console.error("Error fetching Today hourly Category count data:", error);
       toast.error("Error fetching Today hourly Category count data.");
@@ -625,7 +664,7 @@ const HourlyReport = () => {
             options={modelVariants}
             onChange={(e) => {
               const selected = modelVariants.find(
-                (opt) => opt.value === e.target.value
+                (opt) => opt.value === e.target.value,
               );
               setSelectedModel(selected || null);
             }}
