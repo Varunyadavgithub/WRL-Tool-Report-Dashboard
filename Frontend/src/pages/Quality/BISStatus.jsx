@@ -83,11 +83,11 @@ const BISStatus = () => {
   })();
 
   const testCompletedCount = filteredReport.filter(
-    (report) => report.Status === "Test Completed"
+    (report) => report.Status === "Test Completed",
   ).length;
 
   const testPendingCount = filteredReport.filter(
-    (report) => report.Status !== "Test Completed"
+    (report) => report.Status !== "Test Completed",
   ).length;
 
   // Download file handler
@@ -96,7 +96,7 @@ const BISStatus = () => {
     const matchedFile = bisStatus.files.find(
       (file) =>
         file.modelName === report.ModelName &&
-        file.year === report.Year.toString()
+        file.year === report.Year.toString(),
     );
 
     if (!matchedFile) {
@@ -218,7 +218,7 @@ const BISStatus = () => {
                 const matchedFile = bisStatus.files.find(
                   (file) =>
                     file.modelName === report.ModelName &&
-                    file.year === report.Year.toString()
+                    file.year === report.Year.toString(),
                 );
                 return (
                   <tr

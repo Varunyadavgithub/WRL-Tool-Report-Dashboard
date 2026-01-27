@@ -25,7 +25,7 @@ ChartJS.register(
   BarElement,
   ChartTitle,
   Tooltip,
-  Legend
+  Legend,
 );
 
 const FPA = () => {
@@ -50,7 +50,7 @@ const FPA = () => {
   const [remark, setRemark] = useState("");
   const [country, setCountry] = useState("India");
   const [selectedDefectCategory, setSelectedDefectCategory] = useState(
-    DefectCategory[0]
+    DefectCategory[0],
   );
   const [defectImage, setDefectImage] = useState(null);
 
@@ -122,7 +122,7 @@ const FPA = () => {
   const getFpaDefect = async () => {
     try {
       const res = await axios.get(`${baseURL}quality/fpa-defect`);
-      setFpaDefect(res?.data);
+      setFpaDefect(res?.data?.data);
     } catch (error) {
       console.error("Failed to fetch Fpa Defect data:", error);
       toast.error("Failed to fetch Fpa Defect data.");
@@ -195,7 +195,7 @@ const FPA = () => {
           headers: {
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
 
       if (res?.data?.success) {
@@ -386,7 +386,7 @@ const FPA = () => {
               value={selectedDefectCategory.value || ""}
               onChange={(e) => {
                 const selected = DefectCategory.find(
-                  (item) => item.value === e.target.value
+                  (item) => item.value === e.target.value,
                 );
                 setSelectedDefectCategory(selected);
               }}
@@ -443,7 +443,7 @@ const FPA = () => {
                     value={selectedFpaDefectCategory?.value || ""}
                     onChange={(e) => {
                       const selected = fpaDefectCategory.find(
-                        (option) => option.value === e.target.value
+                        (option) => option.value === e.target.value,
                       );
                       setSelectedFpaDefectCategory(selected);
                     }}
