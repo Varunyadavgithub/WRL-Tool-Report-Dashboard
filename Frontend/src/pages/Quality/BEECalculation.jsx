@@ -5,9 +5,19 @@ import Button from "../../components/ui/Button";
 import axios from "axios";
 import modelsData from "../../data/modelsData.json";
 import { baseURL } from "../../assets/assets";
+import {
+  FaStar,
+  FaSave,
+  FaCog,
+  FaBoxOpen,
+  FaSearch,
+  FaTrash,
+  FaPlus,
+  FaArrowUp,
+} from "react-icons/fa";
+import toast from "react-hot-toast";
 
 export default function BEECalculation() {
-  /* ---------------- STATES ---------------- */
   const [models, setModels] = useState(modelsData);
   const [hard, setHard] = useState({ model: "", volume: "", energy: "" });
   const [glass, setGlass] = useState({ model: "", volume: "", energy: "" });
@@ -56,8 +66,8 @@ export default function BEECalculation() {
             ? "TRUE"
             : "FALSE"
           : A >= r.min && A < r.max
-          ? "TRUE"
-          : "FALSE",
+            ? "TRUE"
+            : "FALSE",
     }));
   };
 
@@ -82,16 +92,22 @@ export default function BEECalculation() {
             ? "TRUE"
             : "FALSE"
           : A >= r.min && A < r.max
-          ? "TRUE"
-          : "FALSE",
+            ? "TRUE"
+            : "FALSE",
     }));
   };
 
   /* ------------ NEXT STAR IMPROVEMENT ------------ */
   function getNextStarImprovement(table, currentKWh) {
     const row = table.find((r) => r.status === "TRUE");
-    if (!row || row.star === 5)
-      return "⭐ Already 5 Star — Best Efficiency Achieved";
+
+    if (!row || row.star === 5) {
+      return (
+        <span className="flex justify-center items-center gap-2">
+          <FaStar /> Already 5 Star — Best Efficiency Achieved
+        </span>
+      );
+    }
 
     const idx = table.findIndex((r) => r.star === row.star) - 1;
     const next = table[idx];
@@ -100,36 +116,59 @@ export default function BEECalculation() {
     const requiredKWh = (requiredAEC / 365).toFixed(2);
     const improve = (currentKWh - requiredKWh).toFixed(2);
 
-    return `⬆ Reduce ${improve} kWh/day to reach ⭐${row.star + 1}`;
+    return (
+      <span className="flex justify-center items-center gap-2">
+        <FaArrowUp />
+        Reduce {improve} kWh/day to reach
+        <FaStar /> {row.star + 1}
+      </span>
+    );
   }
 
   /* ------------ SAVE BEE RESULT ------------ */
   const save = async () => {
-    await axios.post(`${baseURL}/saveBeeRating`, {
-      hardModel: hard.model,
-      hardRating: getAchievedStar(hardTable),
-      glassModel: glass.model,
-      glassRating: getAchievedStar(glassTable),
-    });
-    alert("Saved Successfully");
+    const toastId = toast.loading("Saving BEE Rating...");
+
+    try {
+      await axios.post(`${baseURL}saveBeeRating`, {
+        hardModel: hard.model,
+        hardRating: getAchievedStar(hardTable),
+        glassModel: glass.model,
+        glassRating: getAchievedStar(glassTable),
+      });
+
+      toast.success("BEE Rating saved successfully", { id: toastId });
+    } catch (err) {
+      toast.error("Failed to save BEE Rating", { id: toastId });
+    }
   };
 
   /* ------------ MODEL MASTER FUNCTIONS ------------ */
   function addModel() {
-    if (!newModel.model || !newModel.volume)
-      return alert("Enter Model & Volume");
+    if (!newModel.model || !newModel.volume) {
+      toast.error("Please enter both Model and Volume");
+      return;
+    }
+
     setModels([...models, newModel]);
     setNewModel({ model: "", volume: "" });
   }
 
   function deleteModel(name) {
     setModels(models.filter((m) => m.model !== name));
+    toast.success(`Model ${name} deleted`);
   }
 
   async function saveModelsToDB() {
-    await axios.post(`${baseURL}/saveModelList`, models);
-    alert("Model Master Updated!");
-    setShowModelPopup(false);
+    const toastId = toast.loading("Saving models...");
+
+    try {
+      await axios.post(`${baseURL}saveModelList`, models);
+      toast.success("Model Master updated successfully", { id: toastId });
+      setShowModelPopup(false);
+    } catch (err) {
+      toast.error("Failed to save models", { id: toastId });
+    }
   }
 
   /* ================= UI START ================= */
@@ -147,7 +186,8 @@ export default function BEECalculation() {
           onClick={() => setShowModelPopup(true)}
           className="bg-indigo-600 text-white px-6 rounded"
         >
-          ⚙ Manage Models
+          <FaCog className="inline mr-2" />
+          Manage Models
         </Button>
       </div>
 
@@ -174,7 +214,7 @@ export default function BEECalculation() {
               <ul className="absolute w-full bg-white border rounded shadow max-h-40 overflow-y-auto z-50">
                 {models
                   .filter((m) =>
-                    m.model.toLowerCase().includes(hard.model.toLowerCase())
+                    m.model.toLowerCase().includes(hard.model.toLowerCase()),
                   )
                   .map((m, i) => (
                     <li
@@ -212,23 +252,23 @@ export default function BEECalculation() {
                   getAchievedStar(hardTable) == 1
                     ? "bg-red-500"
                     : getAchievedStar(hardTable) == 2
-                    ? "bg-orange-500"
-                    : getAchievedStar(hardTable) == 3
-                    ? "bg-yellow-500"
-                    : getAchievedStar(hardTable) == 4
-                    ? "bg-green-600"
-                    : getAchievedStar(hardTable) == 5
-                    ? "bg-blue-700"
-                    : "bg-gray-500"
+                      ? "bg-orange-500"
+                      : getAchievedStar(hardTable) == 3
+                        ? "bg-yellow-500"
+                        : getAchievedStar(hardTable) == 4
+                          ? "bg-green-600"
+                          : getAchievedStar(hardTable) == 5
+                            ? "bg-blue-700"
+                            : "bg-gray-500"
                 }`}
               >
-                ⭐ {getAchievedStar(hardTable)}
+                <FaStar className="inline mr-2" />
+                {getAchievedStar(hardTable)}
               </span>
 
               <p className="mt-1 text-blue-700 font-semibold text-sm">
                 {getNextStarImprovement(hardTable, hard.energy)}
               </p>
-
             </div>
           )}
 
@@ -237,7 +277,9 @@ export default function BEECalculation() {
               <thead className="bg-blue-100">
                 <tr>
                   <th>Star</th>
-                  <th colSpan={3}>Annual Energy Consumption (Et) in kWh/year at 38°C</th>
+                  <th colSpan={3}>
+                    Annual Energy Consumption (Et) in kWh/year at 38°C
+                  </th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -288,7 +330,7 @@ export default function BEECalculation() {
               <ul className="absolute w-full bg-white border rounded shadow max-h-40 overflow-y-auto z-50">
                 {models
                   .filter((m) =>
-                    m.model.toLowerCase().includes(glass.model.toLowerCase())
+                    m.model.toLowerCase().includes(glass.model.toLowerCase()),
                   )
                   .map((m, i) => (
                     <li
@@ -329,14 +371,14 @@ export default function BEECalculation() {
                   getAchievedStar(glassTable) == 1
                     ? "bg-red-500"
                     : getAchievedStar(glassTable) == 2
-                    ? "bg-orange-500"
-                    : getAchievedStar(glassTable) == 3
-                    ? "bg-yellow-500"
-                    : getAchievedStar(glassTable) == 4
-                    ? "bg-green-600"
-                    : getAchievedStar(glassTable) == 5
-                    ? "bg-blue-700"
-                    : "bg-gray-500"
+                      ? "bg-orange-500"
+                      : getAchievedStar(glassTable) == 3
+                        ? "bg-yellow-500"
+                        : getAchievedStar(glassTable) == 4
+                          ? "bg-green-600"
+                          : getAchievedStar(glassTable) == 5
+                            ? "bg-blue-700"
+                            : "bg-gray-500"
                 }`}
               >
                 ⭐ {getAchievedStar(glassTable)}
@@ -345,7 +387,6 @@ export default function BEECalculation() {
               <p className="mt-1 text-green-700 font-semibold text-sm">
                 {getNextStarImprovement(glassTable, glass.energy)}
               </p>
-
             </div>
           )}
 
@@ -354,7 +395,9 @@ export default function BEECalculation() {
               <thead className="bg-green-100">
                 <tr>
                   <th>Star</th>
-                  <th colSpan={3}>Annual Energy Consumption (Et) in kWh/year at 38°C</th>
+                  <th colSpan={3}>
+                    Annual Energy Consumption (Et) in kWh/year at 38°C
+                  </th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -390,7 +433,8 @@ export default function BEECalculation() {
           onClick={save}
           className="bg-blue-600 text-white px-8 py-2 rounded text-lg"
         >
-          💾 Save BEE Rating
+          <FaSave className="inline mr-2" />
+          Save BEE Rating
         </Button>
       </div>
 
@@ -399,15 +443,19 @@ export default function BEECalculation() {
         <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-[999]">
           <div className="bg-white w-[650px] p-6 rounded-xl shadow-2xl">
             <h2 className="text-2xl font-bold text-center text-indigo-700 mb-4">
-              📦 Model Master Management
+              <FaBoxOpen className="inline mr-2" />
+              Model Master Management
             </h2>
 
-            <input
-              placeholder="🔍 Search Model..."
-              className="border p-2 w-full mb-4 rounded focus:ring-2 ring-indigo-400"
-              value={searchModel}
-              onChange={(e) => setSearchModel(e.target.value.toLowerCase())}
-            />
+            <div className="flex items-center border p-2 rounded mb-4">
+              <FaSearch className="text-gray-500 mr-2" />
+              <input
+                placeholder="Search Model..."
+                className="outline-none flex-1"
+                value={searchModel}
+                onChange={(e) => setSearchModel(e.target.value.toLowerCase())}
+              />
+            </div>
 
             <div className="max-h-[330px] overflow-y-auto border rounded">
               <table className="w-full text-center text-sm">
@@ -442,7 +490,7 @@ export default function BEECalculation() {
                             onClick={() => deleteModel(m.model)}
                             className="text-red-600 text-lg"
                           >
-                            ✖
+                            <FaTrash />
                           </button>
                         </td>
                       </tr>
@@ -474,7 +522,8 @@ export default function BEECalculation() {
                 onClick={addModel}
                 className="bg-indigo-600 text-white px-4 py-2 rounded"
               >
-                + Add
+                <FaPlus className="inline mr-1" />
+                Add
               </Button>
             </div>
 
@@ -489,7 +538,8 @@ export default function BEECalculation() {
                 onClick={saveModelsToDB}
                 className="bg-green-600 text-white px-6 rounded"
               >
-                💾 Save
+                <FaSave className="inline mr-2" />
+                Save
               </Button>
             </div>
           </div>

@@ -19,19 +19,11 @@ import { globalErrorHandler } from "./middlewares/errorHandler.js";
 const app = express();
 
 // <------------------------------------------------------------- Middlewares ------------------------------------------------------------->
-const allowedOrigins = process.env.CORS_ORIGIN.split(",");
-
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("CORS not allowed"));
-      }
-    },
+    origin: "http://localhost:5173",
     credentials: true,
-  })
+  }),
 );
 
 app.use(express.json());
