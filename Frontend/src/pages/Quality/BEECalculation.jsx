@@ -15,6 +15,7 @@ import {
   FaArrowUp,
 } from "react-icons/fa";
 import toast from "react-hot-toast";
+import { RxCross1 } from "react-icons/rx";
 
 /* ================= CONSTANTS ================= */
 const STAR_COLORS = {
@@ -525,9 +526,9 @@ export default function BEECalculation() {
               </h2>
               <button
                 onClick={() => setShowModelPopup(false)}
-                className="text-gray-400 hover:text-gray-700 text-xl"
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-600 hover:text-gray-800 transition-colors duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400 cursor-pointer"
               >
-                ✕
+                <RxCross1 className="text-xl" />
               </button>
             </div>
 
