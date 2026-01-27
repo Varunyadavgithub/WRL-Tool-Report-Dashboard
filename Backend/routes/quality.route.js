@@ -61,6 +61,12 @@ import {
   getReworkEntryDetailsByAssemblySerial,
   getReworkReport,
 } from "../controllers/quality/rework.controller.js";
+import {
+  deleteBeeModel,
+  getBeeModels,
+  saveBeeModels,
+  saveBeeRating,
+} from "../controllers/quality/beeCalculation.controller.js";
 const router = express.Router();
 
 // -----------------> CPT Routes
@@ -76,7 +82,7 @@ router.post(
   "/add-fpa-defect",
   uploadFpaDefectImage.single("image"),
   handleMulterError,
-  addDefect
+  addDefect,
 );
 router.get("/download-fpa-defect-image/:fgSrNo", downloadDefectImage);
 
@@ -124,7 +130,7 @@ router.post(
   "/upload-bis-pdf",
   uploadBISReportPDF.single("file"),
   handleMulterError,
-  uploadBisPdfFile
+  uploadBisPdfFile,
 );
 router.get("/bis-files", getBisPdfFiles);
 router.get("/download-bis-file/:srNo", downloadBisPdfFile);
@@ -133,9 +139,15 @@ router.put(
   "/update-bis-file/:srNo",
   uploadBISReportPDF.single("file"),
   handleMulterError,
-  updateBisPdfFile
+  updateBisPdfFile,
 );
 router.get("/bis-status", getBisReportStatus);
+
+// -----------------> BEE Calculation Routes
+router.get("/bee/models", getBeeModels);
+router.post("/bee/models", saveBeeModels);
+router.delete("/bee/models/:model", deleteBeeModel);
+router.post("/bee/save-rating", saveBeeRating);
 
 // -----------------> Hold Cabinet Details Routes
 router.get("/hold-cabinet-details", getDispatchHoldDetails);
