@@ -8,6 +8,7 @@ import dispatchRoute from "./dispatch.route.js";
 import productionPlaningRoutes from "./planing.route.js";
 import complianceRoute from "./compliance.route.js";
 import taskReminders from "./taskReminder.route.js";
+import auditReport from "./taskReminder.route.js";
 
 const routers = Router();
 
@@ -20,5 +21,6 @@ routers.use("/planing", productionPlaningRoutes);
 routers.use("/visitor", visitorRoutes);
 routers.use("/compliance", complianceRoute);
 routers.use("/task-reminders", taskReminders);
+routers.use("/audit-report", auditReport);
 
 export default routers;

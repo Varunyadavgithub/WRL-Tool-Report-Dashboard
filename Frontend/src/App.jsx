@@ -9,32 +9,32 @@ const Login = lazy(() => import("./pages/Auth/Login"));
 const Home = lazy(() => import("./pages/Home"));
 
 const ProductionOverview = lazy(() => import("./pages/Production/Overview"));
-const ComponentTraceabilityReport = lazy(() =>
-  import("./pages/Production/ComponentTraceabilityReport")
+const ComponentTraceabilityReport = lazy(
+  () => import("./pages/Production/ComponentTraceabilityReport"),
 );
 const HourlyReport = lazy(() => import("./pages/Production/HourlyReport"));
-const LineHourlyReport = lazy(() =>
-  import("./pages/Production/LineHourlyReport")
+const LineHourlyReport = lazy(
+  () => import("./pages/Production/LineHourlyReport"),
 );
-const StageHistoryReport = lazy(() =>
-  import("./pages/Production/StageHistoryReport")
+const StageHistoryReport = lazy(
+  () => import("./pages/Production/StageHistoryReport"),
 );
-const ModelNameUpdate = lazy(() =>
-  import("./pages/Production/ModelNameUpdate")
+const ModelNameUpdate = lazy(
+  () => import("./pages/Production/ModelNameUpdate"),
 );
-const TotalProduction = lazy(() =>
-  import("./pages/Production/TotalProduction")
+const TotalProduction = lazy(
+  () => import("./pages/Production/TotalProduction"),
 );
 const NFCReport = lazy(() => import("./pages/Production/NFCReport"));
-const ComponentDetails = lazy(() =>
-  import("./pages/Production/ComponentDetails")
+const ComponentDetails = lazy(
+  () => import("./pages/Production/ComponentDetails"),
 );
 
 const ReworkEntry = lazy(() => import("./pages/Quality/ReworkEntry"));
 const ReworkReport = lazy(() => import("./pages/Quality/ReworkReport"));
 const BrazingReport = lazy(() => import("./pages/Quality/BrazingReport"));
-const GasChargingReport = lazy(() =>
-  import("./pages/Quality/GasChargingReport")
+const GasChargingReport = lazy(
+  () => import("./pages/Quality/GasChargingReport"),
 );
 const ESTReport = lazy(() => import("./pages/Quality/ESTReport"));
 const CPTReport = lazy(() => import("./pages/Quality/CPTReport"));
@@ -44,24 +44,24 @@ const FPADefectReport = lazy(() => import("./pages/Quality/FPADefectReport"));
 const LPT = lazy(() => import("./pages/Quality/LPT"));
 const LPTReport = lazy(() => import("./pages/Quality/LPTReport"));
 const DispatchHold = lazy(() => import("./pages/Quality/DispatchHold"));
-const HoldCabinateDetails = lazy(() =>
-  import("./pages/Quality/HoldCabinateDetails")
+const HoldCabinateDetails = lazy(
+  () => import("./pages/Quality/HoldCabinateDetails"),
 );
 
-const DispatchPerformanceReport = lazy(() =>
-  import("./pages/Dispatch/DispatchPerformanceReport")
+const DispatchPerformanceReport = lazy(
+  () => import("./pages/Dispatch/DispatchPerformanceReport"),
 );
 const DispatchReport = lazy(() => import("./pages/Dispatch/DispatchReport"));
-const DispatchUnloading = lazy(() =>
-  import("./pages/Dispatch/DispatchUnloading")
+const DispatchUnloading = lazy(
+  () => import("./pages/Dispatch/DispatchUnloading"),
 );
 const FGCasting = lazy(() => import("./pages/Dispatch/FGCasting"));
 const GateEntry = lazy(() => import("./pages/Dispatch/GateEntry"));
 const ErrorLog = lazy(() => import("./pages/Dispatch/ErrorLog"));
 
 const FiveDaysPlaning = lazy(() => import("./pages/Planing/FiveDaysPlaning"));
-const ProductionPlaning = lazy(() =>
-  import("./pages/Planing/ProductionPlaning")
+const ProductionPlaning = lazy(
+  () => import("./pages/Planing/ProductionPlaning"),
 );
 const DailyPlan = lazy(() => import("./pages/Planing/DailyPlan"));
 
@@ -74,22 +74,33 @@ const BEECalculation = lazy(() => import("./pages/Quality/BEECalculation"));
 
 const Dashboard = lazy(() => import("./pages/Visitor/Dashboard"));
 const GeneratePass = lazy(() => import("./pages/Visitor/GeneratePass"));
-const VisitorPassDisplay = lazy(() =>
-  import("./pages/Visitor/VisitorPassDisplay")
+const VisitorPassDisplay = lazy(
+  () => import("./pages/Visitor/VisitorPassDisplay"),
 );
 const InOut = lazy(() => import("./pages/Visitor/InOut"));
 const Reports = lazy(() => import("./pages/Visitor/Reports"));
 const History = lazy(() => import("./pages/Visitor/History"));
 const ManageEmployee = lazy(() => import("./pages/Visitor/ManageEmployee"));
 
-const LogisticsDisplay = lazy(() =>
-  import("./pages/PerformanceDisplays/LogisticsDisplay")
+const LogisticsDisplay = lazy(
+  () => import("./pages/PerformanceDisplays/LogisticsDisplay"),
 );
 
 const Calibiration = lazy(() => import("./pages/Compliance/Calibration"));
 
 const ManageTasks = lazy(() => import("./pages/TaskReminders/ManageTasks"));
 const TaskOverview = lazy(() => import("./pages/TaskReminders/TaskOverview"));
+// const AuditReportTemplate = lazy(
+//   () => import("./pages/AuditReport/AuditReportTemplate"),
+// );
+// Audit Report Components
+const TemplateList = lazy(() => import("./pages/AuditReport/TemplateList"));
+const TemplateBuilder = lazy(
+  () => import("./pages/AuditReport/TemplateBuilder"),
+);
+const AuditList = lazy(() => import("./pages/AuditReport/AuditList"));
+const AuditEntry = lazy(() => import("./pages/AuditReport/AuditEntry"));
+const AuditView = lazy(() => import("./pages/AuditReport/AuditView"));
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -324,6 +335,42 @@ function App() {
             )}
             {canAccess(["admin"]) && (
               <Route path="/reminder/overview" element={<TaskOverview />} />
+            )}
+            {/*-------------------------------------------------------------- Audit Report --------------------------------------------------------------*/}
+            {/* {canAccess(["admin"]) && (
+              <Route
+                path="/auditreport/template"
+                element={<AuditReportTemplate />}
+              />
+            )} */}
+            {canAccess(["admin", "quality manager"]) && (
+              <>
+                <Route
+                  path="/auditreport/templates"
+                  element={<TemplateList />}
+                />
+                <Route
+                  path="/auditreport/templates/new"
+                  element={<TemplateBuilder />}
+                />
+                <Route
+                  path="/auditreport/templates/:id"
+                  element={<TemplateBuilder />}
+                />
+                <Route path="/auditreport/audits" element={<AuditList />} />
+                <Route
+                  path="/auditreport/audits/new"
+                  element={<AuditEntry />}
+                />
+                <Route
+                  path="/auditreport/audits/:id"
+                  element={<AuditEntry />}
+                />
+                <Route
+                  path="/auditreport/audits/:id/view"
+                  element={<AuditView />}
+                />
+              </>
             )}
             {/*-------------------------------------------------------------- Catch All --------------------------------------------------------------*/}
             <Route path="*" element={<NotFound />} />

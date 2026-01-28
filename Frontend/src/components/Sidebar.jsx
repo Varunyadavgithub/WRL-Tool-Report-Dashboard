@@ -16,6 +16,7 @@ import {
 } from "react-icons/md";
 import { FaUserShield } from "react-icons/fa6";
 import { useSelector } from "react-redux";
+import { MdOutlineFactCheck } from "react-icons/md";
 
 // Define menu configurations
 const MENU_CONFIG = [
@@ -260,6 +261,28 @@ const MENU_CONFIG = [
       },
     ],
   },
+  {
+    key: "Audit Report",
+    icon: MdOutlineFactCheck,
+    label: "Audit Report",
+    items: [
+      // {
+      //   path: "/auditreport/template",
+      //   label: "Audit Report Template",
+      //   roles: ["admin"],
+      // },
+      {
+        path: "/auditreport/templates",
+        label: "Templates",
+        roles: ["admin", "quality manager"],
+      },
+      {
+        path: "/auditreport/audits",
+        label: "Audit Records",
+        roles: ["admin", "quality manager"],
+      },
+    ],
+  },
 ];
 
 const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
@@ -269,7 +292,7 @@ const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
     allowedRoles.includes(userRole) || userRole === "admin";
 
   const [expandedMenus, setExpandedMenus] = useState(
-    MENU_CONFIG.reduce((acc, menu) => ({ ...acc, [menu.key]: false }), {})
+    MENU_CONFIG.reduce((acc, menu) => ({ ...acc, [menu.key]: false }), {}),
   );
 
   const location = useLocation();
@@ -282,7 +305,7 @@ const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
           ...acc,
           [key]: false,
         }),
-        {}
+        {},
       );
 
       // Toggle the selected menu
@@ -305,7 +328,7 @@ const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
               <Link
                 to={item.path}
                 className={`block p-2 rounded-lg hover:bg-gray-700 transition ${isActive(
-                  item.path
+                  item.path,
                 )}`}
                 onClick={() => window.scrollTo(0, 0)}
               >
