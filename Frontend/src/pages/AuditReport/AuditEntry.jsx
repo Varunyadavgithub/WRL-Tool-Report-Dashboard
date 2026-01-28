@@ -1,3 +1,4 @@
+// pages/AuditEntry.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -36,10 +37,17 @@ const AuditEntry = () => {
   const [searchParams] = useSearchParams();
   const templateId = searchParams.get("template");
 
-  const { getTemplateById, getAuditById, createAudit, updateAudit } =
-    useAuditData();
+  const {
+    getTemplateById,
+    getAuditById,
+    createAudit,
+    updateAudit,
+    loading,
+    error,
+  } = useAuditData();
 
   const [saving, setSaving] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [template, setTemplate] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -63,82 +71,88 @@ const AuditEntry = () => {
 
   // Load template or existing audit
   useEffect(() => {
-    if (id) {
-      // Editing existing audit
-      const audit = getAuditById(id);
-      if (audit) {
-        setAuditData({
-          templateId: audit.templateId || "",
-          templateName: audit.templateName || "",
-          reportName: audit.reportName || "",
-          formatNo: audit.formatNo || "",
-          revNo: audit.revNo || "",
-          revDate: audit.revDate || "",
-          notes: audit.notes || "",
-          status: audit.status || "draft",
-        });
-        setInfoData(audit.infoData || {});
-        setSections(audit.sections || []);
+    const loadData = async () => {
+      setInitialLoading(true);
+      try {
+        if (id) {
+          // Editing existing audit
+          const audit = await getAuditById(id);
+          if (audit) {
+            setAuditData({
+              templateId: audit.templateId || "",
+              templateName: audit.templateName || "",
+              reportName: audit.reportName || "",
+              formatNo: audit.formatNo || "",
+              revNo: audit.revNo || "",
+              revDate: audit.revDate || "",
+              notes: audit.notes || "",
+              status: audit.status || "draft",
+            });
+            setInfoData(audit.infoData || {});
+            setSections(audit.sections || []);
 
-        // Load template for column config
-        if (audit.templateId) {
-          const tmpl = getTemplateById(audit.templateId);
-          if (tmpl) {
-            setTemplate(tmpl);
-          } else {
-            // Use stored config from audit if template not found
+            // Use stored config from audit
             setTemplate({
               columns: audit.columns,
               infoFields: audit.infoFields,
               headerConfig: audit.headerConfig,
             });
           }
-        }
-      }
-    } else if (templateId) {
-      // Creating new audit from template
-      const tmpl = getTemplateById(templateId);
-      if (tmpl) {
-        setTemplate(tmpl);
-        setAuditData({
-          templateId: tmpl.id,
-          templateName: tmpl.name,
-          reportName: tmpl.name,
-          formatNo: tmpl.headerConfig?.defaultFormatNo || "",
-          revNo: tmpl.headerConfig?.defaultRevNo || "",
-          revDate: new Date().toISOString().split("T")[0],
-          notes: "",
-          status: "draft",
-        });
+        } else if (templateId) {
+          // Creating new audit from template
+          const tmpl = await getTemplateById(templateId);
+          if (tmpl) {
+            setTemplate(tmpl);
+            setAuditData({
+              templateId: tmpl.id,
+              templateName: tmpl.name,
+              reportName: tmpl.name,
+              formatNo: tmpl.headerConfig?.defaultFormatNo || "",
+              revNo: tmpl.headerConfig?.defaultRevNo || "",
+              revDate: new Date().toISOString().split("T")[0],
+              notes: "",
+              status: "draft",
+            });
 
-        // Initialize info fields
-        const initialInfoData = {};
-        tmpl.infoFields?.forEach((field) => {
-          if (field.id === "date") {
-            initialInfoData[field.id] = new Date().toISOString().split("T")[0];
-          } else {
-            initialInfoData[field.id] = "";
+            // Initialize info fields
+            const initialInfoData = {};
+            tmpl.infoFields?.forEach((field) => {
+              if (field.id === "date") {
+                initialInfoData[field.id] = new Date()
+                  .toISOString()
+                  .split("T")[0];
+              } else {
+                initialInfoData[field.id] = "";
+              }
+            });
+            setInfoData(initialInfoData);
+
+            // Initialize sections from template
+            const initialSections =
+              tmpl.defaultSections?.map((section) => ({
+                ...section,
+                id: Date.now() + Math.random(),
+                checkPoints: section.checkPoints.map((cp) => ({
+                  ...cp,
+                  id: Date.now() + Math.random(),
+                  observation: "",
+                  remark: "",
+                  status: "pending",
+                })),
+              })) || [];
+            setSections(initialSections);
           }
-        });
-        setInfoData(initialInfoData);
-
-        // Initialize sections from template
-        const initialSections =
-          tmpl.defaultSections?.map((section) => ({
-            ...section,
-            id: Date.now() + Math.random(),
-            checkPoints: section.checkPoints.map((cp) => ({
-              ...cp,
-              id: Date.now() + Math.random(),
-              observation: "",
-              remark: "",
-              status: "pending",
-            })),
-          })) || [];
-        setSections(initialSections);
+        }
+      } catch (err) {
+        alert("Failed to load data: " + err.message);
+        navigate("/auditreport/audits");
+      } finally {
+        setInitialLoading(false);
       }
-    }
-  }, [id, templateId, getTemplateById, getAuditById]);
+    };
+
+    loadData();
+  }, [id, templateId]);
 
   // Handle audit data change
   const handleAuditDataChange = (field, value) => {
@@ -336,7 +350,7 @@ const AuditEntry = () => {
   const summary = getSummary();
 
   // Save audit
-  const handleSave = (asDraft = true) => {
+  const handleSave = async (asDraft = true) => {
     setSaving(true);
     try {
       const auditPayload = {
@@ -350,9 +364,9 @@ const AuditEntry = () => {
       };
 
       if (id) {
-        updateAudit(id, auditPayload);
+        await updateAudit(id, auditPayload);
       } else {
-        createAudit(auditPayload);
+        await createAudit(auditPayload);
       }
 
       alert(
@@ -454,6 +468,19 @@ const AuditEntry = () => {
     }
   };
 
+  // Loading state
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading audit...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // No template selected
   if (!template && !id) {
     return (
       <div className="min-h-screen bg-gray-100 py-6 px-4 flex items-center justify-center">
@@ -527,7 +554,16 @@ const AuditEntry = () => {
               disabled={saving}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all text-sm disabled:opacity-50"
             >
-              <FaSave /> Save Draft
+              {saving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <FaSave /> Save Draft
+                </>
+              )}
             </button>
             <button
               onClick={() => handleSave(false)}
@@ -538,6 +574,13 @@ const AuditEntry = () => {
             </button>
           </div>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 print:hidden">
+            {error}
+          </div>
+        )}
 
         {/* Main Report Container */}
         <div className="bg-white shadow-xl rounded-lg overflow-hidden border-2 border-gray-300 print:shadow-none print:border print:rounded-none">

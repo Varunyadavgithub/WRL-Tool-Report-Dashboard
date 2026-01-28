@@ -1,3 +1,4 @@
+// pages/AuditView.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -7,7 +8,6 @@ import {
   FaStickyNote,
   FaClipboardCheck,
   FaPrint,
-  FaDownload,
   FaCheckCircle,
   FaTimesCircle,
   FaExclamationTriangle,
@@ -15,6 +15,7 @@ import {
   FaEdit,
   FaCheck,
   FaBan,
+  FaHistory,
 } from "react-icons/fa";
 import { MdFormatListNumbered, MdUpdate, MdDateRange } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
@@ -24,28 +25,66 @@ import useAuditData from "../../hooks/useAuditData";
 const AuditView = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { getAuditById, updateAudit } = useAuditData();
+  const {
+    getAuditById,
+    approveAudit,
+    rejectAudit,
+    getAuditHistory,
+    loading,
+    error,
+  } = useAuditData();
 
   const [audit, setAudit] = useState(null);
   const [template, setTemplate] = useState(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [approvalAction, setApprovalAction] = useState("approve");
   const [approverName, setApproverName] = useState("");
   const [approvalComments, setApprovalComments] = useState("");
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [auditHistory, setAuditHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
+  // Load audit data
   useEffect(() => {
-    if (id) {
-      const auditData = getAuditById(id);
-      if (auditData) {
-        setAudit(auditData);
-        setTemplate({
-          columns: auditData.columns,
-          infoFields: auditData.infoFields,
-          headerConfig: auditData.headerConfig,
-        });
+    const loadAudit = async () => {
+      if (id) {
+        setInitialLoading(true);
+        try {
+          const auditData = await getAuditById(id);
+          if (auditData) {
+            setAudit(auditData);
+            setTemplate({
+              columns: auditData.columns,
+              infoFields: auditData.infoFields,
+              headerConfig: auditData.headerConfig,
+            });
+          }
+        } catch (err) {
+          alert("Failed to load audit: " + err.message);
+          navigate("/auditreport/audits");
+        } finally {
+          setInitialLoading(false);
+        }
       }
+    };
+    loadAudit();
+  }, [id]);
+
+  // Load audit history
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const history = await getAuditHistory(id);
+      setAuditHistory(history || []);
+      setShowHistoryModal(true);
+    } catch (err) {
+      alert("Failed to load audit history: " + err.message);
+    } finally {
+      setHistoryLoading(false);
     }
-  }, [id, getAuditById]);
+  };
 
   // Print function
   const handlePrint = () => {
@@ -59,27 +98,45 @@ const AuditView = () => {
   };
 
   // Handle approval/rejection
-  const handleApproval = () => {
+  const handleApproval = async () => {
     if (!approverName.trim()) {
       alert("Please enter approver name");
       return;
     }
 
-    const updateData = {
-      status: approvalAction === "approve" ? "approved" : "rejected",
-      approvedBy: approverName,
-      approvalComments: approvalComments,
-      approvedAt: new Date().toISOString(),
-    };
+    if (approvalAction === "reject" && !approvalComments.trim()) {
+      alert("Please enter rejection reason");
+      return;
+    }
 
-    updateAudit(id, updateData);
-    setAudit({ ...audit, ...updateData });
-    setShowApprovalModal(false);
-    setApproverName("");
-    setApprovalComments("");
-    alert(
-      `Audit ${approvalAction === "approve" ? "approved" : "rejected"} successfully!`,
-    );
+    setActionLoading(true);
+    try {
+      let updatedAudit;
+      const approvalData = {
+        approverName: approverName,
+        comments: approvalComments,
+      };
+
+      if (approvalAction === "approve") {
+        updatedAudit = await approveAudit(id, approvalData);
+      } else {
+        updatedAudit = await rejectAudit(id, approvalData);
+      }
+
+      setAudit(updatedAudit);
+      setShowApprovalModal(false);
+      setApproverName("");
+      setApprovalComments("");
+      alert(
+        `Audit ${
+          approvalAction === "approve" ? "approved" : "rejected"
+        } successfully!`,
+      );
+    } catch (err) {
+      alert(`Failed to ${approvalAction} audit: ` + err.message);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   // Get field icon
@@ -162,6 +219,11 @@ const AuditView = () => {
 
   // Calculate summary
   const getSummary = () => {
+    // Use pre-calculated summary if available
+    if (audit?.summary) {
+      return audit.summary;
+    }
+
     let pass = 0,
       fail = 0,
       warning = 0,
@@ -183,12 +245,32 @@ const AuditView = () => {
     };
   };
 
-  if (!audit) {
+  // Loading state
+  if (initialLoading) {
     return (
       <div className="min-h-screen bg-gray-100 py-6 px-4 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading audit...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Audit not found
+  if (!audit) {
+    return (
+      <div className="min-h-screen bg-gray-100 py-6 px-4 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-700 mb-4">
+            Audit Not Found
+          </h2>
+          <button
+            onClick={() => navigate("/auditreport/audits")}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+          >
+            Back to Audits
+          </button>
         </div>
       </div>
     );
@@ -214,17 +296,26 @@ const AuditView = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             <button
+              onClick={loadHistory}
+              disabled={historyLoading}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-all text-sm disabled:opacity-50"
+            >
+              <FaHistory /> History
+            </button>
+            <button
               onClick={handlePrint}
               className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-all text-sm"
             >
               <FaPrint /> Print
             </button>
-            <button
-              onClick={() => navigate(`/auditreport/audits/${id}`)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all text-sm"
-            >
-              <FaEdit /> Edit
-            </button>
+            {audit.status !== "approved" && (
+              <button
+                onClick={() => navigate(`/auditreport/audits/${id}`)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all text-sm"
+              >
+                <FaEdit /> Edit
+              </button>
+            )}
             {audit.status === "submitted" && (
               <>
                 <button
@@ -243,6 +334,13 @@ const AuditView = () => {
             )}
           </div>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 print:hidden">
+            {error}
+          </div>
+        )}
 
         {/* Approval Info Banner */}
         {(audit.status === "approved" || audit.status === "rejected") &&
@@ -270,9 +368,11 @@ const AuditView = () => {
                   {audit.status === "approved" ? "Approved" : "Rejected"} by{" "}
                   {audit.approvedBy}
                 </span>
-                <span className="text-gray-500 text-sm">
-                  on {new Date(audit.approvedAt).toLocaleString()}
-                </span>
+                {audit.approvedAt && (
+                  <span className="text-gray-500 text-sm">
+                    on {new Date(audit.approvedAt).toLocaleString()}
+                  </span>
+                )}
               </div>
               {audit.approvalComments && (
                 <p className="mt-2 text-gray-600 text-sm pl-6">
@@ -298,6 +398,11 @@ const AuditView = () => {
                 <p className="text-blue-200 text-sm mt-2">
                   Template: {audit.templateName}
                 </p>
+                {audit.auditCode && (
+                  <p className="text-blue-200 text-xs mt-1">
+                    Code: {audit.auditCode}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -350,7 +455,9 @@ const AuditView = () => {
               .map((field, index, arr) => (
                 <div
                   key={field.id}
-                  className={`p-4 ${index < arr.length - 1 ? "border-r border-gray-300" : ""}`}
+                  className={`p-4 ${
+                    index < arr.length - 1 ? "border-r border-gray-300" : ""
+                  }`}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     {getFieldIcon(field.id)}
@@ -513,7 +620,11 @@ const AuditView = () => {
                 <div
                   className="bg-green-500 h-3 rounded-full transition-all"
                   style={{
-                    width: `${summary.total > 0 ? (summary.pass / summary.total) * 100 : 0}%`,
+                    width: `${
+                      summary.total > 0
+                        ? (summary.pass / summary.total) * 100
+                        : 0
+                    }%`,
                   }}
                 ></div>
               </div>
@@ -546,7 +657,9 @@ const AuditView = () => {
                     {audit.approvedBy}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {new Date(audit.approvedAt).toLocaleDateString()}
+                    {audit.approvedAt
+                      ? new Date(audit.approvedAt).toLocaleDateString()
+                      : "-"}
                   </p>
                 </div>
               ) : (
@@ -566,13 +679,17 @@ const AuditView = () => {
             <div>
               <span className="text-gray-500">Created:</span>
               <span className="ml-2 text-gray-700">
-                {new Date(audit.createdAt).toLocaleString()}
+                {audit.createdAt
+                  ? new Date(audit.createdAt).toLocaleString()
+                  : "-"}
               </span>
             </div>
             <div>
               <span className="text-gray-500">Updated:</span>
               <span className="ml-2 text-gray-700">
-                {new Date(audit.updatedAt).toLocaleString()}
+                {audit.updatedAt
+                  ? new Date(audit.updatedAt).toLocaleString()
+                  : "-"}
               </span>
             </div>
             <div>
@@ -628,12 +745,19 @@ const AuditView = () => {
               </div>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Comments (Optional)
+                  Comments{" "}
+                  {approvalAction === "reject" && (
+                    <span className="text-red-500">*</span>
+                  )}
                 </label>
                 <textarea
                   value={approvalComments}
                   onChange={(e) => setApprovalComments(e.target.value)}
-                  placeholder="Enter any comments..."
+                  placeholder={
+                    approvalAction === "reject"
+                      ? "Enter rejection reason..."
+                      : "Enter any comments (optional)..."
+                  }
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -646,19 +770,92 @@ const AuditView = () => {
                   setApproverName("");
                   setApprovalComments("");
                 }}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium"
+                disabled={actionLoading}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleApproval}
-                className={`px-4 py-2 text-white rounded-lg font-medium ${
+                disabled={actionLoading}
+                className={`px-4 py-2 text-white rounded-lg font-medium disabled:opacity-50 flex items-center gap-2 ${
                   approvalAction === "approve"
                     ? "bg-green-600 hover:bg-green-700"
                     : "bg-red-600 hover:bg-red-700"
                 }`}
               >
-                {approvalAction === "approve" ? "Approve" : "Reject"}
+                {actionLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Processing...
+                  </>
+                ) : approvalAction === "approve" ? (
+                  "Approve"
+                ) : (
+                  "Reject"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="p-4 bg-purple-600 text-white flex justify-between items-center">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <FaHistory /> Audit History
+              </h3>
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                className="p-1 hover:bg-purple-700 rounded text-white"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-4 max-h-[60vh] overflow-y-auto">
+              {auditHistory.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">
+                  No history records found.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {auditHistory.map((record, index) => (
+                    <div
+                      key={record.Id || index}
+                      className="border-l-4 border-purple-500 pl-4 py-2"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-semibold text-gray-800 capitalize">
+                            {record.Action}
+                          </span>
+                          <span className="text-gray-500 ml-2">
+                            by {record.ActionBy}
+                          </span>
+                        </div>
+                        <span className="text-xs text-gray-400">
+                          {new Date(record.ActionAt).toLocaleString()}
+                        </span>
+                      </div>
+                      {record.Comments && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          {record.Comments}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="p-4 bg-gray-50 border-t">
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium"
+              >
+                Close
               </button>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import sql from "mssql";
-import { dbConfig3 } from "../config/db.js";
+import { dbConfig3 } from "../../config/db.js";
 import { tryCatch } from "../../config/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { generateTemplateCode } from "../../utils/generateCode.js";
@@ -10,7 +10,7 @@ export const getAllTemplates = tryCatch(async (req, res) => {
   const offset = (parseInt(page) - 1) * parseInt(limit);
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
-  const request = pool.request();
+  const request = await pool.request();
 
   let whereConditions = ["IsDeleted=0"];
 
@@ -99,7 +99,7 @@ export const getTemplateById = tryCatch(async (req, res) => {
   }
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
-  const result = (pool.request().input("id", sql.Int, id).query = `
+  const result = await pool.request().input("id", sql.Int, id).query(`
     SELECT 
         Id,
         TemplateCode,
@@ -165,7 +165,7 @@ export const createTemplate = tryCatch(async (req, res) => {
   const createdBy = req.user?.userCode || "SYSTEM";
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
-  const result = pool
+  const result = await pool
     .request()
     .input("templateCode", sql.VarChar, templateCode)
     .input("name", sql.NVarChar, name)
@@ -195,7 +195,7 @@ export const createTemplate = tryCatch(async (req, res) => {
       );
     `);
 
-  const template = result.recordset[0];
+  const template = result?.recordset[0];
 
   res.status(201).json({
     success: true,

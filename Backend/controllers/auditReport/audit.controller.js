@@ -1,5 +1,5 @@
 import sql from "mssql";
-import { dbConfig3 } from "../config/db.js";
+import { dbConfig3 } from "../../config/db.js";
 import { tryCatch } from "../../config/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { generateAuditCode } from "../../utils/generateCode.js";
@@ -48,7 +48,7 @@ export const getAllAudits = tryCatch(async (req, res) => {
   const offset = (parseInt(page) - 1) * parseInt(limit);
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
-  const request = pool.request();
+  const request = await pool.request();
 
   let whereConditions = ["IsDeleted = 0"];
 
@@ -764,7 +764,7 @@ export const getAuditStats = tryCatch(async (req, res) => {
   const { startDate, endDate, templateId } = req.query;
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
-  const request = pool.request();
+  const request = await pool.request();
 
   let whereConditions = ["IsDeleted = 0"];
 
@@ -825,7 +825,7 @@ export const exportAuditData = tryCatch(async (req, res) => {
   const { startDate, endDate, templateId, status } = req.query;
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
-  const request = pool.request();
+  const request = await pool.request();
 
   let whereConditions = ["IsDeleted = 0"];
 

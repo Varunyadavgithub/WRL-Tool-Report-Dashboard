@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+// pages/AuditList.jsx
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FaPlus,
   FaEdit,
@@ -13,68 +14,107 @@ import {
   FaClock,
   FaPaperPlane,
   FaClipboardCheck,
-} from 'react-icons/fa';
-import { HiClipboardDocumentCheck } from 'react-icons/hi2';
-import useAuditData from '../../hooks/useAuditData';
+} from "react-icons/fa";
+import useAuditData from "../../hooks/useAuditData";
 
 const AuditList = () => {
   const navigate = useNavigate();
-  const { audits, templates, deleteAudit, loadAudits, loadTemplates } = useAuditData();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterTemplate, setFilterTemplate] = useState('');
+  const {
+    audits,
+    templates,
+    deleteAudit,
+    loadAudits,
+    loadTemplates,
+    loading,
+    error,
+  } = useAuditData();
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterTemplate, setFilterTemplate] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [auditToDelete, setAuditToDelete] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
 
+  // Load audits and templates on mount
   useEffect(() => {
-    loadAudits();
-    loadTemplates();
+    const fetchData = async () => {
+      setInitialLoading(true);
+      try {
+        await Promise.all([loadAudits(), loadTemplates()]);
+      } catch (err) {
+        console.error("Failed to load data:", err);
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
+  // Filter audits
   const filteredAudits = audits.filter((audit) => {
     const matchesSearch =
       audit.reportName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       audit.templateName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      audit.infoData?.modelName?.toLowerCase().includes(searchTerm.toLowerCase());
+      audit.auditCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      audit.infoData?.modelName
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase());
     const matchesStatus = !filterStatus || audit.status === filterStatus;
-    const matchesTemplate = !filterTemplate || audit.templateId === filterTemplate;
+    const matchesTemplate =
+      !filterTemplate || audit.templateId == filterTemplate;
     return matchesSearch && matchesStatus && matchesTemplate;
   });
 
-  const handleDelete = () => {
+  // Handle delete
+  const handleDelete = async () => {
     if (auditToDelete) {
-      deleteAudit(auditToDelete.id);
-      setShowDeleteModal(false);
-      setAuditToDelete(null);
+      setActionLoading(true);
+      try {
+        await deleteAudit(auditToDelete.id);
+        setShowDeleteModal(false);
+        setAuditToDelete(null);
+      } catch (err) {
+        alert("Failed to delete audit: " + err.message);
+      } finally {
+        setActionLoading(false);
+      }
     }
   };
 
+  // Confirm delete
   const confirmDelete = (audit) => {
+    if (audit.status === "approved") {
+      alert("Cannot delete an approved audit");
+      return;
+    }
     setAuditToDelete(audit);
     setShowDeleteModal(true);
   };
 
+  // Get status badge
   const getStatusBadge = (status) => {
     switch (status) {
-      case 'draft':
+      case "draft":
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
             <FaClock size={10} /> Draft
           </span>
         );
-      case 'submitted':
+      case "submitted":
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
             <FaPaperPlane size={10} /> Submitted
           </span>
         );
-      case 'approved':
+      case "approved":
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
             <FaCheckCircle size={10} /> Approved
           </span>
         );
-      case 'rejected':
+      case "rejected":
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
             <FaTimesCircle size={10} /> Rejected
@@ -89,7 +129,11 @@ const AuditList = () => {
     }
   };
 
+  // Get summary from audit
   const getSummaryFromAudit = (audit) => {
+    if (audit.summary) {
+      return audit.summary;
+    }
     let pass = 0,
       fail = 0,
       warning = 0,
@@ -97,13 +141,25 @@ const AuditList = () => {
     audit.sections?.forEach((section) => {
       section.checkPoints?.forEach((cp) => {
         total++;
-        if (cp.status === 'pass') pass++;
-        else if (cp.status === 'fail') fail++;
-        else if (cp.status === 'warning') warning++;
+        if (cp.status === "pass") pass++;
+        else if (cp.status === "fail") fail++;
+        else if (cp.status === "warning") warning++;
       });
     });
     return { pass, fail, warning, total };
   };
+
+  // Loading state
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading audits...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4">
@@ -115,15 +171,24 @@ const AuditList = () => {
               <FaClipboardCheck className="text-green-600" />
               Audit Records
             </h1>
-            <p className="text-gray-600 mt-1">View and manage your audit entries</p>
+            <p className="text-gray-600 mt-1">
+              View and manage your audit entries
+            </p>
           </div>
           <button
-            onClick={() => navigate('/auditreport/templates')}
+            onClick={() => navigate("/auditreport/templates")}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all"
           >
             <FaPlus /> New Audit
           </button>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {error}
+          </div>
+        )}
 
         {/* Search and Filter */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
@@ -172,24 +237,26 @@ const AuditList = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-md p-4">
-            <div className="text-3xl font-bold text-blue-600">{audits.length}</div>
+            <div className="text-3xl font-bold text-blue-600">
+              {audits.length}
+            </div>
             <div className="text-gray-600 text-sm">Total Audits</div>
           </div>
           <div className="bg-white rounded-lg shadow-md p-4">
             <div className="text-3xl font-bold text-gray-600">
-              {audits.filter((a) => a.status === 'draft').length}
+              {audits.filter((a) => a.status === "draft").length}
             </div>
             <div className="text-gray-600 text-sm">Drafts</div>
           </div>
           <div className="bg-white rounded-lg shadow-md p-4">
             <div className="text-3xl font-bold text-blue-600">
-              {audits.filter((a) => a.status === 'submitted').length}
+              {audits.filter((a) => a.status === "submitted").length}
             </div>
             <div className="text-gray-600 text-sm">Submitted</div>
           </div>
           <div className="bg-white rounded-lg shadow-md p-4">
             <div className="text-3xl font-bold text-green-600">
-              {audits.filter((a) => a.status === 'approved').length}
+              {audits.filter((a) => a.status === "approved").length}
             </div>
             <div className="text-gray-600 text-sm">Approved</div>
           </div>
@@ -199,14 +266,16 @@ const AuditList = () => {
         {filteredAudits.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
             <FaFileAlt className="text-6xl text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">No Audits Found</h3>
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">
+              No Audits Found
+            </h3>
             <p className="text-gray-500 mb-4">
               {searchTerm || filterStatus || filterTemplate
-                ? 'No audits match your search criteria.'
-                : 'Get started by creating your first audit.'}
+                ? "No audits match your search criteria."
+                : "Get started by creating your first audit."}
             </p>
             <button
-              onClick={() => navigate('/auditreport/templates')}
+              onClick={() => navigate("/auditreport/templates")}
               className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all"
             >
               <FaPlus /> Create Audit
@@ -243,36 +312,45 @@ const AuditList = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {filteredAudits
-                    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+                    .sort(
+                      (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt),
+                    )
                     .map((audit) => {
                       const summary = getSummaryFromAudit(audit);
                       return (
-                        <tr key={audit.id} className="hover:bg-gray-50 transition-colors">
+                        <tr
+                          key={audit.id}
+                          className="hover:bg-gray-50 transition-colors"
+                        >
                           <td className="px-4 py-3">
-                            <div className="font-medium text-gray-800">{audit.reportName}</div>
+                            <div className="font-medium text-gray-800">
+                              {audit.reportName}
+                            </div>
                             <div className="text-xs text-gray-500">
-                              Format: {audit.formatNo || '-'} | Rev: {audit.revNo || '-'}
+                              {audit.auditCode && `${audit.auditCode} | `}
+                              Format: {audit.formatNo || "-"} | Rev:{" "}
+                              {audit.revNo || "-"}
                             </div>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
-                            {audit.templateName || '-'}
+                            {audit.templateName || "-"}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
-                            {audit.infoData?.modelName || '-'}
+                            {audit.infoData?.modelName || "-"}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
-                            {audit.infoData?.date || audit.revDate || '-'}
+                            {audit.infoData?.date || audit.revDate || "-"}
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-center gap-2">
                               <span className="flex items-center gap-1 text-xs text-green-600">
-                                <FaCheckCircle size={10} /> {summary.pass}
+                                <FaCheckCircle size={10} /> {summary.pass || 0}
                               </span>
                               <span className="flex items-center gap-1 text-xs text-yellow-600">
-                                ⚠ {summary.warning}
+                                ⚠ {summary.warning || 0}
                               </span>
                               <span className="flex items-center gap-1 text-xs text-red-600">
-                                <FaTimesCircle size={10} /> {summary.fail}
+                                <FaTimesCircle size={10} /> {summary.fail || 0}
                               </span>
                             </div>
                           </td>
@@ -282,26 +360,36 @@ const AuditList = () => {
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-center gap-2">
                               <button
-                                onClick={() => navigate(`/auditreport/audits/${audit.id}/view`)}
+                                onClick={() =>
+                                  navigate(
+                                    `/auditreport/audits/${audit.id}/view`,
+                                  )
+                                }
                                 className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-all"
                                 title="View"
                               >
                                 <FaEye size={14} />
                               </button>
-                              <button
-                                onClick={() => navigate(`/auditreport/audits/${audit.id}`)}
-                                className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-all"
-                                title="Edit"
-                              >
-                                <FaEdit size={14} />
-                              </button>
-                              <button
-                                onClick={() => confirmDelete(audit)}
-                                className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all"
-                                title="Delete"
-                              >
-                                <FaTrash size={14} />
-                              </button>
+                              {audit.status !== "approved" && (
+                                <button
+                                  onClick={() =>
+                                    navigate(`/auditreport/audits/${audit.id}`)
+                                  }
+                                  className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-all"
+                                  title="Edit"
+                                >
+                                  <FaEdit size={14} />
+                                </button>
+                              )}
+                              {audit.status !== "approved" && (
+                                <button
+                                  onClick={() => confirmDelete(audit)}
+                                  className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all"
+                                  title="Delete"
+                                >
+                                  <FaTrash size={14} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -325,20 +413,34 @@ const AuditList = () => {
                   Are you sure you want to delete the audit "
                   <strong>{auditToDelete?.reportName}</strong>"?
                 </p>
-                <p className="text-gray-500 text-sm mt-2">This action cannot be undone.</p>
+                <p className="text-gray-500 text-sm mt-2">
+                  This action cannot be undone.
+                </p>
               </div>
               <div className="p-4 bg-gray-50 flex justify-end gap-3">
                 <button
-                  onClick={() => setShowDeleteModal(false)}
-                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setAuditToDelete(null);
+                  }}
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium"
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium disabled:opacity-50 flex items-center gap-2"
                 >
-                  Delete
+                  {actionLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete"
+                  )}
                 </button>
               </div>
             </div>

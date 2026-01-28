@@ -1,189 +1,404 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
+import axios from "axios";
+import { baseURL } from "../assets/assets.js";
 
-const TEMPLATES_KEY = "audit_templates";
-const AUDITS_KEY = "audit_records";
+const API_BASE = `${baseURL}audit-report`;
 
+// ==================== DATA TRANSFORMERS ====================
+// Backend returns PascalCase, Frontend uses camelCase
+
+const transformTemplate = (template) => {
+  if (!template) return null;
+  return {
+    id: template.Id,
+    templateCode: template.TemplateCode,
+    name: template.Name,
+    description: template.Description,
+    category: template.Category,
+    version: template.Version,
+    isActive: template.IsActive,
+    headerConfig: template.HeaderConfig,
+    infoFields: template.InfoFields,
+    columns: template.Columns,
+    defaultSections: template.DefaultSections,
+    createdBy: template.CreatedBy,
+    createdAt: template.CreatedAt,
+    updatedBy: template.UpdatedBy,
+    updatedAt: template.UpdatedAt,
+  };
+};
+
+const transformAudit = (audit) => {
+  if (!audit) return null;
+  return {
+    id: audit.Id,
+    auditCode: audit.AuditCode,
+    templateId: audit.TemplateId,
+    templateName: audit.TemplateName,
+    reportName: audit.ReportName,
+    formatNo: audit.FormatNo,
+    revNo: audit.RevNo,
+    revDate: audit.RevDate,
+    notes: audit.Notes,
+    status: audit.Status,
+    infoData: audit.InfoData,
+    sections: audit.Sections,
+    columns: audit.Columns,
+    infoFields: audit.InfoFields,
+    headerConfig: audit.HeaderConfig,
+    summary: audit.Summary,
+    createdBy: audit.CreatedBy,
+    createdAt: audit.CreatedAt,
+    updatedBy: audit.UpdatedBy,
+    updatedAt: audit.UpdatedAt,
+    submittedBy: audit.SubmittedBy,
+    submittedAt: audit.SubmittedAt,
+    approvedBy: audit.ApprovedBy,
+    approvedAt: audit.ApprovedAt,
+    approvalComments: audit.ApprovalComments,
+  };
+};
+
+// ==================== MAIN HOOK ====================
 export const useAuditData = () => {
   const [templates, setTemplates] = useState([]);
   const [audits, setAudits] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Load data from localStorage on mount
-  useEffect(() => {
-    loadTemplates();
-    loadAudits();
-  }, []);
+  // Clear error
+  const clearError = useCallback(() => setError(null), []);
 
-  // Templates
-  const loadTemplates = () => {
-    const stored = localStorage.getItem(TEMPLATES_KEY);
-    if (stored) {
-      setTemplates(JSON.parse(stored));
+  // ==================== TEMPLATE METHODS ====================
+
+  const loadTemplates = useCallback(async (params = {}) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(`${API_BASE}/templates`, { params });
+      const transformedTemplates = (response.data.data || []).map(
+        transformTemplate,
+      );
+      setTemplates(transformedTemplates);
+      return {
+        data: transformedTemplates,
+        totalCount: response.data.totalCount || 0,
+        page: response.data.page || 1,
+        limit: response.data.limit || 50,
+      };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to load templates";
+      setError(message);
+      console.error("Load templates error:", err);
+      return { data: [], totalCount: 0 };
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
-  const saveTemplates = (newTemplates) => {
-    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(newTemplates));
-    setTemplates(newTemplates);
-  };
-
-  const getTemplateById = useCallback((id) => {
-    const stored = localStorage.getItem(TEMPLATES_KEY);
-    if (stored) {
-      const templates = JSON.parse(stored);
-      return templates.find((t) => t.id === id);
+  const getTemplateById = useCallback(async (id) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(`${API_BASE}/templates/${id}`);
+      return transformTemplate(response.data.data);
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to load template";
+      setError(message);
+      console.error("Get template error:", err);
+      throw new Error(message);
+    } finally {
+      setLoading(false);
     }
-    return null;
   }, []);
 
-  const createTemplate = useCallback((templateData) => {
-    const newTemplate = {
-      ...templateData,
-      id: `template_${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    const stored = localStorage.getItem(TEMPLATES_KEY);
-    const templates = stored ? JSON.parse(stored) : [];
-    const newTemplates = [...templates, newTemplate];
-    saveTemplates(newTemplates);
-    return newTemplate;
-  }, []);
-
-  const updateTemplate = useCallback((id, templateData) => {
-    const stored = localStorage.getItem(TEMPLATES_KEY);
-    const templates = stored ? JSON.parse(stored) : [];
-    const updatedTemplates = templates.map((t) =>
-      t.id === id
-        ? { ...t, ...templateData, updatedAt: new Date().toISOString() }
-        : t,
-    );
-    saveTemplates(updatedTemplates);
-    return updatedTemplates.find((t) => t.id === id);
-  }, []);
-
-  const deleteTemplate = useCallback((id) => {
-    const stored = localStorage.getItem(TEMPLATES_KEY);
-    const templates = stored ? JSON.parse(stored) : [];
-    const filteredTemplates = templates.filter((t) => t.id !== id);
-    saveTemplates(filteredTemplates);
-  }, []);
-
-  const duplicateTemplate = useCallback(
-    (id) => {
-      const template = getTemplateById(id);
-      if (template) {
-        const newTemplate = {
-          ...template,
-          id: `template_${Date.now()}`,
-          name: `${template.name} (Copy)`,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        const stored = localStorage.getItem(TEMPLATES_KEY);
-        const templates = stored ? JSON.parse(stored) : [];
-        const newTemplates = [...templates, newTemplate];
-        saveTemplates(newTemplates);
-        return newTemplate;
-      }
-      return null;
-    },
-    [getTemplateById],
-  );
-
-  // Audits
-  const loadAudits = () => {
-    const stored = localStorage.getItem(AUDITS_KEY);
-    if (stored) {
-      setAudits(JSON.parse(stored));
+  const createTemplate = useCallback(async (templateData) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.post(`${API_BASE}/templates`, templateData);
+      const newTemplate = transformTemplate(response.data.data);
+      setTemplates((prev) => [newTemplate, ...prev]);
+      return newTemplate;
+    } catch (err) {
+      const message =
+        err.response?.data?.message || "Failed to create template";
+      setError(message);
+      console.error("Create template error:", err);
+      throw new Error(message);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
-  const saveAudits = (newAudits) => {
-    localStorage.setItem(AUDITS_KEY, JSON.stringify(newAudits));
-    setAudits(newAudits);
-  };
-
-  const getAuditById = useCallback((id) => {
-    const stored = localStorage.getItem(AUDITS_KEY);
-    if (stored) {
-      const audits = JSON.parse(stored);
-      return audits.find((a) => a.id === id);
+  const updateTemplate = useCallback(async (id, templateData) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.put(
+        `${API_BASE}/templates/${id}`,
+        templateData,
+      );
+      const updatedTemplate = transformTemplate(response.data.data);
+      setTemplates((prev) =>
+        prev.map((t) => (t.id == id ? updatedTemplate : t)),
+      );
+      return updatedTemplate;
+    } catch (err) {
+      const message =
+        err.response?.data?.message || "Failed to update template";
+      setError(message);
+      console.error("Update template error:", err);
+      throw new Error(message);
+    } finally {
+      setLoading(false);
     }
-    return null;
   }, []);
 
-  const createAudit = useCallback((auditData) => {
-    const newAudit = {
-      ...auditData,
-      id: `audit_${Date.now()}`,
-      status: "draft",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    const stored = localStorage.getItem(AUDITS_KEY);
-    const audits = stored ? JSON.parse(stored) : [];
-    const newAudits = [...audits, newAudit];
-    saveAudits(newAudits);
-    return newAudit;
+  const deleteTemplate = useCallback(async (id) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await axios.delete(`${API_BASE}/templates/${id}`);
+      setTemplates((prev) => prev.filter((t) => t.id != id));
+      return true;
+    } catch (err) {
+      const message =
+        err.response?.data?.message || "Failed to delete template";
+      setError(message);
+      console.error("Delete template error:", err);
+      throw new Error(message);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const updateAudit = useCallback((id, auditData) => {
-    const stored = localStorage.getItem(AUDITS_KEY);
-    const audits = stored ? JSON.parse(stored) : [];
-    const updatedAudits = audits.map((a) =>
-      a.id === id
-        ? { ...a, ...auditData, updatedAt: new Date().toISOString() }
-        : a,
-    );
-    saveAudits(updatedAudits);
-    return updatedAudits.find((a) => a.id === id);
+  const duplicateTemplate = useCallback(async (id) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.post(
+        `${API_BASE}/templates/${id}/duplicate`,
+      );
+      const newTemplate = transformTemplate(response.data.data);
+      setTemplates((prev) => [newTemplate, ...prev]);
+      return newTemplate;
+    } catch (err) {
+      const message =
+        err.response?.data?.message || "Failed to duplicate template";
+      setError(message);
+      console.error("Duplicate template error:", err);
+      throw new Error(message);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const deleteAudit = useCallback((id) => {
-    const stored = localStorage.getItem(AUDITS_KEY);
-    const audits = stored ? JSON.parse(stored) : [];
-    const filteredAudits = audits.filter((a) => a.id !== id);
-    saveAudits(filteredAudits);
+  // ==================== AUDIT METHODS ====================
+
+  const loadAudits = useCallback(async (params = {}) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(`${API_BASE}/audits`, { params });
+      const transformedAudits = (response.data.data || []).map(transformAudit);
+      setAudits(transformedAudits);
+      return {
+        data: transformedAudits,
+        totalCount: response.data.totalCount || 0,
+        page: response.data.page || 1,
+        limit: response.data.limit || 50,
+      };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to load audits";
+      setError(message);
+      console.error("Load audits error:", err);
+      return { data: [], totalCount: 0 };
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const submitAudit = useCallback(
-    (id) => {
-      return updateAudit(id, { status: "submitted" });
-    },
-    [updateAudit],
-  );
+  const getAuditById = useCallback(async (id) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(`${API_BASE}/audits/${id}`);
+      return transformAudit(response.data.data);
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to load audit";
+      setError(message);
+      console.error("Get audit error:", err);
+      throw new Error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const approveAudit = useCallback(
-    (id, approverName) => {
-      return updateAudit(id, {
-        status: "approved",
-        approvedBy: approverName,
-        approvedAt: new Date().toISOString(),
-      });
-    },
-    [updateAudit],
-  );
+  const createAudit = useCallback(async (auditData) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.post(`${API_BASE}/audits`, auditData);
+      const newAudit = transformAudit(response.data.data);
+      setAudits((prev) => [newAudit, ...prev]);
+      return newAudit;
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to create audit";
+      setError(message);
+      console.error("Create audit error:", err);
+      throw new Error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const updateAudit = useCallback(async (id, auditData) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.put(`${API_BASE}/audits/${id}`, auditData);
+      const updatedAudit = transformAudit(response.data.data);
+      setAudits((prev) => prev.map((a) => (a.id == id ? updatedAudit : a)));
+      return updatedAudit;
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to update audit";
+      setError(message);
+      console.error("Update audit error:", err);
+      throw new Error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const deleteAudit = useCallback(async (id) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await axios.delete(`${API_BASE}/audits/${id}`);
+      setAudits((prev) => prev.filter((a) => a.id != id));
+      return true;
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to delete audit";
+      setError(message);
+      console.error("Delete audit error:", err);
+      throw new Error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const submitAudit = useCallback(async (id) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.post(`${API_BASE}/audits/${id}/submit`);
+      const updatedAudit = transformAudit(response.data.data);
+      setAudits((prev) => prev.map((a) => (a.id == id ? updatedAudit : a)));
+      return updatedAudit;
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to submit audit";
+      setError(message);
+      console.error("Submit audit error:", err);
+      throw new Error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const approveAudit = useCallback(async (id, approvalData) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.post(
+        `${API_BASE}/audits/${id}/approve`,
+        approvalData,
+      );
+      const updatedAudit = transformAudit(response.data.data);
+      setAudits((prev) => prev.map((a) => (a.id == id ? updatedAudit : a)));
+      return updatedAudit;
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to approve audit";
+      setError(message);
+      console.error("Approve audit error:", err);
+      throw new Error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const rejectAudit = useCallback(async (id, rejectionData) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.post(
+        `${API_BASE}/audits/${id}/reject`,
+        rejectionData,
+      );
+      const updatedAudit = transformAudit(response.data.data);
+      setAudits((prev) => prev.map((a) => (a.id == id ? updatedAudit : a)));
+      return updatedAudit;
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to reject audit";
+      setError(message);
+      console.error("Reject audit error:", err);
+      throw new Error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const getAuditHistory = useCallback(async (id) => {
+    try {
+      const response = await axios.get(`${API_BASE}/audits/${id}/history`);
+      return response.data.data;
+    } catch (err) {
+      console.error("Get audit history error:", err);
+      throw new Error(
+        err.response?.data?.message || "Failed to load audit history",
+      );
+    }
+  }, []);
+
+  const getAuditStats = useCallback(async (params = {}) => {
+    try {
+      const response = await axios.get(`${API_BASE}/audits/stats`, { params });
+      return response.data.data;
+    } catch (err) {
+      console.error("Get audit stats error:", err);
+      throw new Error(
+        err.response?.data?.message || "Failed to load audit stats",
+      );
+    }
+  }, []);
 
   return {
+    // State
     templates,
     audits,
     loading,
+    error,
+    clearError,
+
     // Template methods
+    loadTemplates,
     getTemplateById,
     createTemplate,
     updateTemplate,
     deleteTemplate,
     duplicateTemplate,
-    loadTemplates,
+
     // Audit methods
+    loadAudits,
     getAuditById,
     createAudit,
     updateAudit,
     deleteAudit,
     submitAudit,
     approveAudit,
-    loadAudits,
+    rejectAudit,
+    getAuditHistory,
+    getAuditStats,
   };
 };
 

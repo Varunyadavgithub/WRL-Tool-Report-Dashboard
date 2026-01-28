@@ -8,7 +8,7 @@ import dispatchRoute from "./dispatch.route.js";
 import productionPlaningRoutes from "./planing.route.js";
 import complianceRoute from "./compliance.route.js";
 import taskReminders from "./taskReminder.route.js";
-import auditReport from "./taskReminder.route.js";
+import auditReport from "./auditReport.route.js";
 
 const routers = Router();
 

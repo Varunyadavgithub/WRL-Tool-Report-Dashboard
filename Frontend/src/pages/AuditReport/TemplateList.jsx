@@ -1,3 +1,4 @@
+// pages/TemplateList.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -10,24 +11,44 @@ import {
   FaFileAlt,
   FaCheckCircle,
   FaTimesCircle,
-  FaEye,
 } from "react-icons/fa";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
 import useAuditData from "../../hooks/useAuditData";
 
 const TemplateList = () => {
   const navigate = useNavigate();
-  const { templates, deleteTemplate, duplicateTemplate, loadTemplates } =
-    useAuditData();
+  const {
+    templates,
+    deleteTemplate,
+    duplicateTemplate,
+    loadTemplates,
+    loading,
+    error,
+  } = useAuditData();
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
 
+  // Load templates on mount
   useEffect(() => {
-    loadTemplates();
+    const fetchTemplates = async () => {
+      setInitialLoading(true);
+      try {
+        await loadTemplates();
+      } catch (err) {
+        console.error("Failed to load templates:", err);
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+    fetchTemplates();
   }, []);
 
+  // Filter templates
   const filteredTemplates = templates.filter((template) => {
     const matchesSearch =
       template.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -37,23 +58,42 @@ const TemplateList = () => {
     return matchesSearch && matchesCategory;
   });
 
-  const handleDelete = () => {
+  // Handle delete
+  const handleDelete = async () => {
     if (templateToDelete) {
-      deleteTemplate(templateToDelete.id);
-      setShowDeleteModal(false);
-      setTemplateToDelete(null);
+      setActionLoading(true);
+      try {
+        await deleteTemplate(templateToDelete.id);
+        setShowDeleteModal(false);
+        setTemplateToDelete(null);
+      } catch (err) {
+        alert("Failed to delete template: " + err.message);
+      } finally {
+        setActionLoading(false);
+      }
     }
   };
 
-  const handleDuplicate = (template) => {
-    duplicateTemplate(template.id);
+  // Handle duplicate
+  const handleDuplicate = async (template) => {
+    setActionLoading(true);
+    try {
+      await duplicateTemplate(template.id);
+      alert("Template duplicated successfully!");
+    } catch (err) {
+      alert("Failed to duplicate template: " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
+  // Confirm delete
   const confirmDelete = (template) => {
     setTemplateToDelete(template);
     setShowDeleteModal(true);
   };
 
+  // Get category badge color
   const getCategoryBadge = (category) => {
     const colors = {
       quality: "bg-blue-100 text-blue-700",
@@ -65,6 +105,7 @@ const TemplateList = () => {
     return colors[category] || colors.other;
   };
 
+  // Get total checkpoints
   const getTotalCheckpoints = (template) => {
     if (!template.defaultSections) return 0;
     return template.defaultSections.reduce(
@@ -72,6 +113,18 @@ const TemplateList = () => {
       0,
     );
   };
+
+  // Loading state
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading templates...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4">
@@ -94,6 +147,13 @@ const TemplateList = () => {
             <FaPlus /> Create New Template
           </button>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {error}
+          </div>
+        )}
 
         {/* Search and Filter */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
@@ -244,7 +304,8 @@ const TemplateList = () => {
                     </button>
                     <button
                       onClick={() => handleDuplicate(template)}
-                      className="p-2 bg-purple-100 hover:bg-purple-200 text-purple-600 rounded-lg transition-all"
+                      disabled={actionLoading}
+                      className="p-2 bg-purple-100 hover:bg-purple-200 text-purple-600 rounded-lg transition-all disabled:opacity-50"
                       title="Duplicate"
                     >
                       <FaCopy size={14} />
@@ -259,7 +320,10 @@ const TemplateList = () => {
                   </div>
                 </div>
                 <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-500">
-                  Created: {new Date(template.createdAt).toLocaleDateString()}
+                  Created:{" "}
+                  {template.createdAt
+                    ? new Date(template.createdAt).toLocaleDateString()
+                    : "-"}
                 </div>
               </div>
             ))}
@@ -284,16 +348,28 @@ const TemplateList = () => {
               </div>
               <div className="p-4 bg-gray-50 flex justify-end gap-3">
                 <button
-                  onClick={() => setShowDeleteModal(false)}
-                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setTemplateToDelete(null);
+                  }}
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium"
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium disabled:opacity-50 flex items-center gap-2"
                 >
-                  Delete
+                  {actionLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete"
+                  )}
                 </button>
               </div>
             </div>

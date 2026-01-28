@@ -90,14 +90,11 @@ const Calibiration = lazy(() => import("./pages/Compliance/Calibration"));
 
 const ManageTasks = lazy(() => import("./pages/TaskReminders/ManageTasks"));
 const TaskOverview = lazy(() => import("./pages/TaskReminders/TaskOverview"));
-// const AuditReportTemplate = lazy(
-//   () => import("./pages/AuditReport/AuditReportTemplate"),
-// );
-// Audit Report Components
-const TemplateList = lazy(() => import("./pages/AuditReport/TemplateList"));
+
 const TemplateBuilder = lazy(
   () => import("./pages/AuditReport/TemplateBuilder"),
 );
+const TemplateList = lazy(() => import("./pages/AuditReport/TemplateList"));
 const AuditList = lazy(() => import("./pages/AuditReport/AuditList"));
 const AuditEntry = lazy(() => import("./pages/AuditReport/AuditEntry"));
 const AuditView = lazy(() => import("./pages/AuditReport/AuditView"));
