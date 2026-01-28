@@ -14,6 +14,7 @@ import {
 } from "react-icons/fa";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
 import useAuditData from "../../hooks/useAuditData";
+import toast from "react-hot-toast";
 
 const TemplateList = () => {
   const navigate = useNavigate();
@@ -67,7 +68,7 @@ const TemplateList = () => {
         setShowDeleteModal(false);
         setTemplateToDelete(null);
       } catch (err) {
-        alert("Failed to delete template: " + err.message);
+        toast.error("Failed to delete template: " + err.message);
       } finally {
         setActionLoading(false);
       }
@@ -79,9 +80,9 @@ const TemplateList = () => {
     setActionLoading(true);
     try {
       await duplicateTemplate(template.id);
-      alert("Template duplicated successfully!");
+      toast.success("Template duplicated successfully!");
     } catch (err) {
-      alert("Failed to duplicate template: " + err.message);
+      toast.error("Failed to duplicate template: " + err.message);
     } finally {
       setActionLoading(false);
     }

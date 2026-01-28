@@ -1,5 +1,4 @@
-// pages/AuditEntry.jsx
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   FaCalendarAlt,
@@ -30,6 +29,7 @@ import {
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
 import { BiSolidFactory } from "react-icons/bi";
 import useAuditData from "../../hooks/useAuditData";
+import toast from "react-hot-toast";
 
 const AuditEntry = () => {
   const navigate = useNavigate();
@@ -144,7 +144,7 @@ const AuditEntry = () => {
           }
         }
       } catch (err) {
-        alert("Failed to load data: " + err.message);
+        toast.error("Failed to load data. Please try again.");
         navigate("/auditreport/audits");
       } finally {
         setInitialLoading(false);
@@ -369,12 +369,13 @@ const AuditEntry = () => {
         await createAudit(auditPayload);
       }
 
-      alert(
+      toast.success(
         asDraft ? "Audit saved as draft!" : "Audit submitted successfully!",
       );
+
       navigate("/auditreport/audits");
     } catch (error) {
-      alert("Error saving audit: " + error.message);
+      toast.error("Error saving audit. Please try again.");
     } finally {
       setSaving(false);
     }

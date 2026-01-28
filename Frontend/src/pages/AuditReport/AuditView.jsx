@@ -1,5 +1,4 @@
-// pages/AuditView.jsx
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   FaCalendarAlt,
@@ -21,6 +20,7 @@ import { MdFormatListNumbered, MdUpdate, MdDateRange } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
 import { BiSolidFactory } from "react-icons/bi";
 import useAuditData from "../../hooks/useAuditData";
+import toast from "react-hot-toast";
 
 const AuditView = () => {
   const navigate = useNavigate();
@@ -62,7 +62,7 @@ const AuditView = () => {
             });
           }
         } catch (err) {
-          alert("Failed to load audit: " + err.message);
+          toast.error(`Failed to load audit: ${err.message}`);
           navigate("/auditreport/audits");
         } finally {
           setInitialLoading(false);
@@ -80,7 +80,7 @@ const AuditView = () => {
       setAuditHistory(history || []);
       setShowHistoryModal(true);
     } catch (err) {
-      alert("Failed to load audit history: " + err.message);
+      toast.error(`Failed to load audit history: ${err.message}`);
     } finally {
       setHistoryLoading(false);
     }
@@ -100,12 +100,12 @@ const AuditView = () => {
   // Handle approval/rejection
   const handleApproval = async () => {
     if (!approverName.trim()) {
-      alert("Please enter approver name");
+      toast.error("Please enter approver name");
       return;
     }
 
     if (approvalAction === "reject" && !approvalComments.trim()) {
-      alert("Please enter rejection reason");
+      toast.error("Please enter rejection reason");
       return;
     }
 
@@ -127,13 +127,13 @@ const AuditView = () => {
       setShowApprovalModal(false);
       setApproverName("");
       setApprovalComments("");
-      alert(
+      toast.success(
         `Audit ${
           approvalAction === "approve" ? "approved" : "rejected"
         } successfully!`,
       );
     } catch (err) {
-      alert(`Failed to ${approvalAction} audit: ` + err.message);
+      toast.error(`Failed to ${approvalAction} audit: ` + err.message);
     } finally {
       setActionLoading(false);
     }

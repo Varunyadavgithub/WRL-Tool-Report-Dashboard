@@ -20,6 +20,7 @@ import {
 import { MdAddCircle } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
 import useAuditData from "../../hooks/useAuditData";
+import toast from "react-hot-toast";
 
 const TemplateBuilder = () => {
   const navigate = useNavigate();
@@ -173,7 +174,7 @@ const TemplateBuilder = () => {
               setDefaultSections(template.defaultSections);
           }
         } catch (err) {
-          alert("Failed to load template: " + err.message);
+          toast.error("Failed to load template: " + err.message);
           navigate("/auditreport/templates");
         } finally {
           setInitialLoading(false);
@@ -425,7 +426,7 @@ const TemplateBuilder = () => {
   // Save template
   const handleSave = async () => {
     if (!templateMeta.name.trim()) {
-      alert("Please enter a template name");
+      toast.error("Please enter a template name");
       return;
     }
 
@@ -445,15 +446,15 @@ const TemplateBuilder = () => {
 
       if (id) {
         await updateTemplate(id, templateData);
-        alert("Template updated successfully!");
+        toast.success("Template updated successfully!");
       } else {
         await createTemplate(templateData);
-        alert("Template created successfully!");
+        toast.success("Template created successfully!");
       }
 
       navigate("/auditreport/templates");
     } catch (error) {
-      alert("Error saving template: " + error.message);
+      toast.error("Error saving template: " + error.message);
     } finally {
       setSaving(false);
     }

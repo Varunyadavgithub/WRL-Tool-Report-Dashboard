@@ -1,5 +1,4 @@
-// pages/AuditList.jsx
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaPlus,
@@ -16,6 +15,7 @@ import {
   FaClipboardCheck,
 } from "react-icons/fa";
 import useAuditData from "../../hooks/useAuditData";
+import toast from "react-hot-toast";
 
 const AuditList = () => {
   const navigate = useNavigate();
@@ -76,7 +76,7 @@ const AuditList = () => {
         setShowDeleteModal(false);
         setAuditToDelete(null);
       } catch (err) {
-        alert("Failed to delete audit: " + err.message);
+        toast.error(`Failed to delete audit: ${err.message}`);
       } finally {
         setActionLoading(false);
       }
@@ -86,7 +86,7 @@ const AuditList = () => {
   // Confirm delete
   const confirmDelete = (audit) => {
     if (audit.status === "approved") {
-      alert("Cannot delete an approved audit");
+      toast.error("Cannot delete an approved audit");
       return;
     }
     setAuditToDelete(audit);

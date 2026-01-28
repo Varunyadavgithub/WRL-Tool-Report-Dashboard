@@ -3,6 +3,13 @@ import { dbConfig3 } from "../../config/db.js";
 import { tryCatch } from "../../config/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { generateTemplateCode } from "../../utils/generateCode.js";
+import {
+  saveTemplateFile,
+  readTemplateFile,
+  deleteTemplateFile,
+  updateTemplateFile,
+  backupTemplateFile,
+} from "../../utils/templateStorage.js";
 
 // Get all templates
 export const getAllTemplates = tryCatch(async (req, res) => {
@@ -10,7 +17,7 @@ export const getAllTemplates = tryCatch(async (req, res) => {
   const offset = (parseInt(page) - 1) * parseInt(limit);
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
-  const request = await pool.request();
+  const request = pool.request();
 
   let whereConditions = ["IsDeleted=0"];
 
@@ -19,7 +26,7 @@ export const getAllTemplates = tryCatch(async (req, res) => {
     whereConditions.push("Category = @category");
   }
 
-  if (isActive != undefined) {
+  if (isActive !== undefined) {
     request.input("isActive", sql.Bit, isActive === "true" ? 1 : 0);
     whereConditions.push("IsActive=@isActive");
   }
@@ -40,15 +47,12 @@ export const getAllTemplates = tryCatch(async (req, res) => {
       SELECT 
         Id,
         TemplateCode,
+        TemplateFileName,
         Name,
         Description,
         Category,
         Version,
         IsActive,
-        HeaderConfig,
-        InfoFields,
-        Columns,
-        DefaultSections,
         CreatedBy,
         CreatedAt,
         UpdatedBy,
@@ -65,19 +69,33 @@ export const getAllTemplates = tryCatch(async (req, res) => {
   `;
 
   const result = await request.query(query);
+  await pool.close();
 
-  // Parse JSON fields
-  const templates = result.recordset.map((template) => ({
-    ...template,
-    HeaderConfig: template.HeaderConfig
-      ? JSON.parse(template.HeaderConfig)
-      : null,
-    InfoFields: template.InfoFields ? JSON.parse(template.InfoFields) : [],
-    Columns: template.Columns ? JSON.parse(template.Columns) : [],
-    DefaultSections: template.DefaultSections
-      ? JSON.parse(template.DefaultSections)
-      : [],
-  }));
+  // Load JSON config from files for each template
+  const templates = await Promise.all(
+    result.recordset.map(async (template) => {
+      let config = null;
+
+      if (template.TemplateFileName) {
+        try {
+          config = await readTemplateFile(template.TemplateFileName);
+        } catch (err) {
+          console.warn(
+            `Could not load config for template ${template.Name}:`,
+            err.message,
+          );
+        }
+      }
+
+      return {
+        ...template,
+        HeaderConfig: config?.headerConfig || null,
+        InfoFields: config?.infoFields || [],
+        Columns: config?.columns || [],
+        DefaultSections: config?.defaultSections || [],
+      };
+    }),
+  );
 
   res.status(200).json({
     success: true,
@@ -101,24 +119,23 @@ export const getTemplateById = tryCatch(async (req, res) => {
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
   const result = await pool.request().input("id", sql.Int, id).query(`
     SELECT 
-        Id,
-        TemplateCode,
-        Name,
-        Description,
-        Category,
-        Version,
-        IsActive,
-        HeaderConfig,
-        InfoFields,
-        Columns,
-        DefaultSections,
-        CreatedBy,
-        CreatedAt,
-        UpdatedBy,
-        UpdatedAt
-      FROM AuditTemplates
-      WHERE Id = @id AND IsDeleted = 0
+      Id,
+      TemplateCode,
+      TemplateFileName,
+      Name,
+      Description,
+      Category,
+      Version,
+      IsActive,
+      CreatedBy,
+      CreatedAt,
+      UpdatedBy,
+      UpdatedAt
+    FROM AuditTemplates
+    WHERE Id = @id AND IsDeleted = 0
   `);
+
+  await pool.close();
 
   if (result.recordset.length === 0) {
     throw new AppError("Template not found", 404);
@@ -126,19 +143,28 @@ export const getTemplateById = tryCatch(async (req, res) => {
 
   const template = result.recordset[0];
 
+  // Load JSON config from file
+  let config = null;
+  if (template.TemplateFileName) {
+    try {
+      config = await readTemplateFile(template.TemplateFileName);
+    } catch (err) {
+      console.warn(
+        `Could not load config for template ${template.Name}:`,
+        err.message,
+      );
+    }
+  }
+
   res.status(200).json({
     success: true,
     message: "Template retrieved successfully",
     data: {
       ...template,
-      HeaderConfig: template.HeaderConfig
-        ? JSON.parse(template.HeaderConfig)
-        : null,
-      InfoFields: template.InfoFields ? JSON.parse(template.InfoFields) : [],
-      Columns: template.Columns ? JSON.parse(template.Columns) : [],
-      DefaultSections: template.DefaultSections
-        ? JSON.parse(template.DefaultSections)
-        : [],
+      HeaderConfig: config?.headerConfig || null,
+      InfoFields: config?.infoFields || [],
+      Columns: config?.columns || [],
+      DefaultSections: config?.defaultSections || [],
     },
   });
 });
@@ -149,7 +175,7 @@ export const createTemplate = tryCatch(async (req, res) => {
     name,
     description,
     category,
-    version,
+    version = "01",
     isActive,
     headerConfig,
     infoFields,
@@ -164,52 +190,54 @@ export const createTemplate = tryCatch(async (req, res) => {
   const templateCode = await generateTemplateCode();
   const createdBy = req.user?.userCode || "SYSTEM";
 
+  // Save JSON config to file first
+  const fileResult = await saveTemplateFile({
+    templateName: name,
+    version: version || "01",
+    templateCode,
+    headerConfig: headerConfig || {},
+    infoFields: infoFields || [],
+    columns: columns || [],
+    defaultSections: defaultSections || [],
+  });
+
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
+
+  // Insert metadata into database with file reference
   const result = await pool
     .request()
     .input("templateCode", sql.VarChar, templateCode)
+    .input("templateFileName", sql.VarChar, fileResult.fileName)
     .input("name", sql.NVarChar, name)
     .input("description", sql.NVarChar, description || null)
     .input("category", sql.VarChar, category || null)
-    .input("version", sql.VarChar, version || "1.0")
+    .input("version", sql.VarChar, version || "01")
     .input("isActive", sql.Bit, isActive !== false ? 1 : 0)
-    .input("headerConfig", sql.NVarChar, JSON.stringify(headerConfig || {}))
-    .input("infoFields", sql.NVarChar, JSON.stringify(infoFields || []))
-    .input("columns", sql.NVarChar, JSON.stringify(columns || []))
-    .input(
-      "defaultSections",
-      sql.NVarChar,
-      JSON.stringify(defaultSections || []),
-    )
     .input("createdBy", sql.VarChar, createdBy).query(`
       INSERT INTO AuditTemplates (
-        TemplateCode, Name, Description, Category, Version, IsActive,
-        HeaderConfig, InfoFields, Columns, DefaultSections,
+        TemplateCode, TemplateFileName, Name, Description, Category, Version, IsActive,
         CreatedBy, CreatedAt, UpdatedBy, UpdatedAt
       )
       OUTPUT INSERTED.*
       VALUES (
-        @templateCode, @name, @description, @category, @version, @isActive,
-        @headerConfig, @infoFields, @columns, @defaultSections,
+        @templateCode, @templateFileName, @name, @description, @category, @version, @isActive,
         @createdBy, GETDATE(), @createdBy, GETDATE()
       );
     `);
 
-  const template = result?.recordset[0];
+  await pool.close();
+
+  const template = result.recordset[0];
 
   res.status(201).json({
     success: true,
     message: "Template created successfully",
     data: {
       ...template,
-      HeaderConfig: template.HeaderConfig
-        ? JSON.parse(template.HeaderConfig)
-        : null,
-      InfoFields: template.InfoFields ? JSON.parse(template.InfoFields) : [],
-      Columns: template.Columns ? JSON.parse(template.Columns) : [],
-      DefaultSections: template.DefaultSections
-        ? JSON.parse(template.DefaultSections)
-        : [],
+      HeaderConfig: headerConfig || {},
+      InfoFields: infoFields || [],
+      Columns: columns || [],
+      DefaultSections: defaultSections || [],
     },
   });
 });
@@ -237,49 +265,68 @@ export const updateTemplate = tryCatch(async (req, res) => {
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
 
-  // Check if template exists
-  const checkResult = await pool
-    .request()
-    .input("id", sql.Int, id)
-    .query("SELECT Id FROM AuditTemplates WHERE Id = @id AND IsDeleted = 0");
+  // Get current template
+  const checkResult = await pool.request().input("id", sql.Int, id).query(`
+    SELECT Id, TemplateCode, TemplateFileName, Name, Version 
+    FROM AuditTemplates 
+    WHERE Id = @id AND IsDeleted = 0
+  `);
 
   if (checkResult.recordset.length === 0) {
+    await pool.close();
     throw new AppError("Template not found", 404);
   }
 
+  const currentTemplate = checkResult.recordset[0];
+  const oldFileName = currentTemplate.TemplateFileName;
+
+  // Backup existing template file before update
+  if (oldFileName) {
+    try {
+      await backupTemplateFile(oldFileName);
+    } catch (err) {
+      console.warn("Could not backup template file:", err.message);
+    }
+  }
+
+  // Update JSON config file (handles rename if name changed)
+  const fileResult = await updateTemplateFile({
+    oldFileName,
+    templateName: name || currentTemplate.Name,
+    version: version || currentTemplate.Version || "01",
+    templateCode: currentTemplate.TemplateCode,
+    headerConfig: headerConfig || {},
+    infoFields: infoFields || [],
+    columns: columns || [],
+    defaultSections: defaultSections || [],
+  });
+
+  // Update metadata in database
   const result = await pool
     .request()
     .input("id", sql.Int, id)
+    .input("templateFileName", sql.VarChar, fileResult.fileName)
     .input("name", sql.NVarChar, name)
     .input("description", sql.NVarChar, description || null)
     .input("category", sql.VarChar, category || null)
-    .input("version", sql.VarChar, version || "1.0")
+    .input("version", sql.VarChar, version || "01")
     .input("isActive", sql.Bit, isActive !== false ? 1 : 0)
-    .input("headerConfig", sql.NVarChar, JSON.stringify(headerConfig || {}))
-    .input("infoFields", sql.NVarChar, JSON.stringify(infoFields || []))
-    .input("columns", sql.NVarChar, JSON.stringify(columns || []))
-    .input(
-      "defaultSections",
-      sql.NVarChar,
-      JSON.stringify(defaultSections || []),
-    )
     .input("updatedBy", sql.VarChar, updatedBy).query(`
       UPDATE AuditTemplates
       SET 
+        TemplateFileName = @templateFileName,
         Name = @name,
         Description = @description,
         Category = @category,
         Version = @version,
         IsActive = @isActive,
-        HeaderConfig = @headerConfig,
-        InfoFields = @infoFields,
-        Columns = @columns,
-        DefaultSections = @defaultSections,
         UpdatedBy = @updatedBy,
         UpdatedAt = GETDATE()
       OUTPUT INSERTED.*
       WHERE Id = @id AND IsDeleted = 0;
     `);
+
+  await pool.close();
 
   const template = result.recordset[0];
 
@@ -288,14 +335,10 @@ export const updateTemplate = tryCatch(async (req, res) => {
     message: "Template updated successfully",
     data: {
       ...template,
-      HeaderConfig: template.HeaderConfig
-        ? JSON.parse(template.HeaderConfig)
-        : null,
-      InfoFields: template.InfoFields ? JSON.parse(template.InfoFields) : [],
-      Columns: template.Columns ? JSON.parse(template.Columns) : [],
-      DefaultSections: template.DefaultSections
-        ? JSON.parse(template.DefaultSections)
-        : [],
+      HeaderConfig: headerConfig || {},
+      InfoFields: infoFields || [],
+      Columns: columns || [],
+      DefaultSections: defaultSections || [],
     },
   });
 });
@@ -313,14 +356,18 @@ export const deleteTemplate = tryCatch(async (req, res) => {
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
 
   // Check if template exists
-  const checkResult = await pool
-    .request()
-    .input("id", sql.Int, id)
-    .query("SELECT Id FROM AuditTemplates WHERE Id = @id AND IsDeleted = 0");
+  const checkResult = await pool.request().input("id", sql.Int, id).query(`
+    SELECT Id, TemplateCode, TemplateFileName 
+    FROM AuditTemplates 
+    WHERE Id = @id AND IsDeleted = 0
+  `);
 
   if (checkResult.recordset.length === 0) {
+    await pool.close();
     throw new AppError("Template not found", 404);
   }
+
+  const templateFileName = checkResult.recordset[0].TemplateFileName;
 
   // Check if template is used in any audits
   const auditCheck = await pool
@@ -331,12 +378,14 @@ export const deleteTemplate = tryCatch(async (req, res) => {
     );
 
   if (auditCheck.recordset[0].Count > 0) {
+    await pool.close();
     throw new AppError(
       "Cannot delete template. It is used in existing audits.",
       400,
     );
   }
 
+  // Soft delete in database
   await pool
     .request()
     .input("id", sql.Int, id)
@@ -345,6 +394,18 @@ export const deleteTemplate = tryCatch(async (req, res) => {
       SET IsDeleted = 1, UpdatedBy = @updatedBy, UpdatedAt = GETDATE()
       WHERE Id = @id;
     `);
+
+  await pool.close();
+
+  // Backup and delete template file
+  if (templateFileName) {
+    try {
+      await backupTemplateFile(templateFileName);
+      await deleteTemplateFile(templateFileName);
+    } catch (err) {
+      console.warn("Could not delete template file:", err.message);
+    }
+  }
 
   res.status(200).json({
     success: true,
@@ -362,44 +423,74 @@ export const duplicateTemplate = tryCatch(async (req, res) => {
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
 
-  // Get original template
+  // Get original template metadata
   const originalResult = await pool.request().input("id", sql.Int, id).query(`
-      SELECT * FROM AuditTemplates WHERE Id = @id AND IsDeleted = 0
-    `);
+    SELECT * FROM AuditTemplates WHERE Id = @id AND IsDeleted = 0
+  `);
 
   if (originalResult.recordset.length === 0) {
+    await pool.close();
     throw new AppError("Template not found", 404);
   }
 
   const original = originalResult.recordset[0];
-  const templateCode = await generateTemplateCode();
+  const newTemplateCode = await generateTemplateCode();
   const createdBy = req.user?.userCode || "SYSTEM";
+  const newName = `${original.Name} (Copy)`;
 
+  // Load original template config from file
+  let originalConfig = null;
+  if (original.TemplateFileName) {
+    try {
+      originalConfig = await readTemplateFile(original.TemplateFileName);
+    } catch (err) {
+      console.warn("Could not load original template config:", err.message);
+    }
+  }
+
+  if (!originalConfig) {
+    originalConfig = {
+      headerConfig: {},
+      infoFields: [],
+      columns: [],
+      defaultSections: [],
+    };
+  }
+
+  // Save new template config file
+  const fileResult = await saveTemplateFile({
+    templateName: newName,
+    version: "01",
+    templateCode: newTemplateCode,
+    headerConfig: originalConfig.headerConfig,
+    infoFields: originalConfig.infoFields,
+    columns: originalConfig.columns,
+    defaultSections: originalConfig.defaultSections,
+  });
+
+  // Create new template in database
   const result = await pool
     .request()
-    .input("templateCode", sql.VarChar, templateCode)
-    .input("name", sql.NVarChar, `${original.Name} (Copy)`)
+    .input("templateCode", sql.VarChar, newTemplateCode)
+    .input("templateFileName", sql.VarChar, fileResult.fileName)
+    .input("name", sql.NVarChar, newName)
     .input("description", sql.NVarChar, original.Description)
     .input("category", sql.VarChar, original.Category)
-    .input("version", sql.VarChar, "1.0")
+    .input("version", sql.VarChar, "01")
     .input("isActive", sql.Bit, 1)
-    .input("headerConfig", sql.NVarChar, original.HeaderConfig)
-    .input("infoFields", sql.NVarChar, original.InfoFields)
-    .input("columns", sql.NVarChar, original.Columns)
-    .input("defaultSections", sql.NVarChar, original.DefaultSections)
     .input("createdBy", sql.VarChar, createdBy).query(`
       INSERT INTO AuditTemplates (
-        TemplateCode, Name, Description, Category, Version, IsActive,
-        HeaderConfig, InfoFields, Columns, DefaultSections,
+        TemplateCode, TemplateFileName, Name, Description, Category, Version, IsActive,
         CreatedBy, CreatedAt, UpdatedBy, UpdatedAt
       )
       OUTPUT INSERTED.*
       VALUES (
-        @templateCode, @name, @description, @category, @version, @isActive,
-        @headerConfig, @infoFields, @columns, @defaultSections,
+        @templateCode, @templateFileName, @name, @description, @category, @version, @isActive,
         @createdBy, GETDATE(), @createdBy, GETDATE()
       );
     `);
+
+  await pool.close();
 
   const template = result.recordset[0];
 
@@ -408,14 +499,10 @@ export const duplicateTemplate = tryCatch(async (req, res) => {
     message: "Template duplicated successfully",
     data: {
       ...template,
-      HeaderConfig: template.HeaderConfig
-        ? JSON.parse(template.HeaderConfig)
-        : null,
-      InfoFields: template.InfoFields ? JSON.parse(template.InfoFields) : [],
-      Columns: template.Columns ? JSON.parse(template.Columns) : [],
-      DefaultSections: template.DefaultSections
-        ? JSON.parse(template.DefaultSections)
-        : [],
+      HeaderConfig: originalConfig?.headerConfig || null,
+      InfoFields: originalConfig?.infoFields || [],
+      Columns: originalConfig?.columns || [],
+      DefaultSections: originalConfig?.defaultSections || [],
     },
   });
 });
@@ -431,6 +518,8 @@ export const getTemplateCategories = tryCatch(async (req, res) => {
     GROUP BY Category
     ORDER BY Category;
   `);
+
+  await pool.close();
 
   res.status(200).json({
     success: true,
