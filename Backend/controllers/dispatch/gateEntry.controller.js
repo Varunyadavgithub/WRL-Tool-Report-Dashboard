@@ -1,5 +1,5 @@
-import { sendGateEntryAlertEmail } from "../../config/emailConfig.js";
-import { tryCatch } from "../../config/tryCatch.js";
+import { sendGateEntryAlertMail } from "../../emailTemplates/gateEntryAlert.template.js";
+import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 
 export const sendMaterialGateEntryAlertEmail = tryCatch(async (req, res) => {
@@ -9,7 +9,7 @@ export const sendMaterialGateEntryAlertEmail = tryCatch(async (req, res) => {
     throw new AppError("No Gate Entry data provided.", 400);
   }
 
-  const emailSent = await sendGateEntryAlertEmail(data);
+  const emailSent = await sendGateEntryAlertMail(data);
 
   if (!emailSent) {
     throw new AppError("Failed to send Gate Entry alert email.", 500);

@@ -1,5 +1,5 @@
-import sql, { dbConfig1 } from "../../config/db.js";
-import { tryCatch } from "../../config/tryCatch.js";
+import sql, { dbConfig1 } from "../../config/db.config.js";
+import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 
 export const getDispatchHoldDetails = tryCatch(async (req, res) => {

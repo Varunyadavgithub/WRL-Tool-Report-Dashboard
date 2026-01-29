@@ -1,5 +1,5 @@
 import sql from "mssql";
-import { dbConfig3 } from "../config/db.js";
+import { dbConfig3 } from "../config/db.config.js";
 
 export const generateTemplateCode = async () => {
   const pool = await new sql.ConnectionPool(dbConfig3).connect();

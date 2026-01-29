@@ -1,5 +1,5 @@
-import sql, { dbConfig3 } from "../../config/db.js";
-import { sendVisitorReportEmail } from "../../config/emailConfig.js";
+import sql, { dbConfig3 } from "../../config/db.config.js";
+import { sendVisitorReportMail } from "../../emailTemplates/Visitor_Management_System/visitorReport.template.js";
 
 // Visitor
 export const fetchVisitors = async (req, res) => {
@@ -97,7 +97,7 @@ export const sendVisitorReport = async (req, res) => {
         .json({ success: false, message: "No visitor data provided." });
     }
 
-    const emailSent = await sendVisitorReportEmail(visitors);
+    const emailSent = await sendVisitorReportMail(visitors);
 
     if (emailSent) {
       return res

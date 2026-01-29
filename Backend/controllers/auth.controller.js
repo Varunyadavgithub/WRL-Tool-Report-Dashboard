@@ -1,7 +1,7 @@
 import sql from "mssql";
 import jwt from "jsonwebtoken";
-import { dbConfig1 } from "../config/db.js";
-import { tryCatch } from "../config/tryCatch.js";
+import { dbConfig1 } from "../config/db.config.js";
+import { tryCatch } from "../utils/tryCatch.js";
 import { AppError } from "../utils/AppError.js";
 
 // Handles user login by verifying credentials and issuing a JWT token.
@@ -49,7 +49,7 @@ export const login = tryCatch(async (req, res) => {
       role: user.UserRole,
     },
     process.env.JWT_SECRET,
-    { expiresIn: "1d" }
+    { expiresIn: "1d" },
   );
 
   res.cookie("token", token, {

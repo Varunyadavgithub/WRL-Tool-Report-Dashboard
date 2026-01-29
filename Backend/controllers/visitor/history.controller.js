@@ -1,4 +1,4 @@
-import sql, { dbConfig3 } from "../../config/db.js";
+import sql, { dbConfig3 } from "../../config/db.config.js";
 
 export const getAllVisitors = async (req, res) => {
   try {

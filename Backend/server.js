@@ -11,7 +11,7 @@ import {
   dbConfig2,
   dbConfig3,
   dbConfig4,
-} from "./config/db.js";
+} from "./config/db.config.js";
 import { startCalibrationCron } from "./cron/calibrationEscalation.js";
 import { globalErrorHandler } from "./middlewares/errorHandler.js";
 // const _dirname = path.resolve();

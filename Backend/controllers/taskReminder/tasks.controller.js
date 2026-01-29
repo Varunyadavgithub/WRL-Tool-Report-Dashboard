@@ -1,11 +1,9 @@
 import sql from "mssql";
-import { dbConfig3, dbConfig4 } from "../../config/db.js";
-import { tryCatch } from "../../config/tryCatch.js";
+import { dbConfig3, dbConfig4 } from "../../config/db.config.js";
+import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
-import {
-  sendTaskCompletedEmail,
-  sendTaskReminderEmail,
-} from "../../config/emailConfig.js";
+import { sendTaskReminderMail } from "../../emailTemplates/Task_Reminder_System/createTaskReminder.template.js";
+import { sendTaskCompletedMail } from "../../emailTemplates/Task_Reminder_System/taskCompleted.template.js";
 
 // CREATE A NEW TASK
 export const createTask = tryCatch(async (req, res) => {
@@ -22,7 +20,7 @@ export const createTask = tryCatch(async (req, res) => {
   if (!title || !assignedTo || !priority || !dueDate) {
     throw new AppError(
       "Required fields: title, assignedTo, priority, dueDate",
-      400
+      400,
     );
   }
 
@@ -58,7 +56,7 @@ export const createTask = tryCatch(async (req, res) => {
       .request()
       .input("assignedTo", sql.VarChar(50), assignedTo)
       .query(
-        `SELECT employee_email, name FROM Users WHERE employee_id = @assignedTo`
+        `SELECT employee_email, name FROM Users WHERE employee_id = @assignedTo`,
       );
 
     if (userResult.recordset.length === 0) {
@@ -67,7 +65,7 @@ export const createTask = tryCatch(async (req, res) => {
       const assignedUserEmail = userResult.recordset[0];
 
       // Send email (non-blocking)
-      sendTaskReminderEmail({
+      sendTaskReminderMail({
         assignedTo: assignedUserEmail.employee_email,
         assignedUserName: assignedUserEmail.name,
         title: created.Title,
@@ -219,13 +217,13 @@ export const updateTaskStatus = tryCatch(async (req, res) => {
         .request()
         .input("assignedTo", sql.VarChar(50), updatedTask.AssignedTo)
         .query(
-          `SELECT employee_email, name FROM Users WHERE employee_id = @assignedTo`
+          `SELECT employee_email, name FROM Users WHERE employee_id = @assignedTo`,
         );
 
       const assignedUser = userResult.recordset?.[0];
 
       if (assignedUser) {
-        sendTaskCompletedEmail({
+        sendTaskCompletedMail({
           assignedTo: assignedUser.employee_email,
           assignedUserName: assignedUser.name,
           title: updatedTask.Title,

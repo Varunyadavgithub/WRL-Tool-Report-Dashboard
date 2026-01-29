@@ -1,28 +1,12 @@
-import nodemailer from "nodemailer";
+import transporter from "../../config/email.config.js";
 
 /* ================= EMAIL SUBJECTS ================= */
 export const ESCALATION_SUBJECTS = {
   0: "ℹ Calibration Due Soon (15 Days)",
   1: "⚠ Calibration Warning (10 Days)",
   2: "🚨 Calibration CRITICAL (5 Days)",
-  3: "❌ AUDIT RISK – Calibration Overdue"
+  3: "❌ AUDIT RISK – Calibration Overdue",
 };
-
-/* ================= SMTP TRANSPORT ================= */
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false,       // 👈 FIX
-    servername: undefined            // 👈 IMPORTANT
-  }
-});
-
 
 /* ================= SEND MAIL ================= */
 export const sendCalibrationMail = async ({ level, asset, to, cc }) => {

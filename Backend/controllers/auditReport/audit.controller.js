@@ -1,6 +1,6 @@
 import sql from "mssql";
-import { dbConfig3 } from "../../config/db.js";
-import { tryCatch } from "../../config/tryCatch.js";
+import { dbConfig3 } from "../../config/db.config.js";
+import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { generateAuditCode } from "../../utils/generateCode.js";
 

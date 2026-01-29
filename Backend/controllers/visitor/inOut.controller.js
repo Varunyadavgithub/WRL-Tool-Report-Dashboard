@@ -1,5 +1,5 @@
-import sql, { dbConfig3 } from "../../config/db.js";
-import { sendVisitorPassEmail } from "../../config/emailConfig.js";
+import sql, { dbConfig3 } from "../../config/db.config.js";
+import { sendVisitorPassMail } from "../../emailTemplates/Visitor_Management_System/visitorPass.template.js";
 
 export const getVisitorLogs = async (_, res) => {
   try {
@@ -15,7 +15,7 @@ export const getVisitorLogs = async (_, res) => {
       now.getDate(),
       8,
       0,
-      0
+      0,
     );
 
     // Set end date: tomorrow at 20:00:00
@@ -25,7 +25,7 @@ export const getVisitorLogs = async (_, res) => {
       now.getDate() + 1,
       20,
       0,
-      0
+      0,
     );
     const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
     const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
@@ -160,7 +160,7 @@ export const visitorIn = async (req, res) => {
 
     if (data) {
       // ✅ Step 4: Send check-in notification email
-      await sendVisitorPassEmail({
+      await sendVisitorPassMail({
         to: data.employee_email,
         cc: [data.manager_email, process.env.CC_HR, process.env.CC_PH],
         photoPath: data.visitor_photo, // You can fetch actual photo if required

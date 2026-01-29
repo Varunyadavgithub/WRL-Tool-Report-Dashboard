@@ -1,6 +1,6 @@
 import sql from "mssql";
-import { dbConfig1 } from "../../config/db.js";
-import { tryCatch } from "../../config/tryCatch.js";
+import { dbConfig1 } from "../../config/db.config.js";
+import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 
 // Fetches detailed information about components based on a provided serial number.

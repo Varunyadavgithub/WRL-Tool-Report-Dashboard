@@ -1,7 +1,7 @@
 import sql from "mssql";
-import { dbConfig3 } from "../config/db.js";
-import { sendCalibrationMail } from "./mailer.js";
-import { ESCALATION_RECIPIENTS } from "../config/escalationConfig.js";
+import { dbConfig3 } from "../config/db.config.js";
+import { sendCalibrationMail } from "../emailTemplates/Calibration_System/calibrationMail.template.js";
+import { ESCALATION_RECIPIENTS } from "../utils/escalation.js";
 
 export const runCalibrationEscalation = async () => {
   const pool = await sql.connect(dbConfig3);
@@ -71,8 +71,7 @@ export const runCalibrationEscalation = async () => {
     await pool
       .request()
       .input("ID", sql.Int, a.ID)
-      .input("Level", sql.Int, level)
-      .query(`
+      .input("Level", sql.Int, level).query(`
         UPDATE CalibrationAssets
         SET EscalationLevel = @Level,
             LastEscalationSentOn = GETDATE()
@@ -86,8 +85,7 @@ export const runCalibrationEscalation = async () => {
       .input("EscalationLevel", sql.Int, level)
       .input("DaysLeft", sql.Int, a.DaysLeft)
       .input("MailTo", recipients.to.join(","))
-      .input("MailCC", recipients.cc.join(","))
-      .query(`
+      .input("MailCC", recipients.cc.join(",")).query(`
         INSERT INTO CalibrationEscalationLog
         (AssetID, EscalationLevel, DaysLeft, MailTo, MailCC)
         VALUES

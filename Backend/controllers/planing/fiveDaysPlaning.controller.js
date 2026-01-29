@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import { tryCatch } from "../../config/tryCatch.js";
+import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 
 const uploadDir = path.resolve("uploads", "FiveDaysPlan");
