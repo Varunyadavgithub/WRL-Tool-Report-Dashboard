@@ -1,4 +1,4 @@
-import { sendGateEntryAlertMail } from "../../emailTemplates/gateEntryAlert.template.js";
+import { sendGateEntryAlertMail } from "../../emailTemplates/Dispatch_System/gateEntryAlert.template.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 

@@ -1,4 +1,4 @@
-import transporter from "../config/email.config.js";
+import transporter from "../../config/email.config.js";
 
 // -------------------- Gate Entry Alert Email --------------------
 export const sendGateEntryAlertMail = async (gateEntries) => {
