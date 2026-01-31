@@ -1,132 +1,58 @@
-import sql, { dbConfig3 } from "../../config/db.config.js";
+import sql from "mssql";
+import { dbConfig3 } from "../../config/db.config.js";
+import { tryCatch } from "../../utils/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 import { sendVisitorPassMail } from "../../emailTemplates/Visitor_Management_System/visitorPass.template.js";
 
-export const getVisitorLogs = async (_, res) => {
-  try {
-    const pool = await new sql.ConnectionPool(dbConfig3).connect();
-    const request = pool.request();
-
-    const now = new Date();
-
-    // Set start date: today at 08:00:00
-    const startDate = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-      8,
-      0,
-      0,
-    );
-
-    // Set end date: tomorrow at 20:00:00
-    const endDate = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate() + 1,
-      20,
-      0,
-      0,
-    );
-    const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
-
-    const result = await pool
-      .request()
-      .input("StartDate", sql.DateTime, istStart)
-      .input("EndDate", sql.DateTime, istEnd).query(`
-        SELECT 
-            vp.pass_id,
-            vp.visitor_name,
-            vp.visitor_contact_no,
-            vp.company,
-            d.department_name,
-            u.name,
-            vp.purpose_of_visit,
-            vp.allow_on,
-            vp.allow_till,
-            vp.vehicle_details,
-            vp.visitor_photo,
-            vl.check_in_time,
-            vl.check_out_time,
-            vp.created_at
-        FROM visit_logs vl
-        RIGHT JOIN visitor_passes vp ON vp.pass_id = vl.unique_pass_id
-        INNER JOIN users u ON u.employee_id = vp.employee_to_visit
-        INNER JOIN departments d ON d.deptCode = vp.department_to_visit
-        where vp.created_at between @StartDate And @EndDate
-        ORDER BY vp.created_at DESC
-    `);
-
-    res.status(200).json({
-      success: true,
-      data: result.recordset,
-    });
-    await pool.close();
-  } catch (error) {
-    console.error("Error fetching visitor logs:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch visitor logs",
-    });
-  }
-};
-
-export const visitorIn = async (req, res) => {
+/* ==============================
+   Visitor Check-In
+================================ */
+export const visitorIn = tryCatch(async (req, res, next) => {
   const { passId } = req.body;
 
   if (!passId) {
-    return res.status(400).json({
-      success: false,
-      message: "Pass ID is required",
-    });
+    throw new AppError("Pass ID is required", 400);
   }
 
-  try {
-    const pool = await new sql.ConnectionPool(dbConfig3).connect();
-    const request = pool.request();
-    request.input("PassId", sql.VarChar(50), passId);
+  const pool = await new sql.ConnectionPool(dbConfig3).connect();
+  const request = pool.request().input("PassId", sql.VarChar(50), passId);
 
-    // Get current status of the visitor
-    const result = await request.query(`
-      SELECT status FROM visitor_passes WHERE pass_id = @PassId
-    `);
+  const statusResult = await request.query(`
+    SELECT status FROM visitor_passes WHERE pass_id = @PassId
+  `);
 
-    // If passId not found
-    if (result?.recordset.length === 0) {
-      await pool.close();
-      return res.status(404).json({
-        success: false,
-        message: "Pass ID not found",
-      });
-    }
+  if (!statusResult.recordset.length) {
+    await pool.close();
+    throw new AppError("Pass ID not found", 404);
+  }
 
-    const currentStatus = parseInt(result?.recordset[0]?.status);
+  const status = Number(statusResult.recordset[0].status);
 
-    // Allow check-in only if status is 1 (new) or 103 (checked out)
-    if (currentStatus === 1 || currentStatus === 103) {
-      // Proceed to check-in
-      await request.query(`
-        BEGIN TRANSACTION;
+  // 1 = new, 103 = checked out
+  if (![1, 103].includes(status)) {
+    await pool.close();
+    throw new AppError(
+      "Visitor is already checked in or status is invalid",
+      409,
+    );
+  }
 
-            INSERT INTO visit_logs (unique_pass_id, check_in_time, check_out_time)
-            VALUES (@PassId, SWITCHOFFSET( GETUTCDATE(), '+05:30'), NULL);
+  await request.query(`
+    BEGIN TRANSACTION;
 
-        UPDATE visitor_passes
-        SET status = 100 -- checked in
-        WHERE pass_id = @PassId;
+      INSERT INTO visit_logs (unique_pass_id, check_in_time, check_out_time)
+      VALUES (@PassId, SWITCHOFFSET(GETUTCDATE(), '+05:30'), NULL);
 
-        COMMIT;
-    `);
-    } else {
-      return res.status(409).json({
-        success: false,
-        message:
-          "Visitor is already checked in or status invalid. Please check out first.",
-      });
-    }
+      UPDATE visitor_passes
+      SET status = 100
+      WHERE pass_id = @PassId;
 
-    // ✅ Step 3: Fetch visitor + employee details for email
-    const infoQuery = `
+    COMMIT;
+  `);
+
+  /* ---------- Fetch details for email ---------- */
+  const info = await pool.request().input("PassId", sql.VarChar(50), passId)
+    .query(`
       SELECT 
         vp.visitor_photo,
         vp.pass_id,
@@ -135,8 +61,6 @@ export const visitorIn = async (req, res) => {
         vp.visitor_email,
         vp.allow_on,
         vp.allow_till,
-        vp.department_to_visit,
-        vp.employee_to_visit,
         d.department_name,
         u.name AS employee_name,
         u.employee_email,
@@ -145,111 +69,154 @@ export const visitorIn = async (req, res) => {
         v.city,
         vp.purpose_of_visit
       FROM visitor_passes vp
-      INNER JOIN visitors v ON v.visitor_id = vp.visitor_id
+      JOIN visitors v ON v.visitor_id = vp.visitor_id
       LEFT JOIN departments d ON vp.department_to_visit = d.deptCode
       LEFT JOIN users u ON vp.employee_to_visit = u.employee_id
       WHERE vp.pass_id = @PassId
-    `;
+    `);
 
-    const infoResult = await pool
-      .request()
-      .input("PassId", sql.VarChar(50), passId)
-      .query(infoQuery);
+  const data = info.recordset[0];
 
-    const data = infoResult.recordset[0];
-
-    if (data) {
-      // ✅ Step 4: Send check-in notification email
-      await sendVisitorPassMail({
-        to: data.employee_email,
-        cc: [data.manager_email, process.env.CC_HR, process.env.CC_PH],
-        photoPath: data.visitor_photo, // You can fetch actual photo if required
-        visitorName: data.visitor_name,
-        visitorContact: data.visitor_contact_no,
-        visitorEmail: data.visitor_email,
-        company: data.company,
-        city: data.city,
-        visitorId: data.pass_id,
-        allowOn: data.allow_on,
-        allowTill: data.allow_till,
-        departmentToVisit: data.department_name,
-        employeeToVisit: data.employee_name,
-        purposeOfVisit: data.purpose_of_visit,
-      });
-    }
-
-    await pool.close();
-
-    res.status(201).json({
-      success: true,
-      message: "Visitor checked in successfully and email sent",
-      data: { passId },
-    });
-  } catch (error) {
-    console.error("Error on check-in:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while checking in visitor",
+  if (data) {
+    await sendVisitorPassMail({
+      to: data.employee_email,
+      cc: [data.manager_email, process.env.CC_HR, process.env.CC_PH],
+      photoPath: data.visitor_photo,
+      visitorName: data.visitor_name,
+      visitorContact: data.visitor_contact_no,
+      visitorEmail: data.visitor_email,
+      company: data.company,
+      city: data.city,
+      visitorId: data.pass_id,
+      allowOn: data.allow_on,
+      allowTill: data.allow_till,
+      departmentToVisit: data.department_name,
+      employeeToVisit: data.employee_name,
+      purposeOfVisit: data.purpose_of_visit,
     });
   }
-};
 
-export const visitorOut = async (req, res) => {
+  await pool.close();
+
+  res.status(201).json({
+    success: true,
+    message: "Visitor checked in successfully",
+    data: { passId },
+  });
+});
+
+/* ==============================
+   Visitor Check-Out
+================================ */
+export const visitorOut = tryCatch(async (req, res, next) => {
   const { passId } = req.body;
 
   if (!passId) {
-    return res.status(400).json({
-      success: false,
-      message: "Pass ID is required",
-    });
+    throw new AppError("Pass ID is required", 400);
   }
 
-  try {
-    const pool = await new sql.ConnectionPool(dbConfig3).connect();
-    const request = pool.request();
-    request.input("PassId", sql.VarChar(50), passId);
+  const pool = await new sql.ConnectionPool(dbConfig3).connect();
+  const request = pool.request().input("PassId", sql.VarChar(50), passId);
 
-    // Step 1: Check if visitor is currently checked in
-    const check = await request.query(`
-      SELECT * FROM visit_logs
-      WHERE unique_pass_id = @PassId AND check_out_time IS NULL
-    `);
+  const activeVisit = await request.query(`
+    SELECT 1 FROM visit_logs
+    WHERE unique_pass_id = @PassId AND check_out_time IS NULL
+  `);
 
-    if (check.recordset.length === 0) {
-      await pool.close();
-      return res.status(404).json({
-        success: false,
-        message: "Visitor is not currently checked in or already checked out.",
-      });
-    }
+  if (!activeVisit.recordset.length) {
+    await pool.close();
+    throw new AppError(
+      "Visitor is not currently checked in or already checked out",
+      404,
+    );
+  }
 
-    // Step 2: Perform checkout and update status
-    await request.query(`
-      BEGIN TRANSACTION;
+  await request.query(`
+    BEGIN TRANSACTION;
 
       UPDATE visit_logs
-      SET check_out_time = SWITCHOFFSET( GETUTCDATE(), '+05:30')
+      SET check_out_time = SWITCHOFFSET(GETUTCDATE(), '+05:30')
       WHERE unique_pass_id = @PassId AND check_out_time IS NULL;
 
       UPDATE visitor_passes
       SET status = 103
       WHERE pass_id = @PassId;
 
-      COMMIT;
+    COMMIT;
+  `);
+
+  await pool.close();
+
+  res.status(200).json({
+    success: true,
+    message: "Visitor checked out successfully",
+    data: { passId },
+  });
+});
+
+/* ==============================
+   Get Visitor Logs (Today)
+================================ */
+export const getVisitorLogs = tryCatch(async (_, res, next) => {
+  const pool = await new sql.ConnectionPool(dbConfig3).connect();
+
+  const now = new Date();
+
+  // Today 08:00 → Tomorrow 20:00 (IST)
+  const startDate = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    8,
+    0,
+    0,
+  );
+
+  const endDate = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 1,
+    20,
+    0,
+    0,
+  );
+
+  const istStart = new Date(startDate.getTime() + 330 * 60000);
+  const istEnd = new Date(endDate.getTime() + 330 * 60000);
+
+  const result = await pool
+    .request()
+    .input("StartDate", sql.DateTime, istStart)
+    .input("EndDate", sql.DateTime, istEnd).query(`
+      SELECT 
+        vp.pass_id,
+        vp.visitor_name,
+        vp.visitor_contact_no,
+        vp.company,
+        d.department_name,
+        u.name AS employee_name,
+        vp.purpose_of_visit,
+        vp.allow_on,
+        vp.allow_till,
+        vp.vehicle_details,
+        vp.visitor_photo,
+        vl.check_in_time,
+        vl.check_out_time,
+        vp.created_at
+      FROM visit_logs vl
+      RIGHT JOIN visitor_passes vp ON vp.pass_id = vl.unique_pass_id
+      INNER JOIN users u ON u.employee_id = vp.employee_to_visit
+      INNER JOIN departments d ON d.deptCode = vp.department_to_visit
+      WHERE vp.created_at BETWEEN @StartDate AND @EndDate
+      ORDER BY vp.created_at DESC
     `);
 
-    await pool.close();
+  await pool.close();
 
-    res.status(200).json({
-      success: true,
-      message: "Visitor checked out successfully",
-      data: { passId },
-    });
-  } catch (error) {
-    console.error("Error on check-out:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while checking out visitor",
-    });
-  }
-};
+  res.status(200).json({
+    success: true,
+    message: "Visitor logs fetched successfully",
+    count: result.recordset.length,
+    data: result.recordset,
+  });
+});

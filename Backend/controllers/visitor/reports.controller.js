@@ -1,26 +1,28 @@
-import sql, { dbConfig3 } from "../../config/db.config.js";
+import sql from "mssql";
+import { dbConfig3 } from "../../config/db.config.js";
 import { sendVisitorReportMail } from "../../emailTemplates/Visitor_Management_System/visitorReport.template.js";
+import { tryCatch } from "../../utils/tryCatch.js";
+import { AppError } from "../../utils/AppError.js";
 
-// Visitor
-export const fetchVisitors = async (req, res) => {
+/* ==============================
+   Fetch Visitors (Report)
+================================ */
+export const fetchVisitors = tryCatch(async (req, res) => {
   const { startTime, endTime } = req.query;
+
   if (!startTime || !endTime) {
-    return res.status(400).json({
-      success: false,
-      message: "startTime, endTime is required",
-    });
+    throw new AppError("startTime and endTime are required", 400);
   }
-  try {
-    const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
-    const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
 
-    const pool = await new sql.ConnectionPool(dbConfig3).connect();
-    const request = pool
-      .request()
-      .input("startTime", sql.DateTime, istStart)
-      .input("endTime", sql.DateTime, istEnd);
+  const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
+  const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
 
-    const query = `
+  const pool = await new sql.ConnectionPool(dbConfig3).connect();
+
+  const result = await pool
+    .request()
+    .input("startTime", sql.DateTime, istStart)
+    .input("endTime", sql.DateTime, istEnd).query(`
       SELECT 
           v.visitor_id AS id,
           vp.visit_type,
@@ -45,7 +47,11 @@ export const fetchVisitors = async (req, res) => {
               VARCHAR(8),
               DATEADD(
                   SECOND,
-                  DATEDIFF(SECOND, vl.check_in_time, ISNULL(vl.check_out_time, GETDATE())),
+                  DATEDIFF(
+                    SECOND,
+                    vl.check_in_time,
+                    ISNULL(vl.check_out_time, GETDATE())
+                  ),
                   0
               ),
               108
@@ -70,48 +76,38 @@ export const fetchVisitors = async (req, res) => {
           GROUP BY visitor_id
       ) vp_count 
           ON vp_count.visitor_id = v.visitor_id
-      where vl.check_in_time between @startTime and @endTime
-    `;
-    const result = await request.query(query);
 
-    res.status(200).json({
-      success: true,
-      data: result.recordset,
-      totalCount:
-        result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
-    });
-    await pool.close();
-  } catch (error) {
-    console.error("SQL error:", error);
-    res.status(500).json({ success: false, error: error.message });
+      WHERE vl.check_in_time BETWEEN @startTime AND @endTime
+    `);
+
+  await pool.close();
+
+  res.status(200).json({
+    success: true,
+    message: "Visitor report data fetched successfully",
+    data: result.recordset,
+    totalCount: result.recordset.length,
+  });
+});
+
+/* ==============================
+   Send Visitor Report Email
+================================ */
+export const sendVisitorReport = tryCatch(async (req, res) => {
+  const { visitors } = req.body;
+
+  if (!Array.isArray(visitors) || visitors.length === 0) {
+    throw new AppError("No visitor data provided", 400);
   }
-};
 
-export const sendVisitorReport = async (req, res) => {
-  try {
-    const { visitors } = req.body;
+  const emailSent = await sendVisitorReportMail(visitors);
 
-    if (!Array.isArray(visitors) || visitors.length === 0) {
-      return res
-        .status(400)
-        .json({ success: false, message: "No visitor data provided." });
-    }
-
-    const emailSent = await sendVisitorReportMail(visitors);
-
-    if (emailSent) {
-      return res
-        .status(200)
-        .json({ success: true, message: "Visitor report sent successfully." });
-    } else {
-      return res
-        .status(500)
-        .json({ success: false, message: "Failed to send email." });
-    }
-  } catch (error) {
-    console.error("Error in sendVisitorReport controller:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Internal server error." });
+  if (!emailSent) {
+    throw new AppError("Failed to send visitor report email", 500);
   }
-};
+
+  res.status(200).json({
+    success: true,
+    message: "Visitor report sent successfully",
+  });
+});
