@@ -293,7 +293,6 @@ export const ROUTE_CONFIG = [
         component: TagUpdate,
         roles: [
           ROLES.ADMIN,
-          ROLES.LINE_QUALITY_ENGINEER,
           ROLES.QUALITY_MANAGER,
         ],
       },

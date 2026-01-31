@@ -68,7 +68,7 @@ const TemplateBuilder = () => {
       type: "select",
       required: true,
       visible: true,
-      options: ["Day Shift", "Night Shift", "Morning Shift", "Evening Shift"],
+      options: ["Day Shift", "Night Shift"],
     },
     { id: "eid", name: "EID", type: "text", required: true, visible: true },
   ]);
@@ -82,6 +82,16 @@ const TemplateBuilder = () => {
       required: true,
       width: "w-32",
       type: "text",
+      isGroupColumn: true, // New property to identify group columns
+    },
+    {
+      id: "stage",
+      name: "Stage",
+      visible: true,
+      required: true,
+      width: "w-32",
+      type: "text",
+      isGroupColumn: true, // New property to identify group columns
     },
     {
       id: "checkPoint",
@@ -136,11 +146,12 @@ const TemplateBuilder = () => {
     },
   ]);
 
-  // Default sections structure
+  // Default sections structure - now includes stageName
   const [defaultSections, setDefaultSections] = useState([
     {
       id: Date.now(),
       sectionName: "",
+      stageName: "",
       checkPoints: [
         {
           id: Date.now(),
@@ -199,6 +210,15 @@ const TemplateBuilder = () => {
     );
   };
 
+  // Handle stage name change
+  const handleStageNameChange = (sectionId, value) => {
+    setDefaultSections((prev) =>
+      prev.map((section) =>
+        section.id === sectionId ? { ...section, stageName: value } : section,
+      ),
+    );
+  };
+
   // Handle checkpoint field change
   const handleCheckpointChange = (sectionId, checkpointId, field, value) => {
     setDefaultSections((prev) =>
@@ -220,6 +240,7 @@ const TemplateBuilder = () => {
     const newSection = {
       id: Date.now(),
       sectionName: "",
+      stageName: "",
       checkPoints: [
         {
           id: Date.now(),
@@ -288,6 +309,7 @@ const TemplateBuilder = () => {
         ...sectionToDuplicate,
         id: Date.now(),
         sectionName: `${sectionToDuplicate.sectionName} (Copy)`,
+        stageName: `${sectionToDuplicate.stageName} (Copy)`,
         checkPoints: sectionToDuplicate.checkPoints.map((cp) => ({
           ...cp,
           id: Date.now() + Math.random(),
@@ -474,225 +496,211 @@ const TemplateBuilder = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate("/auditreport/templates")}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-all"
-            >
-              <FaArrowLeft /> Back
-            </button>
-            <h1 className="text-2xl font-bold text-gray-800">
-              {id ? "Edit Template" : "Create New Template"}
-            </h1>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setShowInfoFieldManager(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-all text-sm"
-            >
-              <FaInfoCircle /> Info Fields
-            </button>
-            <button
-              onClick={() => setShowColumnManager(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all text-sm"
-            >
-              <FaColumns /> Table Columns
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all disabled:opacity-50"
-            >
-              {saving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <FaSave /> Save Template
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
-          </div>
-        )}
-
-        {/* Template Meta Info */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-            <FaFileAlt className="text-blue-600" /> Template Information
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Template Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={templateMeta.name}
-                onChange={(e) => handleMetaChange("name", e.target.value)}
-                placeholder="Enter template name"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category
-              </label>
-              <select
-                value={templateMeta.category}
-                onChange={(e) => handleMetaChange("category", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      <div className="mx-auto">
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-40 bg-gray-100/90 backdrop-blur border-b border-gray-200 shadow-sm">
+          <div className="mb-6 flex flex-wrap justify-between items-center gap-4 px-4 py-4">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate("/auditreport/templates")}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-all"
               >
-                <option value="">Select Category</option>
-                <option value="quality">Quality Audit</option>
-                <option value="safety">Safety Audit</option>
-                <option value="process">Process Audit</option>
-                <option value="compliance">Compliance Audit</option>
-                <option value="other">Other</option>
-              </select>
+                <FaArrowLeft /> Back
+              </button>
+
+              <h1 className="text-2xl font-bold text-gray-800">
+                {id ? "Edit Template" : "Create New Template"}
+              </h1>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Version
-              </label>
-              <input
-                type="text"
-                value={templateMeta.version}
-                onChange={(e) => handleMetaChange("version", e.target.value)}
-                placeholder="1.0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div className="flex items-end">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={templateMeta.isActive}
-                  onChange={(e) =>
-                    handleMetaChange("isActive", e.target.checked)
-                  }
-                  className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
-                />
-                <span className="text-sm font-medium text-gray-700">
-                  Active Template
-                </span>
-              </label>
-            </div>
-            <div className="md:col-span-2 lg:col-span-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                value={templateMeta.description}
-                onChange={(e) =>
-                  handleMetaChange("description", e.target.value)
-                }
-                placeholder="Enter template description"
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setShowInfoFieldManager(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-all text-sm"
+              >
+                <FaInfoCircle /> Info Fields
+              </button>
+
+              <button
+                onClick={() => setShowColumnManager(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all text-sm"
+              >
+                <FaColumns /> Table Columns
+              </button>
+
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all disabled:opacity-50"
+              >
+                {saving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <FaSave /> Save Template
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Header Config */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">
-            Header Configuration
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <div className="flex items-center">
-              <label className="flex items-center gap-2 cursor-pointer">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch py-6">
+          {/* Template Meta Info */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-full hover:shadow-md transition">
+            <h2 className="text-lg font-semibold text-gray-800 mb-5 flex items-center gap-2">
+              <FaFileAlt className="text-blue-600" />
+              Template Information
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Template Name <span className="text-red-500">*</span>
+                </label>
                 <input
-                  type="checkbox"
-                  checked={headerConfig.showFormatNo}
+                  type="text"
+                  value={templateMeta.name}
+                  onChange={(e) => handleMetaChange("name", e.target.value)}
+                  placeholder="Enter template name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category
+                </label>
+                <select
+                  value={templateMeta.category}
+                  onChange={(e) => handleMetaChange("category", e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Category</option>
+                  <option value="quality">Quality Audit</option>
+                  <option value="safety">Safety Audit</option>
+                  <option value="process">Process Audit</option>
+                  <option value="compliance">Compliance Audit</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Version
+                </label>
+                <input
+                  type="text"
+                  value={templateMeta.version}
+                  onChange={(e) => handleMetaChange("version", e.target.value)}
+                  placeholder="1.0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex items-end">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={templateMeta.isActive}
+                    onChange={(e) =>
+                      handleMetaChange("isActive", e.target.checked)
+                    }
+                    className="w-5 h-5 text-blue-600 rounded"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Active Template
+                  </span>
+                </label>
+              </div>
+
+              <div className="md:col-span-2 lg:col-span-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={templateMeta.description}
+                  onChange={(e) =>
+                    handleMetaChange("description", e.target.value)
+                  }
+                  rows={3}
+                  placeholder="Enter template description"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Header Config */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-full hover:shadow-md transition">
+            <h2 className="text-lg font-semibold text-gray-800 mb-5 flex items-center gap-2">
+              <FaFileAlt className="text-blue-600" />
+              Header Configuration
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 flex-1">
+              {[
+                { label: "Show Format No", key: "showFormatNo" },
+                { label: "Show Rev No", key: "showRevNo" },
+                { label: "Show Rev Date", key: "showRevDate" },
+              ].map((item) => (
+                <label
+                  key={item.key}
+                  className="flex items-center gap-2 p-3 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={headerConfig[item.key]}
+                    onChange={(e) =>
+                      setHeaderConfig((prev) => ({
+                        ...prev,
+                        [item.key]: e.target.checked,
+                      }))
+                    }
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span className="text-sm text-gray-700">{item.label}</span>
+                </label>
+              ))}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Default Format No
+                </label>
+                <input
+                  type="text"
+                  value={headerConfig.defaultFormatNo}
                   onChange={(e) =>
                     setHeaderConfig((prev) => ({
                       ...prev,
-                      showFormatNo: e.target.checked,
+                      defaultFormatNo: e.target.value,
                     }))
                   }
-                  className="w-4 h-4 text-blue-600 rounded"
+                  placeholder="QA-001"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
-                <span className="text-sm">Show Format No</span>
-              </label>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Default Format No
-              </label>
-              <input
-                type="text"
-                value={headerConfig.defaultFormatNo}
-                onChange={(e) =>
-                  setHeaderConfig((prev) => ({
-                    ...prev,
-                    defaultFormatNo: e.target.value,
-                  }))
-                }
-                placeholder="QA-001"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              />
-            </div>
-            <div className="flex items-center">
-              <label className="flex items-center gap-2 cursor-pointer">
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Default Rev No
+                </label>
                 <input
-                  type="checkbox"
-                  checked={headerConfig.showRevNo}
+                  type="text"
+                  value={headerConfig.defaultRevNo}
                   onChange={(e) =>
                     setHeaderConfig((prev) => ({
                       ...prev,
-                      showRevNo: e.target.checked,
+                      defaultRevNo: e.target.value,
                     }))
                   }
-                  className="w-4 h-4 text-blue-600 rounded"
+                  placeholder="01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
-                <span className="text-sm">Show Rev No</span>
-              </label>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Default Rev No
-              </label>
-              <input
-                type="text"
-                value={headerConfig.defaultRevNo}
-                onChange={(e) =>
-                  setHeaderConfig((prev) => ({
-                    ...prev,
-                    defaultRevNo: e.target.value,
-                  }))
-                }
-                placeholder="01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              />
-            </div>
-            <div className="flex items-center">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={headerConfig.showRevDate}
-                  onChange={(e) =>
-                    setHeaderConfig((prev) => ({
-                      ...prev,
-                      showRevDate: e.target.checked,
-                    }))
-                  }
-                  className="w-4 h-4 text-blue-600 rounded"
-                />
-                <span className="text-sm">Show Rev Date</span>
-              </label>
+              </div>
             </div>
           </div>
         </div>
@@ -888,6 +896,11 @@ const TemplateBuilder = () => {
                             Required
                           </span>
                         )}
+                        {column.isGroupColumn && (
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                            Group
+                          </span>
+                        )}
                         {column.entryField && (
                           <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
                             Entry Field
@@ -1045,6 +1058,35 @@ const TemplateBuilder = () => {
                                       )
                                     }
                                     className="w-full text-sm font-bold text-gray-700 bg-white border border-gray-300 rounded px-2 py-1 focus:border-blue-500 outline-none"
+                                  />
+                                </div>
+                              </td>
+                            );
+                          }
+                          return null;
+                        }
+
+                        // Stage column with rowSpan
+                        if (column.id === "stage") {
+                          if (checkpointIndex === 0) {
+                            return (
+                              <td
+                                key={column.id}
+                                className="px-3 py-2 font-bold bg-indigo-50 border-r border-gray-300 align-top"
+                                rowSpan={section.checkPoints.length}
+                              >
+                                <div className="flex flex-col gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Stage Name"
+                                    value={section.stageName || ""}
+                                    onChange={(e) =>
+                                      handleStageNameChange(
+                                        section.id,
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="w-full text-sm font-bold text-indigo-700 bg-white border border-indigo-300 rounded px-2 py-1 focus:border-indigo-500 outline-none"
                                   />
                                   <div className="flex flex-wrap gap-1">
                                     <button

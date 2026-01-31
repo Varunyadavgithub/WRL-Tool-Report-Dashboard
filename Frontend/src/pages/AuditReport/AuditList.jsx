@@ -163,7 +163,7 @@ const AuditList = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4">
-      <div className="max-w-7xl mx-auto">
+      <div className="mx-auto">
         {/* Header */}
         <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
           <div>
@@ -183,12 +183,6 @@ const AuditList = () => {
           </button>
         </div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
-          </div>
-        )}
 
         {/* Search and Filter */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
