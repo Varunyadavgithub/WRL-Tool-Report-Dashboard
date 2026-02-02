@@ -164,25 +164,26 @@ const AuditList = () => {
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4">
       <div className="mx-auto">
-        {/* Header */}
-        <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-              <FaClipboardCheck className="text-green-600" />
-              Audit Records
-            </h1>
-            <p className="text-gray-600 mt-1">
-              View and manage your audit entries
-            </p>
+        <div className="sticky top-0 z-40 bg-gray-100/90 backdrop-blur border-b border-gray-200 shadow-sm p-4 mb-4">
+          {/* Header */}
+          <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                <FaClipboardCheck className="text-green-600" />
+                Audit Records
+              </h1>
+              <p className="text-gray-600 mt-1">
+                View and manage your audit entries
+              </p>
+            </div>
+            <button
+              onClick={() => navigate("/auditreport/templates")}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all"
+            >
+              <FaPlus /> New Audit
+            </button>
           </div>
-          <button
-            onClick={() => navigate("/auditreport/templates")}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all"
-          >
-            <FaPlus /> New Audit
-          </button>
         </div>
-
 
         {/* Search and Filter */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">

@@ -1,4 +1,3 @@
-// pages/TemplateList.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -131,24 +130,25 @@ const TemplateList = () => {
     <div className="min-h-screen bg-gray-100 py-6 px-4">
       <div className="mx-auto">
         {/* Header */}
-        <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-              <HiClipboardDocumentCheck className="text-blue-600" />
-              Audit Templates
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Manage your audit report templates
-            </p>
+        <div className="sticky top-0 z-40 bg-gray-100/90 backdrop-blur border-b border-gray-200 shadow-sm p-4 mb-4">
+          <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                <HiClipboardDocumentCheck className="text-blue-600" />
+                Audit Templates
+              </h1>
+              <p className="text-gray-600 mt-1">
+                Manage your audit report templates
+              </p>
+            </div>
+            <button
+              onClick={() => navigate("/auditreport/templates/new")}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all"
+            >
+              <FaPlus /> Create New Template
+            </button>
           </div>
-          <button
-            onClick={() => navigate("/auditreport/templates/new")}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all"
-          >
-            <FaPlus /> Create New Template
-          </button>
         </div>
-
 
         {/* Search and Filter */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">

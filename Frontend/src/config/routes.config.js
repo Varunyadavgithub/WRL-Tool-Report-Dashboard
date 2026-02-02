@@ -291,10 +291,7 @@ export const ROUTE_CONFIG = [
         path: "/quality/tag-update",
         label: "Tag Update",
         component: TagUpdate,
-        roles: [
-          ROLES.ADMIN,
-          ROLES.QUALITY_MANAGER,
-        ],
+        roles: [ROLES.ADMIN, ROLES.QUALITY_MANAGER],
       },
       {
         path: "/quality/upload-bis-report",
@@ -503,24 +500,28 @@ export const ROUTE_CONFIG = [
     label: "Audit Report",
     basePath: "/auditreport",
     roles: [ROLES.ADMIN, ROLES.QUALITY_MANAGER],
+
+    // Sidebar items (VISIBLE)
     items: [
       {
+        path: "/auditreport/build-templates",
+        label: "Build Templates",
+        component: TemplateBuilder,
+      },
+      {
         path: "/auditreport/templates",
-        label: "Templates",
+        label: "All Templates",
         component: TemplateList,
       },
       {
         path: "/auditreport/audits",
-        label: "Audit Records",
+        label: "Audits",
         component: AuditList,
       },
     ],
-    // Hidden routes (not shown in sidebar but accessible)
+
+    // Hidden routes (NOT in sidebar)
     hiddenItems: [
-      {
-        path: "/auditreport/templates/new",
-        component: TemplateBuilder,
-      },
       {
         path: "/auditreport/templates/:id",
         component: TemplateBuilder,

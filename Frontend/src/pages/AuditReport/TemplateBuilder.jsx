@@ -1,5 +1,4 @@
-// pages/TemplateBuilder.jsx
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   FaFileAlt,
@@ -16,8 +15,9 @@ import {
   FaCopy,
   FaGripVertical,
   FaInfoCircle,
+  FaClipboardList,
 } from "react-icons/fa";
-import { MdAddCircle } from "react-icons/md";
+import { MdAddCircle, MdOutlineFactCheck } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
 import useAuditData from "../../hooks/useAuditData";
 import toast from "react-hot-toast";
@@ -70,7 +70,13 @@ const TemplateBuilder = () => {
       visible: true,
       options: ["Day Shift", "Night Shift"],
     },
-    { id: "eid", name: "EID", type: "text", required: true, visible: true },
+    {
+      id: "serial",
+      name: "Serial No.",
+      type: "text",
+      required: true,
+      visible: true,
+    },
   ]);
 
   // Dynamic columns configuration
@@ -498,19 +504,19 @@ const TemplateBuilder = () => {
     <div className="min-h-screen bg-gray-100 py-6 px-4">
       <div className="mx-auto">
         {/* Sticky Header */}
-        <div className="sticky top-0 z-40 bg-gray-100/90 backdrop-blur border-b border-gray-200 shadow-sm">
-          <div className="mb-6 flex flex-wrap justify-between items-center gap-4 px-4 py-4">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate("/auditreport/templates")}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-all"
-              >
-                <FaArrowLeft /> Back
-              </button>
-
-              <h1 className="text-2xl font-bold text-gray-800">
-                {id ? "Edit Template" : "Create New Template"}
-              </h1>
+        <div className="sticky top-0 z-40 bg-gray-100/90 backdrop-blur border-b border-gray-200 shadow-sm p-4">
+          <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
+            {/* Header */}
+            <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                  <MdOutlineFactCheck className="text-green-600" />
+                  Create New Template
+                </h1>
+                <p className="text-gray-600 mt-1">
+                  Build and customize audit templates
+                </p>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -723,7 +729,7 @@ const TemplateBuilder = () => {
               <div className="p-4 max-h-[60vh] overflow-y-auto">
                 <p className="text-sm text-gray-600 mb-4">
                   Configure the fields that appear in the header section (Model
-                  Name, Date, Shift, EID, etc.)
+                  Name, Date, Shift, Serial No., etc.)
                 </p>
                 <div className="space-y-3">
                   {infoFields.map((field) => (
