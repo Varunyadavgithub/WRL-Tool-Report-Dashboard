@@ -31,7 +31,7 @@ import {
   formatDateTimeLocal,
   formatDateForDisplay,
 } from "../../utils/dateUtils";
-import { exportToExcel } from "../../utils/exportUtils";
+import { exportToXls } from "../../utils/exportToXls.js";
 
 // React Icons
 import {
@@ -199,7 +199,7 @@ const ESTReport = () => {
       }).unwrap();
 
       if (result?.data) {
-        exportToExcel(result.data, "EST_Report");
+        exportToXls(result.data, "EST_Report.xlsx");
       }
     } catch (error) {
       console.error("Export failed:", error);
