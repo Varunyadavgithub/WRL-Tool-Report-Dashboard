@@ -13,7 +13,6 @@ import {
   FaBarcode,
   FaCubes,
   FaTimes,
-  FaPrint,
 } from "react-icons/fa";
 import { HiLightningBolt, HiOutlineDocumentReport } from "react-icons/hi";
 import { BiTime } from "react-icons/bi";
@@ -33,10 +32,6 @@ const ESTDetailModal = () => {
 
   const handleClose = () => {
     dispatch(closeDetailModal());
-  };
-
-  const handlePrint = () => {
-    window.print();
   };
 
   // Status Badge Component
@@ -114,7 +109,13 @@ const ESTDetailModal = () => {
   };
 
   // Test Card Component
-  const TestCard = ({ title, icon: Icon, status, children, color = "blue" }) => {
+  const TestCard = ({
+    title,
+    icon: Icon,
+    status,
+    children,
+    color = "blue",
+  }) => {
     const isPass = status === "Pass";
     const borderColor = isPass ? "border-green-400" : "border-red-400";
     const headerBg = isPass ? "bg-green-50" : "bg-red-50";
@@ -208,15 +209,8 @@ const ESTDetailModal = () => {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={handlePrint}
-              className="p-2 hover:bg-white/20 rounded-full transition-colors flex items-center gap-2"
-              title="Print"
-            >
-              <FaPrint className="text-lg" />
-            </button>
-            <button
               onClick={handleClose}
-              className="p-2 hover:bg-white/20 rounded-full transition-colors"
+              className="p-2 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
             >
               <FaTimes className="text-xl" />
             </button>
@@ -249,7 +243,9 @@ const ESTDetailModal = () => {
                   <FaCalendarAlt className="text-green-500" size={10} />
                   Date & Time
                 </span>
-                <p className="text-sm">{formatDateForDisplay(data.date_time)}</p>
+                <p className="text-sm">
+                  {formatDateForDisplay(data.date_time)}
+                </p>
               </div>
               <div>
                 <span className="text-xs text-gray-500 flex items-center gap-1">
@@ -261,7 +257,9 @@ const ESTDetailModal = () => {
                 </p>
               </div>
               <div className="flex flex-col items-center">
-                <span className="text-xs text-gray-500 mb-1">Overall Result</span>
+                <span className="text-xs text-gray-500 mb-1">
+                  Overall Result
+                </span>
                 <StatusBadge status={data.result} size="lg" />
               </div>
             </div>
@@ -559,7 +557,9 @@ const ESTDetailModal = () => {
               </div>
               <div className="bg-gray-50 p-2 rounded">
                 <span className="text-gray-500 block">ECT Read Ohms</span>
-                <span className="font-semibold">{data.read_ect_ohms || "N/A"}</span>
+                <span className="font-semibold">
+                  {data.read_ect_ohms || "N/A"}
+                </span>
               </div>
               <div className="bg-gray-50 p-2 rounded">
                 <span className="text-gray-500 block">HV Set kV</span>
@@ -611,13 +611,6 @@ const ESTDetailModal = () => {
             Last updated: {formatDateForDisplay(data.date_time)}
           </p>
           <div className="flex gap-2">
-            <button
-              onClick={handlePrint}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 transition-colors flex items-center gap-2"
-            >
-              <FaPrint />
-              Print Report
-            </button>
             <button
               onClick={handleClose}
               className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-400 transition-colors"
