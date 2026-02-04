@@ -1,7 +1,9 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import authSlice from "./authSlice";
+import estReportSlice from "./estReportSlice";
 import { commonApi } from "./api/commonApi.js";
 import { taskReminderApi } from "./api/taskReminder.js";
+import { estReportApi } from "./api/estReportApi.js";
 import {
   persistReducer,
   FLUSH,
@@ -17,12 +19,15 @@ const persistConfig = {
   key: "root",
   version: 1,
   storage,
+  blacklist: [estReportApi.reducerPath], // Don't persist API cache
 };
 
 const rootReducer = combineReducers({
   auth: authSlice,
+  estReport: estReportSlice,
   [commonApi.reducerPath]: commonApi.reducer,
   [taskReminderApi.reducerPath]: taskReminderApi.reducer,
+  [estReportApi.reducerPath]: estReportApi.reducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
@@ -34,7 +39,11 @@ const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }).concat(commonApi.middleware, taskReminderApi.middleware),
+    }).concat(
+      commonApi.middleware,
+      taskReminderApi.middleware,
+      estReportApi.middleware,
+    ),
 });
 
 export default store;
