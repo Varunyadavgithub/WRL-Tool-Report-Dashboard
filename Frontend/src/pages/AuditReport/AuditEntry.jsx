@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   FaCalendarAlt,
@@ -6,30 +6,49 @@ import {
   FaIdBadge,
   FaStickyNote,
   FaClipboardCheck,
-  FaPlus,
-  FaTrash,
-  FaPrint,
   FaSave,
   FaCheckCircle,
   FaTimesCircle,
   FaExclamationTriangle,
   FaArrowLeft,
-  FaArrowUp,
-  FaArrowDown,
   FaPaperPlane,
   FaEye,
   FaEdit,
+  FaUserCheck,
+  FaUserShield,
+  FaBarcode,
 } from "react-icons/fa";
-import {
-  MdFormatListNumbered,
-  MdUpdate,
-  MdDateRange,
-  MdAddCircle,
-} from "react-icons/md";
+import { MdFormatListNumbered, MdUpdate, MdDateRange } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
 import { BiSolidFactory } from "react-icons/bi";
 import useAuditData from "../../hooks/useAuditData";
+import { useGetModelVariantsByAssemblyQuery } from "../../redux/api/commonApi.js";
 import toast from "react-hot-toast";
+import { getCurrentShift } from "../../utils/shiftUtils.js";
+
+// Get current date in YYYY-MM-DD format
+const getCurrentDate = () => {
+  return new Date().toISOString().split("T")[0];
+};
+
+// Format date for display (DD/MM/YYYY)
+const formatDateForDisplay = (dateString) => {
+  if (!dateString) return "-";
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "-";
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  } catch {
+    return "-";
+  }
+};
+
+// Generate unique IDs
+const generateId = () =>
+  `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 const AuditEntry = () => {
   const navigate = useNavigate();
@@ -51,6 +70,51 @@ const AuditEntry = () => {
   const [template, setTemplate] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
 
+  // Serial number state for API call
+  const [serialNo, setSerialNo] = useState("");
+  const [debouncedSerial, setDebouncedSerial] = useState("");
+  const [modelFetched, setModelFetched] = useState(false);
+
+  // Current shift and date state
+  const [currentShift, setCurrentShift] = useState(getCurrentShift());
+  const [currentDate, setCurrentDate] = useState(getCurrentDate());
+
+  // Update shift every minute to keep it accurate
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentShift(getCurrentShift());
+      const newDate = getCurrentDate();
+      if (newDate !== currentDate) {
+        setCurrentDate(newDate);
+      }
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [currentDate]);
+
+  // Debounce serial number input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (serialNo.trim() && serialNo.length >= 3) {
+        setDebouncedSerial(serialNo.trim());
+      } else {
+        setDebouncedSerial("");
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [serialNo]);
+
+  // RTK Query hook for fetching model variants
+  const {
+    data: modelVariants,
+    isLoading: isLoadingModels,
+    isError: isModelError,
+    isFetching: isFetchingModels,
+  } = useGetModelVariantsByAssemblyQuery(debouncedSerial, {
+    skip: !debouncedSerial || debouncedSerial.length < 3,
+  });
+
   // Audit header data
   const [auditData, setAuditData] = useState({
     templateId: "",
@@ -66,8 +130,123 @@ const AuditEntry = () => {
   // Info fields data
   const [infoData, setInfoData] = useState({});
 
-  // Sections data with checkpoints
+  // Sections data with stages and checkpoints
   const [sections, setSections] = useState([]);
+
+  // Signature data
+  const [signatures, setSignatures] = useState({
+    auditor: { name: "", date: "" },
+    reviewer: { name: "", date: "" },
+    approver: { name: "", date: "" },
+  });
+
+  // Auto-populate model when serial number returns data
+  useEffect(() => {
+    if (modelVariants && modelVariants.length > 0 && !modelFetched) {
+      const firstModel = modelVariants[0];
+      setInfoData((prev) => ({
+        ...prev,
+        serialNo: serialNo,
+        modelName: firstModel.label,
+        modelCode: firstModel.value,
+      }));
+      setModelFetched(true);
+      toast.success(`Model found: ${firstModel.label}`);
+    } else if (modelVariants && modelVariants.length === 0 && debouncedSerial) {
+      toast.error("No model found for this serial number");
+    }
+  }, [modelVariants, serialNo, debouncedSerial, modelFetched]);
+
+  // Handle model error
+  useEffect(() => {
+    if (isModelError && debouncedSerial) {
+      toast.error("Failed to fetch model for this serial number");
+    }
+  }, [isModelError, debouncedSerial]);
+
+  // Helper function to migrate old template structure to new structure
+  const migrateTemplateStructure = useCallback((templateSections) => {
+    if (!templateSections || !Array.isArray(templateSections)) {
+      return [];
+    }
+
+    return templateSections.map((section) => {
+      if (section.stages && Array.isArray(section.stages)) {
+        return {
+          ...section,
+          id: section.id || generateId(),
+          stages: section.stages.map((stage) => ({
+            ...stage,
+            id: stage.id || generateId(),
+            checkPoints: (stage.checkPoints || []).map((cp) => ({
+              ...cp,
+              id: cp.id || generateId(),
+              observation: cp.observation || "",
+              remark: cp.remark || "",
+              status: cp.status || "pending",
+            })),
+          })),
+        };
+      }
+
+      return {
+        id: generateId(),
+        sectionName: section.sectionName || "",
+        stages: [
+          {
+            id: generateId(),
+            stageName: section.stageName || "",
+            checkPoints: (section.checkPoints || []).map((cp) => ({
+              ...cp,
+              id: generateId(),
+              observation: "",
+              remark: "",
+              status: "pending",
+            })),
+          },
+        ],
+      };
+    });
+  }, []);
+
+  // Helper function to migrate audit sections
+  const migrateAuditSections = useCallback((auditSections) => {
+    if (!auditSections || !Array.isArray(auditSections)) {
+      return [];
+    }
+
+    return auditSections.map((section) => {
+      if (section.stages && Array.isArray(section.stages)) {
+        return {
+          ...section,
+          id: section.id || generateId(),
+          stages: section.stages.map((stage) => ({
+            ...stage,
+            id: stage.id || generateId(),
+            checkPoints: (stage.checkPoints || []).map((cp) => ({
+              ...cp,
+              id: cp.id || generateId(),
+            })),
+          })),
+        };
+      }
+
+      return {
+        ...section,
+        id: section.id || generateId(),
+        stages: [
+          {
+            id: generateId(),
+            stageName: section.stageName || "",
+            checkPoints: (section.checkPoints || []).map((cp) => ({
+              ...cp,
+              id: cp.id || generateId(),
+            })),
+          },
+        ],
+      };
+    });
+  }, []);
 
   // Load template or existing audit
   useEffect(() => {
@@ -88,10 +267,24 @@ const AuditEntry = () => {
               notes: audit.notes || "",
               status: audit.status || "draft",
             });
-            setInfoData(audit.infoData || {});
-            setSections(audit.sections || []);
 
-            // Use stored config from audit
+            const existingInfoData = audit.infoData || {};
+            setInfoData(existingInfoData);
+
+            if (existingInfoData.serialNo) {
+              setSerialNo(existingInfoData.serialNo);
+              setModelFetched(true);
+            }
+
+            setSections(migrateAuditSections(audit.sections || []));
+            setSignatures(
+              audit.signatures || {
+                auditor: { name: "", date: "" },
+                reviewer: { name: "", date: "" },
+                approver: { name: "", date: "" },
+              },
+            );
+
             setTemplate({
               columns: audit.columns,
               infoFields: audit.infoFields,
@@ -109,41 +302,40 @@ const AuditEntry = () => {
               reportName: tmpl.name,
               formatNo: tmpl.headerConfig?.defaultFormatNo || "",
               revNo: tmpl.headerConfig?.defaultRevNo || "",
-              revDate: new Date().toISOString().split("T")[0],
+              revDate: getCurrentDate(),
               notes: "",
               status: "draft",
             });
 
-            // Initialize info fields
+            const shift = getCurrentShift();
+            const todayDate = getCurrentDate();
+
             const initialInfoData = {};
             tmpl.infoFields?.forEach((field) => {
               if (field.id === "date") {
-                initialInfoData[field.id] = new Date()
-                  .toISOString()
-                  .split("T")[0];
+                initialInfoData[field.id] = todayDate;
+              } else if (field.id === "shift") {
+                initialInfoData[field.id] = shift.value;
               } else {
                 initialInfoData[field.id] = "";
               }
             });
             setInfoData(initialInfoData);
 
-            // Initialize sections from template
-            const initialSections =
-              tmpl.defaultSections?.map((section) => ({
-                ...section,
-                id: Date.now() + Math.random(),
-                checkPoints: section.checkPoints.map((cp) => ({
-                  ...cp,
-                  id: Date.now() + Math.random(),
-                  observation: "",
-                  remark: "",
-                  status: "pending",
-                })),
-              })) || [];
+            const initialSections = migrateTemplateStructure(
+              tmpl.defaultSections,
+            );
             setSections(initialSections);
+
+            setSignatures({
+              auditor: { name: "", date: todayDate },
+              reviewer: { name: "", date: "" },
+              approver: { name: "", date: "" },
+            });
           }
         }
       } catch (err) {
+        console.error("Load data error:", err);
         toast.error("Failed to load data. Please try again.");
         navigate("/auditreport/audits");
       } finally {
@@ -152,150 +344,109 @@ const AuditEntry = () => {
     };
 
     loadData();
-  }, [id, templateId]);
+  }, [
+    id,
+    templateId,
+    getAuditById,
+    getTemplateById,
+    migrateAuditSections,
+    migrateTemplateStructure,
+    navigate,
+  ]);
 
-  // Handle audit data change
-  const handleAuditDataChange = (field, value) => {
-    setAuditData((prev) => ({ ...prev, [field]: value }));
-  };
+  // Handle serial number change
+  const handleSerialChange = useCallback((value) => {
+    setSerialNo(value);
+    setModelFetched(false);
+    setInfoData((prev) => ({
+      ...prev,
+      serialNo: value,
+      modelName: "",
+      modelCode: "",
+    }));
+  }, []);
+
+  // Handle model selection from dropdown
+  const handleModelSelect = useCallback(
+    (modelValue) => {
+      const selectedModel = modelVariants?.find((m) => m.value === modelValue);
+      if (selectedModel) {
+        setInfoData((prev) => ({
+          ...prev,
+          modelName: selectedModel.label,
+          modelCode: selectedModel.value,
+        }));
+      }
+    },
+    [modelVariants],
+  );
 
   // Handle info field change
-  const handleInfoChange = (fieldId, value) => {
-    setInfoData((prev) => ({ ...prev, [fieldId]: value }));
-  };
+  const handleInfoChange = useCallback(
+    (fieldId, value) => {
+      if (fieldId === "serialNo" || fieldId === "serial") {
+        handleSerialChange(value);
+      } else {
+        setInfoData((prev) => ({ ...prev, [fieldId]: value }));
+      }
+    },
+    [handleSerialChange],
+  );
 
-  // Handle section name change
-  const handleSectionNameChange = (sectionId, value) => {
-    setSections((prev) =>
-      prev.map((section) =>
-        section.id === sectionId ? { ...section, sectionName: value } : section,
-      ),
-    );
-  };
+  // Handle notes change
+  const handleNotesChange = useCallback((value) => {
+    setAuditData((prev) => ({ ...prev, notes: value }));
+  }, []);
 
-  // Handle checkpoint field change
-  const handleCheckpointChange = (sectionId, checkpointId, field, value) => {
-    setSections((prev) =>
-      prev.map((section) =>
-        section.id === sectionId
-          ? {
-              ...section,
-              checkPoints: section.checkPoints.map((cp) =>
-                cp.id === checkpointId ? { ...cp, [field]: value } : cp,
-              ),
-            }
-          : section,
-      ),
-    );
-  };
+  // Handle checkpoint entry field change
+  const handleEntryFieldChange = useCallback(
+    (sectionId, stageId, checkpointId, field, value) => {
+      const allowedFields = ["observation", "remark", "status"];
+      if (!allowedFields.includes(field)) {
+        return;
+      }
 
-  // Add checkpoint to section
-  const addCheckpoint = (sectionId) => {
-    setSections((prev) =>
-      prev.map((section) =>
-        section.id === sectionId
-          ? {
-              ...section,
-              checkPoints: [
-                ...section.checkPoints,
-                {
-                  id: Date.now(),
-                  checkPoint: "",
-                  method: "",
-                  specification: "",
-                  observation: "",
-                  remark: "",
-                  status: "pending",
-                },
-              ],
-            }
-          : section,
-      ),
-    );
-  };
+      setSections((prev) =>
+        prev.map((section) =>
+          section.id === sectionId
+            ? {
+                ...section,
+                stages: section.stages.map((stage) =>
+                  stage.id === stageId
+                    ? {
+                        ...stage,
+                        checkPoints: stage.checkPoints.map((cp) =>
+                          cp.id === checkpointId
+                            ? { ...cp, [field]: value }
+                            : cp,
+                        ),
+                      }
+                    : stage,
+                ),
+              }
+            : section,
+        ),
+      );
+    },
+    [],
+  );
 
-  // Delete checkpoint
-  const deleteCheckpoint = (sectionId, checkpointId) => {
-    setSections((prev) =>
-      prev.map((section) =>
-        section.id === sectionId
-          ? {
-              ...section,
-              checkPoints:
-                section.checkPoints.length > 1
-                  ? section.checkPoints.filter((cp) => cp.id !== checkpointId)
-                  : section.checkPoints,
-            }
-          : section,
-      ),
-    );
-  };
-
-  // Move checkpoint
-  const moveCheckpoint = (sectionId, index, direction) => {
-    setSections((prev) =>
-      prev.map((section) => {
-        if (section.id === sectionId) {
-          const newCheckpoints = [...section.checkPoints];
-          const newIndex = direction === "up" ? index - 1 : index + 1;
-          if (newIndex >= 0 && newIndex < newCheckpoints.length) {
-            [newCheckpoints[index], newCheckpoints[newIndex]] = [
-              newCheckpoints[newIndex],
-              newCheckpoints[index],
-            ];
-          }
-          return { ...section, checkPoints: newCheckpoints };
-        }
-        return section;
-      }),
-    );
-  };
-
-  // Add new section
-  const addSection = () => {
-    const newSection = {
-      id: Date.now(),
-      sectionName: "New Section",
-      checkPoints: [
-        {
-          id: Date.now(),
-          checkPoint: "",
-          method: "",
-          specification: "",
-          observation: "",
-          remark: "",
-          status: "pending",
-        },
-      ],
-    };
-    setSections((prev) => [...prev, newSection]);
-  };
-
-  // Delete section
-  const deleteSection = (sectionId) => {
-    if (sections.length > 1) {
-      setSections((prev) => prev.filter((section) => section.id !== sectionId));
-    }
-  };
-
-  // Move section
-  const moveSection = (index, direction) => {
-    const newSections = [...sections];
-    const newIndex = direction === "up" ? index - 1 : index + 1;
-    if (newIndex >= 0 && newIndex < sections.length) {
-      [newSections[index], newSections[newIndex]] = [
-        newSections[newIndex],
-        newSections[index],
-      ];
-      setSections(newSections);
-    }
-  };
+  // Handle signature change
+  const handleSignatureChange = useCallback((role, field, value) => {
+    setSignatures((prev) => ({
+      ...prev,
+      [role]: {
+        ...prev[role],
+        [field]: value,
+      },
+    }));
+  }, []);
 
   // Get visible columns from template
   const visibleColumns = template?.columns?.filter((col) => col.visible) || [];
 
   // Get status badge
-  const getStatusBadge = (status) => {
+  const getStatusBadge = useCallback((status) => {
     switch (status) {
       case "pass":
         return (
@@ -322,20 +473,31 @@ const AuditEntry = () => {
           </span>
         );
     }
-  };
+  }, []);
+
+  // Calculate total checkpoints in a section
+  const getSectionTotalCheckpoints = useCallback((section) => {
+    if (!section.stages) return 0;
+    return section.stages.reduce(
+      (total, stage) => total + (stage.checkPoints?.length || 0),
+      0,
+    );
+  }, []);
 
   // Calculate summary
-  const getSummary = () => {
+  const getSummary = useCallback(() => {
     let pass = 0,
       fail = 0,
       warning = 0,
       pending = 0;
     sections.forEach((section) => {
-      section.checkPoints?.forEach((cp) => {
-        if (cp.status === "pass") pass++;
-        else if (cp.status === "fail") fail++;
-        else if (cp.status === "warning") warning++;
-        else pending++;
+      section.stages?.forEach((stage) => {
+        stage.checkPoints?.forEach((cp) => {
+          if (cp.status === "pass") pass++;
+          else if (cp.status === "fail") fail++;
+          else if (cp.status === "warning") warning++;
+          else pending++;
+        });
       });
     });
     return {
@@ -345,52 +507,100 @@ const AuditEntry = () => {
       pending,
       total: pass + fail + warning + pending,
     };
-  };
+  }, [sections]);
 
   const summary = getSummary();
 
-  // Save audit
+  // ========== FIXED SAVE FUNCTION ==========
   const handleSave = async (asDraft = true) => {
+    // Validation
+    if (!serialNo.trim()) {
+      toast.error("Please enter a Serial Number");
+      return;
+    }
+
+    if (!infoData.modelName) {
+      toast.error("Please wait for model to be fetched or select a model");
+      return;
+    }
+
+    // Additional validation
+    if (!auditData.templateId) {
+      toast.error("Template is required");
+      return;
+    }
+
+    if (!auditData.reportName?.trim()) {
+      toast.error("Report name is required");
+      return;
+    }
+
     setSaving(true);
     try {
-      const auditPayload = {
-        ...auditData,
-        infoData,
-        sections,
-        status: asDraft ? "draft" : "submitted",
-        columns: template?.columns,
-        infoFields: template?.infoFields,
-        headerConfig: template?.headerConfig,
+      const currentSummary = getSummary();
+
+      // Prepare infoData with all required fields
+      const finalInfoData = {
+        ...infoData,
+        serialNo: serialNo.trim(),
+        serial: serialNo.trim(),
+        shift: infoData.shift || currentShift.value,
+        date: infoData.date || currentDate,
       };
 
+      // ✅ FIXED: Send camelCase keys to match backend expectations
+      const auditPayload = {
+        templateId: parseInt(auditData.templateId, 10), // Ensure integer
+        templateName: auditData.templateName,
+        reportName: auditData.reportName,
+        formatNo: auditData.formatNo || null,
+        revNo: auditData.revNo || null,
+        revDate: auditData.revDate || null,
+        notes: auditData.notes || null,
+        status: asDraft ? "draft" : "submitted",
+        infoData: finalInfoData,
+        sections: sections,
+        signatures: signatures, // ✅ Now handled by backend
+        columns: template?.columns || [],
+        infoFields: template?.infoFields || [],
+        headerConfig: template?.headerConfig || {},
+      };
+
+      console.log("Saving audit payload:", auditPayload);
+
+      let result;
       if (id) {
-        await updateAudit(id, auditPayload);
+        result = await updateAudit(id, auditPayload);
+        console.log("Update result:", result);
       } else {
-        await createAudit(auditPayload);
+        result = await createAudit(auditPayload);
+        console.log("Create result:", result);
       }
 
       toast.success(
         asDraft ? "Audit saved as draft!" : "Audit submitted successfully!",
       );
 
-      navigate("/auditreport/audits");
+      // Small delay before navigation to ensure state is updated
+      setTimeout(() => {
+        navigate("/auditreport/audits");
+      }, 500);
     } catch (error) {
-      toast.error("Error saving audit. Please try again.");
+      console.error("Save error:", error);
+      toast.error(error.message || "Error saving audit. Please try again.");
     } finally {
       setSaving(false);
     }
   };
 
-  // Print function
-  const handlePrint = () => {
-    window.print();
-  };
-
   // Get field icon
-  const getFieldIcon = (fieldId) => {
+  const getFieldIcon = useCallback((fieldId) => {
     switch (fieldId) {
       case "modelName":
         return <BiSolidFactory className="text-lg text-indigo-600" />;
+      case "serialNo":
+      case "serial":
+        return <FaBarcode className="text-lg text-purple-600" />;
       case "date":
         return <FaCalendarAlt className="text-lg text-red-500" />;
       case "shift":
@@ -400,74 +610,228 @@ const AuditEntry = () => {
       default:
         return <FaClipboardCheck className="text-lg text-gray-500" />;
     }
-  };
+  }, []);
 
-  // Render info field input
-  const renderInfoFieldInput = (field) => {
-    const value = infoData[field.id] || "";
+  // Render info field input (keeping your existing implementation)
+  const renderInfoFieldInput = useCallback(
+    (field) => {
+      const value = infoData[field.id] || "";
 
-    if (showPreview) {
-      return (
-        <span className="font-semibold text-gray-800">{value || "-"}</span>
-      );
-    }
+      if (showPreview) {
+        if (field.id === "date") {
+          return (
+            <span className="font-semibold text-gray-800">
+              {formatDateForDisplay(value) || "-"}
+            </span>
+          );
+        }
+        return (
+          <span className="font-semibold text-gray-800">{value || "-"}</span>
+        );
+      }
 
-    switch (field.type) {
-      case "date":
+      // Handle serial number field
+      if (field.id === "serialNo" || field.id === "serial") {
         return (
-          <input
-            type="date"
-            value={value}
-            onChange={(e) => handleInfoChange(field.id, e.target.value)}
-            className="w-full font-semibold text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={serialNo}
+              onChange={(e) => handleSerialChange(e.target.value)}
+              placeholder={`Enter ${field.name}`}
+              className="w-full font-semibold text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none pr-8"
+            />
+            {(isLoadingModels || isFetchingModels) && (
+              <div className="absolute right-0 top-1/2 -translate-y-1/2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              </div>
+            )}
+            {!isLoadingModels &&
+              !isFetchingModels &&
+              serialNo &&
+              infoData.modelName && (
+                <FaCheckCircle className="absolute right-0 top-1/2 -translate-y-1/2 text-green-500" />
+              )}
+          </div>
         );
-      case "select":
+      }
+
+      // Handle model name field
+      if (field.id === "modelName") {
         return (
-          <select
-            value={value}
-            onChange={(e) => handleInfoChange(field.id, e.target.value)}
-            className="w-full font-semibold text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
-          >
-            <option value="">Select {field.name}</option>
-            {field.options?.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            {modelVariants && modelVariants.length > 1 ? (
+              <>
+                <select
+                  value={infoData.modelCode || ""}
+                  onChange={(e) => handleModelSelect(e.target.value)}
+                  className="w-full font-semibold text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
+                >
+                  <option value="">Select Model</option>
+                  {modelVariants.map((model) => (
+                    <option key={model.value} value={model.value}>
+                      {model.label}
+                    </option>
+                  ))}
+                </select>
+                {infoData.modelCode && (
+                  <span className="text-xs text-red-600 mt-1 block font-medium">
+                    Code: {infoData.modelCode}
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={infoData.modelName || ""}
+                  readOnly
+                  placeholder={
+                    isLoadingModels || isFetchingModels
+                      ? "Loading..."
+                      : !serialNo
+                        ? "Enter serial first"
+                        : "No model found"
+                  }
+                  className={`w-full font-semibold bg-gray-100 border-b border-gray-300 outline-none rounded px-2 py-1 ${
+                    infoData.modelName ? "text-gray-800" : "text-gray-400"
+                  }`}
+                />
+                {isLoadingModels || isFetchingModels ? (
+                  <span className="text-xs text-red-600 mt-1 block font-medium">
+                    Fetching model data...
+                  </span>
+                ) : !serialNo ? (
+                  <span className="text-xs text-red-600 mt-1 block font-medium">
+                    ⚠ Please enter serial number to auto-fetch model
+                  </span>
+                ) : !infoData.modelName && debouncedSerial ? (
+                  <span className="text-xs text-red-600 mt-1 block font-medium">
+                    ✗ No model found for this serial number
+                  </span>
+                ) : infoData.modelName ? (
+                  <span className="text-xs text-red-600 mt-1 block font-medium">
+                    ✓ Model Code: {infoData.modelCode || "N/A"}
+                  </span>
+                ) : (
+                  <span className="text-xs text-red-600 mt-1 block font-medium">
+                    ⚠ Waiting for serial number input...
+                  </span>
+                )}
+              </>
+            )}
+          </div>
         );
-      case "number":
+      }
+
+      // Handle shift field
+      if (field.id === "shift") {
         return (
-          <input
-            type="number"
-            value={value}
-            onChange={(e) => handleInfoChange(field.id, e.target.value)}
-            placeholder={`Enter ${field.name}`}
-            className="w-full font-semibold text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={value || currentShift.value}
+              readOnly
+              className="w-full font-semibold text-gray-800 bg-orange-50 border-b border-orange-300 outline-none rounded px-2 py-1 cursor-not-allowed"
+            />
+            <span className="text-xs text-orange-600 mt-1 block">
+              <FaClock className="inline text-xs mr-1" />
+              Auto-detected: {currentShift.label}
+            </span>
+          </div>
         );
-      case "time":
+      }
+
+      // Handle date field
+      if (field.id === "date") {
         return (
-          <input
-            type="time"
-            value={value}
-            onChange={(e) => handleInfoChange(field.id, e.target.value)}
-            className="w-full font-semibold text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={formatDateForDisplay(value || currentDate)}
+              readOnly
+              className="w-full font-semibold text-gray-800 bg-red-50 border-b border-red-300 outline-none rounded px-2 py-1 cursor-not-allowed"
+            />
+            <span className="text-xs text-red-600 mt-1 block">
+              <FaCalendarAlt className="inline text-xs mr-1" />
+              Auto-detected: Today's Date
+            </span>
+          </div>
         );
-      default:
-        return (
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => handleInfoChange(field.id, e.target.value)}
-            placeholder={`Enter ${field.name}`}
-            className="w-full font-semibold text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
-          />
-        );
-    }
-  };
+      }
+
+      // Default field types
+      switch (field.type) {
+        case "date":
+          return (
+            <input
+              type="date"
+              value={value}
+              onChange={(e) => handleInfoChange(field.id, e.target.value)}
+              className="w-full font-semibold text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
+            />
+          );
+        case "select":
+          return (
+            <select
+              value={value}
+              onChange={(e) => handleInfoChange(field.id, e.target.value)}
+              className="w-full font-semibold text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
+            >
+              <option value="">Select {field.name}</option>
+              {field.options?.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          );
+        case "number":
+          return (
+            <input
+              type="number"
+              value={value}
+              onChange={(e) => handleInfoChange(field.id, e.target.value)}
+              placeholder={`Enter ${field.name}`}
+              className="w-full font-semibold text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
+            />
+          );
+        case "time":
+          return (
+            <input
+              type="time"
+              value={value}
+              onChange={(e) => handleInfoChange(field.id, e.target.value)}
+              className="w-full font-semibold text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
+            />
+          );
+        default:
+          return (
+            <input
+              type="text"
+              value={value}
+              onChange={(e) => handleInfoChange(field.id, e.target.value)}
+              placeholder={`Enter ${field.name}`}
+              className="w-full font-semibold text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
+            />
+          );
+      }
+    },
+    [
+      infoData,
+      showPreview,
+      serialNo,
+      isLoadingModels,
+      isFetchingModels,
+      modelVariants,
+      debouncedSerial,
+      currentShift,
+      currentDate,
+      handleSerialChange,
+      handleModelSelect,
+      handleInfoChange,
+    ],
+  );
 
   // Loading state
   if (initialLoading) {
@@ -501,120 +865,104 @@ const AuditEntry = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-6 px-4 print:bg-white print:p-0">
-      <div className="max-w-7xl mx-auto">
-        {/* Action Buttons */}
-        <div className="mb-4 flex flex-wrap justify-between items-center gap-3 print:hidden">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate("/auditreport/audits")}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-all"
-            >
-              <FaArrowLeft /> Back
-            </button>
-            <h1 className="text-xl font-bold text-gray-800">
-              {id ? "Edit Audit" : "New Audit Entry"}
-            </h1>
-            {auditData.status && (
-              <span
-                className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  auditData.status === "draft"
-                    ? "bg-gray-200 text-gray-700"
-                    : auditData.status === "submitted"
-                      ? "bg-blue-100 text-blue-700"
-                      : auditData.status === "approved"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-600"
+    <div className="min-h-screen bg-gray-100 py-6 px-4">
+      <div className="mx-auto">
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-40 bg-gray-100/90 backdrop-blur border-b border-gray-200 shadow-sm p-4">
+          <div className="mb-4 flex flex-wrap justify-between items-center gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate("/auditreport/audits")}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-all"
+              >
+                <FaArrowLeft /> Back
+              </button>
+              <h1 className="text-xl font-bold text-gray-800">
+                New Audit Entry
+              </h1>
+              {auditData.status && (
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    auditData.status === "draft"
+                      ? "bg-gray-200 text-gray-700"
+                      : auditData.status === "submitted"
+                        ? "bg-blue-100 text-blue-700"
+                        : auditData.status === "approved"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {auditData.status.charAt(0).toUpperCase() +
+                    auditData.status.slice(1)}
+                </span>
+              )}
+              {/* Current Date Indicator */}
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 flex items-center gap-1">
+                <FaCalendarAlt /> {formatDateForDisplay(currentDate)}
+              </span>
+              {/* Current Shift Indicator */}
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 flex items-center gap-1">
+                <FaClock /> {currentShift.label}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setShowPreview(!showPreview)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all text-sm ${
+                  showPreview
+                    ? "bg-orange-600 hover:bg-orange-700 text-white"
+                    : "bg-gray-600 hover:bg-gray-700 text-white"
                 }`}
               >
-                {auditData.status.charAt(0).toUpperCase() +
-                  auditData.status.slice(1)}
-              </span>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setShowPreview(!showPreview)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all text-sm ${
-                showPreview
-                  ? "bg-orange-600 hover:bg-orange-700 text-white"
-                  : "bg-gray-600 hover:bg-gray-700 text-white"
-              }`}
-            >
-              {showPreview ? <FaEdit /> : <FaEye />}
-              {showPreview ? "Edit Mode" : "Preview"}
-            </button>
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-all text-sm"
-            >
-              <FaPrint /> Print
-            </button>
-            <button
-              onClick={() => handleSave(true)}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all text-sm disabled:opacity-50"
-            >
-              {saving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <FaSave /> Save Draft
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => handleSave(false)}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all text-sm disabled:opacity-50"
-            >
-              <FaPaperPlane /> Submit
-            </button>
+                {showPreview ? <FaEdit /> : <FaEye />}
+                {showPreview ? "Edit Mode" : "Preview"}
+              </button>
+
+              <button
+                onClick={() => handleSave(true)}
+                disabled={saving || isLoadingModels}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all text-sm disabled:opacity-50"
+              >
+                {saving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <FaSave /> Save Draft
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => handleSave(false)}
+                disabled={saving || isLoadingModels}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all text-sm disabled:opacity-50"
+              >
+                <FaPaperPlane /> Submit
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 print:hidden">
-            {error}
-          </div>
-        )}
-
         {/* Main Report Container */}
-        <div className="bg-white shadow-xl rounded-lg overflow-hidden border-2 border-gray-300 print:shadow-none print:border print:rounded-none">
+        <div className="bg-white shadow-xl rounded-lg overflow-hidden border-2 border-gray-300 mt-4">
           {/* Header Section */}
           <div className="grid grid-cols-1 md:grid-cols-3 border-b-2 border-gray-300">
-            {/* Left - Report Name */}
-            <div className="md:col-span-2 bg-gradient-to-r from-blue-600 to-blue-800 p-6 print:bg-blue-700">
+            <div className="md:col-span-2 bg-gradient-to-r from-blue-600 to-blue-800 p-6">
               <div className="text-center">
                 <div className="flex items-center justify-center gap-3 mb-2">
                   <HiClipboardDocumentCheck className="text-4xl text-white" />
                 </div>
-                {showPreview ? (
-                  <h1 className="text-2xl md:text-3xl font-bold text-white">
-                    {auditData.reportName || "Audit Report"}
-                  </h1>
-                ) : (
-                  <input
-                    type="text"
-                    placeholder="Enter Report Name"
-                    value={auditData.reportName}
-                    onChange={(e) =>
-                      handleAuditDataChange("reportName", e.target.value)
-                    }
-                    className="w-full text-2xl md:text-3xl font-bold text-white bg-transparent border-b-2 border-white/50 focus:border-white outline-none text-center placeholder-white/70"
-                  />
-                )}
+                <h1 className="text-2xl md:text-3xl font-bold text-white">
+                  {auditData.reportName || "Audit Report"}
+                </h1>
                 <p className="text-blue-200 text-sm mt-2">
                   Template: {auditData.templateName}
                 </p>
               </div>
             </div>
 
-            {/* Right - Format Info */}
             <div className="bg-gray-50 divide-y divide-gray-300">
               {template?.headerConfig?.showFormatNo !== false && (
                 <div className="p-3 flex items-center gap-3">
@@ -623,21 +971,9 @@ const AuditEntry = () => {
                     <span className="text-xs text-gray-500 block">
                       Format No
                     </span>
-                    {showPreview ? (
-                      <span className="font-semibold text-gray-800">
-                        {auditData.formatNo || "-"}
-                      </span>
-                    ) : (
-                      <input
-                        type="text"
-                        placeholder="XXX"
-                        value={auditData.formatNo}
-                        onChange={(e) =>
-                          handleAuditDataChange("formatNo", e.target.value)
-                        }
-                        className="w-full font-semibold text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
-                      />
-                    )}
+                    <span className="font-semibold text-gray-800">
+                      {auditData.formatNo || "-"}
+                    </span>
                   </div>
                 </div>
               )}
@@ -646,21 +982,9 @@ const AuditEntry = () => {
                   <MdUpdate className="text-xl text-green-600 flex-shrink-0" />
                   <div className="flex-1">
                     <span className="text-xs text-gray-500 block">Rev. No</span>
-                    {showPreview ? (
-                      <span className="font-semibold text-gray-800">
-                        {auditData.revNo || "-"}
-                      </span>
-                    ) : (
-                      <input
-                        type="text"
-                        placeholder="XX"
-                        value={auditData.revNo}
-                        onChange={(e) =>
-                          handleAuditDataChange("revNo", e.target.value)
-                        }
-                        className="w-full font-semibold text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
-                      />
-                    )}
+                    <span className="font-semibold text-gray-800">
+                      {auditData.revNo || "-"}
+                    </span>
                   </div>
                 </div>
               )}
@@ -671,36 +995,24 @@ const AuditEntry = () => {
                     <span className="text-xs text-gray-500 block">
                       Rev. Date
                     </span>
-                    {showPreview ? (
-                      <span className="font-semibold text-gray-800">
-                        {auditData.revDate || "-"}
-                      </span>
-                    ) : (
-                      <input
-                        type="date"
-                        value={auditData.revDate}
-                        onChange={(e) =>
-                          handleAuditDataChange("revDate", e.target.value)
-                        }
-                        className="w-full font-semibold text-gray-800 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
-                      />
-                    )}
+                    <span className="font-semibold text-gray-800">
+                      {formatDateForDisplay(auditData?.revDate) || "-"}
+                    </span>
                   </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Info Section - Dynamic Fields */}
+          {/* Info Section - Dynamic Fields from Template */}
           <div className="grid grid-cols-2 md:grid-cols-4 border-b-2 border-gray-300 bg-gray-50">
             {template?.infoFields
               ?.filter((field) => field.visible)
-              .map((field, index) => (
+              .map((field, index, arr) => (
                 <div
                   key={field.id}
                   className={`p-4 ${
-                    index <
-                    template.infoFields.filter((f) => f.visible).length - 1
+                    index < arr.length - 1
                       ? "border-r border-b md:border-b-0"
                       : ""
                   } border-gray-300`}
@@ -733,7 +1045,7 @@ const AuditEntry = () => {
               <textarea
                 placeholder="Enter notes here..."
                 value={auditData.notes}
-                onChange={(e) => handleAuditDataChange("notes", e.target.value)}
+                onChange={(e) => handleNotesChange(e.target.value)}
                 rows={3}
                 className="w-full text-gray-700 bg-transparent border border-gray-300 rounded-lg p-2 focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 outline-none resize-none"
               />
@@ -744,287 +1056,192 @@ const AuditEntry = () => {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-gradient-to-r from-gray-700 to-gray-800 text-white print:bg-gray-700">
+                <tr className="bg-gradient-to-r from-gray-700 to-gray-800 text-white">
                   {visibleColumns.map((column) => (
                     <th
                       key={column.id}
-                      className={`px-3 py-3 text-left font-semibold border-r border-gray-600 text-sm ${column.width}`}
+                      className={`px-3 py-3 text-left font-semibold border-r border-gray-600 text-sm ${column.width} ${
+                        column.entryField ? "bg-blue-900" : ""
+                      }`}
                     >
-                      {column.name}
+                      <div className="flex items-center gap-1">
+                        {column.name}
+                        {column.entryField && (
+                          <span className="text-xs text-blue-300 ml-1">
+                            (Entry)
+                          </span>
+                        )}
+                      </div>
                     </th>
                   ))}
-                  {!showPreview && (
-                    <th className="px-3 py-3 text-center font-semibold text-sm w-24 print:hidden">
-                      Actions
-                    </th>
-                  )}
                 </tr>
               </thead>
               <tbody>
-                {sections.map((section, sectionIndex) =>
-                  section.checkPoints.map((checkpoint, checkpointIndex) => (
-                    <tr
-                      key={`${section.id}-${checkpoint.id}`}
-                      className={`border-b border-gray-200 hover:bg-blue-50 transition-colors ${
-                        checkpoint.status === "pass"
-                          ? "bg-green-50"
-                          : checkpoint.status === "fail"
-                            ? "bg-red-50"
-                            : checkpoint.status === "warning"
-                              ? "bg-yellow-50"
-                              : ""
-                      }`}
-                    >
-                      {visibleColumns.map((column) => {
-                        // Section column with rowSpan
-                        if (column.id === "section") {
-                          if (checkpointIndex === 0) {
-                            return (
-                              <td
-                                key={column.id}
-                                className="px-3 py-2 font-bold bg-gray-100 border-r border-gray-300 align-top"
-                                rowSpan={section.checkPoints.length}
-                              >
-                                <div className="flex flex-col gap-2">
-                                  {showPreview ? (
-                                    <span className="text-gray-700 text-sm">
-                                      {section.sectionName || "-"}
-                                    </span>
-                                  ) : (
-                                    <>
-                                      <input
-                                        type="text"
-                                        placeholder="Section Name"
-                                        value={section.sectionName}
+                {sections.map((section) => {
+                  const sectionTotalRows = getSectionTotalCheckpoints(section);
+                  let sectionRowRendered = false;
+
+                  return section.stages?.map((stage) => {
+                    let stageRowRendered = false;
+
+                    return stage.checkPoints?.map(
+                      (checkpoint, checkpointIndex) => {
+                        const showSectionCell =
+                          !sectionRowRendered && checkpointIndex === 0;
+                        const showStageCell =
+                          !stageRowRendered && checkpointIndex === 0;
+
+                        if (showSectionCell && checkpointIndex === 0) {
+                          sectionRowRendered = true;
+                        }
+                        if (showStageCell) stageRowRendered = true;
+
+                        return (
+                          <tr
+                            key={`${section.id}-${stage.id}-${checkpoint.id}`}
+                            className={`border-b border-gray-200 hover:bg-blue-50 transition-colors ${
+                              checkpoint.status === "pass"
+                                ? "bg-green-50"
+                                : checkpoint.status === "fail"
+                                  ? "bg-red-50"
+                                  : checkpoint.status === "warning"
+                                    ? "bg-yellow-50"
+                                    : ""
+                            }`}
+                          >
+                            {visibleColumns.map((column) => {
+                              if (column.id === "section") {
+                                if (
+                                  showSectionCell &&
+                                  section.stages.indexOf(stage) === 0
+                                ) {
+                                  return (
+                                    <td
+                                      key={column.id}
+                                      className="px-3 py-2 font-bold bg-gray-100 border-r border-gray-300 text-center align-middle"
+                                      rowSpan={sectionTotalRows}
+                                    >
+                                      <span className="text-red-700 text-sm font-semibold">
+                                        {section.sectionName || "-"}
+                                      </span>
+                                    </td>
+                                  );
+                                }
+                                return null;
+                              }
+
+                              if (column.id === "stage") {
+                                if (showStageCell) {
+                                  return (
+                                    <td
+                                      key={column.id}
+                                      className="px-3 py-2 font-bold bg-indigo-50 border-r border-gray-300 text-center align-middle"
+                                      rowSpan={stage.checkPoints.length}
+                                    >
+                                      <span className="text-indigo-700 text-sm font-semibold">
+                                        {stage.stageName || "-"}
+                                      </span>
+                                    </td>
+                                  );
+                                }
+                                return null;
+                              }
+
+                              if (column.id === "status") {
+                                return (
+                                  <td
+                                    key={column.id}
+                                    className="px-3 py-2 border-r border-gray-200 bg-blue-50"
+                                  >
+                                    {showPreview ? (
+                                      getStatusBadge(checkpoint.status)
+                                    ) : (
+                                      <select
+                                        value={checkpoint.status || "pending"}
                                         onChange={(e) =>
-                                          handleSectionNameChange(
+                                          handleEntryFieldChange(
                                             section.id,
+                                            stage.id,
+                                            checkpoint.id,
+                                            "status",
                                             e.target.value,
                                           )
                                         }
-                                        className="w-full text-sm font-bold text-gray-700 bg-white border border-gray-300 rounded px-2 py-1 focus:border-blue-500 outline-none"
+                                        className={`w-full text-xs px-2 py-1 rounded border focus:outline-none focus:ring-2 ${
+                                          checkpoint.status === "pass"
+                                            ? "bg-green-100 border-green-300 text-green-700 focus:ring-green-500"
+                                            : checkpoint.status === "fail"
+                                              ? "bg-red-100 border-red-300 text-red-700 focus:ring-red-500"
+                                              : checkpoint.status === "warning"
+                                                ? "bg-yellow-100 border-yellow-300 text-yellow-700 focus:ring-yellow-500"
+                                                : "bg-gray-100 border-gray-300 text-gray-700 focus:ring-gray-500"
+                                        }`}
+                                      >
+                                        <option value="pending">Pending</option>
+                                        <option value="pass">Pass</option>
+                                        <option value="fail">Fail</option>
+                                        <option value="warning">Warning</option>
+                                      </select>
+                                    )}
+                                  </td>
+                                );
+                              }
+
+                              if (column.entryField) {
+                                return (
+                                  <td
+                                    key={column.id}
+                                    className="px-3 py-2 border-r border-gray-200 bg-blue-50"
+                                  >
+                                    {showPreview ? (
+                                      <span className="text-gray-700 text-sm">
+                                        {checkpoint[column.id] || "-"}
+                                      </span>
+                                    ) : (
+                                      <input
+                                        type={
+                                          column.type === "number"
+                                            ? "number"
+                                            : "text"
+                                        }
+                                        placeholder={`Enter ${column.name}`}
+                                        value={checkpoint[column.id] || ""}
+                                        onChange={(e) =>
+                                          handleEntryFieldChange(
+                                            section.id,
+                                            stage.id,
+                                            checkpoint.id,
+                                            column.id,
+                                            e.target.value,
+                                          )
+                                        }
+                                        className="w-full text-sm text-gray-700 bg-white border border-blue-300 rounded px-2 py-1 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                                       />
-                                      <div className="flex flex-wrap gap-1 print:hidden">
-                                        <button
-                                          onClick={() =>
-                                            addCheckpoint(section.id)
-                                          }
-                                          className="p-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs"
-                                          title="Add Row"
-                                        >
-                                          <FaPlus size={10} />
-                                        </button>
-                                        <button
-                                          onClick={() =>
-                                            moveSection(sectionIndex, "up")
-                                          }
-                                          disabled={sectionIndex === 0}
-                                          className="p-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs disabled:opacity-50"
-                                          title="Move Up"
-                                        >
-                                          <FaArrowUp size={10} />
-                                        </button>
-                                        <button
-                                          onClick={() =>
-                                            moveSection(sectionIndex, "down")
-                                          }
-                                          disabled={
-                                            sectionIndex === sections.length - 1
-                                          }
-                                          className="p-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs disabled:opacity-50"
-                                          title="Move Down"
-                                        >
-                                          <FaArrowDown size={10} />
-                                        </button>
-                                        <button
-                                          onClick={() =>
-                                            deleteSection(section.id)
-                                          }
-                                          disabled={sections.length <= 1}
-                                          className="p-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs disabled:opacity-50"
-                                          title="Delete Section"
-                                        >
-                                          <FaTrash size={10} />
-                                        </button>
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                            );
-                          }
-                          return null;
-                        }
+                                    )}
+                                  </td>
+                                );
+                              }
 
-                        // Status column
-                        if (column.id === "status") {
-                          return (
-                            <td
-                              key={column.id}
-                              className="px-3 py-2 border-r border-gray-200"
-                            >
-                              {showPreview ? (
-                                getStatusBadge(checkpoint.status)
-                              ) : (
-                                <select
-                                  value={checkpoint.status || "pending"}
-                                  onChange={(e) =>
-                                    handleCheckpointChange(
-                                      section.id,
-                                      checkpoint.id,
-                                      "status",
-                                      e.target.value,
-                                    )
-                                  }
-                                  className={`w-full text-xs px-2 py-1 rounded border focus:outline-none focus:ring-1 ${
-                                    checkpoint.status === "pass"
-                                      ? "bg-green-100 border-green-300 text-green-700 focus:ring-green-500"
-                                      : checkpoint.status === "fail"
-                                        ? "bg-red-100 border-red-300 text-red-700 focus:ring-red-500"
-                                        : checkpoint.status === "warning"
-                                          ? "bg-yellow-100 border-yellow-300 text-yellow-700 focus:ring-yellow-500"
-                                          : "bg-gray-100 border-gray-300 text-gray-700 focus:ring-gray-500"
-                                  }`}
+                              return (
+                                <td
+                                  key={column.id}
+                                  className="px-3 py-2 border-r border-gray-200"
                                 >
-                                  <option value="pending">Pending</option>
-                                  <option value="pass">Pass</option>
-                                  <option value="fail">Fail</option>
-                                  <option value="warning">Warning</option>
-                                </select>
-                              )}
-                            </td>
-                          );
-                        }
-
-                        // Entry fields (observation, remark, etc.)
-                        if (column.entryField) {
-                          return (
-                            <td
-                              key={column.id}
-                              className="px-3 py-2 border-r border-gray-200"
-                            >
-                              {showPreview ? (
-                                <span className="text-gray-700 text-sm">
-                                  {checkpoint[column.id] || "-"}
-                                </span>
-                              ) : (
-                                <input
-                                  type={
-                                    column.type === "number" ? "number" : "text"
-                                  }
-                                  placeholder={column.name}
-                                  value={checkpoint[column.id] || ""}
-                                  onChange={(e) =>
-                                    handleCheckpointChange(
-                                      section.id,
-                                      checkpoint.id,
-                                      column.id,
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="w-full text-sm text-gray-700 bg-white border border-gray-300 rounded px-2 py-1 focus:border-blue-500 outline-none"
-                                />
-                              )}
-                            </td>
-                          );
-                        }
-
-                        // Template fields (readonly from template)
-                        return (
-                          <td
-                            key={column.id}
-                            className="px-3 py-2 border-r border-gray-200"
-                          >
-                            {showPreview ? (
-                              <span className="text-gray-700 text-sm">
-                                {checkpoint[column.id] || "-"}
-                              </span>
-                            ) : (
-                              <input
-                                type="text"
-                                placeholder={column.name}
-                                value={checkpoint[column.id] || ""}
-                                onChange={(e) =>
-                                  handleCheckpointChange(
-                                    section.id,
-                                    checkpoint.id,
-                                    column.id,
-                                    e.target.value,
-                                  )
-                                }
-                                className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded px-2 py-1 focus:border-blue-500 outline-none"
-                              />
-                            )}
-                          </td>
+                                  <span className="text-gray-700 text-sm">
+                                    {checkpoint[column.id] || "-"}
+                                  </span>
+                                </td>
+                              );
+                            })}
+                          </tr>
                         );
-                      })}
-
-                      {/* Actions column */}
-                      {!showPreview && (
-                        <td className="px-3 py-2 text-center print:hidden">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() =>
-                                moveCheckpoint(
-                                  section.id,
-                                  checkpointIndex,
-                                  "up",
-                                )
-                              }
-                              disabled={checkpointIndex === 0}
-                              className="p-1 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded text-xs disabled:opacity-50"
-                              title="Move Up"
-                            >
-                              <FaArrowUp size={10} />
-                            </button>
-                            <button
-                              onClick={() =>
-                                moveCheckpoint(
-                                  section.id,
-                                  checkpointIndex,
-                                  "down",
-                                )
-                              }
-                              disabled={
-                                checkpointIndex ===
-                                section.checkPoints.length - 1
-                              }
-                              className="p-1 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded text-xs disabled:opacity-50"
-                              title="Move Down"
-                            >
-                              <FaArrowDown size={10} />
-                            </button>
-                            <button
-                              onClick={() =>
-                                deleteCheckpoint(section.id, checkpoint.id)
-                              }
-                              disabled={section.checkPoints.length <= 1}
-                              className="p-1 bg-red-100 hover:bg-red-200 text-red-600 rounded text-xs disabled:opacity-50"
-                              title="Delete Row"
-                            >
-                              <FaTrash size={10} />
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  )),
-                )}
+                      },
+                    );
+                  });
+                })}
               </tbody>
             </table>
           </div>
-
-          {/* Add Section Button */}
-          {!showPreview && (
-            <div className="p-4 bg-gray-50 border-t border-gray-300 print:hidden">
-              <button
-                onClick={addSection}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all text-sm"
-              >
-                <MdAddCircle /> Add New Section
-              </button>
-            </div>
-          )}
 
           {/* Summary Section */}
           <div className="p-4 bg-gray-100 border-t-2 border-gray-300">
@@ -1070,38 +1287,128 @@ const AuditEntry = () => {
           </div>
 
           {/* Signature Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 border-t-2 border-gray-300">
-            <div className="p-6 border-r border-b md:border-b-0 border-gray-300 text-center">
-              <span className="text-sm font-medium text-gray-600 block mb-8">
-                Auditor Signature
-              </span>
-              <div className="border-b-2 border-gray-400 w-3/4 mx-auto mb-2"></div>
-              <span className="text-xs text-gray-500">Name & Date</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 border-t-2 border-gray-300">
+            {/* Auditor Signature */}
+            <div className="p-6 border-r border-b md:border-b-0 border-gray-300">
+              <div className="flex items-center gap-2 mb-4 justify-center">
+                <FaUserCheck className="text-xl text-blue-600" />
+                <span className="text-sm font-semibold text-gray-700">
+                  Auditor Signature
+                </span>
+              </div>
+              {showPreview ? (
+                <div className="text-center">
+                  <div className="border-b-2 border-gray-400 w-3/4 mx-auto mb-2 pb-4">
+                    <span className="text-gray-800 font-medium">
+                      {signatures.auditor?.name || ""}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {formatDateForDisplay(signatures.auditor?.date) || "Date"}
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter name"
+                      value={signatures.auditor?.name || ""}
+                      onChange={(e) =>
+                        handleSignatureChange("auditor", "name", e.target.value)
+                      }
+                      className="w-full text-sm text-gray-700 bg-white border border-gray-300 rounded px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      value={signatures.auditor?.date || ""}
+                      onChange={(e) =>
+                        handleSignatureChange("auditor", "date", e.target.value)
+                      }
+                      className="w-full text-sm text-gray-700 bg-white border border-gray-300 rounded px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="p-6 border-r border-b md:border-b-0 border-gray-300 text-center">
-              <span className="text-sm font-medium text-gray-600 block mb-8">
-                Reviewed By
-              </span>
-              <div className="border-b-2 border-gray-400 w-3/4 mx-auto mb-2"></div>
-              <span className="text-xs text-gray-500">Name & Date</span>
-            </div>
-            <div className="p-6 text-center">
-              <span className="text-sm font-medium text-gray-600 block mb-8">
-                Approved By
-              </span>
-              <div className="border-b-2 border-gray-400 w-3/4 mx-auto mb-2"></div>
-              <span className="text-xs text-gray-500">Name & Date</span>
+
+            {/* Approved By */}
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-4 justify-center">
+                <FaUserShield className="text-xl text-purple-600" />
+                <span className="text-sm font-semibold text-gray-700">
+                  Approved By
+                </span>
+              </div>
+              {showPreview ? (
+                <div className="text-center">
+                  <div className="border-b-2 border-gray-400 w-3/4 mx-auto mb-2 pb-4">
+                    <span className="text-gray-800 font-medium">
+                      {signatures.approver?.name || ""}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {formatDateForDisplay(signatures.approver?.date) || "Date"}
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter name"
+                      value={signatures.approver?.name || ""}
+                      onChange={(e) =>
+                        handleSignatureChange(
+                          "approver",
+                          "name",
+                          e.target.value,
+                        )
+                      }
+                      className="w-full text-sm text-gray-700 bg-white border border-gray-300 rounded px-3 py-2 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      value={signatures.approver?.date || ""}
+                      onChange={(e) =>
+                        handleSignatureChange(
+                          "approver",
+                          "date",
+                          e.target.value,
+                        )
+                      }
+                      className="w-full text-sm text-gray-700 bg-white border border-gray-300 rounded px-3 py-2 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="mt-4 text-center text-gray-500 text-sm print:hidden">
+        <div className="mt-4 text-center text-gray-500 text-sm">
           <p>
             This document is confidential and intended for internal use only.
           </p>
           <p>
-            Generated on {new Date().toLocaleDateString()} |{" "}
+            Generated on {formatDateForDisplay(currentDate)} |{" "}
             {new Date().toLocaleTimeString()}
           </p>
         </div>

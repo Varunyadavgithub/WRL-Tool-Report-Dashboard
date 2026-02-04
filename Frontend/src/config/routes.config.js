@@ -530,6 +530,7 @@ export const ROUTE_CONFIG = [
         path: "/auditreport/audits/new",
         component: AuditEntry,
       },
+
       {
         path: "/auditreport/audits/:id",
         component: AuditEntry,

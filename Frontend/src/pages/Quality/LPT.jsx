@@ -11,6 +11,7 @@ import toast from "react-hot-toast";
 import axios from "axios";
 import { getFormattedISTDate } from "../../utils/dateUtils.js";
 import { baseURL } from "../../assets/assets.js";
+import { getCurrentShift } from "../../utils/shiftUtils.js";
 
 const LPT = () => {
   const [loading, setLoading] = useState(false);
@@ -111,23 +112,6 @@ const LPT = () => {
     } catch (error) {
       console.error("Failed to fetch Lpt Defect Category data:", error);
       toast.error("Failed to fetch Lpt Defect Category data.");
-    }
-  };
-
-  const getCurrentShift = () => {
-    const now = new Date();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-
-    // Convert current time to minutes since midnight
-    const totalMinutes = hours * 60 + minutes;
-
-    // Shift 1: 08:00 (480 minutes) to 20:00 (1200 minutes)
-    // Shift 2: 20:01 to 07:59 (the rest of the day)
-    if (totalMinutes >= 480 && totalMinutes < 1200) {
-      return { label: "Shift 1", value: "shift 1" };
-    } else {
-      return { label: "Shift 2", value: "shift 2" };
     }
   };
 

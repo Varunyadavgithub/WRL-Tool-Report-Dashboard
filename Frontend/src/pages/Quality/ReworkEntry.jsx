@@ -6,6 +6,7 @@ import Button from "../../components/ui/Button";
 import InputField from "../../components/ui/InputField";
 import Title from "../../components/ui/Title";
 import { baseURL } from "../../assets/assets.js";
+import { getCurrentShift } from "../../utils/shiftUtils.js";
 
 const ReworkEntry = () => {
   const { user } = useSelector((store) => store.auth);
@@ -62,7 +63,7 @@ const ReworkEntry = () => {
 
       const { data } = await axios.get(
         `${baseURL}quality/rework-entry/details`,
-        { params: { AssemblySerial: serialNumber } }
+        { params: { AssemblySerial: serialNumber } },
       );
 
       if (!data.modelName || !data.category) {
@@ -81,13 +82,6 @@ const ReworkEntry = () => {
     } finally {
       setLoadingQuery(false);
     }
-  };
-
-  // ===== Shift Calculation =====
-  const getCurrentShift = () => {
-    const now = new Date();
-    const mins = now.getHours() * 60 + now.getMinutes();
-    return mins >= 480 && mins < 1200 ? "Shift 1" : "Shift 2";
   };
 
   // ===== Handle Rework IN =====
@@ -154,7 +148,7 @@ const ReworkEntry = () => {
 
       const { data } = await axios.post(
         `${baseURL}quality/rework-out`,
-        payload
+        payload,
       );
 
       toast.success(data.message);

@@ -18,6 +18,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+import { getCurrentShift } from "../../utils/shiftUtils.js";
 
 ChartJS.register(
   CategoryScale,
@@ -53,23 +54,6 @@ const FPA = () => {
     DefectCategory[0],
   );
   const [defectImage, setDefectImage] = useState(null);
-
-  const getCurrentShift = () => {
-    const now = new Date();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-
-    // Convert current time to minutes since midnight
-    const totalMinutes = hours * 60 + minutes;
-
-    // Shift 1: 08:00 (480 minutes) to 20:00 (1200 minutes)
-    // Shift 2: 20:01 to 07:59 (the rest of the day)
-    if (totalMinutes >= 480 && totalMinutes < 1200) {
-      return { label: "Shift 1", value: "shift 1" };
-    } else {
-      return { label: "Shift 2", value: "shift 2" };
-    }
-  };
 
   const getFPACountData = async () => {
     try {

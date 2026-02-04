@@ -1,0 +1,163 @@
+{
+  "templateCode": "TMPL0001",
+  "templateName": "Traceability",
+  "version": "1.0",
+  "headerConfig": {
+    "showFormatNo": true,
+    "showRevNo": true,
+    "showRevDate": true,
+    "defaultFormatNo": "001",
+    "defaultRevNo": "001"
+  },
+  "infoFields": [
+    {
+      "id": "modelName",
+      "name": "Model Name",
+      "type": "text",
+      "required": true,
+      "visible": true
+    },
+    {
+      "id": "date",
+      "name": "Date",
+      "type": "date",
+      "required": true,
+      "visible": true
+    },
+    {
+      "id": "shift",
+      "name": "Shift",
+      "type": "select",
+      "required": true,
+      "visible": true,
+      "options": [
+        "Day Shift",
+        "Night Shift"
+      ]
+    },
+    {
+      "id": "serial",
+      "name": "Serial No.",
+      "type": "text",
+      "required": true,
+      "visible": true
+    }
+  ],
+  "columns": [
+    {
+      "id": "section",
+      "name": "Section",
+      "visible": true,
+      "required": true,
+      "width": "w-32",
+      "type": "text",
+      "isGroupColumn": true
+    },
+    {
+      "id": "stage",
+      "name": "Stage",
+      "visible": true,
+      "required": true,
+      "width": "w-32",
+      "type": "text",
+      "isGroupColumn": true
+    },
+    {
+      "id": "checkPoint",
+      "name": "Check Points",
+      "visible": true,
+      "required": false,
+      "width": "w-40",
+      "type": "text"
+    },
+    {
+      "id": "method",
+      "name": "Method of Inspection",
+      "visible": true,
+      "required": false,
+      "width": "w-40",
+      "type": "text"
+    },
+    {
+      "id": "specification",
+      "name": "Specifications",
+      "visible": true,
+      "required": false,
+      "width": "w-48",
+      "type": "text"
+    },
+    {
+      "id": "observation",
+      "name": "Observations",
+      "visible": true,
+      "required": false,
+      "width": "w-40",
+      "type": "text",
+      "entryField": true
+    },
+    {
+      "id": "remark",
+      "name": "Remark",
+      "visible": true,
+      "required": false,
+      "width": "w-40",
+      "type": "text",
+      "entryField": true
+    },
+    {
+      "id": "status",
+      "name": "Status",
+      "visible": true,
+      "required": false,
+      "width": "w-28",
+      "type": "status",
+      "entryField": true
+    }
+  ],
+  "defaultSections": [
+    {
+      "id": 1770114594685,
+      "sectionName": "Trial",
+      "stages": [
+        {
+          "id": 1770114594686,
+          "stageName": "trial",
+          "checkPoints": [
+            {
+              "id": 1770114594687,
+              "checkPoint": "trial",
+              "method": "trial",
+              "specification": "trial"
+            },
+            {
+              "id": 1770114691760,
+              "checkPoint": "trial",
+              "method": "trial",
+              "specification": "trial"
+            },
+            {
+              "id": 1770114695920,
+              "checkPoint": "trial",
+              "method": "trial",
+              "specification": "trial"
+            }
+          ]
+        },
+        {
+          "id": 1770114700351,
+          "stageName": "trial",
+          "checkPoints": [
+            {
+              "id": 1770114700352,
+              "checkPoint": "trial",
+              "method": "trial",
+              "specification": "trial"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "savedAt": "2026-02-03T10:31:46.569Z",
+  "updatedAt": "2026-02-03T10:31:46.569Z"
+}

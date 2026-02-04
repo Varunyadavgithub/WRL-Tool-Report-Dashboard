@@ -18,6 +18,16 @@ export const commonApi = createApi({
       providesTags: ["Common"],
     }),
 
+    getModelVariantsByAssembly: builder.query({
+      query: (serial) => `shared/model-variants/${serial}`,
+      transformResponse: (response) =>
+        response.data.map((item) => ({
+          label: item.Name,
+          value: item.Name.toString(),
+        })),
+      providesTags: ["Common"],
+    }),
+
     getStages: builder.query({
       query: () => "shared/stage-names",
       transformResponse: (response) =>
@@ -54,6 +64,7 @@ export const commonApi = createApi({
 
 export const {
   useGetModelVariantsQuery,
+  useGetModelVariantsByAssemblyQuery,
   useGetStagesQuery,
   useGetComponentTypesQuery,
   useGetEmployeesWithDepartmentsQuery,

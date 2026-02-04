@@ -28,6 +28,51 @@ export const getModelVariants = tryCatch(async (_, res) => {
   }
 });
 
+export const getModelVariantsByAssembly = tryCatch(async (req, res) => {
+  const { serial } = req.params; // or req.query.serial if you prefer
+
+  if (!serial) {
+    throw new AppError("Assembly serial is required", 400);
+  }
+
+  const query = `
+    SELECT DISTINCT
+      m.Name
+    FROM 
+      MaterialBarcode AS mb
+    INNER JOIN 
+      Material AS m ON m.MatCode = mb.Material
+    WHERE 
+      mb.Serial = @serial
+  `;
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
+    const result = await pool
+      .request()
+      .input("serial", sql.VarChar, serial)
+      .query(query);
+
+    if (result.recordset.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No model variants found for this assembly",
+        data: [],
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message:
+        "According to the Assembly Barcode model variants fetched successfully",
+      data: result.recordset,
+    });
+  } finally {
+    await pool.close();
+  }
+});
+
 // Fetches a list of component types from the **MaterialCategory** table.
 export const getCompType = tryCatch(async (_, res) => {
   const query = `

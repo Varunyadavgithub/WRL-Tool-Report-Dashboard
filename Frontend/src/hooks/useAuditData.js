@@ -5,58 +5,86 @@ import { baseURL } from "../assets/assets.js";
 const API_BASE = `${baseURL}audit-report`;
 
 // ==================== DATA TRANSFORMERS ====================
-// Backend returns PascalCase, Frontend uses camelCase
+
+// Safe value getter
+const getValue = (obj, key, defaultVal = null) => {
+  if (!obj) return defaultVal;
+  // Try both cases
+  return (
+    obj[key] ?? obj[key.charAt(0).toUpperCase() + key.slice(1)] ?? defaultVal
+  );
+};
 
 const transformTemplate = (template) => {
   if (!template) return null;
   return {
-    id: template.Id,
-    templateCode: template.TemplateCode,
-    name: template.Name,
-    description: template.Description,
-    category: template.Category,
-    version: template.Version,
-    isActive: template.IsActive,
-    headerConfig: template.HeaderConfig,
-    infoFields: template.InfoFields,
-    columns: template.Columns,
-    defaultSections: template.DefaultSections,
-    createdBy: template.CreatedBy,
-    createdAt: template.CreatedAt,
-    updatedBy: template.UpdatedBy,
-    updatedAt: template.UpdatedAt,
+    id: template.Id ?? template.id,
+    templateCode: template.TemplateCode ?? template.templateCode,
+    name: template.Name ?? template.name,
+    description: template.Description ?? template.description,
+    category: template.Category ?? template.category,
+    version: template.Version ?? template.version,
+    isActive: template.IsActive ?? template.isActive,
+    headerConfig: template.HeaderConfig ?? template.headerConfig ?? {},
+    infoFields: template.InfoFields ?? template.infoFields ?? [],
+    columns: template.Columns ?? template.columns ?? [],
+    defaultSections: template.DefaultSections ?? template.defaultSections ?? [],
+    createdBy: template.CreatedBy ?? template.createdBy,
+    createdAt: template.CreatedAt ?? template.createdAt,
+    updatedBy: template.UpdatedBy ?? template.updatedBy,
+    updatedAt: template.UpdatedAt ?? template.updatedAt,
   };
 };
 
 const transformAudit = (audit) => {
   if (!audit) return null;
-  return {
-    id: audit.Id,
-    auditCode: audit.AuditCode,
-    templateId: audit.TemplateId,
-    templateName: audit.TemplateName,
-    reportName: audit.ReportName,
-    formatNo: audit.FormatNo,
-    revNo: audit.RevNo,
-    revDate: audit.RevDate,
-    notes: audit.Notes,
-    status: audit.Status,
-    infoData: audit.InfoData,
-    sections: audit.Sections,
-    columns: audit.Columns,
-    infoFields: audit.InfoFields,
-    headerConfig: audit.HeaderConfig,
-    summary: audit.Summary,
-    createdBy: audit.CreatedBy,
-    createdAt: audit.CreatedAt,
-    updatedBy: audit.UpdatedBy,
-    updatedAt: audit.UpdatedAt,
-    submittedBy: audit.SubmittedBy,
-    submittedAt: audit.SubmittedAt,
-    approvedBy: audit.ApprovedBy,
-    approvedAt: audit.ApprovedAt,
-    approvalComments: audit.ApprovalComments,
+
+  // 🔍 DEBUG: Log raw audit data
+  console.log("🔍 transformAudit input:", {
+    id: audit.Id ?? audit.id,
+    hasSummary: !!(audit.Summary ?? audit.summary),
+    summaryValue: audit.Summary ?? audit.summary,
+    hasSections: !!(audit.Sections ?? audit.sections),
+    sectionsLength: (audit.Sections ?? audit.sections)?.length,
+  });
+
+  const transformed = {
+    id: audit.Id ?? audit.id,
+    auditCode: audit.AuditCode ?? audit.auditCode,
+    templateId: audit.TemplateId ?? audit.templateId,
+    templateName: audit.TemplateName ?? audit.templateName,
+    reportName: audit.ReportName ?? audit.reportName,
+    formatNo: audit.FormatNo ?? audit.formatNo,
+    revNo: audit.RevNo ?? audit.revNo,
+    revDate: audit.RevDate ?? audit.revDate,
+    notes: audit.Notes ?? audit.notes,
+    status: audit.Status ?? audit.status,
+    infoData: audit.InfoData ?? audit.infoData ?? {},
+    sections: audit.Sections ?? audit.sections ?? [],
+    signatures: audit.Signatures ?? audit.signatures ?? {},
+    columns: audit.Columns ?? audit.columns ?? [],
+    infoFields: audit.InfoFields ?? audit.infoFields ?? [],
+    headerConfig: audit.HeaderConfig ?? audit.headerConfig ?? {},
+    summary: audit.Summary ?? audit.summary ?? {},
+    createdBy: audit.CreatedBy ?? audit.createdBy,
+    createdAt: audit.CreatedAt ?? audit.createdAt,
+    updatedBy: audit.UpdatedBy ?? audit.updatedBy,
+    updatedAt: audit.UpdatedAt ?? audit.updatedAt,
+    submittedBy: audit.SubmittedBy ?? audit.submittedBy,
+    submittedAt: audit.SubmittedAt ?? audit.submittedAt,
+    approvedBy: audit.ApprovedBy ?? audit.approvedBy,
+    approvedAt: audit.ApprovedAt ?? audit.approvedAt,
+    approvalComments: audit.ApprovalComments ?? audit.approvalComments,
   };
+
+  // 🔍 DEBUG: Log transformed
+  console.log("🔍 transformAudit output:", {
+    id: transformed.id,
+    summary: transformed.summary,
+    sectionsLength: transformed.sections?.length,
+  });
+
+  return transformed;
 };
 
 // ==================== MAIN HOOK ====================
@@ -66,7 +94,6 @@ export const useAuditData = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Clear error
   const clearError = useCallback(() => setError(null), []);
 
   // ==================== TEMPLATE METHODS ====================
@@ -76,6 +103,8 @@ export const useAuditData = () => {
     setError(null);
     try {
       const response = await axios.get(`${API_BASE}/templates`, { params });
+      console.log("📦 loadTemplates raw response:", response.data);
+
       const transformedTemplates = (response.data.data || []).map(
         transformTemplate,
       );
@@ -201,7 +230,16 @@ export const useAuditData = () => {
     setError(null);
     try {
       const response = await axios.get(`${API_BASE}/audits`, { params });
+
+      // 🔍 DEBUG: Log raw API response
+      console.log("📦 loadAudits raw response:", response.data);
+      console.log("📦 First audit raw:", response.data.data?.[0]);
+
       const transformedAudits = (response.data.data || []).map(transformAudit);
+
+      // 🔍 DEBUG: Log transformed
+      console.log("📦 First audit transformed:", transformedAudits[0]);
+
       setAudits(transformedAudits);
       return {
         data: transformedAudits,
@@ -224,7 +262,20 @@ export const useAuditData = () => {
     setError(null);
     try {
       const response = await axios.get(`${API_BASE}/audits/${id}`);
-      return transformAudit(response.data.data);
+
+      // 🔍 DEBUG
+      console.log("📦 getAuditById raw response:", response.data);
+      console.log("📦 Raw audit data:", response.data.data);
+      console.log("📦 Raw summary:", response.data.data?.Summary);
+      console.log("📦 Raw sections:", response.data.data?.Sections);
+
+      const transformed = transformAudit(response.data.data);
+
+      console.log("📦 Transformed audit:", transformed);
+      console.log("📦 Transformed summary:", transformed?.summary);
+      console.log("📦 Transformed sections:", transformed?.sections);
+
+      return transformed;
     } catch (err) {
       const message = err.response?.data?.message || "Failed to load audit";
       setError(message);
@@ -373,22 +424,17 @@ export const useAuditData = () => {
   }, []);
 
   return {
-    // State
     templates,
     audits,
     loading,
     error,
     clearError,
-
-    // Template methods
     loadTemplates,
     getTemplateById,
     createTemplate,
     updateTemplate,
     deleteTemplate,
     duplicateTemplate,
-
-    // Audit methods
     loadAudits,
     getAuditById,
     createAudit,

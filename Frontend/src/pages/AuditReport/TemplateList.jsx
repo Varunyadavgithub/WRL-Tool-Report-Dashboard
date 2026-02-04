@@ -14,8 +14,11 @@ import {
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
 import useAuditData from "../../hooks/useAuditData";
 import toast from "react-hot-toast";
+import { useSelector } from "react-redux";
+import { ROLES } from "../../config/routes.config";
 
 const TemplateList = () => {
+  const { user } = useSelector((store) => store.auth);
   const navigate = useNavigate();
   const {
     templates,
@@ -141,12 +144,6 @@ const TemplateList = () => {
                 Manage your audit report templates
               </p>
             </div>
-            <button
-              onClick={() => navigate("/auditreport/templates/new")}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all"
-            >
-              <FaPlus /> Create New Template
-            </button>
           </div>
         </div>
 
@@ -223,12 +220,6 @@ const TemplateList = () => {
                 ? "No templates match your search criteria."
                 : "Get started by creating your first audit template."}
             </p>
-            <button
-              onClick={() => navigate("/auditreport/templates/new")}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all"
-            >
-              <FaPlus /> Create Template
-            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -288,30 +279,38 @@ const TemplateList = () => {
                     >
                       <FaPlus size={12} /> Use
                     </button>
-                    <button
-                      onClick={() =>
-                        navigate(`/auditreport/templates/${template.id}`)
-                      }
-                      className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-all"
-                      title="Edit"
-                    >
-                      <FaEdit size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleDuplicate(template)}
-                      disabled={actionLoading}
-                      className="p-2 bg-purple-100 hover:bg-purple-200 text-purple-600 rounded-lg transition-all disabled:opacity-50"
-                      title="Duplicate"
-                    >
-                      <FaCopy size={14} />
-                    </button>
-                    <button
-                      onClick={() => confirmDelete(template)}
-                      className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all"
-                      title="Delete"
-                    >
-                      <FaTrash size={14} />
-                    </button>
+                    {[
+                      ROLES.ADMIN,
+                      ROLES.QUALITY_MANAGER,
+                      ROLES.LINE_QUALITY_ENGINEER,
+                    ].includes(user?.role) && (
+                      <>
+                        <button
+                          onClick={() =>
+                            navigate(`/auditreport/templates/${template.id}`)
+                          }
+                          className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-all"
+                          title="Edit"
+                        >
+                          <FaEdit size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDuplicate(template)}
+                          disabled={actionLoading}
+                          className="p-2 bg-purple-100 hover:bg-purple-200 text-purple-600 rounded-lg transition-all disabled:opacity-50"
+                          title="Duplicate"
+                        >
+                          <FaCopy size={14} />
+                        </button>
+                        <button
+                          onClick={() => confirmDelete(template)}
+                          className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all"
+                          title="Delete"
+                        >
+                          <FaTrash size={14} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-500">

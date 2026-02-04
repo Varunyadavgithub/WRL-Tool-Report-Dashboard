@@ -5,7 +5,6 @@ import {
   FaPlus,
   FaTrash,
   FaSave,
-  FaArrowLeft,
   FaArrowUp,
   FaArrowDown,
   FaEye,
@@ -15,7 +14,6 @@ import {
   FaCopy,
   FaGripVertical,
   FaInfoCircle,
-  FaClipboardList,
 } from "react-icons/fa";
 import { MdAddCircle, MdOutlineFactCheck } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
@@ -88,7 +86,7 @@ const TemplateBuilder = () => {
       required: true,
       width: "w-32",
       type: "text",
-      isGroupColumn: true, // New property to identify group columns
+      isGroupColumn: true,
     },
     {
       id: "stage",
@@ -97,7 +95,7 @@ const TemplateBuilder = () => {
       required: true,
       width: "w-32",
       type: "text",
-      isGroupColumn: true, // New property to identify group columns
+      isGroupColumn: true,
     },
     {
       id: "checkPoint",
@@ -152,18 +150,23 @@ const TemplateBuilder = () => {
     },
   ]);
 
-  // Default sections structure - now includes stageName
+  // Updated structure: Section -> Multiple Stages -> Multiple Checkpoints
   const [defaultSections, setDefaultSections] = useState([
     {
       id: Date.now(),
       sectionName: "",
-      stageName: "",
-      checkPoints: [
+      stages: [
         {
-          id: Date.now(),
-          checkPoint: "",
-          method: "",
-          specification: "",
+          id: Date.now() + 1,
+          stageName: "",
+          checkPoints: [
+            {
+              id: Date.now() + 2,
+              checkPoint: "",
+              method: "",
+              specification: "",
+            },
+          ],
         },
       ],
     },
@@ -187,8 +190,29 @@ const TemplateBuilder = () => {
             if (template.headerConfig) setHeaderConfig(template.headerConfig);
             if (template.infoFields) setInfoFields(template.infoFields);
             if (template.columns) setColumns(template.columns);
-            if (template.defaultSections)
-              setDefaultSections(template.defaultSections);
+            if (template.defaultSections) {
+              // Handle migration from old structure to new structure
+              const migratedSections = template.defaultSections.map(
+                (section) => {
+                  if (section.stages) {
+                    return section; // Already new structure
+                  }
+                  // Migrate old structure
+                  return {
+                    id: section.id,
+                    sectionName: section.sectionName,
+                    stages: [
+                      {
+                        id: Date.now() + Math.random(),
+                        stageName: section.stageName || "",
+                        checkPoints: section.checkPoints || [],
+                      },
+                    ],
+                  };
+                },
+              );
+              setDefaultSections(migratedSections);
+            }
           }
         } catch (err) {
           toast.error("Failed to load template: " + err.message);
@@ -217,23 +241,43 @@ const TemplateBuilder = () => {
   };
 
   // Handle stage name change
-  const handleStageNameChange = (sectionId, value) => {
-    setDefaultSections((prev) =>
-      prev.map((section) =>
-        section.id === sectionId ? { ...section, stageName: value } : section,
-      ),
-    );
-  };
-
-  // Handle checkpoint field change
-  const handleCheckpointChange = (sectionId, checkpointId, field, value) => {
+  const handleStageNameChange = (sectionId, stageId, value) => {
     setDefaultSections((prev) =>
       prev.map((section) =>
         section.id === sectionId
           ? {
               ...section,
-              checkPoints: section.checkPoints.map((cp) =>
-                cp.id === checkpointId ? { ...cp, [field]: value } : cp,
+              stages: section.stages.map((stage) =>
+                stage.id === stageId ? { ...stage, stageName: value } : stage,
+              ),
+            }
+          : section,
+      ),
+    );
+  };
+
+  // Handle checkpoint field change
+  const handleCheckpointChange = (
+    sectionId,
+    stageId,
+    checkpointId,
+    field,
+    value,
+  ) => {
+    setDefaultSections((prev) =>
+      prev.map((section) =>
+        section.id === sectionId
+          ? {
+              ...section,
+              stages: section.stages.map((stage) =>
+                stage.id === stageId
+                  ? {
+                      ...stage,
+                      checkPoints: stage.checkPoints.map((cp) =>
+                        cp.id === checkpointId ? { ...cp, [field]: value } : cp,
+                      ),
+                    }
+                  : stage,
               ),
             }
           : section,
@@ -246,13 +290,18 @@ const TemplateBuilder = () => {
     const newSection = {
       id: Date.now(),
       sectionName: "",
-      stageName: "",
-      checkPoints: [
+      stages: [
         {
-          id: Date.now(),
-          checkPoint: "",
-          method: "",
-          specification: "",
+          id: Date.now() + 1,
+          stageName: "",
+          checkPoints: [
+            {
+              id: Date.now() + 2,
+              checkPoint: "",
+              method: "",
+              specification: "",
+            },
+          ],
         },
       ],
     };
@@ -268,45 +317,6 @@ const TemplateBuilder = () => {
     }
   };
 
-  // Add checkpoint to section
-  const addCheckpoint = (sectionId) => {
-    setDefaultSections((prev) =>
-      prev.map((section) =>
-        section.id === sectionId
-          ? {
-              ...section,
-              checkPoints: [
-                ...section.checkPoints,
-                {
-                  id: Date.now(),
-                  checkPoint: "",
-                  method: "",
-                  specification: "",
-                },
-              ],
-            }
-          : section,
-      ),
-    );
-  };
-
-  // Delete checkpoint
-  const deleteCheckpoint = (sectionId, checkpointId) => {
-    setDefaultSections((prev) =>
-      prev.map((section) =>
-        section.id === sectionId
-          ? {
-              ...section,
-              checkPoints:
-                section.checkPoints.length > 1
-                  ? section.checkPoints.filter((cp) => cp.id !== checkpointId)
-                  : section.checkPoints,
-            }
-          : section,
-      ),
-    );
-  };
-
   // Duplicate section
   const duplicateSection = (sectionId) => {
     const sectionToDuplicate = defaultSections.find((s) => s.id === sectionId);
@@ -315,10 +325,14 @@ const TemplateBuilder = () => {
         ...sectionToDuplicate,
         id: Date.now(),
         sectionName: `${sectionToDuplicate.sectionName} (Copy)`,
-        stageName: `${sectionToDuplicate.stageName} (Copy)`,
-        checkPoints: sectionToDuplicate.checkPoints.map((cp) => ({
-          ...cp,
+        stages: sectionToDuplicate.stages.map((stage) => ({
+          ...stage,
           id: Date.now() + Math.random(),
+          stageName: `${stage.stageName}`,
+          checkPoints: stage.checkPoints.map((cp) => ({
+            ...cp,
+            id: Date.now() + Math.random(),
+          })),
         })),
       };
       setDefaultSections((prev) => [...prev, newSection]);
@@ -338,27 +352,174 @@ const TemplateBuilder = () => {
     }
   };
 
-  // Move checkpoint up/down
-  const moveCheckpoint = (sectionId, index, direction) => {
+  // Add new stage to section
+  const addStage = (sectionId) => {
+    const newStage = {
+      id: Date.now(),
+      stageName: "",
+      checkPoints: [
+        {
+          id: Date.now() + 1,
+          checkPoint: "",
+          method: "",
+          specification: "",
+        },
+      ],
+    };
+    setDefaultSections((prev) =>
+      prev.map((section) =>
+        section.id === sectionId
+          ? { ...section, stages: [...section.stages, newStage] }
+          : section,
+      ),
+    );
+  };
+
+  // Delete stage from section
+  const deleteStage = (sectionId, stageId) => {
+    setDefaultSections((prev) =>
+      prev.map((section) =>
+        section.id === sectionId
+          ? {
+              ...section,
+              stages:
+                section.stages.length > 1
+                  ? section.stages.filter((stage) => stage.id !== stageId)
+                  : section.stages,
+            }
+          : section,
+      ),
+    );
+  };
+
+  // Duplicate stage
+  const duplicateStage = (sectionId, stageId) => {
     setDefaultSections((prev) =>
       prev.map((section) => {
         if (section.id === sectionId) {
-          const newCheckpoints = [...section.checkPoints];
-          const newIndex = direction === "up" ? index - 1 : index + 1;
-          if (newIndex >= 0 && newIndex < newCheckpoints.length) {
-            [newCheckpoints[index], newCheckpoints[newIndex]] = [
-              newCheckpoints[newIndex],
-              newCheckpoints[index],
-            ];
+          const stageToDuplicate = section.stages.find((s) => s.id === stageId);
+          if (stageToDuplicate) {
+            const newStage = {
+              ...stageToDuplicate,
+              id: Date.now(),
+              stageName: `${stageToDuplicate.stageName} (Copy)`,
+              checkPoints: stageToDuplicate.checkPoints.map((cp) => ({
+                ...cp,
+                id: Date.now() + Math.random(),
+              })),
+            };
+            return { ...section, stages: [...section.stages, newStage] };
           }
-          return { ...section, checkPoints: newCheckpoints };
         }
         return section;
       }),
     );
   };
 
-  // Column management
+  // Move stage up/down within section
+  const moveStage = (sectionId, stageIndex, direction) => {
+    setDefaultSections((prev) =>
+      prev.map((section) => {
+        if (section.id === sectionId) {
+          const newStages = [...section.stages];
+          const newIndex = direction === "up" ? stageIndex - 1 : stageIndex + 1;
+          if (newIndex >= 0 && newIndex < newStages.length) {
+            [newStages[stageIndex], newStages[newIndex]] = [
+              newStages[newIndex],
+              newStages[stageIndex],
+            ];
+          }
+          return { ...section, stages: newStages };
+        }
+        return section;
+      }),
+    );
+  };
+
+  // Add checkpoint to stage
+  const addCheckpoint = (sectionId, stageId) => {
+    setDefaultSections((prev) =>
+      prev.map((section) =>
+        section.id === sectionId
+          ? {
+              ...section,
+              stages: section.stages.map((stage) =>
+                stage.id === stageId
+                  ? {
+                      ...stage,
+                      checkPoints: [
+                        ...stage.checkPoints,
+                        {
+                          id: Date.now(),
+                          checkPoint: "",
+                          method: "",
+                          specification: "",
+                        },
+                      ],
+                    }
+                  : stage,
+              ),
+            }
+          : section,
+      ),
+    );
+  };
+
+  // Delete checkpoint
+  const deleteCheckpoint = (sectionId, stageId, checkpointId) => {
+    setDefaultSections((prev) =>
+      prev.map((section) =>
+        section.id === sectionId
+          ? {
+              ...section,
+              stages: section.stages.map((stage) =>
+                stage.id === stageId
+                  ? {
+                      ...stage,
+                      checkPoints:
+                        stage.checkPoints.length > 1
+                          ? stage.checkPoints.filter(
+                              (cp) => cp.id !== checkpointId,
+                            )
+                          : stage.checkPoints,
+                    }
+                  : stage,
+              ),
+            }
+          : section,
+      ),
+    );
+  };
+
+  // Move checkpoint up/down
+  const moveCheckpoint = (sectionId, stageId, index, direction) => {
+    setDefaultSections((prev) =>
+      prev.map((section) => {
+        if (section.id === sectionId) {
+          return {
+            ...section,
+            stages: section.stages.map((stage) => {
+              if (stage.id === stageId) {
+                const newCheckpoints = [...stage.checkPoints];
+                const newIndex = direction === "up" ? index - 1 : index + 1;
+                if (newIndex >= 0 && newIndex < newCheckpoints.length) {
+                  [newCheckpoints[index], newCheckpoints[newIndex]] = [
+                    newCheckpoints[newIndex],
+                    newCheckpoints[index],
+                  ];
+                }
+                return { ...stage, checkPoints: newCheckpoints };
+              }
+              return stage;
+            }),
+          };
+        }
+        return section;
+      }),
+    );
+  };
+
+  // Column management functions (unchanged)
   const addColumn = () => {
     if (newColumn.name.trim()) {
       const columnId =
@@ -424,7 +585,7 @@ const TemplateBuilder = () => {
     );
   };
 
-  // Info field management
+  // Info field management (unchanged)
   const addInfoField = () => {
     const newField = {
       id: `field_${Date.now()}`,
@@ -450,6 +611,14 @@ const TemplateBuilder = () => {
 
   // Get visible columns
   const visibleColumns = columns.filter((col) => col.visible);
+
+  // Calculate total checkpoints in a section (across all stages)
+  const getSectionTotalCheckpoints = (section) => {
+    return section.stages.reduce(
+      (total, stage) => total + stage.checkPoints.length,
+      0,
+    );
+  };
 
   // Save template
   const handleSave = async () => {
@@ -506,15 +675,15 @@ const TemplateBuilder = () => {
         {/* Sticky Header */}
         <div className="sticky top-0 z-40 bg-gray-100/90 backdrop-blur border-b border-gray-200 shadow-sm p-4">
           <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
-            {/* Header */}
             <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
               <div>
                 <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                   <MdOutlineFactCheck className="text-green-600" />
-                  Create New Template
+                  {id ? "Edit Template" : "Create New Template"}
                 </h1>
                 <p className="text-gray-600 mt-1">
-                  Build and customize audit templates
+                  Build and customize audit templates with multiple stages per
+                  section
                 </p>
               </div>
             </div>
@@ -999,11 +1168,12 @@ const TemplateBuilder = () => {
             <FaInfoCircle className="text-blue-600 mt-0.5 flex-shrink-0" />
             <div className="text-sm text-blue-800">
               <p className="font-medium">
-                Define your audit sections and checkpoints below.
+                Define your audit sections, stages, and checkpoints below.
               </p>
               <p>
-                Fields marked as "Entry Field" (Observations, Remarks, Status)
-                will be filled by auditors during audit entry.
+                Each section can have multiple stages, and each stage can have
+                multiple checkpoints. Fields marked as "Entry Field" will be
+                filled by auditors during audit entry.
               </p>
             </div>
           </div>
@@ -1036,202 +1206,310 @@ const TemplateBuilder = () => {
                 </tr>
               </thead>
               <tbody>
-                {defaultSections.map((section, sectionIndex) =>
-                  section.checkPoints.map((checkpoint, checkpointIndex) => (
-                    <tr
-                      key={`${section.id}-${checkpoint.id}`}
-                      className="border-b border-gray-200 hover:bg-blue-50 transition-colors"
-                    >
-                      {visibleColumns.map((column) => {
-                        // Section column with rowSpan
-                        if (column.id === "section") {
-                          if (checkpointIndex === 0) {
-                            return (
-                              <td
-                                key={column.id}
-                                className="px-3 py-2 font-bold bg-gray-100 border-r border-gray-300 align-top"
-                                rowSpan={section.checkPoints.length}
-                              >
-                                <div className="flex flex-col gap-2">
-                                  <input
-                                    type="text"
-                                    placeholder="Section Name"
-                                    value={section.sectionName}
-                                    onChange={(e) =>
-                                      handleSectionNameChange(
-                                        section.id,
-                                        e.target.value,
-                                      )
-                                    }
-                                    className="w-full text-sm font-bold text-gray-700 bg-white border border-gray-300 rounded px-2 py-1 focus:border-blue-500 outline-none"
-                                  />
-                                </div>
-                              </td>
-                            );
-                          }
-                          return null;
-                        }
+                {defaultSections.map((section, sectionIndex) => {
+                  const sectionTotalRows = getSectionTotalCheckpoints(section);
+                  let sectionRowRendered = false;
 
-                        // Stage column with rowSpan
-                        if (column.id === "stage") {
-                          if (checkpointIndex === 0) {
-                            return (
-                              <td
-                                key={column.id}
-                                className="px-3 py-2 font-bold bg-indigo-50 border-r border-gray-300 align-top"
-                                rowSpan={section.checkPoints.length}
-                              >
-                                <div className="flex flex-col gap-2">
-                                  <input
-                                    type="text"
-                                    placeholder="Stage Name"
-                                    value={section.stageName || ""}
-                                    onChange={(e) =>
-                                      handleStageNameChange(
-                                        section.id,
-                                        e.target.value,
-                                      )
-                                    }
-                                    className="w-full text-sm font-bold text-indigo-700 bg-white border border-indigo-300 rounded px-2 py-1 focus:border-indigo-500 outline-none"
-                                  />
-                                  <div className="flex flex-wrap gap-1">
-                                    <button
-                                      onClick={() => addCheckpoint(section.id)}
-                                      className="p-1.5 bg-green-500 hover:bg-green-600 text-white rounded text-xs"
-                                      title="Add Row"
-                                    >
-                                      <FaPlus size={10} />
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        duplicateSection(section.id)
-                                      }
-                                      className="p-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded text-xs"
-                                      title="Duplicate Section"
-                                    >
-                                      <FaCopy size={10} />
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        moveSection(sectionIndex, "up")
-                                      }
-                                      disabled={sectionIndex === 0}
-                                      className="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs disabled:opacity-50"
-                                      title="Move Up"
-                                    >
-                                      <FaArrowUp size={10} />
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        moveSection(sectionIndex, "down")
-                                      }
-                                      disabled={
-                                        sectionIndex ===
-                                        defaultSections.length - 1
-                                      }
-                                      className="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs disabled:opacity-50"
-                                      title="Move Down"
-                                    >
-                                      <FaArrowDown size={10} />
-                                    </button>
-                                    <button
-                                      onClick={() => deleteSection(section.id)}
-                                      disabled={defaultSections.length <= 1}
-                                      className="p-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs disabled:opacity-50"
-                                      title="Delete Section"
-                                    >
-                                      <FaTrash size={10} />
-                                    </button>
-                                  </div>
-                                </div>
-                              </td>
-                            );
-                          }
-                          return null;
-                        }
+                  return section.stages.map((stage, stageIndex) => {
+                    let stageRowRendered = false;
 
-                        // Entry fields - show placeholder
-                        if (column.entryField) {
-                          return (
-                            <td
-                              key={column.id}
-                              className="px-3 py-2 border-r border-gray-200 bg-orange-50"
-                            >
-                              <span className="text-xs text-gray-400 italic">
-                                (Filled during audit)
-                              </span>
-                            </td>
-                          );
-                        }
+                    return stage.checkPoints.map(
+                      (checkpoint, checkpointIndex) => {
+                        const showSectionCell =
+                          !sectionRowRendered && checkpointIndex === 0;
+                        const showStageCell =
+                          !stageRowRendered && checkpointIndex === 0;
 
-                        // Editable columns for template
+                        if (showSectionCell) sectionRowRendered = true;
+                        if (showStageCell) stageRowRendered = true;
+
                         return (
-                          <td
-                            key={column.id}
-                            className="px-3 py-2 border-r border-gray-200"
+                          <tr
+                            key={`${section.id}-${stage.id}-${checkpoint.id}`}
+                            className="border-b border-gray-200 hover:bg-blue-50 transition-colors"
                           >
-                            <input
-                              type="text"
-                              placeholder={column.name}
-                              value={checkpoint[column.id] || ""}
-                              onChange={(e) =>
-                                handleCheckpointChange(
-                                  section.id,
-                                  checkpoint.id,
-                                  column.id,
-                                  e.target.value,
-                                )
+                            {visibleColumns.map((column) => {
+                              // Section column with rowSpan for entire section
+                              if (column.id === "section") {
+                                if (showSectionCell) {
+                                  return (
+                                    <td
+                                      key={column.id}
+                                      className="px-3 py-2 font-bold bg-gray-100 border-r border-gray-300 align-top"
+                                      rowSpan={sectionTotalRows}
+                                    >
+                                      <div className="flex flex-col gap-2">
+                                        <input
+                                          type="text"
+                                          placeholder="Section Name"
+                                          value={section.sectionName}
+                                          onChange={(e) =>
+                                            handleSectionNameChange(
+                                              section.id,
+                                              e.target.value,
+                                            )
+                                          }
+                                          className="w-full text-sm font-bold text-gray-700 bg-white border border-gray-300 rounded px-2 py-1 focus:border-blue-500 outline-none"
+                                        />
+                                        <div className="flex flex-wrap gap-1">
+                                          <button
+                                            onClick={() => addStage(section.id)}
+                                            className="p-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-xs flex items-center gap-1"
+                                            title="Add Stage"
+                                          >
+                                            <FaPlus size={10} />
+                                            <span className="text-xs">
+                                              Stage
+                                            </span>
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              duplicateSection(section.id)
+                                            }
+                                            className="p-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded text-xs"
+                                            title="Duplicate Section"
+                                          >
+                                            <FaCopy size={10} />
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              moveSection(sectionIndex, "up")
+                                            }
+                                            disabled={sectionIndex === 0}
+                                            className="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs disabled:opacity-50"
+                                            title="Move Section Up"
+                                          >
+                                            <FaArrowUp size={10} />
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              moveSection(sectionIndex, "down")
+                                            }
+                                            disabled={
+                                              sectionIndex ===
+                                              defaultSections.length - 1
+                                            }
+                                            className="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs disabled:opacity-50"
+                                            title="Move Section Down"
+                                          >
+                                            <FaArrowDown size={10} />
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              deleteSection(section.id)
+                                            }
+                                            disabled={
+                                              defaultSections.length <= 1
+                                            }
+                                            className="p-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs disabled:opacity-50"
+                                            title="Delete Section"
+                                          >
+                                            <FaTrash size={10} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </td>
+                                  );
+                                }
+                                return null;
                               }
-                              className="w-full text-sm text-gray-700 bg-white border border-gray-300 rounded px-2 py-1 focus:border-blue-500 outline-none"
-                            />
-                          </td>
-                        );
-                      })}
 
-                      {/* Actions column */}
-                      <td className="px-3 py-2 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() =>
-                              moveCheckpoint(section.id, checkpointIndex, "up")
-                            }
-                            disabled={checkpointIndex === 0}
-                            className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded text-xs disabled:opacity-50"
-                            title="Move Up"
-                          >
-                            <FaArrowUp size={10} />
-                          </button>
-                          <button
-                            onClick={() =>
-                              moveCheckpoint(
-                                section.id,
-                                checkpointIndex,
-                                "down",
-                              )
-                            }
-                            disabled={
-                              checkpointIndex === section.checkPoints.length - 1
-                            }
-                            className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded text-xs disabled:opacity-50"
-                            title="Move Down"
-                          >
-                            <FaArrowDown size={10} />
-                          </button>
-                          <button
-                            onClick={() =>
-                              deleteCheckpoint(section.id, checkpoint.id)
-                            }
-                            disabled={section.checkPoints.length <= 1}
-                            className="p-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded text-xs disabled:opacity-50"
-                            title="Delete Row"
-                          >
-                            <FaTrash size={10} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )),
-                )}
+                              // Stage column with rowSpan for the stage
+                              if (column.id === "stage") {
+                                if (showStageCell) {
+                                  return (
+                                    <td
+                                      key={column.id}
+                                      className="px-3 py-2 font-bold bg-indigo-50 border-r border-gray-300 align-top"
+                                      rowSpan={stage.checkPoints.length}
+                                    >
+                                      <div className="flex flex-col gap-2">
+                                        <input
+                                          type="text"
+                                          placeholder="Stage Name"
+                                          value={stage.stageName || ""}
+                                          onChange={(e) =>
+                                            handleStageNameChange(
+                                              section.id,
+                                              stage.id,
+                                              e.target.value,
+                                            )
+                                          }
+                                          className="w-full text-sm font-bold text-indigo-700 bg-white border border-indigo-300 rounded px-2 py-1 focus:border-indigo-500 outline-none"
+                                        />
+                                        <div className="flex flex-wrap gap-1">
+                                          <button
+                                            onClick={() =>
+                                              addCheckpoint(
+                                                section.id,
+                                                stage.id,
+                                              )
+                                            }
+                                            className="p-1.5 bg-green-500 hover:bg-green-600 text-white rounded text-xs"
+                                            title="Add Checkpoint"
+                                          >
+                                            <FaPlus size={10} />
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              duplicateStage(
+                                                section.id,
+                                                stage.id,
+                                              )
+                                            }
+                                            className="p-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded text-xs"
+                                            title="Duplicate Stage"
+                                          >
+                                            <FaCopy size={10} />
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              moveStage(
+                                                section.id,
+                                                stageIndex,
+                                                "up",
+                                              )
+                                            }
+                                            disabled={stageIndex === 0}
+                                            className="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs disabled:opacity-50"
+                                            title="Move Stage Up"
+                                          >
+                                            <FaArrowUp size={10} />
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              moveStage(
+                                                section.id,
+                                                stageIndex,
+                                                "down",
+                                              )
+                                            }
+                                            disabled={
+                                              stageIndex ===
+                                              section.stages.length - 1
+                                            }
+                                            className="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs disabled:opacity-50"
+                                            title="Move Stage Down"
+                                          >
+                                            <FaArrowDown size={10} />
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              deleteStage(section.id, stage.id)
+                                            }
+                                            disabled={
+                                              section.stages.length <= 1
+                                            }
+                                            className="p-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs disabled:opacity-50"
+                                            title="Delete Stage"
+                                          >
+                                            <FaTrash size={10} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </td>
+                                  );
+                                }
+                                return null;
+                              }
+
+                              // Entry fields - show placeholder
+                              if (column.entryField) {
+                                return (
+                                  <td
+                                    key={column.id}
+                                    className="px-3 py-2 border-r border-gray-200 bg-orange-50"
+                                  >
+                                    <span className="text-xs text-gray-400 italic">
+                                      (Filled during audit)
+                                    </span>
+                                  </td>
+                                );
+                              }
+
+                              // Editable columns for template
+                              return (
+                                <td
+                                  key={column.id}
+                                  className="px-3 py-2 border-r border-gray-200"
+                                >
+                                  <input
+                                    type="text"
+                                    placeholder={column.name}
+                                    value={checkpoint[column.id] || ""}
+                                    onChange={(e) =>
+                                      handleCheckpointChange(
+                                        section.id,
+                                        stage.id,
+                                        checkpoint.id,
+                                        column.id,
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="w-full text-sm text-gray-700 bg-white border border-gray-300 rounded px-2 py-1 focus:border-blue-500 outline-none"
+                                  />
+                                </td>
+                              );
+                            })}
+
+                            {/* Actions column */}
+                            <td className="px-3 py-2 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() =>
+                                    moveCheckpoint(
+                                      section.id,
+                                      stage.id,
+                                      checkpointIndex,
+                                      "up",
+                                    )
+                                  }
+                                  disabled={checkpointIndex === 0}
+                                  className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded text-xs disabled:opacity-50"
+                                  title="Move Up"
+                                >
+                                  <FaArrowUp size={10} />
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    moveCheckpoint(
+                                      section.id,
+                                      stage.id,
+                                      checkpointIndex,
+                                      "down",
+                                    )
+                                  }
+                                  disabled={
+                                    checkpointIndex ===
+                                    stage.checkPoints.length - 1
+                                  }
+                                  className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded text-xs disabled:opacity-50"
+                                  title="Move Down"
+                                >
+                                  <FaArrowDown size={10} />
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    deleteCheckpoint(
+                                      section.id,
+                                      stage.id,
+                                      checkpoint.id,
+                                    )
+                                  }
+                                  disabled={stage.checkPoints.length <= 1}
+                                  className="p-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded text-xs disabled:opacity-50"
+                                  title="Delete Row"
+                                >
+                                  <FaTrash size={10} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      },
+                    );
+                  });
+                })}
               </tbody>
             </table>
           </div>
