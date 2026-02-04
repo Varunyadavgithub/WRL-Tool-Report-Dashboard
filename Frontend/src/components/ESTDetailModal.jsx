@@ -22,7 +22,6 @@ import { BsSpeedometer2 } from "react-icons/bs";
 import { RiFlashlightFill } from "react-icons/ri";
 import { AiOutlineThunderbolt, AiFillThunderbolt } from "react-icons/ai";
 import { VscCircuitBoard } from "react-icons/vsc";
-import { formatDateForDisplay } from "../utils/dateUtils.js";
 
 const ESTDetailModal = () => {
   const dispatch = useDispatch();
@@ -244,7 +243,7 @@ const ESTDetailModal = () => {
                   Date & Time
                 </span>
                 <p className="text-sm">
-                  {formatDateForDisplay(data.date_time)}
+                  {data.date_time && data.date_time.replace("T"," ").replace("Z","")}
                 </p>
               </div>
               <div>
@@ -528,7 +527,7 @@ const ESTDetailModal = () => {
                     Date
                   </span>
                   <span className="font-bold text-xs">
-                    {formatDateForDisplay(data.date_time)}
+                    {data.date_time && data.date_time.replace("T"," ").replace("Z","")}
                   </span>
                 </div>
                 <div className="flex justify-between items-center bg-white/20 backdrop-blur rounded-lg px-3 py-2">
@@ -608,7 +607,7 @@ const ESTDetailModal = () => {
         {/* Footer */}
         <div className="bg-gray-100 px-6 py-3 flex items-center justify-between border-t">
           <p className="text-xs text-gray-500">
-            Last updated: {formatDateForDisplay(data.date_time)}
+            Last updated: {data.date_time && data.date_time.replace("T"," ").replace("Z","")}
           </p>
           <div className="flex gap-2">
             <button

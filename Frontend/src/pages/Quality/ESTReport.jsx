@@ -29,7 +29,6 @@ import {
   getYesterdayRange,
   getMTDRange,
   formatDateTimeLocal,
-  formatDateForDisplay,
 } from "../../utils/dateUtils";
 import { exportToXls } from "../../utils/exportToXls.js";
 
@@ -631,7 +630,10 @@ const ESTReport = () => {
                   <InfoCard
                     icon={FaCalendarAlt}
                     label="Date & Time"
-                    value={formatDateForDisplay(currentData.date_time)}
+                    value={
+                      currentData.date_time &&
+                      currentData.date_time.replace("T", " ").replace("Z", "")
+                    }
                     color="green"
                   />
                   <InfoCard
@@ -839,7 +841,8 @@ const ESTReport = () => {
                         {item.serial_no}
                       </td>
                       <td className="px-3 py-3">
-                        {formatDateForDisplay(item.date_time)}
+                        {item.date_time &&
+                          item.date_time.replace("T", " ").replace("Z", "")}
                       </td>
                       <td className="px-3 py-3">
                         <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-semibold">

@@ -13,19 +13,6 @@ export const formatDateForApi = (date) => {
   return d.toISOString();
 };
 
-// Format date for display
-export const formatDateForDisplay = (date) => {
-  if (!date) return "";
-  const d = new Date(date);
-  return d.toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
-
 // Get today's date range
 export const getTodayRange = () => {
   const start = new Date();
