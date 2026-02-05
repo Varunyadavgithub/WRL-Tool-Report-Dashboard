@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import Title from "../../components/ui/Title";
 import Loader from "../../components/ui/Loader";
 import SelectField from "../../components/ui/SelectField";
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import Button from "../../components/ui/Button";
+import Pagination from "../../components/ui/Pagination.jsx";
 
 // Redux
 import {
@@ -21,6 +22,9 @@ import {
   setSelectedRecord,
   setActiveQuickFilter,
   setDateRange,
+  setPage,
+  setLimit,
+  setPagination,
 } from "../../redux/estReportSlice";
 
 // Utils
@@ -34,7 +38,6 @@ import { exportToXls } from "../../utils/exportToXls.js";
 
 // React Icons
 import {
-  FaBolt,
   FaShieldAlt,
   FaTint,
   FaBatteryFull,
@@ -49,20 +52,15 @@ import {
   FaCubes,
   FaDownload,
   FaSync,
+  FaRedo,
 } from "react-icons/fa";
-import {
-  MdElectricalServices,
-  MdOutlineSpeed,
-  MdFilterAlt,
-} from "react-icons/md";
+import { MdFilterAlt } from "react-icons/md";
 import { HiLightningBolt, HiOutlineDocumentReport } from "react-icons/hi";
 import { BiSearchAlt, BiTime } from "react-icons/bi";
-import { BsLightningChargeFill, BsSpeedometer2 } from "react-icons/bs";
-import { RiFlashlightFill } from "react-icons/ri";
-import { TbWaveSine, TbReportAnalytics } from "react-icons/tb";
+import { BsLightningChargeFill } from "react-icons/bs";
+import { TbReportAnalytics } from "react-icons/tb";
 import { IoMdStats } from "react-icons/io";
 import { GiElectric } from "react-icons/gi";
-import { AiOutlineThunderbolt, AiFillThunderbolt } from "react-icons/ai";
 import { VscCircuitBoard } from "react-icons/vsc";
 
 // Detail Modal Component
@@ -71,16 +69,20 @@ import ESTDetailModal from "../../components/ESTDetailModal";
 const ESTReport = () => {
   const dispatch = useDispatch();
 
-  // Redux state
-  const { filters, selectedRecord, isDetailModalOpen, activeQuickFilter } =
-    useSelector((state) => state.estReport);
+  // Redux state - ADD pagination HERE
+  const {
+    filters,
+    selectedRecord,
+    isDetailModalOpen,
+    activeQuickFilter,
+    pagination,
+  } = useSelector((state) => state.estReport);
 
   // Local state for date inputs
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [shouldFetch, setShouldFetch] = useState(false);
 
-  // RTK Query hooks
+  // RTK Query hooks - ADD pagination params
   const {
     data: reportData,
     isLoading: reportLoading,
@@ -94,6 +96,8 @@ const ESTReport = () => {
       operator: filters.operator,
       result: filters.result,
       testType: filters.testType,
+      page: pagination.page,
+      limit: pagination.limit,
     },
     { skip: !filters.startDate || !filters.endDate },
   );
@@ -117,6 +121,18 @@ const ESTReport = () => {
 
   const [triggerExport, { isLoading: exportLoading }] =
     useLazyGetExportDataQuery();
+
+  // UPDATE PAGINATION WHEN API RESPONSE CHANGES - ADD THIS useEffect
+  useEffect(() => {
+    if (reportData?.pagination) {
+      dispatch(
+        setPagination({
+          totalPages: reportData.pagination.totalPages || 1,
+          totalRecords: reportData.pagination.totalRecords || 0,
+        }),
+      );
+    }
+  }, [reportData, dispatch]);
 
   // Test type options
   const testTypeOptions = [
@@ -211,6 +227,23 @@ const ESTReport = () => {
     dispatch(setSelectedRecord(record));
   };
 
+  // Handle page change - ADD THIS FUNCTION
+  const handlePageChange = (newPage) => {
+    dispatch(setPage(newPage));
+  };
+
+  // Handle limit change - ADD THIS FUNCTION
+  const handleLimitChange = (newLimit) => {
+    dispatch(setLimit(newLimit));
+  };
+
+  // Handle Reset Filters - ADD THIS FUNCTION
+  const handleResetFilters = () => {
+    dispatch(resetFilters());
+    setStartTime("");
+    setEndTime("");
+  };
+
   // Status Badge Component
   const StatusBadge = ({ status, size = "md" }) => {
     const isPass = status === "Pass" || status === 1;
@@ -235,118 +268,6 @@ const ESTReport = () => {
       </span>
     );
   };
-
-  // Gauge Component
-  const GaugeIndicator = ({ value, max, label, color = "blue" }) => {
-    const numValue = parseFloat(value) || 0;
-    const numMax = parseFloat(max) || 100;
-    const percentage = Math.min((numValue / numMax) * 100, 100);
-
-    const colorMap = {
-      blue: "#3b82f6",
-      green: "#22c55e",
-      yellow: "#eab308",
-      purple: "#a855f7",
-      cyan: "#06b6d4",
-      orange: "#f97316",
-    };
-
-    return (
-      <div className="flex flex-col items-center">
-        <div className="relative w-20 h-20">
-          <svg className="w-20 h-20 transform -rotate-90">
-            <circle
-              cx="40"
-              cy="40"
-              r="32"
-              stroke="#e5e7eb"
-              strokeWidth="8"
-              fill="none"
-            />
-            <circle
-              cx="40"
-              cy="40"
-              r="32"
-              stroke={colorMap[color]}
-              strokeWidth="8"
-              fill="none"
-              strokeDasharray={`${percentage * 2.01} 201`}
-              strokeLinecap="round"
-            />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-xs font-bold text-gray-700">
-              {value || "N/A"}
-            </span>
-          </div>
-        </div>
-        <span className="text-xs text-gray-500 mt-1">{label}</span>
-      </div>
-    );
-  };
-
-  // Test Card Component
-  const TestCard = ({
-    title,
-    icon: Icon,
-    status,
-    children,
-    color = "blue",
-  }) => {
-    const isPass = status === "Pass";
-    const borderColor = isPass ? "border-green-400" : "border-red-400";
-    const headerBg = isPass ? "bg-green-50" : "bg-red-50";
-
-    const iconColorMap = {
-      blue: "text-blue-500",
-      green: "text-green-500",
-      yellow: "text-yellow-500",
-      purple: "text-purple-500",
-      orange: "text-orange-500",
-      cyan: "text-cyan-500",
-    };
-
-    return (
-      <div
-        className={`bg-white rounded-xl border-2 ${borderColor} shadow-lg overflow-hidden transition-all hover:shadow-xl hover:-translate-y-1`}
-      >
-        <div
-          className={`${headerBg} px-4 py-3 flex items-center justify-between border-b`}
-        >
-          <div className="flex items-center gap-2">
-            <Icon className={`text-2xl ${iconColorMap[color]}`} />
-            <h3 className="font-bold text-gray-800">{title}</h3>
-          </div>
-          <StatusBadge status={status} />
-        </div>
-        <div className="p-4">{children}</div>
-      </div>
-    );
-  };
-
-  // Parameter Row Component
-  const ParamRow = ({ label, setValue, readValue, icon: Icon }) => (
-    <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-      <div className="flex items-center gap-2">
-        {Icon && <Icon className="text-gray-400" size={14} />}
-        <span className="text-sm text-gray-600 font-medium">{label}</span>
-      </div>
-      <div className="flex gap-4">
-        <div className="text-center">
-          <span className="text-xs text-gray-400 block">Set</span>
-          <span className="text-sm font-semibold text-blue-600">
-            {setValue || "N/A"}
-          </span>
-        </div>
-        <div className="text-center">
-          <span className="text-xs text-gray-400 block">Read</span>
-          <span className="text-sm font-semibold text-green-600">
-            {readValue || "N/A"}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
 
   // Info Card Component
   const InfoCard = ({ icon: Icon, label, value, color = "gray" }) => {
@@ -404,7 +325,8 @@ const ESTReport = () => {
 
   const estData = reportData?.data || [];
   const currentData = estData[0];
-  const totalCount = reportData?.pagination?.totalRecords || estData.length;
+  // USE pagination.totalRecords instead of estData.length for total count
+  const totalCount = pagination.totalRecords;
   const summary = summaryData?.data;
 
   const isLoading = reportLoading || reportFetching;
@@ -495,10 +417,10 @@ const ESTReport = () => {
           </div>
         </div>
 
-        {/* Box 2: Actions */}
+        {/* Box 2: Actions - UPDATED WITH RESET BUTTON */}
         <div className="bg-white border border-purple-200 p-4 rounded-xl shadow-md">
           <div className="flex flex-col items-center gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
                 onClick={handleQuery}
                 bgColor={
@@ -520,8 +442,20 @@ const ESTReport = () => {
                 textColor="text-gray-700"
                 className="p-2"
                 disabled={isLoading}
+                title="Refresh"
               >
                 <FaSync className={isLoading ? "animate-spin" : ""} />
+              </Button>
+
+              {/* Reset Button - NEW */}
+              <Button
+                onClick={handleResetFilters}
+                bgColor="bg-orange-100"
+                textColor="text-orange-700"
+                className="p-2"
+                title="Reset Filters"
+              >
+                <FaRedo />
               </Button>
 
               {estData.length > 0 && (
@@ -533,7 +467,7 @@ const ESTReport = () => {
                   disabled={exportLoading}
                 >
                   <FaDownload />
-                  {exportLoading ? "Exporting..." : "Export"}
+                  {exportLoading ? "Exporting..." : "Export All"}
                 </Button>
               )}
             </div>
@@ -541,7 +475,7 @@ const ESTReport = () => {
             <div className="bg-purple-100 px-4 py-2 rounded-lg flex items-center gap-2">
               <IoMdStats className="text-purple-600" />
               <span className="font-bold text-purple-800">
-                Records: <span className="text-2xl">{totalCount}</span>
+                Total: <span className="text-2xl">{totalCount}</span> records
               </span>
             </div>
           </div>
@@ -563,7 +497,7 @@ const ESTReport = () => {
               }
               textColor="text-gray-800"
               className="font-semibold text-sm flex items-center gap-1"
-              disabled={quickFilterLoading}
+              disabled={quickFilterLoading || isLoading}
             >
               <BiTime />
               YDAY
@@ -577,7 +511,7 @@ const ESTReport = () => {
               }
               textColor="text-white"
               className="font-semibold text-sm flex items-center gap-1"
-              disabled={quickFilterLoading}
+              disabled={quickFilterLoading || isLoading}
             >
               <FaCalendarAlt />
               TODAY
@@ -591,7 +525,7 @@ const ESTReport = () => {
               }
               textColor="text-white"
               className="font-semibold text-sm flex items-center gap-1"
-              disabled={quickFilterLoading}
+              disabled={quickFilterLoading || isLoading}
             >
               <TbReportAnalytics />
               MTD
@@ -746,12 +680,41 @@ const ESTReport = () => {
             </div>
           )}
 
-          {/* Data Table */}
+          {/* Data Table - UPDATED WITH PAGE INFO */}
           <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <FaTable className="text-purple-500" />
-              Test Records ({estData.length})
-            </h2>
+            {/* PAGINATION COMPONENT - ADD THIS */}
+            {pagination.totalRecords > 0 && (
+              <Pagination
+                currentPage={pagination.page}
+                totalPages={pagination.totalPages}
+                totalRecords={pagination.totalRecords}
+                limit={pagination.limit}
+                onPageChange={handlePageChange}
+                onLimitChange={handleLimitChange}
+                isLoading={isLoading}
+              />
+            )}
+
+            {/* Table Header with Page Info - NEW */}
+            <div className="flex flex-wrap items-center justify-between gap-4 my-4">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <FaTable className="text-purple-500" />
+                Test Records
+              </h2>
+              <div className="flex items-center gap-4 text-sm text-gray-600">
+                <span>
+                  Page <b className="text-purple-600">{pagination.page}</b> of{" "}
+                  <b className="text-purple-600">{pagination.totalPages}</b>
+                </span>
+                <span>|</span>
+                <span>
+                  Showing <b className="text-purple-600">{estData.length}</b> of{" "}
+                  <b className="text-purple-600">{pagination.totalRecords}</b>{" "}
+                  records
+                </span>
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="min-w-full text-xs text-left">
                 <thead className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
