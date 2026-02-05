@@ -2,6 +2,7 @@ import sql from "mssql";
 import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
 export const getLptReport = tryCatch(async (req, res) => {
   const { startDate, endDate, model } = req.query;
@@ -13,8 +14,8 @@ export const getLptReport = tryCatch(async (req, res) => {
     );
   }
 
-  const isStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const isEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const isStart = convertToIST(startDate);
+  const isEnd = convertToIST(endDate);
 
   let query = `
     SELECT * 

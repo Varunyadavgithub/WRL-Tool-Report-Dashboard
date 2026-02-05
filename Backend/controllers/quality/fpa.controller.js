@@ -2,6 +2,7 @@ import sql from "mssql";
 import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
 export const getFpaCount = tryCatch(async (_, res) => {
   const now = new Date();
@@ -13,7 +14,7 @@ export const getFpaCount = tryCatch(async (_, res) => {
     now.getDate(),
     8,
     0,
-    0
+    0,
   );
 
   // Set end date: tomorrow at 20:00:00
@@ -23,10 +24,10 @@ export const getFpaCount = tryCatch(async (_, res) => {
     now.getDate() + 1,
     20,
     0,
-    0
+    0,
   );
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
     WITH DUMDATA AS (
@@ -105,7 +106,7 @@ ORDER BY ModelCount;
   } catch (error) {
     throw new AppError(
       `Failed to fetch the FPA Count data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -118,7 +119,7 @@ export const getAssetDetails = tryCatch(async (req, res) => {
   if (!AssemblySerial) {
     throw new AppError(
       "Missing required query parameters: assemblySerial.",
-      400
+      400,
     );
   }
 
@@ -159,7 +160,7 @@ export const getAssetDetails = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch the Asset Details data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -175,7 +176,7 @@ export const getFPQIDetails = tryCatch(async (_, res) => {
     now.getDate(),
     8,
     0,
-    0
+    0,
   );
 
   // Set end date: tomorrow at 20:00:00
@@ -185,11 +186,11 @@ export const getFPQIDetails = tryCatch(async (_, res) => {
     now.getDate() + 1,
     20,
     0,
-    0
+    0,
   );
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
     SELECT 
@@ -233,7 +234,7 @@ export const getFPQIDetails = tryCatch(async (_, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch the FPQI Details data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -250,7 +251,7 @@ export const getFpaDefect = tryCatch(async (_, res) => {
     now.getDate(),
     8,
     0,
-    0
+    0,
   );
 
   // Set end date: tomorrow at 20:00:00
@@ -260,11 +261,11 @@ export const getFpaDefect = tryCatch(async (_, res) => {
     now.getDate() + 1,
     20,
     0,
-    0
+    0,
   );
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
     Select * from FPAReport 
@@ -288,7 +289,7 @@ export const getFpaDefect = tryCatch(async (_, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch the FPA Defect data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -313,7 +314,7 @@ export const getDefectCategory = tryCatch(async (_, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch the Defect Category data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -338,11 +339,11 @@ export const addDefect = tryCatch(async (req, res) => {
   if (!model || !FGSerialNumber) {
     throw new AppError(
       "Missing required query parameters: model or fgSerialNumber.",
-      400
+      400,
     );
   }
 
-  const currDate = new Date(new Date(currentDateTime).getTime() + 330 * 60000);
+  const currDate = convertToIST(currentDateTime);
 
   const pool = await sql.connect(dbConfig1);
 

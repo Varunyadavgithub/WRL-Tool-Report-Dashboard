@@ -2,6 +2,7 @@ import sql from "mssql";
 import { dbConfig1, dbConfig2 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
 // Get Model Name
 export const getModlelName = tryCatch(async (req, res) => {
@@ -10,7 +11,7 @@ export const getModlelName = tryCatch(async (req, res) => {
   if (!AssemblySerial) {
     throw new AppError(
       "Missing required query parameters: assemblySerial.",
-      400
+      400,
     );
   }
 
@@ -52,7 +53,7 @@ export const holdCabinet = tryCatch(async (req, res) => {
   for (const hold of holds) {
     const { modelName, fgNo, userName, defect, formattedDate } = hold;
 
-    const currDate = new Date(new Date(formattedDate).getTime() + 330 * 60000);
+    const currDate = convertToIST(formattedDate);
 
     /* 1️⃣ Check Hold Status */
     const statusPool = await new sql.ConnectionPool(dbConfig1).connect();
@@ -61,7 +62,7 @@ export const holdCabinet = tryCatch(async (req, res) => {
         .request()
         .input("FGNo", sql.VarChar, fgNo)
         .query(
-          "SELECT serial FROM MaterialBarcode WHERE status = 11 AND serial = @FGNo"
+          "SELECT serial FROM MaterialBarcode WHERE status = 11 AND serial = @FGNo",
         );
 
       if (statusResult.recordset.length) {
@@ -82,7 +83,7 @@ export const holdCabinet = tryCatch(async (req, res) => {
       if (tempResult.recordset.length) {
         throw new AppError(
           `FGNo ${fgNo} is loading under session ${tempResult.recordset[0].Session_ID}`,
-          400
+          400,
         );
       }
     } finally {
@@ -96,13 +97,13 @@ export const holdCabinet = tryCatch(async (req, res) => {
         .request()
         .input("FGNo", sql.VarChar, fgNo)
         .query(
-          "SELECT Session_ID FROM DispatchMaster WHERE FGSerialNo = @FGNo"
+          "SELECT Session_ID FROM DispatchMaster WHERE FGSerialNo = @FGNo",
         );
 
       if (dispatchResult.recordset.length) {
         throw new AppError(
           `FGNo ${fgNo} already dispatched under session ${dispatchResult.recordset[0].Session_ID}`,
-          400
+          400,
         );
       }
     } finally {
@@ -162,7 +163,7 @@ export const releaseCabinet = tryCatch(async (req, res) => {
   for (const release of releases) {
     const { fgNo, releaseUserCode, action, formattedDate } = release;
 
-    const currDate = new Date(new Date(formattedDate).getTime() + 330 * 60000);
+    const currDate = convertToIST(formattedDate);
 
     const pool = await new sql.ConnectionPool(dbConfig1).connect();
     const transaction = new sql.Transaction(pool);

@@ -2,6 +2,7 @@ import sql from "mssql";
 import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
 export const getNfcReoprts = tryCatch(async (req, res) => {
   const { startDate, endDate, model, page = 1, limit = 1000 } = req.query;
@@ -9,12 +10,12 @@ export const getNfcReoprts = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate and endDate",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
   const offset = (parseInt(page) - 1) * parseInt(limit);
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
@@ -101,7 +102,7 @@ FROM FilteredData;
   } catch (error) {
     throw new AppError(
       `Failed to fetch NFC Report data: ${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -115,13 +116,13 @@ export const nfcReportExportData = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate and endDate",
-      400
+      400,
     );
   }
 
   // Convert input dates to IST
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
@@ -216,8 +217,8 @@ export const getQuickFiltersNfcReports = tryCatch(async (req, res) => {
     return res.status(400).send("Missing startDate or endDate.");
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
@@ -300,7 +301,7 @@ FROM FilteredData;
   } catch (error) {
     throw new AppError(
       `Failed to fetch Quick Filter NFC Report data: ${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();

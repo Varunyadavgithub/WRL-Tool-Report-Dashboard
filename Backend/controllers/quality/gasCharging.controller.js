@@ -2,14 +2,10 @@ import sql from "mssql";
 import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
 // Table name - adjust according to your database
 const TABLE_NAME = "GasChargeDtls"; // Change this to your actual table name
-
-// Helper function to convert to IST
-const convertToIST = (date) => {
-  return new Date(new Date(date).getTime() + 330 * 60000);
-};
 
 // Helper function to get date ranges
 const getDateRanges = {

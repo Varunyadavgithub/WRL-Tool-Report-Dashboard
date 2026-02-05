@@ -2,11 +2,7 @@ import sql from "mssql";
 import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
-
-// Helper function to convert to IST
-const convertToIST = (date) => {
-  return new Date(new Date(date).getTime() + 330 * 60000);
-};
+import { convertToIST } from "../../utils/convertToIST.js";
 
 // Helper function to map testType to column name
 const getTestResultColumn = (testType) => {

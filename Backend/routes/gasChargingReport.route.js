@@ -16,7 +16,7 @@ import {
   getFailedRecords,
   getRefrigerantWiseStats,
   getGasWeightAnalysis,
-} from "../controllers/quality/gasChargingController.js";
+} from "../controllers/quality/gasCharging.controller.js";
 
 const router = express.Router();
 

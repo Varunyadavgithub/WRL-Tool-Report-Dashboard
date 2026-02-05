@@ -2,6 +2,7 @@ import sql from "mssql";
 import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
 export const getLptAssetDetails = tryCatch(async (req, res) => {
   const { AssemblySerial } = req.query;
@@ -9,7 +10,7 @@ export const getLptAssetDetails = tryCatch(async (req, res) => {
   if (!AssemblySerial) {
     throw new AppError(
       "Missing required query parameters: assemblySerial.",
-      400
+      400,
     );
   }
 
@@ -51,7 +52,7 @@ WHERE
   } catch (error) {
     throw new AppError(
       `Failed to fetch the LPT Asset Details data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -77,7 +78,7 @@ export const getLptDefectCategory = tryCatch(async (_, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch Lpt Defect Category data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -106,7 +107,7 @@ export const addLptDefect = tryCatch(async (req, res) => {
   } = req.body;
 
   // Convert to IST (UTC+5:30)
-  const currDate = new Date(new Date(currentDateTime).getTime() + 330 * 60000);
+  const currDate = convertToIST(currentDateTime);
 
   const query = `
       INSERT INTO LPTReport
@@ -146,7 +147,7 @@ export const addLptDefect = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to add the LPT Defect data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -163,7 +164,7 @@ export const getLptDefectReport = tryCatch(async (req, res) => {
     now.getDate(),
     8,
     0,
-    0
+    0,
   );
 
   // Set end date: tomorrow at 20:00:00
@@ -173,10 +174,10 @@ export const getLptDefectReport = tryCatch(async (req, res) => {
     now.getDate() + 1,
     20,
     0,
-    0
+    0,
   );
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
     Select * from LPTReport 
@@ -200,7 +201,7 @@ export const getLptDefectReport = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch the LPT Defect Report data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -217,7 +218,7 @@ export const getLptDefectCount = tryCatch(async (req, res) => {
     now.getDate(),
     8,
     0,
-    0
+    0,
   );
 
   // Set end date: tomorrow at 20:00:00
@@ -227,10 +228,10 @@ export const getLptDefectCount = tryCatch(async (req, res) => {
     now.getDate() + 1,
     20,
     0,
-    0
+    0,
   );
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
 WITH FPA_COMPUTED AS (
@@ -294,7 +295,7 @@ ORDER BY f.ModelCount;
   } catch (error) {
     throw new AppError(
       `Failed to fetch the Lpt Defect Count data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();

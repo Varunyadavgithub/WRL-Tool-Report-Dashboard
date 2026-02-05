@@ -3,6 +3,7 @@ import { dbConfig3 } from "../../config/db.config.js";
 import { sendVisitorReportMail } from "../../emailTemplates/Visitor_Management_System/visitorReport.template.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
 /* ==============================
    Fetch Visitors (Report)
@@ -14,8 +15,8 @@ export const fetchVisitors = tryCatch(async (req, res) => {
     throw new AppError("startTime and endTime are required", 400);
   }
 
-  const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
+  const istStart = convertToIST(startTime);
+  const istEnd = convertToIST(endTime);
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
 

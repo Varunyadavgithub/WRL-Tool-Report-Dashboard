@@ -2,6 +2,7 @@ import sql from "mssql";
 import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
 // Generates a report detailing the traceability of components used in finished goods within a specified timeframe.
 export const generateReport = tryCatch(async (req, res) => {
@@ -19,8 +20,8 @@ export const generateReport = tryCatch(async (req, res) => {
   }
 
   // Convert to IST (+5:30)
-  const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
+  const istStart = convertToIST(startTime);
+  const istEnd = convertToIST(endTime);
   const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
 
   const pool = await new sql.ConnectionPool({
@@ -143,7 +144,7 @@ export const generateReport = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to generate component traceability report: ${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -158,8 +159,8 @@ export const componentTraceabilityExportData = tryCatch(async (req, res) => {
     throw new AppError("startTime and endTime are required", 400);
   }
 
-  const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
+  const istStart = convertToIST(startTime);
+  const istEnd = convertToIST(endTime);
 
   const pool = await new sql.ConnectionPool({
     ...dbConfig1,
@@ -277,7 +278,7 @@ export const componentTraceabilityExportData = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to export component traceability data: ${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();

@@ -4,6 +4,7 @@ import sql from "mssql";
 import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
 // Path where defect images are uploaded
 const uploadDir = path.join(process.cwd(), "uploads/FpaDefectImages");
@@ -18,8 +19,8 @@ export const getFpaReport = tryCatch(async (req, res) => {
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   let query = `
     SELECT * 
@@ -72,8 +73,8 @@ export const getFpaDailyReport = tryCatch(async (req, res) => {
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
 WITH ShiftedData AS (
@@ -154,8 +155,8 @@ export const getFpaMonthlyReport = tryCatch(async (req, res) => {
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
 WITH ShiftedData AS (
@@ -237,8 +238,8 @@ export const getFpaYearlyReport = tryCatch(async (req, res) => {
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
 WITH ShiftedData AS (

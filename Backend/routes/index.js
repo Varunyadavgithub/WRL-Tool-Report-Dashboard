@@ -4,7 +4,7 @@ import commonRoutes from "./common.route.js";
 import visitorRoutes from "./visitor.route.js";
 import qualityRoutes from "./quality.route.js";
 import estReportRoutes from "./estReport.route.js";
-import gasChargingReportRoutes from "./gasChargingRoutes.route.js";
+import gasChargingReportRoutes from "./gasChargingReport.route.js";
 import productionRoutes from "./production.route.js";
 import dispatchRoute from "./dispatch.route.js";
 import productionPlaningRoutes from "./planing.route.js";

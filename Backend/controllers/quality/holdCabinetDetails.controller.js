@@ -1,6 +1,7 @@
 import sql, { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
 export const getDispatchHoldDetails = tryCatch(async (req, res) => {
   const { startDate, endDate, status } = req.query;
@@ -12,8 +13,8 @@ export const getDispatchHoldDetails = tryCatch(async (req, res) => {
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   let statusCondition = "";
   if (status) {

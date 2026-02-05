@@ -2,6 +2,7 @@ import sql from "mssql";
 import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
 export const getBarcodeDetails = tryCatch(async (req, res) => {
   const {
@@ -16,12 +17,12 @@ export const getBarcodeDetails = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate and endDate.",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
   const offset = (parseInt(page) - 1) * parseInt(limit);
 
   const finalStationCodes = ["1220010", "1230017"];
@@ -113,7 +114,7 @@ export const getBarcodeDetails = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch Barcode Details data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -127,12 +128,12 @@ export const totalProductionExportData = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate and endDate.",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const finalStationCodes = ["1220010", "1230017"];
   const postFoamingStationCodes = ["1230007", "1220003", "1220004", "1230012"];
@@ -220,7 +221,7 @@ export const totalProductionExportData = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch Total Production Export data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -234,12 +235,12 @@ export const getQuickFiltersBarcodeDetails = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate and endDate.",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const finalStationCodes = ["1220010", "1230017"];
   const postFoamingStationCodes = ["1230007", "1220003", "1220004", "1230012"];
@@ -325,7 +326,7 @@ export const getQuickFiltersBarcodeDetails = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch Quick Filters Barcode Details data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();

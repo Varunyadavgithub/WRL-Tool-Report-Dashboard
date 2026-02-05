@@ -2,6 +2,7 @@ import sql from "mssql";
 import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
 export const fetchFGData = tryCatch(async (req, res) => {
   const {
@@ -16,12 +17,12 @@ export const fetchFGData = tryCatch(async (req, res) => {
   if (!startTime || !endTime || !stationCode) {
     throw new AppError(
       "Missing required query parameters: startDate, endDate and stationCode",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
+  const istStart = convertToIST(startTime);
+  const istEnd = convertToIST(endTime);
   const offset = (parseInt(page) - 1) * parseInt(limit);
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
@@ -123,12 +124,12 @@ export const productionReportExportData = tryCatch(async (req, res) => {
   if (!startTime || !endTime || !stationCode) {
     throw new AppError(
       "Missing required query parameters: startDate, endDate and stationCode",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
+  const istStart = convertToIST(startTime);
+  const istEnd = convertToIST(endTime);
 
   let query = `
       WITH FilteredData AS (
@@ -206,7 +207,7 @@ export const productionReportExportData = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch Production Report export data: ${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -217,8 +218,8 @@ export const productionReportExportData = tryCatch(async (req, res) => {
 export const fetchQuickFiltersData = tryCatch(async (req, res) => {
   const { startTime, endTime, model, stationCode } = req.query;
 
-  const istStart = new Date(new Date(startTime).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endTime).getTime() + 330 * 60000);
+  const istStart = convertToIST(startTime);
+  const istEnd = convertToIST(endTime);
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
@@ -298,7 +299,7 @@ ModelStats AS (
   } catch (error) {
     throw new AppError(
       `Failed to fetch Production Report Quick Filter data: ${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();

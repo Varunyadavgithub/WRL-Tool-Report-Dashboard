@@ -2,6 +2,7 @@ import sql from "mssql";
 import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
 export const getCPTReport = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
@@ -9,12 +10,12 @@ export const getCPTReport = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate and endDate.",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   let query = `
         DECLARE @RETURN_TBL TABLE ([Result_ID] [bigint] NULL,
@@ -152,7 +153,7 @@ export const getCPTReport = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch the CPT Report data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
