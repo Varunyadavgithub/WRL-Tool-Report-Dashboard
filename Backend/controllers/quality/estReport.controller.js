@@ -45,7 +45,7 @@ const getDateRanges = {
 
 /**
  * @desc    Get EST Report data with filters
- * @route   GET /api/v1/est-report
+ * @route   GET /api/v1/quality/est-report
  */
 export const getEstReport = tryCatch(async (req, res) => {
   const {
@@ -92,33 +92,12 @@ export const getEstReport = tryCatch(async (req, res) => {
   // Main data query
   const dataQuery = `
     SELECT 
-      RefNo,
-      model_no,
-      serial_no,
-      date_time,
-      operator,
-      set_ect_ohms,
-      set_ect_time,
-      read_ect_ohms,
-      ect_result,
-      set_hv_kv,
-      set_hv_ma,
-      set_hv_time,
-      read_hv_kv,
-      hv_result,
-      set_ir_mohms,
-      set_ir_time,
-      read_ir_mohms,
-      ir_result,
-      set_lct_ma,
-      set_lct_time,
-      read_lct_ln_ma,
-      read_lct_ln_Vtg,
-      lct_ln_result,
-      set_wattage_lower,
-      set_wattage_upper,
-      result,
-      status
+      RefNo, model_no, serial_no, date_time, operator, set_ect_ohms, 
+      set_ect_time, read_ect_ohms, ect_result, set_hv_kv, set_hv_ma, 
+      set_hv_time, read_hv_kv, hv_result, set_ir_mohms, set_ir_time, 
+      read_ir_mohms, ir_result, set_lct_ma, set_lct_time, read_lct_ln_ma, 
+      read_lct_ln_Vtg, lct_ln_result, set_wattage_lower, set_wattage_upper, 
+      result, status
     FROM ESTStaging
     ${whereClause}
     ORDER BY date_time DESC
@@ -195,7 +174,7 @@ export const getEstReport = tryCatch(async (req, res) => {
 
 /**
  * @desc    Get EST Report Summary
- * @route   GET /api/v1/est-report/summary
+ * @route   GET /api/v1/quality/est-report/summary
  */
 export const getEstReportSummary = tryCatch(async (req, res) => {
   const { startDate, endDate, model } = req.query;
@@ -298,7 +277,7 @@ export const getEstReportSummary = tryCatch(async (req, res) => {
 
 /**
  * @desc    Get distinct models
- * @route   GET /api/v1/est-report/models
+ * @route   GET /api/v1/quality/est-report/models
  */
 export const getDistinctModels = tryCatch(async (req, res) => {
   const query = `
@@ -331,7 +310,7 @@ export const getDistinctModels = tryCatch(async (req, res) => {
 
 /**
  * @desc    Get distinct operators
- * @route   GET /api/v1/est-report/operators
+ * @route   GET /api/v1/quality/est-report/operators
  */
 export const getDistinctOperators = tryCatch(async (req, res) => {
   const query = `
@@ -364,7 +343,7 @@ export const getDistinctOperators = tryCatch(async (req, res) => {
 
 /**
  * @desc    Quick filter (today, yesterday, mtd)
- * @route   GET /api/v1/est-report/quick/:filter
+ * @route   GET /api/v1/quality/est-report/quick/:filter
  */
 export const getEstReportQuickFilter = tryCatch(async (req, res) => {
   const { filter } = req.params;
@@ -434,7 +413,7 @@ export const getEstReportQuickFilter = tryCatch(async (req, res) => {
 
 /**
  * @desc    Get EST Report by RefNo
- * @route   GET /api/v1/est-report/:refNo
+ * @route   GET /api/v1/quality/est-report/:refNo
  */
 export const getEstReportByRefNo = tryCatch(async (req, res) => {
   const { refNo } = req.params;
@@ -475,7 +454,7 @@ export const getEstReportByRefNo = tryCatch(async (req, res) => {
 
 /**
  * @desc    Export EST Report
- * @route   GET /api/v1/est-report/export
+ * @route   GET /api/v1/quality/est-report/export
  */
 export const exportEstReport = tryCatch(async (req, res) => {
   const { startDate, endDate, model, operator, result } = req.query;
@@ -562,7 +541,7 @@ export const exportEstReport = tryCatch(async (req, res) => {
 
 /**
  * @desc    Get model-wise statistics
- * @route   GET /api/v1/est-report/model-stats
+ * @route   GET /api/v1/quality/est-report/model-stats
  */
 export const getModelWiseStats = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
@@ -616,7 +595,7 @@ export const getModelWiseStats = tryCatch(async (req, res) => {
 
 /**
  * @desc    Get operator-wise statistics
- * @route   GET /api/v1/est-report/operator-stats
+ * @route   GET /api/v1/quality/est-report/operator-stats
  */
 export const getOperatorWiseStats = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
@@ -670,7 +649,7 @@ export const getOperatorWiseStats = tryCatch(async (req, res) => {
 
 /**
  * @desc    Get hourly trend
- * @route   GET /api/v1/est-report/hourly-trend
+ * @route   GET /api/v1/quality/est-report/hourly-trend
  */
 export const getHourlyTrend = tryCatch(async (req, res) => {
   const { startDate, endDate, model } = req.query;
@@ -729,7 +708,7 @@ export const getHourlyTrend = tryCatch(async (req, res) => {
 
 /**
  * @desc    Get daily trend
- * @route   GET /api/v1/est-report/daily-trend
+ * @route   GET /api/v1/quality/est-report/daily-trend
  */
 export const getDailyTrend = tryCatch(async (req, res) => {
   const { startDate, endDate, model } = req.query;
@@ -789,7 +768,7 @@ export const getDailyTrend = tryCatch(async (req, res) => {
 
 /**
  * @desc    Get failed tests
- * @route   GET /api/v1/est-report/failures
+ * @route   GET /api/v1/quality/est-report/failures
  */
 export const getFailedTests = tryCatch(async (req, res) => {
   const { startDate, endDate, testType, model } = req.query;
@@ -851,7 +830,7 @@ export const getFailedTests = tryCatch(async (req, res) => {
 
 /**
  * @desc    Get failure analysis
- * @route   GET /api/v1/est-report/failure-analysis
+ * @route   GET /api/v1/quality/est-report/failure-analysis
  */
 export const getFailureAnalysis = tryCatch(async (req, res) => {
   const { startDate, endDate, model } = req.query;
