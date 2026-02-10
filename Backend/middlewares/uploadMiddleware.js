@@ -10,12 +10,10 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
 /* ===================== SUB DIRECTORIES ===================== */
 
-const fiveDaysPlanDir = path.resolve(uploadsDir, "FiveDaysPlan");
 const bisReportDir = path.resolve(uploadsDir, "BISReport");
 const fpaDefectImagesDir = path.resolve(uploadsDir, "FpaDefectImages");
 const calibrationDir = path.resolve(uploadsDir, "Calibration");
 
-if (!fs.existsSync(fiveDaysPlanDir)) fs.mkdirSync(fiveDaysPlanDir);
 if (!fs.existsSync(bisReportDir)) fs.mkdirSync(bisReportDir);
 if (!fs.existsSync(fpaDefectImagesDir)) fs.mkdirSync(fpaDefectImagesDir);
 if (!fs.existsSync(calibrationDir)) fs.mkdirSync(calibrationDir);
@@ -46,7 +44,7 @@ const createStorage = (folder) => {
         uniqueFilename = `${FGSerialNumber}-${Date.now()}${ext}`;
       } else {
         const uniqueValue = Math.floor(
-          100000 + Math.random() * 900000
+          100000 + Math.random() * 900000,
         ).toString();
         uniqueFilename = `${baseFileName}-${uniqueValue}${ext}`;
       }
@@ -124,13 +122,6 @@ const calibrationFileFilter = (_, file, cb) => {
 };
 
 /* ===================== UPLOAD MIDDLEWARES ===================== */
-
-// Five Days Plan Excel
-export const uploadFiveDaysPlanExcel = multer({
-  storage: createStorage("FiveDaysPlan"),
-  fileFilter: createFileFilter("excel"),
-  limits: { fileSize: fileTypes.excel.maxSize },
-});
 
 // BIS Report PDF
 export const uploadBISReportPDF = multer({

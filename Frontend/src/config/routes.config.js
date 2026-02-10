@@ -70,7 +70,6 @@ const FGCasting = lazy(() => import("../pages/Dispatch/FGCasting"));
 const GateEntry = lazy(() => import("../pages/Dispatch/GateEntry"));
 const ErrorLog = lazy(() => import("../pages/Dispatch/ErrorLog"));
 
-const FiveDaysPlaning = lazy(() => import("../pages/Planing/FiveDaysPlaning"));
 const ProductionPlaning = lazy(
   () => import("../pages/Planing/ProductionPlaning"),
 );
@@ -387,11 +386,6 @@ export const ROUTE_CONFIG = [
         label: "Production Planning",
         component: ProductionPlaning,
         roles: [ROLES.ADMIN, ROLES.PRODUCTION_MANAGER, ROLES.PLANNING_TEAM],
-      },
-      {
-        path: "/planing/5-days-planing",
-        label: "5 Days Planning",
-        component: FiveDaysPlaning,
       },
       {
         path: "/planing/daily-planing",
