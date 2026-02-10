@@ -52,7 +52,7 @@ import {
 } from "react-icons/md";
 import { HiStatusOnline, HiDatabase } from "react-icons/hi";
 import { IoSpeedometer, IoCalendarOutline } from "react-icons/io5";
-import { RiDashboardFill, RiCalendarEventLine } from "react-icons/ri";
+import { RiCalendarEventLine } from "react-icons/ri";
 import { TbReportAnalytics, TbCalendarStats } from "react-icons/tb";
 import { GiPowerLightning } from "react-icons/gi";
 import { AiOutlineFieldNumber, AiFillThunderbolt } from "react-icons/ai";
@@ -449,10 +449,6 @@ const CPTReport = () => {
               </span>
               CPT Performance Report
             </h1>
-            <p className="text-indigo-100 mt-2 flex items-center gap-2">
-              <RiDashboardFill className="text-lg" />
-              Comprehensive Power Testing & Analysis Dashboard
-            </p>
           </div>
           <div className="text-right text-white">
             <p className="text-sm opacity-75 flex items-center gap-1 justify-end">
