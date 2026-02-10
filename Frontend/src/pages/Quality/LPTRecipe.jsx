@@ -5,11 +5,15 @@ import Button from "../../components/ui/Button";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { useEffect, useState } from "react";
-import { FaEdit } from "react-icons/fa";
 import { MdDeleteForever } from "react-icons/md";
 import PopupModal from "../../components/ui/PopupModal";
 import { WiThermometer } from "react-icons/wi";
-import { FaBolt } from "react-icons/fa";
+import {
+  FaEdit,
+  FaThermometerHalf,
+  FaBolt,
+  FaBatteryFull,
+} from "react-icons/fa";
 import { MdPowerSettingsNew } from "react-icons/md";
 import { baseURL } from "../../assets/assets";
 import { useGetModelVariantsQuery } from "../../redux/api/commonApi.js";
@@ -386,6 +390,7 @@ const LPTRecipe = () => {
           </div>
         </div>
       </div>
+
       {showUpdateModal && (
         <PopupModal
           title="Update Recipe"
@@ -395,22 +400,61 @@ const LPTRecipe = () => {
           modalId="update-modal"
           onConfirm={confirmUpdate}
           onCancel={() => setShowUpdateModal(false)}
-          icon={<FaEdit className="text-blue-500 w-10 h-10 mx-auto" />}
+          icon={
+            <FaEdit className="text-blue-500 w-8 h-8 sm:w-10 sm:h-10 mx-auto" />
+          }
+          confirmButtonColor="bg-blue-600 hover:bg-blue-700"
+          modalClassName="w-[95%] max-w-md sm:max-w-xl md:max-w-3xl"
         >
-          <div className="space-y-4 mt-4 text-left">
-            <InputField
-              label="Model Name"
-              type="text"
-              value={updateFields.modelName}
-              readOnly
-              className="text-black dark:text-white"
-            />
-            <div>
-              <div className="flex flex-col items-center justify-center gap-2">
-                {/* Temperature Inputs */}
-                <div className="flex items-center justify-between gap-4">
-                  <InputField
-                    label="Min Temp"
+          <div className="mt-4 text-left">
+            {/* Model Name Header */}
+            <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-800 rounded-lg border border-blue-100 dark:border-gray-600">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                    Model Name
+                  </label>
+                  <span className="text-lg font-bold text-gray-800 dark:text-white">
+                    {updateFields.modelName}
+                  </span>
+                </div>
+                <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 rounded-full">
+                  Read Only
+                </span>
+              </div>
+            </div>
+
+            {/* Parameters Table */}
+            <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-600">
+              {/* Header */}
+              <div className="grid grid-cols-3 gap-px bg-gray-200 dark:bg-gray-600">
+                <div className="bg-gray-100 dark:bg-gray-700 p-2 text-center">
+                  <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                    Parameter
+                  </span>
+                </div>
+                <div className="bg-gray-100 dark:bg-gray-700 p-2 text-center">
+                  <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                    Min Value
+                  </span>
+                </div>
+                <div className="bg-gray-100 dark:bg-gray-700 p-2 text-center">
+                  <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                    Max Value
+                  </span>
+                </div>
+              </div>
+
+              {/* Temperature Row */}
+              <div className="grid grid-cols-3 gap-px bg-gray-200 dark:bg-gray-600">
+                <div className="bg-red-50 dark:bg-red-900/30 p-3 flex items-center justify-center gap-2">
+                  <FaThermometerHalf className="text-red-500 dark:text-red-400 w-4 h-4" />
+                  <span className="text-sm font-medium text-red-700 dark:text-red-400">
+                    Temp
+                  </span>
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-2">
+                  <input
                     type="text"
                     value={updateFields.minTemp}
                     onChange={(e) =>
@@ -419,10 +463,12 @@ const LPTRecipe = () => {
                         minTemp: e.target.value,
                       })
                     }
-                    className="text-black dark:text-white"
+                    className="w-full h-9 px-2 text-sm text-center text-gray-800 dark:text-white bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="Min"
                   />
-                  <InputField
-                    label="Max Temp"
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-2">
+                  <input
                     type="text"
                     value={updateFields.maxTemp}
                     onChange={(e) =>
@@ -431,14 +477,22 @@ const LPTRecipe = () => {
                         maxTemp: e.target.value,
                       })
                     }
-                    className="text-black dark:text-white"
+                    className="w-full h-9 px-2 text-sm text-center text-gray-800 dark:text-white bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="Max"
                   />
                 </div>
+              </div>
 
-                {/* Current Inputs */}
-                <div className="flex items-center justify-between gap-4">
-                  <InputField
-                    label="Min Curr"
+              {/* Current Row */}
+              <div className="grid grid-cols-3 gap-px bg-gray-200 dark:bg-gray-600">
+                <div className="bg-yellow-50 dark:bg-yellow-900/30 p-3 flex items-center justify-center gap-2">
+                  <FaBolt className="text-yellow-500 dark:text-yellow-400 w-4 h-4" />
+                  <span className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                    Current
+                  </span>
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-2">
+                  <input
                     type="text"
                     value={updateFields.minCurr}
                     onChange={(e) =>
@@ -447,10 +501,12 @@ const LPTRecipe = () => {
                         minCurr: e.target.value,
                       })
                     }
-                    className="text-black dark:text-white"
+                    className="w-full h-9 px-2 text-sm text-center text-gray-800 dark:text-white bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                    placeholder="Min"
                   />
-                  <InputField
-                    label="Max Curr"
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-2">
+                  <input
                     type="text"
                     value={updateFields.maxCurr}
                     onChange={(e) =>
@@ -459,14 +515,22 @@ const LPTRecipe = () => {
                         maxCurr: e.target.value,
                       })
                     }
-                    className="text-black dark:text-white"
+                    className="w-full h-9 px-2 text-sm text-center text-gray-800 dark:text-white bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                    placeholder="Max"
                   />
                 </div>
+              </div>
 
-                {/* Power Inputs */}
-                <div className="flex items-center justify-between gap-4">
-                  <InputField
-                    label="Min Power"
+              {/* Power Row */}
+              <div className="grid grid-cols-3 gap-px bg-gray-200 dark:bg-gray-600">
+                <div className="bg-blue-50 dark:bg-blue-900/30 p-3 flex items-center justify-center gap-2">
+                  <FaBatteryFull className="text-blue-500 dark:text-blue-400 w-4 h-4" />
+                  <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                    Power
+                  </span>
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-2">
+                  <input
                     type="text"
                     value={updateFields.minPow}
                     onChange={(e) =>
@@ -475,10 +539,12 @@ const LPTRecipe = () => {
                         minPow: e.target.value,
                       })
                     }
-                    className="text-black dark:text-white"
+                    className="w-full h-9 px-2 text-sm text-center text-gray-800 dark:text-white bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Min"
                   />
-                  <InputField
-                    label="Max Power"
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-2">
+                  <input
                     type="text"
                     value={updateFields.maxPow}
                     onChange={(e) =>
@@ -487,7 +553,8 @@ const LPTRecipe = () => {
                         maxPow: e.target.value,
                       })
                     }
-                    className="text-black dark:text-white"
+                    className="w-full h-9 px-2 text-sm text-center text-gray-800 dark:text-white bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Max"
                   />
                 </div>
               </div>
@@ -495,7 +562,6 @@ const LPTRecipe = () => {
           </div>
         </PopupModal>
       )}
-
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <PopupModal

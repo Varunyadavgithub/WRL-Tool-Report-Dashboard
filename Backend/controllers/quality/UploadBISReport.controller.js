@@ -213,95 +213,130 @@ export const deleteBisPdfFile = tryCatch(async (req, res) => {
 });
 
 // Update BIS File Controller
+// Update BIS File Controller
 export const updateBisPdfFile = tryCatch(async (req, res) => {
   const { srNo } = req.params;
   const { modelName, year, month, testFrequency, description } = req.body;
-  const newFileName = req.file?.filename;
+  const newFile = req.file; // New file (if uploaded)
 
+  // Validate required fields
   if (!modelName || !year || !month || !testFrequency || !description) {
+    // If a new file was uploaded but validation fails, delete it
+    if (newFile) {
+      const newFilePath = path.join(uploadDir, newFile.filename);
+      if (fs.existsSync(newFilePath)) {
+        fs.unlinkSync(newFilePath);
+      }
+    }
     throw new AppError(
       "Missing required fields: modelName, year, month, testFrequency or description.",
       400,
     );
   }
 
+  let pool;
+
   try {
-    const pool = await sql.connect(dbConfig1);
+    pool = await sql.connect(dbConfig1);
 
-    // If a new file is uploaded, delete the old file
-    if (newFileName) {
-      // First, get the old filename to delete
-      const oldFileQuery = `SELECT FileName FROM BISUpload WHERE SrNo = @SrNo`;
-      const oldFileResult = await pool
-        .request()
-        .input("SrNo", sql.Int, parseInt(srNo))
-        .query(oldFileQuery);
+    // Step 1: Get the existing record to preserve the old filename
+    const existingQuery = `SELECT FileName FROM BISUpload WHERE SrNo = @SrNo`;
+    const existingResult = await pool
+      .request()
+      .input("SrNo", sql.Int, parseInt(srNo))
+      .query(existingQuery);
 
-      const oldFileName = oldFileResult.recordset[0]?.FileName;
-
-      if (oldFileName) {
-        const oldFilePath = path.join(uploadDir, oldFileName);
-        if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath);
+    if (existingResult.recordset.length === 0) {
+      // If record not found and new file was uploaded, delete it
+      if (newFile) {
+        const newFilePath = path.join(uploadDir, newFile.filename);
+        if (fs.existsSync(newFilePath)) {
+          fs.unlinkSync(newFilePath);
         }
+      }
+      return res.status(404).json({
+        success: false,
+        message: "Record not found",
+      });
+    }
+
+    const oldFileName = existingResult.recordset[0].FileName;
+
+    // Step 2: Determine which filename to use
+    // If new file uploaded -> use new filename, else -> keep old filename
+    const finalFileName = newFile ? newFile.filename : oldFileName;
+
+    // Step 3: If new file uploaded, delete the old file from disk
+    if (newFile && oldFileName) {
+      const oldFilePath = path.join(uploadDir, oldFileName);
+      if (fs.existsSync(oldFilePath)) {
+        fs.unlinkSync(oldFilePath);
+        console.log(`Deleted old file: ${oldFileName}`);
       }
     }
 
-    // Prepare the update query using SrNo
-    const query = `
+    // Step 4: Update the database record
+    const updateQuery = `
       UPDATE BISUpload 
-      SET ModelName = @ModelName, 
-          Year = @Year,
-          Month = @Month,
-          testFrequency = @TestFrequency,
-          Description = @Description, 
-          FileName = @FileName 
+      SET 
+        ModelName = @ModelName, 
+        Year = @Year,
+        Month = @Month,
+        TestFrequency = @TestFrequency,
+        Description = @Description,
+        FileName = @FileName
       WHERE SrNo = @SrNo
     `;
 
-    const result = await pool
+    const updateResult = await pool
       .request()
       .input("ModelName", sql.VarChar, modelName)
       .input("Year", sql.VarChar, year)
       .input("Month", sql.VarChar, month)
       .input("TestFrequency", sql.VarChar, testFrequency)
       .input("Description", sql.VarChar, description)
-      .input("FileName", sql.VarChar, newFileName || null)
+      .input("FileName", sql.VarChar, finalFileName) // ✅ Uses existing filename if no new file
       .input("SrNo", sql.Int, parseInt(srNo))
-      .query(query);
+      .query(updateQuery);
 
-    // Check if the update was successful
-    if (result.rowsAffected[0] === 0) {
+    if (updateResult.rowsAffected[0] === 0) {
       return res.status(404).json({
         success: false,
-        message: "Record not found or no changes made",
+        message: "No changes made",
       });
     }
 
     res.status(200).json({
       success: true,
-      srNo: srNo,
-      filename: newFileName,
-      fileUrl: newFileName ? `/uploads-bis-pdf/${newFileName}` : null,
-      message: "Updated successfully",
+      message: "BIS Report updated successfully",
+      data: {
+        srNo: srNo,
+        modelName,
+        year,
+        month,
+        testFrequency,
+        description,
+        fileName: finalFileName,
+        fileUrl: `/uploads/BISReport/${finalFileName}`,
+        fileUpdated: !!newFile, // true if new file was uploaded
+      },
     });
-    await pool.close();
   } catch (error) {
     console.error("Update error:", error);
 
-    // If a new file was uploaded but update failed, delete the new file
-    if (req.file) {
-      const newFilePath = path.join(uploadDir, req.file.filename);
+    // Cleanup: If update failed and new file was uploaded, delete it
+    if (newFile) {
+      const newFilePath = path.join(uploadDir, newFile.filename);
       if (fs.existsSync(newFilePath)) {
         fs.unlinkSync(newFilePath);
       }
     }
 
-    res.status(500).json({
-      success: false,
-      message: "Server error during update",
-      error: error.message,
-    });
+    throw new AppError(`Failed to update BIS Report: ${error.message}`, 500);
+  } finally {
+    if (pool) {
+      await pool.close();
+    }
   }
 });
 

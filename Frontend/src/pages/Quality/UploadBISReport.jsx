@@ -10,6 +10,7 @@ import {
   FaFilePdf,
   FaDownload,
 } from "react-icons/fa";
+import { AiOutlineFile } from "react-icons/ai";
 import toast from "react-hot-toast";
 import axios from "axios";
 import { Link } from "react-router-dom";
@@ -168,7 +169,7 @@ const UploadBISReport = () => {
           headers: {
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
       if (res?.data?.success) {
         toast.success("BIS Report uploaded successfully");
@@ -205,12 +206,13 @@ const UploadBISReport = () => {
   };
 
   const confirmUpdate = async () => {
+    // Validation
     if (!updateFields.modelName || !updateFields.modelName.trim()) {
       toast.error("Model Name is required");
       return;
     }
 
-    if (!updateFields.year || !updateFields.year.trim()) {
+    if (!updateFields.year || !updateFields.year.toString().trim()) {
       toast.error("Year is required");
       return;
     }
@@ -231,20 +233,21 @@ const UploadBISReport = () => {
     }
 
     const formData = new FormData();
-    formData.append("srNo", updateFields.srNo);
     formData.append("modelName", updateFields.modelName.trim());
-    formData.append("year", updateFields.year.trim());
+    formData.append("year", updateFields.year.toString().trim());
     formData.append("month", updateFields.month.trim());
     formData.append("testFrequency", updateFields.testFrequency.trim());
     formData.append("description", updateFields.description.trim());
 
-    if (selectedFile) {
-      formData.append("file", selectedFile);
+    // ✅ Only append file if user selected a NEW file
+    if (updateFields.selectedFile) {
+      formData.append("file", updateFields.selectedFile);
     }
 
     try {
       setLoading(true);
       const { srNo } = itemToUpdate;
+
       const res = await axios.put(
         `${baseURL}quality/update-bis-file/${srNo}`,
         formData,
@@ -252,15 +255,15 @@ const UploadBISReport = () => {
           headers: {
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
 
       if (res?.data?.success) {
-        toast.success("BIS Report updated successfully");
+        toast.success(res.data.message || "BIS Report updated successfully");
         fetchUploadedFiles();
         setShowUpdateModal(false);
 
-        setSelectedFile(null);
+        // Reset update fields
         setUpdateFields({
           srNo: "",
           modelName: "",
@@ -273,7 +276,7 @@ const UploadBISReport = () => {
       }
     } catch (err) {
       console.error(err);
-      toast.error(err.res?.data?.error || "Failed to update BIS Report");
+      toast.error(err.response?.data?.message || "Failed to update BIS Report");
     } finally {
       setLoading(false);
     }
@@ -323,7 +326,7 @@ const UploadBISReport = () => {
           params: {
             filename: fileName,
           },
-        }
+        },
       );
 
       if (res?.data?.success) {
@@ -395,7 +398,7 @@ const UploadBISReport = () => {
                     <option value="">Select Year</option>
                     {Array.from(
                       { length: new Date().getFullYear() - 2021 + 1 },
-                      (_, index) => 2021 + index
+                      (_, index) => 2021 + index,
                     ).map((year) => (
                       <option key={year} value={year}>
                         {year}
@@ -689,6 +692,7 @@ const UploadBISReport = () => {
           </div>
         )}
       </div>
+
       {showUpdateModal && (
         <PopupModal
           title="Update BIS Report"
@@ -698,192 +702,240 @@ const UploadBISReport = () => {
           modalId="update-modal"
           onConfirm={confirmUpdate}
           onCancel={() => setShowUpdateModal(false)}
-          icon={<FaEdit className="text-blue-500 w-10 h-10 mx-auto" />}
+          icon={
+            <FaEdit className="text-blue-500 w-8 h-8 sm:w-10 sm:h-10 mx-auto" />
+          }
+          confirmButtonColor="bg-blue-600 hover:bg-blue-700"
+          modalClassName="w-[95%] max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-4xl xl:max-w-5xl"
         >
-          <div className="space-y-6 mt-4 text-left">
-            {/* Upload Box */}
-            <div className="bg-white shadow-lg rounded-xl border border-purple-100 p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                <FaFileUpload className="mr-2 text-blue-600" />
-                Upload File
-              </h2>
+          <div className="mt-4 text-left">
+            {/* Main Grid - Side by side on large screens */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+              {/* Left Column - Upload Box */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-600 p-4">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white mb-3 flex items-center">
+                  <FaFileUpload className="mr-2 text-blue-600" />
+                  Upload File
+                </h2>
 
-              <div className="border-2 border-dashed border-purple-300 rounded-lg p-6 text-center">
-                <input
-                  type="file"
-                  id="file-upload"
-                  accept=".pdf"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
+                <div className="border-2 border-dashed border-purple-300 dark:border-purple-500 rounded-lg p-4 sm:p-5 text-center bg-white dark:bg-gray-700">
+                  <input
+                    type="file"
+                    id="update-file-upload"
+                    accept=".pdf"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      const maxSize = 10 * 1024 * 1024;
 
-                <label
-                  htmlFor="file-upload"
-                  className="cursor-pointer flex flex-col items-center"
-                >
-                  <FaCloudUploadAlt className="text-5xl text-purple-500 mb-4" />
-                  <p className="text-gray-600">
-                    {selectedFile
-                      ? `Selected: ${selectedFile.name}`
-                      : "Click to upload PDF"}
-                  </p>
-                </label>
-              </div>
+                      if (file) {
+                        if (file.type !== "application/pdf") {
+                          toast.error("Please upload only PDF files");
+                          return;
+                        }
+                        if (file.size > maxSize) {
+                          toast.error("File size should be less than 10MB");
+                          return;
+                        }
+                        setUpdateFields((prev) => ({
+                          ...prev,
+                          selectedFile: file,
+                        }));
+                      }
+                    }}
+                    className="hidden"
+                  />
 
-              {selectedFile && (
-                <div className="mt-4 text-sm text-gray-600">
-                  <p>File: {selectedFile.name}</p>
-                  <p>Size: {(selectedFile.size / 1024).toFixed(2)} KB</p>
-                </div>
-              )}
-            </div>
-
-            {/* Model Fields */}
-            <div className="flex flex-wrap gap-4">
-              {/* Model Name */}
-              <div className="flex-1 min-w-[200px]">
-                <InputField
-                  label="Model Name"
-                  type="text"
-                  value={updateFields.modelName}
-                  onChange={(e) =>
-                    setUpdateFields({
-                      ...updateFields,
-                      modelName: e.target.value,
-                    })
-                  }
-                  className="text-black dark:text-white w-full"
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-4">
-                {/* Year */}
-                <div className="flex-1 min-w-[120px]">
                   <label
-                    htmlFor="update-year"
-                    className="block text-sm font-medium text-black dark:text-white mb-2"
+                    htmlFor="update-file-upload"
+                    className="cursor-pointer flex flex-col items-center"
                   >
-                    Year
+                    <FaCloudUploadAlt className="text-4xl sm:text-5xl text-purple-500 mb-2 sm:mb-3" />
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      {updateFields.selectedFile
+                        ? `New: ${updateFields.selectedFile.name}`
+                        : "Click to upload new PDF (Optional)"}
+                    </p>
                   </label>
 
-                  <select
-                    id="update-year"
-                    className="w-full text-black dark:text-white bg-white dark:bg-gray-800 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={updateFields.year}
+                  {/* Current File Info */}
+                  {!updateFields.selectedFile && itemToUpdate?.fileName && (
+                    <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded-lg flex flex-col items-center justify-center text-center">
+                      <p className="text-xs sm:text-sm text-green-700 dark:text-green-400 break-all flex items-center gap-1">
+                        <AiOutlineFile /> Current: {itemToUpdate.fileName}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        (Kept if no new file uploaded)
+                      </p>
+                    </div>
+                  )}
+
+                  {/* New File Info */}
+                  {updateFields.selectedFile && (
+                    <div className="mt-3 text-xs sm:text-sm text-gray-600 dark:text-gray-300">
+                      <p className="break-all">
+                        New: {updateFields.selectedFile.name}
+                      </p>
+                      <p>
+                        Size:{" "}
+                        {(updateFields.selectedFile.size / 1024).toFixed(2)} KB
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setUpdateFields((prev) => ({
+                            ...prev,
+                            selectedFile: null,
+                          }))
+                        }
+                        className="text-red-500 text-xs mt-2 hover:underline inline-flex items-center gap-1"
+                      >
+                        <FaTrash className="w-3 h-3" />
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column - Form Fields */}
+              <div className="space-y-3">
+                {/* Row 1: Model Name & Sr No */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5">
+                      Model Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter Model Name"
+                      value={updateFields.modelName}
+                      onChange={(e) =>
+                        setUpdateFields({
+                          ...updateFields,
+                          modelName: e.target.value,
+                        })
+                      }
+                      className="w-full h-10 px-3 text-sm text-gray-800 dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5">
+                      Sr No
+                    </label>
+                    <div className="h-10 px-3 flex items-center bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md">
+                      <span className="font-semibold text-gray-800 dark:text-white">
+                        {updateFields.srNo}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 2: Year, Month, Frequency */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5">
+                      Year
+                    </label>
+                    <select
+                      value={updateFields.year}
+                      onChange={(e) =>
+                        setUpdateFields({
+                          ...updateFields,
+                          year: String(e.target.value),
+                        })
+                      }
+                      className="w-full h-10 px-2 text-sm text-gray-800 dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select</option>
+                      {Array.from(
+                        { length: new Date().getFullYear() - 2021 + 1 },
+                        (_, i) => 2021 + i,
+                      ).map((y) => (
+                        <option key={y} value={String(y)}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5">
+                      Month
+                    </label>
+                    <select
+                      value={updateFields.month}
+                      onChange={(e) =>
+                        setUpdateFields({
+                          ...updateFields,
+                          month: e.target.value,
+                        })
+                      }
+                      className="w-full h-10 px-2 text-sm text-gray-800 dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select</option>
+                      {[
+                        "January",
+                        "February",
+                        "March",
+                        "April",
+                        "May",
+                        "June",
+                        "July",
+                        "August",
+                        "September",
+                        "October",
+                        "November",
+                        "December",
+                      ].map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5">
+                      Frequency
+                    </label>
+                    <select
+                      value={updateFields.testFrequency}
+                      onChange={(e) =>
+                        setUpdateFields({
+                          ...updateFields,
+                          testFrequency: e.target.value,
+                        })
+                      }
+                      className="w-full h-10 px-2 text-sm text-gray-800 dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select</option>
+                      <option value="Monthly">Monthly</option>
+                      <option value="Quarterly">Quarterly</option>
+                      <option value="Yearly">Yearly</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Row 3: Description */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5">
+                    Description
+                  </label>
+                  <textarea
+                    placeholder="Enter Description"
+                    value={updateFields.description}
                     onChange={(e) =>
                       setUpdateFields({
                         ...updateFields,
-                        year: String(e.target.value),
+                        description: e.target.value,
                       })
                     }
-                  >
-                    <option value="">Select Year</option>
-
-                    {Array.from(
-                      { length: new Date().getFullYear() - 2021 + 1 },
-                      (_, index) => 2021 + index
-                    ).map((yearOption) => (
-                      <option key={yearOption} value={String(yearOption)}>
-                        {yearOption}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Month */}
-                <div className="flex-1 min-w-[120px]">
-                  <label
-                    htmlFor="update-month"
-                    className="block text-sm font-medium text-black dark:text-white mb-2"
-                  >
-                    Month
-                  </label>
-
-                  <select
-                    id="update-month"
-                    className="w-full text-black dark:text-white bg-white dark:bg-gray-800 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={updateFields.month}
-                    onChange={(e) =>
-                      setUpdateFields({
-                        ...updateFields,
-                        month: e.target.value, // this will now be the month name
-                      })
-                    }
-                  >
-                    <option value="">Select Month</option>
-                    {[
-                      "January",
-                      "February",
-                      "March",
-                      "April",
-                      "May",
-                      "June",
-                      "July",
-                      "August",
-                      "September",
-                      "October",
-                      "November",
-                      "December",
-                    ].map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Sr No */}
-                <div className="flex-1 min-w-[120px]">
-                  <label className="block text-sm font-medium text-black dark:text-white mb-2">
-                    Sr No
-                  </label>
-                  <h3 className="font-semibold text-black dark:text-white text-lg">
-                    {updateFields.srNo}
-                  </h3>
+                    className="w-full p-2.5 text-sm text-gray-800 dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    rows="4"
+                  />
                 </div>
               </div>
-            </div>
-
-            {/* Test Frequency */}
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-black dark:text-white mb-2">
-                Test Frequency
-              </label>
-
-              <select
-                className="w-full border border-gray-300 rounded-md p-2 bg-white dark:bg-gray-800 text-black dark:text-white focus:ring-2 focus:ring-blue-500"
-                value={updateFields.testFrequency}
-                onChange={(e) =>
-                  setUpdateFields({
-                    ...updateFields,
-                    testFrequency: e.target.value,
-                  })
-                }
-              >
-                <option value="">Select Frequency</option>
-                <option value="Monthly">Monthly</option>
-                <option value="Quarterly">Quarterly</option>
-                <option value="Yearly">Yearly</option>
-              </select>
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="text-sm font-medium text-black dark:text-white block mb-2">
-                Description
-              </label>
-              <textarea
-                placeholder="Enter Description"
-                value={updateFields.description}
-                onChange={(e) =>
-                  setUpdateFields({
-                    ...updateFields,
-                    description: e.target.value,
-                  })
-                }
-                className="w-full p-3 border border-gray-300 rounded-lg text-black dark:text-white focus:ring-2 focus:ring-blue-500"
-                rows="4"
-              />
             </div>
           </div>
         </PopupModal>
