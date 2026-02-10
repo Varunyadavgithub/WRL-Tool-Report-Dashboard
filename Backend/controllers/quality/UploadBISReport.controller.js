@@ -22,7 +22,7 @@ export const uploadBisPdfFile = tryCatch(async (req, res) => {
   ) {
     throw new AppError(
       "Missing required fields: modelName, year, month, testFrequency, description or fileName.",
-      400
+      400,
     );
   }
 
@@ -55,7 +55,7 @@ export const uploadBisPdfFile = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to upload the BIS Report data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -93,7 +93,7 @@ export const getBisPdfFiles = tryCatch(async (_, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch the BIS PDF Files:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -110,6 +110,7 @@ export const downloadBisPdfFile = tryCatch(async (req, res) => {
   }
 
   const filePath = path.join(uploadDir, filename);
+  let pool;
 
   try {
     // Check if file exists
@@ -121,7 +122,8 @@ export const downloadBisPdfFile = tryCatch(async (req, res) => {
     }
 
     // Verify file in database
-    const pool = await sql.connect(dbConfig1);
+    pool = await sql.connect(dbConfig1);
+
     const query = `
       SELECT FileName, ModelName, Year, Month
       FROM BISUpload 
@@ -159,7 +161,7 @@ export const downloadBisPdfFile = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to download Bis Pdf File data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -203,7 +205,7 @@ export const deleteBisPdfFile = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to delete the BIS PDF file:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -219,7 +221,7 @@ export const updateBisPdfFile = tryCatch(async (req, res) => {
   if (!modelName || !year || !month || !testFrequency || !description) {
     throw new AppError(
       "Missing required fields: modelName, year, month, testFrequency or description.",
-      400
+      400,
     );
   }
 
@@ -424,7 +426,7 @@ ORDER BY ModelName, Year;
   } catch (error) {
     throw new AppError(
       `Failed to fetch the BIS Report status data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
