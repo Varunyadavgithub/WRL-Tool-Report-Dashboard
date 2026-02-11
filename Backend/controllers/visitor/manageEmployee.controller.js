@@ -3,11 +3,7 @@ import { dbConfig3 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 
-/* ==============================
-   Departments
-================================ */
-
-/* Get all departments */
+// Get all departments
 export const fetchDepartments = tryCatch(async (_, res) => {
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
 
@@ -24,7 +20,7 @@ export const fetchDepartments = tryCatch(async (_, res) => {
   });
 });
 
-/* Add department */
+// Add department
 export const addDepartment = tryCatch(async (req, res) => {
   const { departmentName, departmentHeadId, deptCode } = req.body;
 
@@ -56,7 +52,7 @@ export const addDepartment = tryCatch(async (req, res) => {
   });
 });
 
-/* Update department */
+// Update department
 export const updateDepartment = tryCatch(async (req, res) => {
   const { deptCode } = req.params;
   const { departmentName, departmentHeadId } = req.body;
@@ -90,7 +86,7 @@ export const updateDepartment = tryCatch(async (req, res) => {
   });
 });
 
-/* Delete department */
+// Delete department
 export const deleteDepartment = tryCatch(async (req, res) => {
   const { deptCode } = req.params;
 
@@ -117,11 +113,7 @@ export const deleteDepartment = tryCatch(async (req, res) => {
   });
 });
 
-/* ==============================
-   Users
-================================ */
-
-/* Get all users */
+// Get all users
 export const fetchUsers = tryCatch(async (_, res) => {
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
 
@@ -138,7 +130,7 @@ export const fetchUsers = tryCatch(async (_, res) => {
   });
 });
 
-/* Add user */
+// Add user
 export const addUser = tryCatch(async (req, res) => {
   const {
     name,
@@ -188,7 +180,7 @@ export const addUser = tryCatch(async (req, res) => {
   });
 });
 
-/* Update user */
+// Update user
 export const updateUser = tryCatch(async (req, res) => {
   const { id } = req.params;
   const {
@@ -245,7 +237,7 @@ export const updateUser = tryCatch(async (req, res) => {
   });
 });
 
-/* Delete user */
+// Delete user
 export const deleteUser = tryCatch(async (req, res) => {
   const { id } = req.params;
 

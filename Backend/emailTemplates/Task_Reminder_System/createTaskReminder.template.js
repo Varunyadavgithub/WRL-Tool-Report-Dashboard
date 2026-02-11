@@ -41,7 +41,7 @@ export const sendTaskReminderMail = async ({
         address: process.env.SMTP_USER,
       },
       to: recipients,
-      subject: `⏰ Task Reminder: ${title}`,
+      subject: `Task Reminder: ${title}`,
       html: `
         <!DOCTYPE html>
         <html lang="en">
@@ -59,7 +59,7 @@ export const sendTaskReminderMail = async ({
           <!-- Header -->
           <tr>
             <td style="background-color:#0052cc; color:#ffffff; padding:30px 20px; text-align:center;">
-              <h1 style="margin:0; font-size:26px;">⏰ Task Reminder</h1>
+              <h1 style="margin:0; font-size:26px;">Task Reminder</h1>
             </td>
           </tr>
 

@@ -1,5 +1,5 @@
 import sql from "mssql";
-import { dbConfig3, dbConfig4 } from "../../config/db.config.js";
+import { dbConfig3 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { sendTaskReminderMail } from "../../emailTemplates/Task_Reminder_System/createTaskReminder.template.js";
@@ -24,7 +24,7 @@ export const createTask = tryCatch(async (req, res) => {
     );
   }
 
-  const taskPool = await new sql.ConnectionPool(dbConfig4).connect();
+  const taskPool = await new sql.ConnectionPool(dbConfig3).connect();
   const userPool = await new sql.ConnectionPool(dbConfig3).connect();
 
   try {
@@ -93,11 +93,11 @@ export const createTask = tryCatch(async (req, res) => {
 
 // GET LIST OF ALL TASKS
 export const getTasks = tryCatch(async (req, res) => {
-  const taskPool = await new sql.ConnectionPool(dbConfig4).connect();
+  const taskPool = await new sql.ConnectionPool(dbConfig3).connect();
   const userPool = await new sql.ConnectionPool(dbConfig3).connect();
 
   try {
-    // 1️⃣ Fetch tasks
+    // Fetch tasks
     const taskResult = await taskPool.request().query(`
       SELECT
         TaskId,
@@ -117,7 +117,7 @@ export const getTasks = tryCatch(async (req, res) => {
 
     const tasks = taskResult.recordset;
 
-    // 2️⃣ Get unique employee IDs
+    // Get unique employee IDs
     const employeeIds = [
       ...new Set(tasks.map((t) => t.employee_id).filter(Boolean)),
     ];
@@ -130,7 +130,7 @@ export const getTasks = tryCatch(async (req, res) => {
       });
     }
 
-    // 3️⃣ Fetch users from OTHER DB
+    // Fetch users from OTHER DB
     const userResult = await userPool.request().query(`
       SELECT employee_id, name
       FROM Users
@@ -142,7 +142,7 @@ export const getTasks = tryCatch(async (req, res) => {
       userMap[u.employee_id] = u.name;
     });
 
-    // 4️⃣ Merge user names into tasks
+    // Merge user names into tasks
     const enrichedTasks = tasks.map((task) => ({
       ...task,
       employee_name: userMap[task.employee_id] || null,
@@ -170,7 +170,7 @@ export const updateTaskStatus = tryCatch(async (req, res) => {
     throw new AppError("Task ID and status are required", 400);
   }
 
-  const pool = await new sql.ConnectionPool(dbConfig4).connect();
+  const pool = await new sql.ConnectionPool(dbConfig3).connect();
   const userPool = await new sql.ConnectionPool(dbConfig3).connect();
 
   try {

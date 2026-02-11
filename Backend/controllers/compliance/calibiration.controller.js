@@ -3,7 +3,7 @@ import { dbConfig3 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 
-/* ===================== ADD / UPDATE ASSET ===================== */
+// ADD / UPDATE ASSET
 export const addAsset = tryCatch(async (req, res) => {
   const d = req.body;
 
@@ -186,7 +186,7 @@ export const addAsset = tryCatch(async (req, res) => {
   }
 });
 
-/* ===================== UPLOAD CALIBRATION REPORT ===================== */
+// UPLOAD CALIBRATION REPORT
 export const uploadCalibrationReport = tryCatch(async (req, res) => {
   const assetId = parseInt(req.params.id);
   const filePath = `/uploads/calibration/${req.file.filename}`;
@@ -272,7 +272,7 @@ export const uploadCalibrationReport = tryCatch(async (req, res) => {
   }
 });
 
-/* ===================== GET ALL ASSETS ===================== */
+// GET ALL ASSETS
 export const getAllAssets = tryCatch(async (req, res) => {
   const query = `
     SELECT A.*, H.EmployeeName, H.DepartmentName
@@ -307,7 +307,7 @@ export const getAllAssets = tryCatch(async (req, res) => {
   }
 });
 
-/* ===================== ADD CALIBRATION CYCLE ===================== */
+// ADD CALIBRATION CYCLE
 export const addCalibrationRecord = tryCatch(async (req, res) => {
   const { assetId, calibratedOn, performedBy, agency, result, remarks, file } =
     req.body;
@@ -348,7 +348,7 @@ export const addCalibrationRecord = tryCatch(async (req, res) => {
   }
 });
 
-/* ===================== GET CERTIFICATES ===================== */
+// GET CERTIFICATES
 export const getCertificates = tryCatch(async (req, res) => {
   const query = `
     SELECT 
@@ -414,7 +414,7 @@ export const getCertificates = tryCatch(async (req, res) => {
   }
 });
 
-/* ===================== UPLOAD CERTIFICATE ONLY ===================== */
+// UPLOAD CERTIFICATE ONLY
 export const uploadCertificate = tryCatch(async (req, res) => {
   const filePath = `/uploads/calibration/${req.file.filename}`;
 
@@ -447,7 +447,7 @@ export const uploadCertificate = tryCatch(async (req, res) => {
   }
 });
 
-/* ===================== ASSET + HISTORY ===================== */
+// ASSET + HISTORY
 export const getAssetWithHistory = tryCatch(async (req, res) => {
   const pool = await sql.connect(dbConfig3);
 

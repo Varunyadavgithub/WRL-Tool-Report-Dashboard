@@ -3,7 +3,7 @@ import { dbConfig2 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 
-// <------- Vehicle ------->
+// Vehicle
 export const getDispatchVehicleUPH = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
 
@@ -165,7 +165,7 @@ ORDER BY SortOrder, TIMEHOUR, session_ID;
   }
 });
 
-// <------- Model ------->
+// Model
 export const getDispatchModelCount = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
 
@@ -297,7 +297,7 @@ ORDER BY TIMEHOUR, ModelName;
   }
 });
 
-// <------- Category ------->
+// Category
 export const getDispatchCategoryModelCount = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
 

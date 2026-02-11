@@ -4,7 +4,7 @@ import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { generateAuditCode } from "../../utils/generateCode.js";
 
-// ✅ FIXED: Helper function to calculate summary - handles BOTH structures
+// Helper function to calculate summary - handles BOTH structures
 const calculateSummary = (sections) => {
   let pass = 0,
     fail = 0,

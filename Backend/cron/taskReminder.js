@@ -29,7 +29,7 @@ cron.schedule("0 * * * *", async () => {
         reminderCount: task.ReminderCount,
       });
 
-      // 🔽 decrement reminder count
+      // decrement reminder count
       await pool
         .request()
         .input("id", sql.Int, task.Id)

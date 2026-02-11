@@ -3,9 +3,7 @@ import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 
-/* =========================================================
-   GET MODEL & CATEGORY BY ASSEMBLY SERIAL
-========================================================= */
+// GET MODEL & CATEGORY BY ASSEMBLY SERIAL
 export const getReworkEntryDetailsByAssemblySerial = tryCatch(
   async (req, res) => {
     const { AssemblySerial } = req.query;
@@ -13,7 +11,7 @@ export const getReworkEntryDetailsByAssemblySerial = tryCatch(
     if (!AssemblySerial) {
       throw new AppError(
         "Missing required query parameters: assemblySerial.",
-        400
+        400,
       );
     }
 
@@ -48,17 +46,15 @@ export const getReworkEntryDetailsByAssemblySerial = tryCatch(
     } catch (error) {
       throw new AppError(
         `Failed to fetch the Rework Entry Details By Assembly Serial data:${error.message}`,
-        500
+        500,
       );
     } finally {
       await pool.close();
     }
-  }
+  },
 );
 
-/* =========================================================
-   REWORK IN  → INSERT NEW ROW
-========================================================= */
+// REWORK IN  → INSERT NEW ROW
 export const createReworkInEntry = tryCatch(async (req, res) => {
   const { AssemblySerial, ModelName, Category, Defect, Part, Shift, UserCode } =
     req.body;
@@ -66,7 +62,7 @@ export const createReworkInEntry = tryCatch(async (req, res) => {
   if (!AssemblySerial || !Defect || !Part || !Shift) {
     throw new AppError(
       "Missing required fields: AssemblySerial, Defect, Part or Shift.",
-      400
+      400,
     );
   }
 
@@ -135,16 +131,14 @@ export const createReworkInEntry = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to create the Rework In Entry data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
   }
 });
 
-/* =========================================================
-   REWORK OUT  → UPDATE EXISTING IN ROW
-========================================================= */
+// REWORK OUT  → UPDATE EXISTING IN ROW
 export const createReworkOutEntry = tryCatch(async (req, res) => {
   const {
     AssemblySerial,
@@ -164,7 +158,7 @@ export const createReworkOutEntry = tryCatch(async (req, res) => {
   ) {
     throw new AppError(
       "Missing required fields: AssemblySerial, RootCause, FailCategory, Origin or ContainmentAction.",
-      400
+      400,
     );
   }
 
@@ -207,23 +201,21 @@ export const createReworkOutEntry = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to create Rework Out Entry data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
   }
 });
 
-/* =========================================================
-   REWORK REPORT  → GET REWORK REPORT
-========================================================= */
+// REWORK REPORT  → GET REWORK REPORT
 export const getReworkReport = tryCatch(async (req, res) => {
   const { stage, lineType, startTime, endTime } = req.query;
 
   if (!stage || !lineType || !startTime || !endTime) {
     throw new AppError(
       "Missing required query parameters: starstage, lineType, startTime or endTime.",
-      400
+      400,
     );
   }
 
@@ -278,7 +270,7 @@ export const getReworkReport = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch the Rework Report data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();

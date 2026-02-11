@@ -43,13 +43,6 @@ const getDateRanges = {
   },
 };
 
-// Helper to parse numeric value from string like "70.00 g" or "0.10 mbar"
-const parseNumericValue = (value) => {
-  if (value === null || value === undefined) return null;
-  const num = parseFloat(value.toString().replace(/[^\d.-]/g, ""));
-  return isNaN(num) ? null : num;
-};
-
 /**
  * @desc    Get Gas Charging Report data with filters and pagination
  * @route   GET /api/v1/gas-charging/report

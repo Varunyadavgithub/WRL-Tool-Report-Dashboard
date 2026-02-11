@@ -19,7 +19,7 @@ const router = express.Router();
 
 /* ===================== ROUTES ===================== */
 
-// ✅ ADD or UPDATE ASSET + FILE
+// ADD or UPDATE ASSET + FILE
 router.post(
   "/addAsset",
   uploadCalibration.single("file"),
@@ -27,19 +27,19 @@ router.post(
   addAsset
 );
 
-// ✅ GET ALL ASSETS
+// GET ALL ASSETS
 router.get("/assets", getAllAssets);
 
-// ✅ ADD NEW CALIBRATION CYCLE (NO FILE)
+// ADD NEW CALIBRATION CYCLE (NO FILE)
 router.post("/addCycle", addCalibrationRecord);
 
-// ✅ GET ASSET + HISTORY
+// GET ASSET + HISTORY
 router.get("/asset/:id", getAssetWithHistory);
 
-// ✅ GET CALIBRATION HISTORY
+// GET CALIBRATION HISTORY
 router.get("/certs/:id", getCertificates);
 
-// ✅ UPLOAD CERTIFICATE ONLY
+// UPLOAD CERTIFICATE ONLY
 router.post(
   "/uploadCert/:id",
   uploadCalibration.single("file"),
@@ -47,7 +47,7 @@ router.post(
   uploadCertificate
 );
 
-// ✅ UPLOAD CALIBRATION REPORT
+// UPLOAD CALIBRATION REPORT
 router.post(
   "/uploadReport/:id",
   uploadCalibration.single("file"),
@@ -55,7 +55,7 @@ router.post(
   uploadCalibrationReport
 );
 
-// ✅ GET CALIBRATION USERS
+// GET CALIBRATION USERS
 router.get("/users/calibration", getCalibrationUsers);
 
 export default router;

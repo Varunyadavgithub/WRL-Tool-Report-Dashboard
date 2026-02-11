@@ -137,7 +137,7 @@ export const uploadFpaDefectImage = multer({
   limits: { fileSize: imageFileTypes.maxSize },
 });
 
-// ✅ Calibration Report Upload
+// Calibration Report Upload
 export const uploadCalibrationReport = multer({
   storage: createStorage("Calibration"),
   fileFilter: calibrationFileFilter,

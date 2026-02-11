@@ -4,9 +4,7 @@ import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { sendVisitorPassMail } from "../../emailTemplates/Visitor_Management_System/visitorPass.template.js";
 
-/* ==============================
-   Visitor Check-In
-================================ */
+// Visitor Check-In
 export const visitorIn = tryCatch(async (req, res, next) => {
   const { passId } = req.body;
 
@@ -105,9 +103,7 @@ export const visitorIn = tryCatch(async (req, res, next) => {
   });
 });
 
-/* ==============================
-   Visitor Check-Out
-================================ */
+// Visitor Check-Out
 export const visitorOut = tryCatch(async (req, res, next) => {
   const { passId } = req.body;
 
@@ -154,9 +150,7 @@ export const visitorOut = tryCatch(async (req, res, next) => {
   });
 });
 
-/* ==============================
-   Get Visitor Logs (Today)
-================================ */
+// Get Visitor Logs (Today)
 export const getVisitorLogs = tryCatch(async (_, res, next) => {
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
 

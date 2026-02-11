@@ -2,10 +2,10 @@ import transporter from "../../config/email.config.js";
 
 /* ================= EMAIL SUBJECTS ================= */
 export const ESCALATION_SUBJECTS = {
-  0: "ℹ Calibration Due Soon (15 Days)",
-  1: "⚠ Calibration Warning (10 Days)",
-  2: "🚨 Calibration CRITICAL (5 Days)",
-  3: "❌ AUDIT RISK – Calibration Overdue",
+  0: "Calibration Due Soon (15 Days)",
+  1: "Calibration Warning (10 Days)",
+  2: "Calibration CRITICAL (5 Days)",
+  3: "AUDIT RISK – Calibration Overdue",
 };
 
 /* ================= SEND MAIL ================= */

@@ -3,9 +3,7 @@ import { dbConfig3 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 
-/* ==============================
-   Get All Visitors (Paginated)
-================================ */
+// Get All Visitors (Paginated)
 export const getAllVisitors = tryCatch(async (req, res, next) => {
   const limit = Number(req.query.limit) || 100;
   const offset = Number(req.query.offset) || 0;
@@ -78,9 +76,7 @@ export const getAllVisitors = tryCatch(async (req, res, next) => {
   });
 });
 
-/* ==============================
-   Get Visitor Details
-================================ */
+// Get Visitor Details
 export const getVisitorDetails = tryCatch(async (req, res, next) => {
   const { visitorId } = req.params;
 

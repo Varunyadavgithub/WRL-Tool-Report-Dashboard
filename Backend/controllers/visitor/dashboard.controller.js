@@ -2,10 +2,7 @@ import sql from "mssql";
 import { dbConfig3 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 
-/* ==============================
-   Get Dashboard Statistics
-   (Visitors, Trends, Departments)
-================================ */
+// Get Dashboard Statistics (Visitors, Trends, Departments)
 export const getDashboardStats = tryCatch(async (req, res, next) => {
   const { filter } = req.query;
   const now = new Date();

@@ -5,9 +5,7 @@ import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { convertToIST } from "../../utils/convertToIST.js";
 
-/* ==============================
-   Fetch Visitors (Report)
-================================ */
+// Fetch Visitors (Report)
 export const fetchVisitors = tryCatch(async (req, res) => {
   const { startTime, endTime } = req.query;
 
@@ -91,9 +89,7 @@ export const fetchVisitors = tryCatch(async (req, res) => {
   });
 });
 
-/* ==============================
-   Send Visitor Report Email
-================================ */
+// Send Visitor Report Email
 export const sendVisitorReport = tryCatch(async (req, res) => {
   const { visitors } = req.body;
 

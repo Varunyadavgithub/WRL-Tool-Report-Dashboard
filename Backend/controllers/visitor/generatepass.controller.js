@@ -3,9 +3,7 @@ import { dbConfig3 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 
-/* ==============================
-   Generate Visitor Pass
-================================ */
+// Generate Visitor Pass
 export const generateVisitorPass = tryCatch(async (req, res, next) => {
   const { name, contactNo } = req.body;
 
@@ -51,9 +49,7 @@ export const generateVisitorPass = tryCatch(async (req, res, next) => {
   });
 });
 
-/* ==============================
-   Fetch Previous Pass
-================================ */
+// Fetch Previous Pass
 export const fetchPreviousPass = tryCatch(async (req, res, next) => {
   const { contactNo } = req.query;
 
@@ -80,9 +76,7 @@ export const fetchPreviousPass = tryCatch(async (req, res, next) => {
   });
 });
 
-/* ==============================
-   Get Visitor Pass Details
-================================ */
+// Get Visitor Pass Details
 export const getVisitorPassDetails = tryCatch(async (req, res, next) => {
   const { passId } = req.params;
 

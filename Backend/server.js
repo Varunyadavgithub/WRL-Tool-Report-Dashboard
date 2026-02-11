@@ -10,7 +10,6 @@ import {
   dbConfig1,
   dbConfig2,
   dbConfig3,
-  dbConfig4,
 } from "./config/db.config.js";
 import { startCalibrationCron } from "./cron/calibrationEscalation.js";
 import { globalErrorHandler } from "./middlewares/errorHandler.js";
@@ -36,8 +35,7 @@ app.use("/uploads", express.static(path.resolve("uploads"))); // Static files
     global.pool1 = await connectToDB(dbConfig1);
     global.pool2 = await connectToDB(dbConfig2);
     global.pool3 = await connectToDB(dbConfig3);
-    global.pool4 = await connectToDB(dbConfig4);
-    console.log("Database connected");
+    console.log("Successfully connected to all databases.");
   } catch (error) {
     console.error("Database connection failed:", error);
     process.exit(1);
@@ -46,14 +44,6 @@ app.use("/uploads", express.static(path.resolve("uploads"))); // Static files
 
 // <------------------------------------------------------------- APIs ------------------------------------------------------------->
 app.use("/api/v1/", routes);
-
-// <------------------------------------------------------------- 404 Handler ------------------------------------------------------------->
-app.use((req, res, next) => {
-  res.status(404).json({
-    success: false,
-    message: "Route not found",
-  });
-});
 
 // <------------------------------------------------------------- Global Error Handler ------------------------------------------------------------->
 app.use(globalErrorHandler);
@@ -68,8 +58,8 @@ app.use(globalErrorHandler);
 // <------------------------------------------------------------- Start server ------------------------------------------------------------->
 const PORT = process.env.PORT;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port:${PORT}`);
+  console.log(`Server running on port:${PORT}`);
 });
 
-// ✅ START CRON AFTER SERVER START
+// START CRON AFTER SERVER START
 startCalibrationCron();

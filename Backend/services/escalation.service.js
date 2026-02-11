@@ -93,5 +93,5 @@ export const runCalibrationEscalation = async () => {
       `);
   }
 
-  console.log("✅ Calibration escalation completed");
+  console.log("Calibration escalation completed");
 };

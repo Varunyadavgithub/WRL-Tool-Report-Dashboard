@@ -8,8 +8,8 @@ export function sendCalibrationAlertMail(to, asset, subject, reportLink = "#") {
     asset.Status == "Valid"
       ? "Calibrated"
       : asset.Status == "Expired"
-        ? "Expired ❌"
-        : "Due Soon ⚠";
+        ? "Expired"
+        : "Due Soon";
 
   const html = `
     <div style="font-family:Arial;padding:15px">
@@ -67,6 +67,6 @@ export function sendCalibrationAlertMail(to, asset, subject, reportLink = "#") {
     (err) =>
       err
         ? console.log("Mail Send Error:", err)
-        : console.log("📩 Mail sent to", to),
+        : console.log("Mail sent to", to),
   );
 }
