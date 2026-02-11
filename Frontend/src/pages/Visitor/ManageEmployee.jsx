@@ -47,7 +47,7 @@ const ManageEmployee = () => {
   const fetchDepartments = async () => {
     try {
       const res = await axios.get(`${baseURL}visitor/departments`);
-      const formatted = res?.data.map((item) => ({
+      const formatted = res?.data?.data.map((item) => ({
         label: item.department_name,
         value: item.deptCode.toString(),
       }));

@@ -1,16 +1,30 @@
-export default function InputField({ label, value, onChange, type="text", disabled=false }) {
+const InputField = ({
+  label,
+  type,
+  placeholder,
+  value,
+  onChange,
+  name,
+  required,
+  className,
+  widthClass,
+}) => {
   return (
-    <div className="flex flex-col gap-1 mb-2">
-      <label className="text-sm font-semibold text-gray-600">{label}</label>
-
+    <div className={`${className || ""}`}>
+      {label && <label className="block font-semibold mb-1">{label}</label>}
       <input
-        type={type}
+        type={type || "text"}
+        className={`p-1 border rounded-md focus:outline-none ${
+          widthClass || "w-full"
+        }`}
+        placeholder={placeholder}
         value={value}
-        onChange={!disabled ? onChange : undefined}   // prevents warning
-        readOnly={disabled}                           // makes it non-editable without error
-        className={`border p-2 rounded focus:outline-blue-500 
-          ${disabled ? "bg-gray-100 cursor-not-allowed" : ""}`}
+        onChange={onChange}
+        name={name}
+        required={required}
       />
     </div>
   );
-}
+};
+
+export default InputField;
