@@ -1,4 +1,4 @@
-# ⚙️ Tool Report Dashboard – MES System
+# ⚙️ WRL Tool Report
 
 **Western Refrigeration Pvt. Ltd.**
 
@@ -94,33 +94,279 @@ It automates and centralizes department-wise production reporting and visitor tr
 ## 📂 Project Structure
 
 ```bash
-Tool-Report-Dashboard/
-├── backend/
-│   ├── routes/
-│   │   ├── reportRoutes.js
-│   │   └── visitorRoutes.js        # 🆕 Visitor routes
-│   ├── controllers/
-│   │   ├── reportController.js
-│   │   └── visitorController.js    # 🆕 Visitor logic
+WRL-Tool-Report-Dashboard/
+├── Backend/
 │   ├── config/
-│   │   └── db.js
+│   │   ├── db.config.js
+│   │   ├── email.config.js
+│   ├── controllers/
+│   │   ├── auditReport/
+│   │   │   ├── audit.controller.js
+│   │   │   ├── template.controller.js
+│   │   └── compliance/
+│   │   │   ├── calibiration.controller.js
+│   │   │   ├── calibirationUsers.controller.js
+│   │   └── dispatch/
+│   │   │   ├── dispatchReport.controller.js
+│   │   │   ├── errorLog.controller.js
+│   │   │   ├── fgCasting.controller.js
+│   │   │   ├── gateEntry.controller.js
+│   │   │   ├── performanceReport.controller.js
+│   │   └── planing/
+│   │   │   ├── dailyPlan.controller.js
+│   │   │   ├── productionPlaning.controller.js
+│   │   └── production/
+│   │   │   ├── componentDetails.controller.js
+│   │   │   ├── componentTraceabilityReport.controller.js
+│   │   │   ├── hourlyReport.controller.js
+│   │   │   ├── lineHourlyReport.controller.js
+│   │   │   ├── modelNameUpdate.controller.js
+│   │   │   ├── nfcReport.controller.js
+│   │   │   ├── productionReport.controller.js
+│   │   │   ├── stageHistoryReport.controller.js
+│   │   │   ├── totalProduction.controller.js
+│   │   └── quality/
+│   │   │   ├── beeCalculation.controller.js
+│   │   │   ├── cptReport.controller.js
+│   │   │   ├── dispatchHold.controller.js
+│   │   │   ├── estReport.controller.js
+│   │   │   ├── fpa.controller.js
+│   │   │   ├── fpaDefectReport.controller.js
+│   │   │   ├── fpaReport.controller.js
+│   │   │   ├── gasCharging.controller.js
+│   │   │   ├── holdCabinetDetails.controller.js
+│   │   │   ├── lpt.controller.js
+│   │   │   ├── lptRecipe.controller.js
+│   │   │   ├── lptReport.controller.js
+│   │   │   ├── rework.controller.js
+│   │   │   ├── tagUpdate.controller.js
+│   │   │   ├── uploadBISReport.controller.js
+│   │   └── taskReminder/
+│   │   │   ├── tasks.controller.js
+│   │   └── visitor/
+│   │   │   ├── dashboard.controller.js
+│   │   │   ├── generatePass.controller.js
+│   │   │   ├── history.controller.js
+│   │   │   ├── inOut.controller.js
+│   │   │   ├── manageEmployee.controller.js
+│   │   │   ├── reports.controller.js
+│   │   └── auth.controller.js
+│   │   └── common.controller.js
+│   ├── cron/
+│   │   ├── calibrationEscalation.js
+│   │   ├── taskReminder.js
+│   ├── emailTemplates/
+│   │   ├── Calibration_System
+│   │   │   ├── calibrationAlert.template.js
+│   │   │   ├── calibrationMail.template.js
+│   │   ├── Dispatch_System
+│   │   │   ├── gateEntryAlert.template.js
+│   │   ├── Task_Reminder_System
+│   │   │   ├── createTaskReminder.template.js
+│   │   │   ├── taskCompleted.template.js
+│   │   ├── Visitor_Management_System
+│   │   │   ├── visitorPass.template.js
+│   │   │   ├── visitorReport.template.js
+│   ├── middlewares
+│   │   ├── auth.js
+│   │   ├── errorHandler.js
+│   │   ├── uploadMiddleware.js
+│   ├── node_modules/
+│   ├── routes/
+│   │   ├── auditReport.route.js
+│   │   ├── auth.route.js
+│   │   ├── common.route.js
+│   │   ├── compliance.route.js
+│   │   ├── dispatch.route.js
+│   │   ├── estReport.route.js
+│   │   ├── gasChargingReport.route.js
+│   │   ├── index.js
+│   │   ├── planing.route.js
+│   │   ├── production.route.js
+│   │   ├── quality.route.js
+│   │   ├── taskReminder.route.js
+│   │   ├── visitor.route.js
+│   ├── services/
+│   │   └── escalation.service.js
+│   ├── uploads/
+│   │   └── AuditTemplates
+│   │   │   ├── backups/
+│   │   └── BISReport
+│   │   └── Calibration
+│   │   └── FpaDefectImages
 │   ├── utils/
-│   │   └── generateQR.js           # 🆕 QR generation
+│   │   └── AppError.js
+│   │   └── convertToIST.js
+│   │   └── escalation.js
+│   │   └── generateCode.js
+│   │   └── templateStorage.js
+│   │   └── tryCatch.js
+│   └── .dockerignore
+│   └── .env
+│   └── .gitignore
+│   └── Dockerfile
+│   └── package-lock.json
+│   └── package.json
 │   └── server.js
 │
-├── frontend/
+├── Frontend/
+│   ├── node_modules/
+│   ├── public/
+│   │   ├── favicon.ico
 │   ├── src/
-│   │   ├── pages/
-│   │   │   ├── Production.jsx
-│   │   │   └── VisitorDashboard.jsx   # 🆕 Visitor UI
+│   │   ├── assets/
+│   │   │   ├── assets.js
+│   │   │   ├── industrialBg1.JPG
+│   │   │   ├── industrialBg2.avif
+│   │   │   ├── industrialBg3.avif
+│   │   │   ├── logo.png
 │   │   ├── components/
-│   │   │   └── VisitorForm.jsx        # 🆕 Visitor Form
+│   │   │   ├── graphs/
+│   │   │   │   └── FpaReportsBarGraph.jsx
+│   │   │   ├── lineHourly/
+│   │   │   │   └── FinalLine
+│   │   │   │   │   └── FinalCategoryCount.jsx
+│   │   │   │   │   └── FinalChoc.jsx
+│   │   │   │   │   └── FinalFreezer.jsx
+│   │   │   │   │   └── FinalSUS.jsx
+│   │   │   │   └── FinalLoading
+│   │   │   │   │   └── FinalCategoryLoadingCount.jsx
+│   │   │   │   │   └── FinalLoadingChoc.jsx
+│   │   │   │   │   └── FinalLoadingFreezer.jsx
+│   │   │   │   │   └── FinalLoadingSUS.jsx
+│   │   │   │   └── Foaming
+│   │   │   │   │   └── FoamingA.jsx
+│   │   │   │   │   └── FoamingB.jsx
+│   │   │   │   │   └── FoamingCategoryCount.jsx
+│   │   │   │   └── PostFoaming
+│   │   │   │   │   └── ManualPostFoaming.jsx
+│   │   │   │   │   └── PostFoamingCategoryCount.jsx
+│   │   │   │   │   └── PostFoamingFreezer.jsx
+│   │   │   │   │   └── PostFoamingSUS.jsx
+│   │   │   ├── ui/
+│   │   │   │   └── Badge.jsx
+│   │   │   │   └── Button.jsx
+│   │   │   │   └── DateTimePicker.jsx
+│   │   │   │   └── ExportButton.jsx
+│   │   │   │   └── InputField.jsx
+│   │   │   │   └── Loader.jsx
+│   │   │   │   └── Pagination.jsx
+│   │   │   │   └── PopupModal.jsx
+│   │   │   │   └── RadioButton.jsx
+│   │   │   │   └── ScrollToTop.jsx
+│   │   │   │   └── SelectField.jsx
+│   │   │   │   └── Title.jsx
+│   │   │   └── ESTDetailModal.jsx
+│   │   │   └── GasChargingDetailModal.jsx
+│   │   │   └── Layout.jsx
+│   │   │   └── Navbar.jsx
+│   │   │   └── ProtectedRoute.jsx
+│   │   │   └── Sidebar.jsx
+│   │   ├── config/
+│   │   │   └── routes.config.js
+│   │   ├── hooks/
+│   │   │   └── useAuditData.js
+│   │   │   └── useEstReport.js
+│   │   │   └── useRoleAccess.js
+│   │   ├── pages/
+│   │   │   ├── AuditReport/
+│   │   │   │   └── AuditEntry.jsx
+│   │   │   │   └── AuditList.jsx
+│   │   │   │   └── AuditView.jsx
+│   │   │   │   └── TemplateBuilder.jsx
+│   │   │   │   └── TemplateList.jsx
+│   │   │   ├── Auth/
+│   │   │   │   └── Login.jsx
+│   │   │   ├── Compliance/
+│   │   │   │   └── Calibration.jsx
+│   │   │   │   └── HistoryTable.jsx
+│   │   │   ├── Dispatch/
+│   │   │   │   └── DispatchPerformanceReport.jsx
+│   │   │   │   └── DispatchReport.jsx
+│   │   │   │   └── DispatchUnloading.jsx
+│   │   │   │   └── ErrorLog.jsx
+│   │   │   │   └── FGCasting.jsx
+│   │   │   │   └── GateEntry.jsx
+│   │   │   ├── PerformanceDisplays/
+│   │   │   │   └── LogisticsDisplay.jsx
+│   │   │   ├── Planing/
+│   │   │   │   └── DailyPlan.jsx
+│   │   │   │   └── ProductionPlaning.jsx
+│   │   │   ├── Production/
+│   │   │   │   └── ComponentDetails.jsx
+│   │   │   │   └── ComponentTraceabilityReport.jsx
+│   │   │   │   └── HourlyReport.jsx
+│   │   │   │   └── LineHourlyReport.jsx
+│   │   │   │   └── ModelNameUpload.jsx
+│   │   │   │   └── NFCReport.jsx
+│   │   │   │   └── Overview.jsx
+│   │   │   │   └── StageHistoryReport.jsx
+│   │   │   │   └── TotalProduction.jsx
+│   │   │   ├── Quality/
+│   │   │   │   └── BEECalculation.jsx
+│   │   │   │   └── BISReports.jsx
+│   │   │   │   └── BISStatus.jsx
+│   │   │   │   └── BrazingReport.jsx
+│   │   │   │   └── CPTReport.jsx
+│   │   │   │   └── DispatchHold.jsx
+│   │   │   │   └── ESTReport.jsx
+│   │   │   │   └── FPA.jsx
+│   │   │   │   └── FPADefectReport.jsx
+│   │   │   │   └── FPAReports.jsx
+│   │   │   │   └── GasChargingReport.jsx
+│   │   │   │   └── HoldCabinetDetails.jsx
+│   │   │   │   └── LPT.jsx
+│   │   │   │   └── LPTRecipe.jsx
+│   │   │   │   └── LPTReport.jsx
+│   │   │   │   └── ProcessHistoryCard.jsx
+│   │   │   │   └── ReworkEntry.jsx
+│   │   │   │   └── ReworkReport.jsx
+│   │   │   │   └── ScrapReport.jsx
+│   │   │   │   └── TagUpdate.jsx
+│   │   │   │   └── UploadBISReport.jsx
+│   │   │   ├── TaskReminders/
+│   │   │   │   └── ManageTasks.jsx
+│   │   │   │   └── TaskOverview.jsx
+│   │   │   ├── Visitor/
+│   │   │   │   └── Dashboard.jsx
+│   │   │   │   └── GeneratePass.jsx
+│   │   │   │   └── History.jsx
+│   │   │   │   └── InOut.jsx
+│   │   │   │   └── ManageEmployee.jsx
+│   │   │   │   └── Reports.jsx
+│   │   │   │   └── VisitorPassDisplay.jsx
+│   │   │   ├── Home.jsx
+│   │   │   └── NotFound.jsx
 │   │   ├── redux/
-│   │   └── App.jsx
-│   └── public/
-├── .env
+│   │   │   ├── api/
+│   │   │   │   └── commonApi.js
+│   │   │   │   └── estReportApi.js
+│   │   │   │   └── gasChargingApi.js
+│   │   │   │   └── taskReminder.js
+│   │   │   ├── authSlice.js
+│   │   │   ├── estReportSlice.js
+│   │   │   ├── gasChargingSlice.js
+│   │   │   ├── store.js
+│   │   ├── utils/
+│   │   │   └── dateUtils.js
+│   │   │   └── exportToXls.js
+│   │   │   └── mapCategories.js
+│   │   │   └── shiftUtils.js
+│   │   ├── App.jsx
+│   │   ├── index.css
+│   │   ├── main.jsx
+│   ├── .dockerignore
+│   ├── .env
+│   ├── .gitignore
+│   ├── Dockerfile
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── vite.config.js
+├── APIs_Doc.md
+└── docker-compose.yml
 ├── README.md
-└── package.json
 ```
 
 ---
