@@ -1,22 +1,6 @@
-# ⚙️ WRL Tool Report
+# 🏭 WRL Tool Report Dashboard for Western Refrigeration Pvt. Ltd.
 
-**Western Refrigeration Pvt. Ltd.**
-
-> **A full-stack enterprise-grade Manufacturing Execution System (MES)**
-> Built with **MERN Stack**, **Tailwind CSS**, and integrated with **multiple SQL Server Databases**
-
----
-
-## 📌 Overview
-
-This project is a scalable, internal web-based **MES + Visitor Management Dashboard** developed for
-**Western Refrigeration Pvt. Ltd.**, Asia’s largest commercial refrigeration manufacturer.
-
-It automates and centralizes department-wise production reporting and visitor tracking across multiple factories.
-
-> ✅ Designed for 20+ roles across multiple departments
-> 🧩 Connects to **3 Microsoft SQL Server databases**
-> 🧑‍✈️ Manages visitor entries and generates dynamic QR-based passes
+A comprehensive, full-stack **Manufacturing Reporting & Management Dashboard** built for industrial operations. This platform centralizes production tracking, quality assurance, dispatch logistics, compliance monitoring, visitor management, audit reporting, and task reminders into a single, unified tool.
 
 ---
 
@@ -28,66 +12,174 @@ It automates and centralizes department-wise production reporting and visitor tr
 
 ---
 
-## 🧑‍💼 Key Highlights
+## 📌 Table of Contents
 
-### 🏭 MES Dashboard
-
-* 🔍 Real-time production data across:
-
-  * Production
-  * Quality
-  * Dispatch
-  * Planning
-
-* 🔐 **Role-Based Access Control (20+ roles):**
-  Each user role sees only relevant reports, filters, and actions.
-
-* 🗂 **Multi-SQL Server Connectivity:**
-  Backend smartly connects to **three SQL Server databases**.
-
-* 📅 **Advanced Reporting Options:**
-  Filter by daily, monthly, or yearly periods. Download reports as Excel files.
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Tech Stack](#tech-stack)
+- [Architecture Overview](#architecture-overview)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Environment Variables](#environment-variables)
+  - [Running Locally](#running-locally)
+  - [Running with Docker](#running-with-docker)
+- [Module Breakdown](#module-breakdown)
+- [API Documentation](#api-documentation)
+- [Team](#team)
+- [License](#license)
 
 ---
 
-### 🧑‍✈️ Visitor Management System (New)
+## 🔍 Overview
 
-> A fully integrated module to manage factory visitors securely and efficiently.
+**WRL Tool Report Dashboard** is an enterprise-grade internal tool designed for manufacturing plant (Western Refrigeration Pvt. Ltd.) to digitize and streamline their daily operations. It replaces fragmented spreadsheets, paper-based logs, and manual reporting with a centralized web application that provides real-time visibility into:
 
-* 📇 **QR-based Visitor Passes**
-  On check-in, a dynamic QR code is generated for each visitor.
+- Production output & hourly tracking
+- Quality inspection results (FPA, LPT, EST, CPT, BIS, BEE)
+- Dispatch & logistics performance
+- Compliance & calibration schedules
+- Visitor management with digital pass generation
+- Audit trail management with dynamic templates
+- Task reminders with email escalation
 
-* 📲 **Gate Entry/Exit Scanning**
-  QR scanned at entry/exit points by guards or gate operators.
-
-* 📊 **Live Visitor Dashboard**
-  Displays currently inside visitors, visit durations, and departmental destinations.
-
-* 📄 **Reports & Exports**
-  Search by date, host, department, or visitor name. Exportable.
-
-* 👮 **Security Role Access**
-  Only security/admin users can create or scan visitor passes.
+The system uses **role-based access control (RBAC)** to ensure that each department only sees and interacts with the modules relevant to them.
 
 ---
 
-## 🧑‍💻 Tech Stack
+## ✨ Key Features
 
-### Backend
+### 🏭 Production Module
 
-* **Node.js**, **Express.js**
-* **Microsoft SQL Server (MSSQL)**
-* **JWT Auth**
-* **Multer**, **QR Code**, **Cookie-parser**
+- Real-time **hourly production reports** (line-wise and aggregate)
+- **Stage history tracking** for individual components
+- **NFC-based** component traceability reports
+- **Component details** lookup and **model name management**
+- **Total production** dashboards with shift-wise breakdowns
+- **Line hourly reports** with category-specific views (Foaming, Post-Foaming, Final Line, Final Loading)
 
-### Frontend
+### ✅ Quality Module
 
-* **React.js (Vite)**
-* **Redux Toolkit + Redux Persist**
-* **Tailwind CSS (Responsive UI)**
-* **Chart.js**, **React ChartJS 2**
-* **React QR Code**, **ExcelJS**, **FileSaver**
-* **React Hot Toast**, **React Datepicker**
+- **FPA (First Piece Approval)** entry, defect logging with image uploads, and reporting
+- **LPT (Leak Proof Test)** management, recipe configuration, and reporting
+- **EST (Electrical Safety Test)** detailed reports with modal views
+- **CPT (Component Performance Test)** report generation
+- **Gas Charging** reports with detailed drill-downs
+- **BIS (Bureau of Indian Standards)** report uploads and status tracking
+- **BEE (Bureau of Energy Efficiency)** calculation tools
+- **Rework** entry and reporting
+- **Scrap & Brazing** reports
+- **Dispatch hold** management and **hold cabinet details**
+- **Tag update** utilities for quality labels
+
+### 🚚 Dispatch Module
+
+- **Dispatch reports** with date-range filtering
+- **Gate entry** tracking with automated email alerts
+- **FG Casting** reports
+- **Error log** management
+- **Performance reports** with KPI tracking
+- **Logistics display** screens for shop-floor monitors
+
+### 📋 Planning Module
+
+- **Daily production plans** with target vs actual comparison
+- **Production planning** with model-wise scheduling
+
+### 📑 Audit Report Module
+
+- **Dynamic template builder** — create custom audit templates without code
+- **Audit entry** forms generated from templates
+- **Audit list** and **audit view** for historical tracking
+- Template versioning with **backup management**
+
+### 📅 Compliance Module
+
+- **Calibration tracking** with instrument-level schedules
+- **Escalation workflows** — automated email reminders at multiple levels
+- **History tables** for calibration records
+
+### 🏢 Visitor Management Module
+
+- **Digital visitor pass** generation with QR codes
+- **Check-in/Check-out** tracking
+- **Employee management** for host assignment
+- **Dashboard** with real-time visitor statistics
+- **History & Reports** with email export capabilities
+
+### ⏰ Task Reminder Module
+
+- **Task creation** with due dates and assignees
+- **Email notifications** on task creation and completion
+- **Cron-based reminders** for overdue tasks
+
+### 🔐 Authentication & Authorization
+
+- **JWT-based authentication** with HTTP-only cookies
+- **Role-based access control** — different modules visible per user role
+- **Protected routes** on both frontend and backend
+
+### 📧 Email System
+
+- **Templated emails** for each module (calibration alerts, visitor passes, task reminders, gate entry alerts)
+- **Nodemailer** integration with configurable SMTP
+
+### 📊 Data Export
+
+- **Excel export** using ExcelJS for detailed reports
+- **PDF generation** using jsPDF for visitor passes
+- **Chart visualizations** using Chart.js with data labels
+
+---
+
+## 🛠 Tech Stack
+
+| Layer             | Technology                                                                                    |
+| ----------------- | --------------------------------------------------------------------------------------------- |
+| **Frontend**      | React 19, Vite 6, Redux Toolkit, React Router 7, React Hot Toast, React Icons, Tailwind CSS 4 |
+| **Backend**       | Node.js, Express 5, ES Modules                                                                |
+| **Databases**     | Microsoft SQL Server (MSSQL)                                                                  |
+| **Auth**          | JSON Web Tokens (JWT), Cookie-based sessions                                                  |
+| **Email**         | Nodemailer with HTML templates                                                                |
+| **Scheduling**    | node-cron for periodic tasks                                                                  |
+| **File Handling** | Multer for file uploads                                                                       |
+| **Charts**        | Chart.js + react-chartjs-2 + chartjs-plugin-datalabels                                        |
+| **PDF/Excel**     | jsPDF, ExcelJS, file-saver, xlsx                                                              |
+| **QR Code**       | qrcode (for visitor passes)                                                                   |
+| **DevOps**        | Docker, Docker Compose                                                                        |
+
+---
+
+## 🏗 Architecture Overview
+
+```
+                ┌─────────────────┐        ┌─────────────────┐
+                │                 │  HTTP  │                 │
+                │    React SPA    │◄──────►│   Express API   │
+                │   (Vite + TW)   │  REST  │     Server      │
+                │                 │        │                 │
+                └────────┬────────┘        └────────┬────────┘
+                         │                          │
+                         │                          │
+                         │                ┌─────────┴─────────┐
+                         │                │                   │
+                         │          ┌─────▼─────┐       ┌─────▼─────┐
+                         │          │   MSSQL   │       │   MSSQL   │
+                         │          │     DB    │       │     DB    │
+                         │          └───────────┘       └───────────┘
+                         │
+                ┌────────▼─────────┐
+                │    Redux Store   │
+                │    (Persisted)   │
+                └──────────────────┘
+```
+
+The application follows a **modular monolith** architecture:
+
+- **Frontend** communicates with the Backend via RESTful APIs using Axios
+- **Backend** connects to both MSSQL and MySQL databases for different data domains
+- **Cron jobs** run server-side for escalation emails and task reminders
+- **State management** uses Redux Toolkit with persistence for session continuity
 
 ---
 
@@ -369,106 +461,237 @@ WRL-Tool-Report-Dashboard/
 ├── README.md
 ```
 
----
-
-## 🔐 Authentication & Authorization
-
-* Secured with **JWT**
-* Role decoded and managed with **Redux Toolkit**
-* Routes and UI components are protected based on role
-* Admins can:
-
-  * Create users
-  * Upload Excel files
-  * Manage visitor records
-
----
-
-## 🔗 `.env` Example
-
-```env
-PORT=3000
-JWT_SECRET=your_secret
-
-# Database Configurations
-DB_USER1=user1
-DB_PASSWORD1=pass1
-DB_SERVER1=192.168.1.1
-DB_NAME1=production_db
-
-DB_USER2=user2
-DB_PASSWORD2=pass2
-DB_SERVER2=192.168.1.2
-DB_NAME2=quality_db
-
-DB_USER3=user3
-DB_PASSWORD3=pass3
-DB_SERVER3=192.168.1.3
-DB_NAME3=dispatch_db
-```
+📖 See [Backend README](./Backend/README.md) and [Frontend README](./Frontend/README.md) for detailed documentation of each.
 
 ---
 
 ## 🚀 Getting Started
 
-### Backend
+## 📌 Prerequisites
+
+Ensure the following are installed on your machine:
+
+| Tool              | Version | Purpose                  |
+| ----------------- | ------- | ------------------------ |
+| Node.js           | ≥ 18.x  | JavaScript runtime       |
+| npm               | ≥ 9.x   | Package manager          |
+| MSSQL Server      | ≥ 2019  | Primary database         |
+| Docker (optional) | ≥ 24.x  | Containerized deployment |
+| Git               | ≥ 2.x   | Version control          |
+
+---
+
+## 🔐 Environment Variables
+
+Both **Frontend** and **Backend** require `.env` files.  
+See the respective READMEs for full details.
+
+---
+
+### 🖥 Backend (`Backend/.env`)
+
+```env
+PORT=3000
+JWT_SECRET=jwt_secret
+CORS_ORIGIN=http://localhost:5173
+
+# Database 1
+DB_USER1=database_username
+DB_PASSWORD1=database_password
+DB_SERVER1=server_IP
+DB_NAME1=database_name
+
+# Database 2
+DB_USER2=database_username
+DB_PASSWORD2=database_password
+DB_SERVER2=server_IP
+DB_NAME2=database_name
+
+# Database 3
+DB_USER3=database_username
+DB_PASSWORD3=database_password
+DB_SERVER3=server_IP
+DB_NAME3=database_name
+
+# Email config
+SMTP_HOST=SMTP_host
+SMTP_PORT=587
+SMTP_USER=SMTP_username
+SMTP_PASS=SMTP_password
+
+# App Configuration
+FRONTEND_URL=frontend_url
+TASK_OVERVIEW_PATH=/reminder/overview
+```
+
+---
+
+### 🌐 Frontend (`Frontend/.env`)
+
+```env
+VITE_API_BASE_URL='http://localhost:3000/api/v1/'
+```
+
+---
+
+## ▶️ Running Locally
+
+### 1️⃣ Clone the repository
 
 ```bash
-cd backend
+git clone https://github.com/Varunyadavgithub/WRL-Tool-Report-Dashboard
+cd WRL-Tool-Report-Dashboard
+```
+
+---
+
+### 2️⃣ Start the Backend
+
+```bash
+cd Backend
 npm install
 npm run dev
 ```
 
-### Frontend
+The API server will start at:
+
+```
+http://localhost:3000
+```
+
+---
+
+### 3️⃣ Start the Frontend
 
 ```bash
-cd frontend
+cd Frontend
 npm install
 npm run dev
 ```
 
-Visit: [http://localhost:5173](http://localhost:5173)
+The development server will start at:
+
+```
+http://localhost:5173
+```
 
 ---
 
-## 📈 Feature Overview
+## 🐳 Running with Docker
 
-| Feature                  | Description                               |
-| ------------------------ | ----------------------------------------- |
-| 🔒 Role-Based Access     | 20+ roles with scoped views               |
-| 🧩 Multi-DB Connection   | Access 3 SQL Server databases dynamically |
-| 📊 Department Dashboards | Production, Quality, Dispatch, Planning   |
-| 📇 Visitor Management    | QR-based passes, check-in/out, tracking   |
-| 📤 Excel Upload/Export   | Daily reports and summaries               |
-| 📉 Chart Visualizations  | Line, Bar, Pie charts with Chart.js       |
-| 🧾 Exportable Reports    | Based on dates, users, departments        |
-| 🔔 Toast Notifications   | Feedback with react-hot-toast             |
-| 🌐 Fully Responsive      | Tailwind CSS design for all screen sizes  |
+From the root directory:
+
+```bash
+docker-compose up --build
+```
+
+This will spin up both frontend and backend containers as defined in `docker-compose.yml`.
+
+### Stop containers
+
+```bash
+docker-compose down
+```
+
+### Rebuild after changes
+
+```bash
+docker-compose up --build -d
+```
+
+---
+
+# 📦 Module Breakdown
+
+| Module        | Backend Controllers | Frontend Pages | Key Capabilities                                |
+| ------------- | ------------------- | -------------- | ----------------------------------------------- |
+| Production    | 9                   | 9              | Hourly reports, traceability, NFC, line-wise    |
+| Quality       | 15                  | 19             | FPA, LPT, EST, CPT, BIS, BEE, rework, gas       |
+| Dispatch      | 5                   | 6              | Gate entry, FG casting, error logs, performance |
+| Planning      | 2                   | 2              | Daily plans, production scheduling              |
+| Audit Report  | 2                   | 5              | Dynamic templates, audit entry & tracking       |
+| Compliance    | 2                   | 2              | Calibration tracking, escalation workflows      |
+| Visitor       | 6                   | 7              | Pass generation, check-in/out, reports          |
+| Task Reminder | 1                   | 2              | Task management with email reminders            |
+| Auth          | 1                   | 1              | Login, JWT tokens, role management              |
 
 ---
 
-## 👨‍💻 Developer
+# 📡 API Documentation
 
-**Varun Yadav**
-<br/>
-Software Developer – MES Team
-<br/>
-Western Refrigeration Pvt. Ltd.
-<br/>
-📍 India
-🔗 [LinkedIn Profile](https://www.linkedin.com/in/thecyberdevvarun)
+Detailed API endpoint documentation is available in:
+
+```
+APIs_Doc.md
+```
 
 ---
-## 👨‍💻 Developer
 
-**Vikash Kumar**
+## 🌍 General API Structure
+
+**Base URL:**
+
+```
+http://localhost:3000/api/v1
+```
+
+### Available Routes
+
+```
+/api/v1/auth/_            → Authentication endpoints
+/api/v1/shared/_          → Shared/common endpoints
+/api/v1/prod/_            → Production module endpoints
+/api/v1/quality/_         → Quality module endpoints
+/api/v1/est-report/_      → EST report endpoints
+/api/v1/gas-charging/_    → Gas charging report endpoints
+/api/v1/dispatch/_        → Dispatch module endpoints
+/api/v1/planing/_         → Planning module endpoints
+/api/v1/visitor/_         → Visitor management endpoints
+/api/v1/compliance/_      → Compliance module endpoints
+/api/v1/task-reminder/_   → Task reminder endpoints
+/api/v1/audit-report/_    → Audit report endpoints
+```
+
+---
+
+## 👥 Team
+
+This project is built and actively maintained by the **WRL MES Developer Team** to support internal manufacturing operations, reporting automation, compliance tracking, and production monitoring at **Western Refrigeration Pvt. Ltd.**
+
+The team focuses on delivering scalable, secure, and production-ready MES solutions aligned with real-time plant requirements.
+
 <br/>
-Software Developer – MES Team
-<br/>
-Western Refrigeration Pvt. Ltd.
-<br/>
-📍 India
-🔗 [LinkedIn Profile](https://www.linkedin.com/in/vikash-kumar-54b464336/)
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="https://github.com/Varunyadavgithub.png" width="120px;" style="border-radius:50%; border:3px solid #e1e4e8;" alt="Varun Yadav"/><br />
+      <b>Varun Yadav</b><br />
+      <sub>MES Developer Trainee</sub><br />
+      <sub>Western Refrigeration Pvt. Ltd.</sub><br />
+      <a href="https://www.linkedin.com/in/thecyberdevvarun">LinkedIn</a>
+    </td>
+    <td align="center">
+      <img src="https://github.com/buildwithvikash.png" width="120px;" style="border-radius:50%; border:3px solid #e1e4e8;" alt="Vikash Kumar"/><br />
+      <b>Vikash Kumar</b><br />
+      <sub>MES Developer</sub><br />
+      <sub>Western Refrigeration Pvt. Ltd.</sub><br />
+      <a href="https://www.linkedin.com/in/vikash-kumar-54b464336/">LinkedIn</a>
+    </td>
+
+  </tr>
+</table>
+
+---
+
+### 💡 Setup Tip
+
+If you encounter issues during first-time setup:
+
+- Ensure your database credentials are correctly configured in `Backend/.env`
+- Verify that **MSSQL** services are running
+- Confirm that databases are accessible from your development machine
+- Check that required ports (1433 for MSSQL) are open
 
 ---
 
