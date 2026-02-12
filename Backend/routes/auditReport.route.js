@@ -21,12 +21,12 @@ import {
   getAuditStats,
   exportAuditData,
 } from "../controllers/auditReport/audit.controller.js";
-// import { authenticate } from "../middleware/auth.js";
+import { authenticate } from "../middlewares/auth.js";
 
 const router = express.Router();
 
 // Apply authentication middleware to all routes
-// router.use(authenticate);
+router.use(authenticate);
 
 // ==================== Template Routes ====================
 router.get("/templates", getAllTemplates);
