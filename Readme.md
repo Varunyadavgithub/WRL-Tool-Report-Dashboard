@@ -619,11 +619,7 @@ docker-compose up --build -d
 
 # 📡 API Documentation
 
-Detailed API endpoint documentation is available in:
-
-```
-APIs_Doc.md
-```
+📘 Detailed API endpoint documentation: [APIs Documentation](APIs_Doc.md)
 
 ---
 

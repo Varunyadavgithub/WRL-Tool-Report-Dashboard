@@ -2233,6 +2233,981 @@ curl -X POST http://localhost:3000/api/v1/audit-report/audits/1/reject \
 
 ---
 
+# 📅 Compliance Module — Calibration Management
+
+**Base Path:** `/api/v1/compliance`
+
+The Compliance module manages calibration tracking for industrial instruments and equipment. It provides full lifecycle management including asset registration, calibration cycle tracking, certificate uploads, escalation history, and user management.
+
+> **Database:** dbConfig3 (MSSQL)  
+> **Authentication:** Not explicitly applied on routes (can be added via middleware)  
+> **File Uploads:** Uses Multer middleware (`uploadCalibration`) for calibration reports and certificates. Files stored in `uploads/Calibration/`
+
+---
+
+## 📊 Calibration Lifecycle
+
+```
+
+┌──────────────┐ ┌──────────────────┐
+│ Asset Added │──── time ───────►│ Due for │
+│ (Calibrated) │ │ Calibration │
+└──────┬───────┘ └────────┬─────────┘
+│ │
+│ Upload report / │ Escalation cron triggers
+│ Add new cycle │
+│ ▼
+│ ┌──────────────────┐
+│ │ Escalation │
+│ │ L1 → L2 → L3 │
+│ │ (Email alerts) │
+│ └────────┬─────────┘
+│ │
+│ New calibration │
+◄────────────────────────────────────┘
+│
+▼
+┌──────────────┐
+│ Calibrated │ ← Escalation cleared
+│ (Reset) │
+└──────────────┘
+
+```
+
+### Asset Status Values
+
+| Status               | Description                                          |
+| -------------------- | ---------------------------------------------------- |
+| `Calibrated`         | Instrument is within its calibration validity period |
+| `Out of Calibration` | Calibration failed or expired                        |
+
+### Escalation Levels
+
+| Level | Trigger               | Action                             |
+| ----- | --------------------- | ---------------------------------- |
+| L1    | Approaching due date  | Email to asset owner               |
+| L2    | Past due date         | Email to owner + department head   |
+| L3    | Significantly overdue | Email to owner + head + management |
+
+---
+
+## 🗄 Database Tables
+
+| Table                      | Purpose                                                |
+| -------------------------- | ------------------------------------------------------ |
+| `CalibrationAssets`        | Master table for calibration instruments/equipment     |
+| `CalibrationHistory`       | Log of all calibration events (cycles, uploads, etc.)  |
+| `CalibrationEscalationLog` | Log of escalation emails sent for overdue calibrations |
+| `users`                    | Employee master data                                   |
+| `departments`              | Department master data                                 |
+
+---
+
+---
+
+## 1. Add or Update Asset
+
+Creates a new calibration asset or updates an existing one. If an `id` is provided in the request body, it performs an update; otherwise, it inserts a new asset. Automatically calculates the next calibration date based on frequency. Optionally accepts a calibration certificate file upload.
+
+- **URL:** `/api/v1/compliance/addAsset`
+- **Method:** `POST`
+- **Auth Required:** ❌
+- **Content-Type:** `multipart/form-data`
+- **File Upload:** ✅ Optional (single file, field name: `file`)
+
+### Request Body (Form Data)
+
+| Field               | Type      | Required                  | Description                                     |
+| ------------------- | --------- | ------------------------- | ----------------------------------------------- |
+| `id`                | `integer` | ❌ (update only)          | Asset ID — if provided, performs update         |
+| `equipment`         | `string`  | ✅                        | Equipment/instrument name                       |
+| `identification`    | `string`  | ✅                        | Identification/serial number                    |
+| `leastCount`        | `string`  | ❌                        | Least count/resolution of the instrument        |
+| `range`             | `string`  | ❌                        | Measurement range                               |
+| `location`          | `string`  | ❌                        | Physical location of the instrument             |
+| `lastDate`          | `string`  | ✅                        | Last calibration date (ISO date string)         |
+| `frequency`         | `integer` | ✅                        | Calibration frequency in months                 |
+| `owner_employee_id` | `string`  | ✅ (insert) / ❌ (update) | Employee ID of the asset owner                  |
+| `department_id`     | `string`  | ✅ (insert) / ❌ (update) | Department code                                 |
+| `remarks`           | `string`  | ❌                        | Additional remarks                              |
+| `agency`            | `string`  | ❌                        | Calibration agency name (used if file uploaded) |
+| `ownerEmployeeId`   | `string`  | ❌                        | Performed by employee ID (used in history log)  |
+| `file`              | `File`    | ❌                        | Calibration certificate/report file             |
+
+### Next Date Calculation
+
+```
+
+nextCalibrationDate = lastDate + frequency (months)
+
+```
+
+### Success Response — Insert
+
+- **Status Code:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Equipment Added Successfully"
+}
+```
+
+### Success Response — Update
+
+- **Status Code:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Equipment Updated Successfully"
+}
+```
+
+### Error Responses
+
+| Status Code | Condition                     | Response Body                                                                           |
+| ----------- | ----------------------------- | --------------------------------------------------------------------------------------- |
+| `400`       | Missing lastDate or frequency | `{ "success": false, "message": "Missing required field Invalid Date and Frequency." }` |
+| `404`       | Asset not found (on update)   | `{ "success": false, "message": "Asset not found." }`                                   |
+| `500`       | Database error                | `{ "success": false, "message": "Failed to add or update the assets data: ..." }`       |
+
+### Example cURL — Insert
+
+```bash
+curl -X POST http://localhost:3000/api/v1/compliance/addAsset \
+  -F "equipment=Digital Multimeter" \
+  -F "identification=DMM-2025-001" \
+  -F "leastCount=0.01V" \
+  -F "range=0-1000V" \
+  -F "location=Production Floor - Line A" \
+  -F "lastDate=2025-01-15" \
+  -F "frequency=12" \
+  -F "owner_employee_id=EMP001" \
+  -F "department_id=DPT002" \
+  -F "remarks=New instrument" \
+  -F "file=@/path/to/certificate.pdf" \
+  -b cookies.txt
+```
+
+### Example cURL — Update
+
+```bash
+curl -X POST http://localhost:3000/api/v1/compliance/addAsset \
+  -F "id=5" \
+  -F "equipment=Digital Multimeter V2" \
+  -F "identification=DMM-2025-001" \
+  -F "lastDate=2025-06-15" \
+  -F "frequency=12" \
+  -F "remarks=Recalibrated" \
+  -b cookies.txt
+```
+
+### Notes
+
+- **Dual operation:** Same endpoint handles both insert and update based on `id` field presence
+- **File handling:** If a file is uploaded during creation, a `CalibrationHistory` entry is also created with `EscalationLevel = "Calibrated"`
+- **File handling (update):** If a file is uploaded during update, a `CalibrationHistory` entry is created with `EscalationLevel = "Updated"`
+- **Owner/Department preservation:** On update, if `owner_employee_id` or `department_id` are not provided, existing values are preserved
+- **File storage path:** `/uploads/calibration/{filename}`
+- **Multer middleware:** `uploadCalibration.single("file")` with `handleMulterError`
+
+### Database Operations
+
+**Insert:**
+
+1. Insert into `CalibrationAssets` with status `"Calibrated"`
+2. If file uploaded → Insert into `CalibrationHistory`
+
+**Update:**
+
+1. Verify asset exists
+2. Update `CalibrationAssets`
+3. If file uploaded → Insert into `CalibrationHistory`
+
+---
+
+## 2. Get All Assets
+
+Retrieves all calibration assets ordered by next calibration date (ascending — soonest due first). Includes the most recent performer's name and department from calibration history.
+
+- **URL:** `/api/v1/compliance/assets`
+- **Method:** `GET`
+- **Auth Required:** ❌
+
+### Query Parameters
+
+_None._
+
+### Success Response
+
+- **Status Code:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "All Assets retrieved successfully.",
+  "data": [
+    {
+      "ID": 1,
+      "EquipmentName": "Digital Multimeter",
+      "IdentificationNo": "DMM-2025-001",
+      "LeastCount": "0.01V",
+      "RangeValue": "0-1000V",
+      "Location": "Production Floor - Line A",
+      "LastCalibrationDate": "2025-01-15T00:00:00.000Z",
+      "NextCalibrationDate": "2026-01-15T00:00:00.000Z",
+      "FrequencyMonths": 12,
+      "Status": "Calibrated",
+      "Remarks": "New instrument",
+      "owner_employee_id": "EMP001",
+      "department_id": "DPT002",
+      "EscalationLevel": null,
+      "LastEscalationSentOn": null,
+      "EmployeeName": "John Doe",
+      "DepartmentName": "Quality"
+    },
+    {
+      "ID": 2,
+      "EquipmentName": "Pressure Gauge",
+      "IdentificationNo": "PG-2024-015",
+      "LeastCount": "0.1 bar",
+      "RangeValue": "0-10 bar",
+      "Location": "Gas Charging Station",
+      "LastCalibrationDate": "2024-06-01T00:00:00.000Z",
+      "NextCalibrationDate": "2025-06-01T00:00:00.000Z",
+      "FrequencyMonths": 12,
+      "Status": "Calibrated",
+      "Remarks": null,
+      "owner_employee_id": "EMP003",
+      "department_id": "DPT001",
+      "EscalationLevel": "L1",
+      "LastEscalationSentOn": "2025-05-15T08:00:00.000Z",
+      "EmployeeName": "Mike Johnson",
+      "DepartmentName": "Production"
+    }
+  ]
+}
+```
+
+### Response Fields
+
+| Field                  | Type       | Description                                            |
+| ---------------------- | ---------- | ------------------------------------------------------ |
+| `ID`                   | `integer`  | Unique asset ID                                        |
+| `EquipmentName`        | `string`   | Name of the equipment/instrument                       |
+| `IdentificationNo`     | `string`   | Serial/identification number                           |
+| `LeastCount`           | `string`   | Instrument resolution/least count                      |
+| `RangeValue`           | `string`   | Measurement range                                      |
+| `Location`             | `string`   | Physical location                                      |
+| `LastCalibrationDate`  | `datetime` | Date of last calibration                               |
+| `NextCalibrationDate`  | `datetime` | Calculated next calibration due date                   |
+| `FrequencyMonths`      | `integer`  | Calibration frequency in months                        |
+| `Status`               | `string`   | Current status (`Calibrated` / `Out of Calibration`)   |
+| `Remarks`              | `string`   | Additional remarks                                     |
+| `owner_employee_id`    | `string`   | Owner employee ID                                      |
+| `department_id`        | `string`   | Department code                                        |
+| `EscalationLevel`      | `string`   | Current escalation level (`L1`, `L2`, `L3`, or `null`) |
+| `LastEscalationSentOn` | `datetime` | Timestamp of last escalation email                     |
+| `EmployeeName`         | `string`   | Name of the last person who performed calibration      |
+| `DepartmentName`       | `string`   | Department of the last performer                       |
+
+### Error Responses
+
+| Status Code | Condition      | Response Body                                                             |
+| ----------- | -------------- | ------------------------------------------------------------------------- |
+| `500`       | Database error | `{ "success": false, "message": "Failed to fetch All Assets data: ..." }` |
+
+### Example cURL
+
+```bash
+curl -X GET http://localhost:3000/api/v1/compliance/assets \
+  -b cookies.txt
+```
+
+### Notes
+
+- Results are ordered by `NextCalibrationDate ASC` — instruments due soonest appear first
+- Uses `OUTER APPLY` to get the most recent performer details from `CalibrationHistory`
+- Joins with `users` and `departments` tables for performer info
+
+### SQL Query Reference
+
+```sql
+SELECT A.*, H.EmployeeName, H.DepartmentName
+FROM CalibrationAssets A
+OUTER APPLY (
+  SELECT TOP 1
+    U.name AS EmployeeName,
+    D.department_name AS DepartmentName
+  FROM CalibrationHistory CH
+  LEFT JOIN users U ON U.employee_id = CH.PerformedBy
+  LEFT JOIN departments D ON D.DeptCode = U.department_id
+  WHERE CH.AssetID = A.ID
+  ORDER BY CH.CreatedAt DESC
+) H
+ORDER BY A.NextCalibrationDate ASC
+```
+
+---
+
+## 3. Add Calibration Cycle
+
+Adds a new calibration cycle/record to the history for an existing asset. Does not require a file upload — use this for manual calibration logging.
+
+- **URL:** `/api/v1/compliance/addCycle`
+- **Method:** `POST`
+- **Auth Required:** ❌
+
+### Request Body
+
+| Field          | Type      | Required | Description                                     |
+| -------------- | --------- | -------- | ----------------------------------------------- |
+| `assetId`      | `integer` | ✅       | ID of the calibration asset                     |
+| `calibratedOn` | `string`  | ✅       | Calibration date (ISO date string)              |
+| `performedBy`  | `string`  | ❌       | Employee ID of person who performed calibration |
+| `agency`       | `string`  | ❌       | External calibration agency name                |
+| `result`       | `string`  | ✅       | Calibration result (`Pass` / `Fail`)            |
+| `remarks`      | `string`  | ❌       | Additional remarks                              |
+| `file`         | `string`  | ❌       | File path reference (manual entry, not upload)  |
+
+### Request Example
+
+```json
+{
+  "assetId": 1,
+  "calibratedOn": "2025-06-15",
+  "performedBy": "EMP001",
+  "agency": "National Calibration Services",
+  "result": "Pass",
+  "remarks": "Annual calibration completed"
+}
+```
+
+### Success Response
+
+- **Status Code:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Calibration Logged Successfully"
+}
+```
+
+### Error Responses
+
+| Status Code | Condition      | Response Body                                                            |
+| ----------- | -------------- | ------------------------------------------------------------------------ |
+| `500`       | Database error | `{ "success": false, "message": "Failed to add Calibration data: ..." }` |
+
+### Example cURL
+
+```bash
+curl -X POST http://localhost:3000/api/v1/compliance/addCycle \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{
+    "assetId": 1,
+    "calibratedOn": "2025-06-15",
+    "performedBy": "EMP001",
+    "agency": "National Calibration Services",
+    "result": "Pass",
+    "remarks": "Annual calibration"
+  }'
+```
+
+### Notes
+
+- **ValidTill calculation:** Automatically set to `calibratedOn + 12 months` (hardcoded, not based on asset's `FrequencyMonths`)
+- **EscalationLevel:** Always set to `"Calibrated"` for new cycles
+- This endpoint does **not** update the parent `CalibrationAssets` record — use the Upload Calibration Report endpoint for full status updates
+
+---
+
+## 4. Get Asset with History
+
+Retrieves a single calibration asset along with its complete calibration history records.
+
+- **URL:** `/api/v1/compliance/asset/:id`
+- **Method:** `GET`
+- **Auth Required:** ❌
+
+### URL Parameters
+
+| Param | Type      | Required | Description       |
+| ----- | --------- | -------- | ----------------- |
+| `id`  | `integer` | ✅       | Asset database ID |
+
+### Success Response
+
+- **Status Code:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Assets and History retrieved successfully.",
+  "asset": {
+    "ID": 1,
+    "EquipmentName": "Digital Multimeter",
+    "IdentificationNo": "DMM-2025-001",
+    "LeastCount": "0.01V",
+    "RangeValue": "0-1000V",
+    "Location": "Production Floor - Line A",
+    "LastCalibrationDate": "2025-06-15T00:00:00.000Z",
+    "NextCalibrationDate": "2026-06-15T00:00:00.000Z",
+    "FrequencyMonths": 12,
+    "Status": "Calibrated",
+    "Remarks": "Recalibrated",
+    "owner_employee_id": "EMP001",
+    "department_id": "DPT002",
+    "EscalationLevel": null,
+    "LastEscalationSentOn": null
+  },
+  "history": [
+    {
+      "ID": 3,
+      "AssetID": 1,
+      "CalibratedOn": "2025-06-15T00:00:00.000Z",
+      "ValidTill": "2026-06-15T00:00:00.000Z",
+      "PerformedBy": "EMP001",
+      "CalibrationAgency": "National Calibration Services",
+      "Result": "Pass",
+      "FilePath": "/uploads/calibration/cert_20250615.pdf",
+      "EscalationLevel": "Calibrated",
+      "Remarks": null,
+      "CreatedAt": "2025-06-15T10:30:00.000Z"
+    },
+    {
+      "ID": 1,
+      "AssetID": 1,
+      "CalibratedOn": "2025-01-15T00:00:00.000Z",
+      "ValidTill": "2026-01-15T00:00:00.000Z",
+      "PerformedBy": "EMP001",
+      "CalibrationAgency": null,
+      "Result": "Pass",
+      "FilePath": "/uploads/calibration/cert_20250115.pdf",
+      "EscalationLevel": "Calibrated",
+      "Remarks": null,
+      "CreatedAt": "2025-01-15T08:00:00.000Z"
+    }
+  ]
+}
+```
+
+### Response Structure
+
+| Field     | Type     | Description                                  |
+| --------- | -------- | -------------------------------------------- |
+| `asset`   | `object` | Single asset record from `CalibrationAssets` |
+| `history` | `array`  | Array of calibration history records         |
+
+### History Record Fields
+
+| Field               | Type       | Description                                                   |
+| ------------------- | ---------- | ------------------------------------------------------------- |
+| `ID`                | `integer`  | History record ID                                             |
+| `AssetID`           | `integer`  | Parent asset ID                                               |
+| `CalibratedOn`      | `datetime` | Date calibration was performed                                |
+| `ValidTill`         | `datetime` | Calibration validity end date                                 |
+| `PerformedBy`       | `string`   | Employee ID of performer                                      |
+| `CalibrationAgency` | `string`   | External agency name                                          |
+| `Result`            | `string`   | Result (`Pass` / `Fail`)                                      |
+| `FilePath`          | `string`   | Path to uploaded certificate file                             |
+| `EscalationLevel`   | `string`   | Level at time of record (`Calibrated`, `Updated`, `Critical`) |
+| `Remarks`           | `string`   | Additional remarks                                            |
+| `CreatedAt`         | `datetime` | Record creation timestamp                                     |
+
+### Error Responses
+
+| Status Code | Condition      | Response Body                                                                         |
+| ----------- | -------------- | ------------------------------------------------------------------------------------- |
+| `500`       | Database error | `{ "success": false, "message": "Failed to fetche the Asset and History data: ..." }` |
+
+### Example cURL
+
+```bash
+curl -X GET http://localhost:3000/api/v1/compliance/asset/1 \
+  -b cookies.txt
+```
+
+---
+
+## 5. Get Certificates (Combined History + Escalation Timeline)
+
+Retrieves a unified timeline of all calibration events and escalation events for a specific asset. Combines data from `CalibrationHistory` and `CalibrationEscalationLog` tables using a `UNION ALL` query, ordered by event time descending.
+
+- **URL:** `/api/v1/compliance/certs/:id`
+- **Method:** `GET`
+- **Auth Required:** ❌
+
+### URL Parameters
+
+| Param | Type      | Required | Description       |
+| ----- | --------- | -------- | ----------------- |
+| `id`  | `integer` | ✅       | Asset database ID |
+
+### Success Response
+
+- **Status Code:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Certificates retrieved successfully.",
+  "data": [
+    {
+      "ID": 5,
+      "AssetID": 1,
+      "EventTime": "2025-06-15T10:30:00.000Z",
+      "EventType": "CALIBRATION",
+      "Result": "Pass",
+      "FilePath": "/uploads/calibration/cert_20250615.pdf",
+      "EmployeeName": "John Doe",
+      "department_name": "Quality",
+      "EscalationLevel": null,
+      "MailTo": null,
+      "MailCC": null,
+      "CalibrationAgency": "National Calibration Services",
+      "ValidTill": "2026-06-15T00:00:00.000Z"
+    },
+    {
+      "ID": 12,
+      "AssetID": 1,
+      "EventTime": "2025-06-01T08:00:00.000Z",
+      "EventType": "ESCALATION",
+      "Result": null,
+      "FilePath": null,
+      "EmployeeName": null,
+      "department_name": null,
+      "EscalationLevel": "L2",
+      "MailTo": "owner@company.com",
+      "MailCC": "manager@company.com",
+      "CalibrationAgency": null,
+      "ValidTill": null
+    },
+    {
+      "ID": 8,
+      "AssetID": 1,
+      "EventTime": "2025-05-15T08:00:00.000Z",
+      "EventType": "ESCALATION",
+      "Result": null,
+      "FilePath": null,
+      "EmployeeName": null,
+      "department_name": null,
+      "EscalationLevel": "L1",
+      "MailTo": "owner@company.com",
+      "MailCC": null,
+      "CalibrationAgency": null,
+      "ValidTill": null
+    },
+    {
+      "ID": 1,
+      "AssetID": 1,
+      "EventTime": "2025-01-15T08:00:00.000Z",
+      "EventType": "CALIBRATION",
+      "Result": "Pass",
+      "FilePath": "/uploads/calibration/cert_20250115.pdf",
+      "EmployeeName": "John Doe",
+      "department_name": "Quality",
+      "EscalationLevel": null,
+      "MailTo": null,
+      "MailCC": null,
+      "CalibrationAgency": null,
+      "ValidTill": "2026-01-15T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+### Response Fields
+
+| Field               | Type       | Description                                           |
+| ------------------- | ---------- | ----------------------------------------------------- |
+| `ID`                | `integer`  | Record ID (from either table)                         |
+| `AssetID`           | `integer`  | Parent asset ID                                       |
+| `EventTime`         | `datetime` | Timestamp of the event                                |
+| `EventType`         | `string`   | `"CALIBRATION"` or `"ESCALATION"`                     |
+| `Result`            | `string`   | Calibration result (only for CALIBRATION events)      |
+| `FilePath`          | `string`   | Certificate file path (only for CALIBRATION events)   |
+| `EmployeeName`      | `string`   | Performer name (only for CALIBRATION events)          |
+| `department_name`   | `string`   | Performer department (only for CALIBRATION events)    |
+| `EscalationLevel`   | `string`   | Escalation level `L1`/`L2`/`L3` (only for ESCALATION) |
+| `MailTo`            | `string`   | Email recipients (only for ESCALATION events)         |
+| `MailCC`            | `string`   | CC recipients (only for ESCALATION events)            |
+| `CalibrationAgency` | `string`   | Agency name (only for CALIBRATION events)             |
+| `ValidTill`         | `datetime` | Validity end date (only for CALIBRATION events)       |
+
+### Error Responses
+
+| Status Code | Condition      | Response Body                                                              |
+| ----------- | -------------- | -------------------------------------------------------------------------- |
+| `500`       | Database error | `{ "success": false, "message": "Failed to fetch the Certificates: ..." }` |
+
+### Example cURL
+
+```bash
+curl -X GET http://localhost:3000/api/v1/compliance/certs/1 \
+  -b cookies.txt
+```
+
+### Notes
+
+- Uses `UNION ALL` to combine calibration events and escalation events into a single timeline
+- Ordered by `EventTime DESC` — most recent events first
+- NULL fields are expected — each event type only populates its relevant fields
+- The `EscalationLevel` for escalation events is formatted as `CONCAT('L', EL.EscalationLevel)` (e.g., `"L1"`, `"L2"`, `"L3"`)
+
+---
+
+## 6. Upload Certificate Only
+
+Uploads a calibration certificate file for an existing asset. Only updates the file reference and sets the asset remarks to "Report Updated". Does **not** create a calibration history entry.
+
+- **URL:** `/api/v1/compliance/uploadCert/:id`
+- **Method:** `POST`
+- **Auth Required:** ❌
+- **Content-Type:** `multipart/form-data`
+- **File Upload:** ✅ Required (single file, field name: `file`)
+
+### URL Parameters
+
+| Param | Type      | Required | Description       |
+| ----- | --------- | -------- | ----------------- |
+| `id`  | `integer` | ✅       | Asset database ID |
+
+### Request Body (Form Data)
+
+| Field  | Type   | Required | Description                  |
+| ------ | ------ | -------- | ---------------------------- |
+| `file` | `File` | ✅       | Calibration certificate file |
+
+### Success Response
+
+- **Status Code:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Certificate Uploaded successfully."
+}
+```
+
+### Error Responses
+
+| Status Code | Condition        | Response Body                                                               |
+| ----------- | ---------------- | --------------------------------------------------------------------------- |
+| `400`       | No file uploaded | Multer error handled by `handleMulterError` middleware                      |
+| `500`       | Database error   | `{ "success": false, "message": "Failed to upload the Certificates: ..." }` |
+
+### Example cURL
+
+```bash
+curl -X POST http://localhost:3000/api/v1/compliance/uploadCert/1 \
+  -F "file=@/path/to/certificate.pdf" \
+  -b cookies.txt
+```
+
+### Notes
+
+- This is a lightweight upload — only updates `CalibrationAssets.Remarks`
+- Does **not** update calibration dates or status
+- Does **not** create a `CalibrationHistory` record
+- Use "Upload Calibration Report" (endpoint #7) for a full calibration update with status change
+
+---
+
+## 7. Upload Calibration Report
+
+Uploads a calibration report with full status update. Creates a calibration history entry, updates the asset's calibration dates and status, and resolves any pending escalation logs.
+
+- **URL:** `/api/v1/compliance/uploadReport/:id`
+- **Method:** `POST`
+- **Auth Required:** ❌
+- **Content-Type:** `multipart/form-data`
+- **File Upload:** ✅ Required (single file, field name: `file`)
+
+### URL Parameters
+
+| Param | Type      | Required | Description       |
+| ----- | --------- | -------- | ----------------- |
+| `id`  | `integer` | ✅       | Asset database ID |
+
+### Request Body (Form Data)
+
+| Field              | Type     | Required | Description                                     |
+| ------------------ | -------- | -------- | ----------------------------------------------- |
+| `file`             | `File`   | ✅       | Calibration report/certificate file             |
+| `performedByEmpId` | `string` | ❌       | Employee ID of person who performed calibration |
+| `agency`           | `string` | ❌       | External calibration agency name                |
+| `result`           | `string` | ✅       | Calibration result (`Pass` or `Fail`)           |
+
+### Success Response
+
+- **Status Code:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Calibration report uploaded successfully."
+}
+```
+
+### Error Responses
+
+| Status Code | Condition                 | Response Body                                                                      |
+| ----------- | ------------------------- | ---------------------------------------------------------------------------------- |
+| `400`       | Missing assetId or result | `{ "success": false, "message": "Missing required field assetId and result." }`    |
+| `404`       | Asset not found           | `{ "success": false, "message": "Asset not found." }`                              |
+| `500`       | Database error            | `{ "success": false, "message": "Failed to Upload Calibration Report data: ..." }` |
+
+### Example cURL
+
+```bash
+curl -X POST http://localhost:3000/api/v1/compliance/uploadReport/1 \
+  -F "file=@/path/to/calibration_report.pdf" \
+  -F "performedByEmpId=EMP001" \
+  -F "agency=National Calibration Services" \
+  -F "result=Pass" \
+  -b cookies.txt
+```
+
+### Notes
+
+- This is the **most comprehensive** calibration update endpoint — it performs 3 database operations:
+
+### Database Operations
+
+**1. Insert into `CalibrationHistory`:**
+
+```
+- CalibratedOn = asset's current LastCalibrationDate
+- ValidTill = LastCalibrationDate + FrequencyMonths
+- EscalationLevel = "Critical" if result is "Fail", otherwise "Calibrated"
+```
+
+**2. Update `CalibrationAssets`:**
+
+```
+- Status = "Out of Calibration" if result is "Fail", otherwise "Calibrated"
+- LastCalibrationDate = calibratedOn
+- NextCalibrationDate = recalculated
+- EscalationLevel = NULL (cleared)
+- LastEscalationSentOn = NULL (cleared)
+```
+
+**3. Update `CalibrationEscalationLog`:**
+
+```
+- Marks all pending escalation logs for this asset as "Resolved by new calibration"
+```
+
+### Result-Based Behavior
+
+| Result | Asset Status         | History EscalationLevel | Escalation Cleared |
+| ------ | -------------------- | ----------------------- | ------------------ |
+| `Pass` | `Calibrated`         | `Calibrated`            | ✅ Yes             |
+| `Fail` | `Out of Calibration` | `Critical`              | ✅ Yes             |
+
+---
+
+## 8. Get Calibration Users
+
+Retrieves a list of all users with their department information. Used for populating owner/performer selection dropdowns in the calibration module.
+
+- **URL:** `/api/v1/compliance/users/calibration`
+- **Method:** `GET`
+- **Auth Required:** ❌
+
+### Query Parameters
+
+_None._
+
+### Success Response
+
+- **Status Code:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Calibration Users data retrieved successfully.",
+  "data": [
+    {
+      "employee_id": "EMP001",
+      "name": "John Doe",
+      "department_id": "DPT002",
+      "department_name": "Quality",
+      "employee_email": "john.doe@company.com",
+      "manager_email": "manager.quality@company.com"
+    },
+    {
+      "employee_id": "EMP002",
+      "name": "Jane Smith",
+      "department_id": "DPT001",
+      "department_name": "Production",
+      "employee_email": "jane.smith@company.com",
+      "manager_email": "manager.production@company.com"
+    },
+    {
+      "employee_id": "EMP003",
+      "name": "Mike Johnson",
+      "department_id": "DPT003",
+      "department_name": "Maintenance",
+      "employee_email": "mike.johnson@company.com",
+      "manager_email": "manager.maintenance@company.com"
+    }
+  ]
+}
+```
+
+### Response Fields
+
+| Field             | Type     | Description                               |
+| ----------------- | -------- | ----------------------------------------- |
+| `employee_id`     | `string` | Unique employee identifier                |
+| `name`            | `string` | Employee full name                        |
+| `department_id`   | `string` | Department code                           |
+| `department_name` | `string` | Department display name                   |
+| `employee_email`  | `string` | Employee email address                    |
+| `manager_email`   | `string` | Employee's manager email (for escalation) |
+
+### Error Responses
+
+| Status Code | Condition      | Response Body                                                                    |
+| ----------- | -------------- | -------------------------------------------------------------------------------- |
+| `500`       | Database error | `{ "success": false, "message": "Failed to fetch Calibration Users data: ..." }` |
+
+### Example cURL
+
+```bash
+curl -X GET http://localhost:3000/api/v1/compliance/users/calibration \
+  -b cookies.txt
+```
+
+### Notes
+
+- Results are ordered by `name` ascending (alphabetical)
+- `manager_email` is used by the escalation cron job for L2/L3 email alerts
+- Uses `LEFT JOIN` with departments — users without a department will have `null` for `department_name`
+
+### SQL Query Reference
+
+```sql
+SELECT
+  u.employee_id,
+  u.name,
+  u.department_id,
+  d.department_name AS department_name,
+  u.employee_email,
+  u.manager_email
+FROM users u
+LEFT JOIN departments d
+  ON d.DeptCode = u.department_id
+ORDER BY u.name
+```
+
+---
+
+---
+
+# 📋 Compliance Module — Quick Reference Table
+
+| #   | Method | Endpoint                               | Auth | Content-Type          | File Upload | Description                                    |
+| --- | ------ | -------------------------------------- | ---- | --------------------- | ----------- | ---------------------------------------------- |
+| 1   | POST   | `/api/v1/compliance/addAsset`          | ❌   | `multipart/form-data` | ✅ Optional | Add or update calibration asset                |
+| 2   | GET    | `/api/v1/compliance/assets`            | ❌   | —                     | ❌          | Get all calibration assets                     |
+| 3   | POST   | `/api/v1/compliance/addCycle`          | ❌   | `application/json`    | ❌          | Add calibration cycle (history only)           |
+| 4   | GET    | `/api/v1/compliance/asset/:id`         | ❌   | —                     | ❌          | Get asset with full calibration history        |
+| 5   | GET    | `/api/v1/compliance/certs/:id`         | ❌   | —                     | ❌          | Get combined calibration + escalation timeline |
+| 6   | POST   | `/api/v1/compliance/uploadCert/:id`    | ❌   | `multipart/form-data` | ✅ Required | Upload certificate only (lightweight)          |
+| 7   | POST   | `/api/v1/compliance/uploadReport/:id`  | ❌   | `multipart/form-data` | ✅ Required | Upload report with full status update          |
+| 8   | GET    | `/api/v1/compliance/users/calibration` | ❌   | —                     | ❌          | Get all users for calibration dropdowns        |
+
+---
+
+## 🗄 Database Schema Reference
+
+### `CalibrationAssets` Table
+
+| Column                 | Type       | Description                             |
+| ---------------------- | ---------- | --------------------------------------- |
+| `ID`                   | `INT (PK)` | Auto-increment primary key              |
+| `EquipmentName`        | `NVARCHAR` | Equipment/instrument name               |
+| `IdentificationNo`     | `VARCHAR`  | Serial/identification number            |
+| `LeastCount`           | `VARCHAR`  | Instrument resolution                   |
+| `RangeValue`           | `VARCHAR`  | Measurement range                       |
+| `Location`             | `VARCHAR`  | Physical location                       |
+| `LastCalibrationDate`  | `DATETIME` | Date of last calibration                |
+| `NextCalibrationDate`  | `DATETIME` | Calculated next due date                |
+| `FrequencyMonths`      | `INT`      | Calibration frequency in months         |
+| `Status`               | `VARCHAR`  | `Calibrated` / `Out of Calibration`     |
+| `Remarks`              | `NVARCHAR` | Additional remarks                      |
+| `owner_employee_id`    | `VARCHAR`  | FK → users.employee_id                  |
+| `department_id`        | `VARCHAR`  | FK → departments.DeptCode               |
+| `EscalationLevel`      | `VARCHAR`  | Current escalation level (NULL if none) |
+| `LastEscalationSentOn` | `DATETIME` | Timestamp of last escalation email      |
+
+### `CalibrationHistory` Table
+
+| Column              | Type       | Description                                    |
+| ------------------- | ---------- | ---------------------------------------------- |
+| `ID`                | `INT (PK)` | Auto-increment primary key                     |
+| `AssetID`           | `INT (FK)` | FK → CalibrationAssets.ID                      |
+| `CalibratedOn`      | `DATETIME` | Date calibration was performed                 |
+| `ValidTill`         | `DATETIME` | Calibration validity end date                  |
+| `PerformedBy`       | `VARCHAR`  | Employee ID of performer                       |
+| `CalibrationAgency` | `VARCHAR`  | External agency name                           |
+| `Result`            | `VARCHAR`  | `Pass` / `Fail`                                |
+| `FilePath`          | `VARCHAR`  | Path to uploaded certificate                   |
+| `EscalationLevel`   | `VARCHAR`  | Level at time of record                        |
+| `Remarks`           | `NVARCHAR` | Additional remarks                             |
+| `CreatedAt`         | `DATETIME` | Record creation timestamp (default: GETDATE()) |
+
+### `CalibrationEscalationLog` Table
+
+| Column            | Type       | Description                       |
+| ----------------- | ---------- | --------------------------------- |
+| `ID`              | `INT (PK)` | Auto-increment primary key        |
+| `AssetID`         | `INT (FK)` | FK → CalibrationAssets.ID         |
+| `EscalationLevel` | `INT`      | Numeric level (1, 2, 3)           |
+| `MailTo`          | `VARCHAR`  | Email recipients                  |
+| `MailCC`          | `VARCHAR`  | CC recipients                     |
+| `TriggeredOn`     | `DATETIME` | When the escalation was triggered |
+| `TriggeredBy`     | `VARCHAR`  | System or user that triggered it  |
+| `Remarks`         | `NVARCHAR` | Resolution remarks                |
+
+---
+
+## 📁 File Storage
+
+| Directory              | Purpose                            | Accessed Via                      |
+| ---------------------- | ---------------------------------- | --------------------------------- |
+| `uploads/Calibration/` | Calibration certificates & reports | `/uploads/calibration/{filename}` |
+
+### Supported Upload Endpoints
+
+| Endpoint            | Multer Config                      | Field Name |
+| ------------------- | ---------------------------------- | ---------- |
+| `/addAsset`         | `uploadCalibration.single("file")` | `file`     |
+| `/uploadCert/:id`   | `uploadCalibration.single("file")` | `file`     |
+| `/uploadReport/:id` | `uploadCalibration.single("file")` | `file`     |
+
+---
+
+## 🔄 Endpoint Comparison Guide
+
+| Feature                   | addAsset (POST)  | addCycle | uploadCert   | uploadReport |
+| ------------------------- | ---------------- | -------- | ------------ | ------------ |
+| Creates/updates asset     | ✅               | ❌       | ✅ (remarks) | ✅           |
+| Creates history record    | ✅ (if file)     | ✅       | ❌           | ✅           |
+| Accepts file upload       | ✅ Optional      | ❌       | ✅ Required  | ✅ Required  |
+| Updates calibration dates | ✅               | ❌       | ❌           | ✅           |
+| Updates asset status      | ✅ (insert only) | ❌       | ❌           | ✅           |
+| Clears escalation         | ❌               | ❌       | ❌           | ✅           |
+| Resolves escalation logs  | ❌               | ❌       | ❌           | ✅           |
+
+---
+
 # 📋 API Quick Reference Table
 
 # Auth Module (`/api/v1/auth`)
