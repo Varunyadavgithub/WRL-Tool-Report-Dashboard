@@ -14,6 +14,7 @@ import {
   FaCopy,
   FaGripVertical,
   FaInfoCircle,
+  FaImage,
 } from "react-icons/fa";
 import { MdAddCircle, MdOutlineFactCheck } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
@@ -59,7 +60,13 @@ const TemplateBuilder = () => {
       required: true,
       visible: true,
     },
-    { id: "date", name: "Date", type: "date", required: true, visible: true },
+    {
+      id: "date",
+      name: "Date",
+      type: "date",
+      required: true,
+      visible: true,
+    },
     {
       id: "shift",
       name: "Shift",
@@ -77,7 +84,7 @@ const TemplateBuilder = () => {
     },
   ]);
 
-  // Dynamic columns configuration
+  // Dynamic columns configuration — Includes default Image column
   const [columns, setColumns] = useState([
     {
       id: "section",
@@ -131,6 +138,15 @@ const TemplateBuilder = () => {
       entryField: true,
     },
     {
+      id: "image",
+      name: "Image",
+      visible: true,
+      required: false,
+      width: "w-36",
+      type: "image",
+      entryField: true,
+    },
+    {
       id: "remark",
       name: "Remark",
       visible: true,
@@ -150,7 +166,7 @@ const TemplateBuilder = () => {
     },
   ]);
 
-  // Updated structure: Section -> Multiple Stages -> Multiple Checkpoints
+  // Section -> Multiple Stages -> Multiple Checkpoints
   const [defaultSections, setDefaultSections] = useState([
     {
       id: Date.now(),
@@ -191,13 +207,11 @@ const TemplateBuilder = () => {
             if (template.infoFields) setInfoFields(template.infoFields);
             if (template.columns) setColumns(template.columns);
             if (template.defaultSections) {
-              // Handle migration from old structure to new structure
               const migratedSections = template.defaultSections.map(
                 (section) => {
                   if (section.stages) {
-                    return section; // Already new structure
+                    return section;
                   }
-                  // Migrate old structure
                   return {
                     id: section.id,
                     sectionName: section.sectionName,
@@ -519,7 +533,7 @@ const TemplateBuilder = () => {
     );
   };
 
-  // Column management functions (unchanged)
+  // Column management functions
   const addColumn = () => {
     if (newColumn.name.trim()) {
       const columnId =
@@ -585,7 +599,7 @@ const TemplateBuilder = () => {
     );
   };
 
-  // Info field management (unchanged)
+  // Info field management
   const addInfoField = () => {
     const newField = {
       id: `field_${Date.now()}`,
@@ -612,7 +626,7 @@ const TemplateBuilder = () => {
   // Get visible columns
   const visibleColumns = columns.filter((col) => col.visible);
 
-  // Calculate total checkpoints in a section (across all stages)
+  // Calculate total checkpoints in a section
   const getSectionTotalCheckpoints = (section) => {
     return section.stages.reduce(
       (total, stage) => total + stage.checkPoints.length,
@@ -755,10 +769,9 @@ const TemplateBuilder = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select Category</option>
+                  <option value="process">Process Audit</option>
                   <option value="quality">Quality Audit</option>
                   <option value="safety">Safety Audit</option>
-                  <option value="process">Process Audit</option>
-                  <option value="compliance">Compliance Audit</option>
                   <option value="other">Other</option>
                 </select>
               </div>
@@ -910,7 +923,9 @@ const TemplateBuilder = () => {
                         type="text"
                         value={field.name}
                         onChange={(e) =>
-                          updateInfoField(field.id, { name: e.target.value })
+                          updateInfoField(field.id, {
+                            name: e.target.value,
+                          })
                         }
                         className="flex-1 px-2 py-1 border rounded text-sm"
                         placeholder="Field Name"
@@ -918,7 +933,9 @@ const TemplateBuilder = () => {
                       <select
                         value={field.type}
                         onChange={(e) =>
-                          updateInfoField(field.id, { type: e.target.value })
+                          updateInfoField(field.id, {
+                            type: e.target.value,
+                          })
                         }
                         className="px-2 py-1 border rounded text-sm"
                       >
@@ -1007,7 +1024,10 @@ const TemplateBuilder = () => {
                       placeholder="Column Name"
                       value={newColumn.name}
                       onChange={(e) =>
-                        setNewColumn({ ...newColumn, name: e.target.value })
+                        setNewColumn({
+                          ...newColumn,
+                          name: e.target.value,
+                        })
                       }
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     />
@@ -1023,7 +1043,7 @@ const TemplateBuilder = () => {
                 <p className="text-sm text-gray-600 mb-3">
                   <strong>Entry Field:</strong> Columns marked as "Entry Field"
                   will be filled during audit entry (e.g., Observations,
-                  Remarks, Status)
+                  Remarks, Status, Image)
                 </p>
 
                 {/* Column list */}
@@ -1081,6 +1101,11 @@ const TemplateBuilder = () => {
                             Entry Field
                           </span>
                         )}
+                        {column.type === "image" && (
+                          <span className="text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded flex items-center gap-1">
+                            <FaImage size={10} /> Image
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <select
@@ -1100,6 +1125,7 @@ const TemplateBuilder = () => {
                           <option value="number">Number</option>
                           <option value="status">Status</option>
                           <option value="date">Date</option>
+                          <option value="image">Image</option>
                         </select>
                         <button
                           onClick={() => toggleColumnEntryField(column.id)}
@@ -1173,7 +1199,8 @@ const TemplateBuilder = () => {
               <p>
                 Each section can have multiple stages, and each stage can have
                 multiple checkpoints. Fields marked as "Entry Field" will be
-                filled by auditors during audit entry.
+                filled by auditors during audit entry. Image columns allow
+                uploading photos per checkpoint.
               </p>
             </div>
           </div>
@@ -1191,6 +1218,10 @@ const TemplateBuilder = () => {
                       }`}
                     >
                       <div className="flex items-center gap-1">
+                        {/* Show image icon for image type columns */}
+                        {column.type === "image" && (
+                          <FaImage size={12} className="text-pink-300" />
+                        )}
                         {column.name}
                         {column.entryField && (
                           <span className="text-xs text-orange-300">
@@ -1229,7 +1260,7 @@ const TemplateBuilder = () => {
                             className="border-b border-gray-200 hover:bg-blue-50 transition-colors"
                           >
                             {visibleColumns.map((column) => {
-                              // Section column with rowSpan for entire section
+                              // Section column
                               if (column.id === "section") {
                                 if (showSectionCell) {
                                   return (
@@ -1314,7 +1345,7 @@ const TemplateBuilder = () => {
                                 return null;
                               }
 
-                              // Stage column with rowSpan for the stage
+                              // Stage column
                               if (column.id === "stage") {
                                 if (showStageCell) {
                                   return (
@@ -1413,7 +1444,30 @@ const TemplateBuilder = () => {
                                 return null;
                               }
 
-                              // Entry fields - show placeholder
+                              // Image entry field — show image placeholder
+                              if (
+                                column.type === "image" &&
+                                column.entryField
+                              ) {
+                                return (
+                                  <td
+                                    key={column.id}
+                                    className="px-3 py-2 border-r border-gray-200 bg-orange-50"
+                                  >
+                                    <div className="flex flex-col items-center justify-center py-1">
+                                      <FaImage
+                                        className="text-gray-400 mb-1"
+                                        size={16}
+                                      />
+                                      <span className="text-xs text-gray-400 italic">
+                                        (Upload during audit)
+                                      </span>
+                                    </div>
+                                  </td>
+                                );
+                              }
+
+                              // Other entry fields — show placeholder
                               if (column.entryField) {
                                 return (
                                   <td

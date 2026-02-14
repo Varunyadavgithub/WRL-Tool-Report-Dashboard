@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   FaCalendarAlt,
@@ -17,6 +17,11 @@ import {
   FaUserCheck,
   FaUserShield,
   FaBarcode,
+  FaImage,
+  FaCloudUploadAlt,
+  FaSearchPlus,
+  FaTimes,
+  FaTrash,
 } from "react-icons/fa";
 import { MdFormatListNumbered, MdUpdate, MdDateRange } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
@@ -25,13 +30,21 @@ import useAuditData from "../../hooks/useAuditData";
 import { useGetModelVariantsByAssemblyQuery } from "../../redux/api/commonApi.js";
 import toast from "react-hot-toast";
 import { getCurrentShift } from "../../utils/shiftUtils.js";
+import { baseURL } from "../../assets/assets.js";
 
-// Get current date in YYYY-MM-DD format
+// ==================== CONSTANTS ====================
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+];
+
 const getCurrentDate = () => {
   return new Date().toISOString().split("T")[0];
 };
 
-// Format date for display (DD/MM/YYYY)
 const formatDateForDisplay = (dateString) => {
   if (!dateString) return "-";
   try {
@@ -46,9 +59,14 @@ const formatDateForDisplay = (dateString) => {
   }
 };
 
-// Generate unique IDs
 const generateId = () =>
   `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+const formatFileSize = (bytes) => {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+};
 
 const AuditEntry = () => {
   const navigate = useNavigate();
@@ -70,16 +88,20 @@ const AuditEntry = () => {
   const [template, setTemplate] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
 
-  // Serial number state for API call
+  // Serial number state
   const [serialNo, setSerialNo] = useState("");
   const [debouncedSerial, setDebouncedSerial] = useState("");
   const [modelFetched, setModelFetched] = useState(false);
 
-  // Current shift and date state
+  // Shift and date
   const [currentShift, setCurrentShift] = useState(getCurrentShift());
   const [currentDate, setCurrentDate] = useState(getCurrentDate());
 
-  // Update shift every minute to keep it accurate
+  // ==================== NEW: Image states ====================
+  const [imagePreview, setImagePreview] = useState(null);
+  const fileInputRefs = useRef({});
+
+  // Update shift every minute
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentShift(getCurrentShift());
@@ -88,11 +110,10 @@ const AuditEntry = () => {
         setCurrentDate(newDate);
       }
     }, 60000);
-
     return () => clearInterval(interval);
   }, [currentDate]);
 
-  // Debounce serial number input
+  // Debounce serial number
   useEffect(() => {
     const timer = setTimeout(() => {
       if (serialNo.trim() && serialNo.length >= 3) {
@@ -101,11 +122,10 @@ const AuditEntry = () => {
         setDebouncedSerial("");
       }
     }, 800);
-
     return () => clearTimeout(timer);
   }, [serialNo]);
 
-  // RTK Query hook for fetching model variants
+  // RTK Query for model variants
   const {
     data: modelVariants,
     isLoading: isLoadingModels,
@@ -127,20 +147,15 @@ const AuditEntry = () => {
     status: "draft",
   });
 
-  // Info fields data
   const [infoData, setInfoData] = useState({});
-
-  // Sections data with stages and checkpoints
   const [sections, setSections] = useState([]);
-
-  // Signature data
   const [signatures, setSignatures] = useState({
     auditor: { name: "", date: "" },
     reviewer: { name: "", date: "" },
     approver: { name: "", date: "" },
   });
 
-  // Auto-populate model when serial number returns data
+  // Auto-populate model
   useEffect(() => {
     if (modelVariants && modelVariants.length > 0 && !modelFetched) {
       const firstModel = modelVariants[0];
@@ -157,19 +172,116 @@ const AuditEntry = () => {
     }
   }, [modelVariants, serialNo, debouncedSerial, modelFetched]);
 
-  // Handle model error
   useEffect(() => {
     if (isModelError && debouncedSerial) {
       toast.error("Failed to fetch model for this serial number");
     }
   }, [isModelError, debouncedSerial]);
 
-  // Helper function to migrate old template structure to new structure
-  const migrateTemplateStructure = useCallback((templateSections) => {
-    if (!templateSections || !Array.isArray(templateSections)) {
-      return [];
+  // ==================== NEW: Image Handlers ====================
+
+  const processImageFile = (file) => {
+    return new Promise((resolve, reject) => {
+      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+        reject(new Error("Invalid file type. Use JPG, PNG, GIF, or WebP."));
+        return;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        reject(new Error("File size exceeds 5MB limit."));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        resolve({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          data: e.target.result,
+          uploadedAt: new Date().toISOString(),
+        });
+      };
+      reader.onerror = () => reject(new Error("Failed to read file."));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageUpload = async (
+    sectionId,
+    stageId,
+    checkpointId,
+    columnId,
+    event,
+  ) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      const imageData = await processImageFile(file);
+
+      setSections((prev) =>
+        prev.map((section) =>
+          section.id === sectionId
+            ? {
+                ...section,
+                stages: section.stages.map((stage) =>
+                  stage.id === stageId
+                    ? {
+                        ...stage,
+                        checkPoints: stage.checkPoints.map((cp) =>
+                          cp.id === checkpointId
+                            ? { ...cp, [columnId]: imageData }
+                            : cp,
+                        ),
+                      }
+                    : stage,
+                ),
+              }
+            : section,
+        ),
+      );
+
+      toast.success(`Image "${file.name}" uploaded!`);
+    } catch (err) {
+      toast.error(err.message);
     }
 
+    // Reset file input
+    const refKey = `${sectionId}-${stageId}-${checkpointId}-${columnId}`;
+    if (fileInputRefs.current[refKey]) {
+      fileInputRefs.current[refKey].value = "";
+    }
+  };
+
+  const handleImageRemove = (sectionId, stageId, checkpointId, columnId) => {
+    setSections((prev) =>
+      prev.map((section) =>
+        section.id === sectionId
+          ? {
+              ...section,
+              stages: section.stages.map((stage) =>
+                stage.id === stageId
+                  ? {
+                      ...stage,
+                      checkPoints: stage.checkPoints.map((cp) =>
+                        cp.id === checkpointId
+                          ? { ...cp, [columnId]: null }
+                          : cp,
+                      ),
+                    }
+                  : stage,
+              ),
+            }
+          : section,
+      ),
+    );
+    toast.success("Image removed.");
+  };
+
+  // ==================== END Image Handlers ====================
+
+  // Migrate template structure
+  const migrateTemplateStructure = useCallback((templateSections) => {
+    if (!templateSections || !Array.isArray(templateSections)) return [];
     return templateSections.map((section) => {
       if (section.stages && Array.isArray(section.stages)) {
         return {
@@ -188,7 +300,6 @@ const AuditEntry = () => {
           })),
         };
       }
-
       return {
         id: generateId(),
         sectionName: section.sectionName || "",
@@ -209,12 +320,9 @@ const AuditEntry = () => {
     });
   }, []);
 
-  // Helper function to migrate audit sections
+  // Migrate audit sections
   const migrateAuditSections = useCallback((auditSections) => {
-    if (!auditSections || !Array.isArray(auditSections)) {
-      return [];
-    }
-
+    if (!auditSections || !Array.isArray(auditSections)) return [];
     return auditSections.map((section) => {
       if (section.stages && Array.isArray(section.stages)) {
         return {
@@ -230,7 +338,6 @@ const AuditEntry = () => {
           })),
         };
       }
-
       return {
         ...section,
         id: section.id || generateId(),
@@ -254,7 +361,6 @@ const AuditEntry = () => {
       setInitialLoading(true);
       try {
         if (id) {
-          // Editing existing audit
           const audit = await getAuditById(id);
           if (audit) {
             setAuditData({
@@ -267,15 +373,12 @@ const AuditEntry = () => {
               notes: audit.notes || "",
               status: audit.status || "draft",
             });
-
             const existingInfoData = audit.infoData || {};
             setInfoData(existingInfoData);
-
             if (existingInfoData.serialNo) {
               setSerialNo(existingInfoData.serialNo);
               setModelFetched(true);
             }
-
             setSections(migrateAuditSections(audit.sections || []));
             setSignatures(
               audit.signatures || {
@@ -284,7 +387,6 @@ const AuditEntry = () => {
                 approver: { name: "", date: "" },
               },
             );
-
             setTemplate({
               columns: audit.columns,
               infoFields: audit.infoFields,
@@ -292,7 +394,6 @@ const AuditEntry = () => {
             });
           }
         } else if (templateId) {
-          // Creating new audit from template
           const tmpl = await getTemplateById(templateId);
           if (tmpl) {
             setTemplate(tmpl);
@@ -306,10 +407,8 @@ const AuditEntry = () => {
               notes: "",
               status: "draft",
             });
-
             const shift = getCurrentShift();
             const todayDate = getCurrentDate();
-
             const initialInfoData = {};
             tmpl.infoFields?.forEach((field) => {
               if (field.id === "date") {
@@ -321,12 +420,7 @@ const AuditEntry = () => {
               }
             });
             setInfoData(initialInfoData);
-
-            const initialSections = migrateTemplateStructure(
-              tmpl.defaultSections,
-            );
-            setSections(initialSections);
-
+            setSections(migrateTemplateStructure(tmpl.defaultSections));
             setSignatures({
               auditor: { name: "", date: todayDate },
               reviewer: { name: "", date: "" },
@@ -342,7 +436,6 @@ const AuditEntry = () => {
         setInitialLoading(false);
       }
     };
-
     loadData();
   }, [
     id,
@@ -354,7 +447,7 @@ const AuditEntry = () => {
     navigate,
   ]);
 
-  // Handle serial number change
+  // Handlers
   const handleSerialChange = useCallback((value) => {
     setSerialNo(value);
     setModelFetched(false);
@@ -366,7 +459,6 @@ const AuditEntry = () => {
     }));
   }, []);
 
-  // Handle model selection from dropdown
   const handleModelSelect = useCallback(
     (modelValue) => {
       const selectedModel = modelVariants?.find((m) => m.value === modelValue);
@@ -381,7 +473,6 @@ const AuditEntry = () => {
     [modelVariants],
   );
 
-  // Handle info field change
   const handleInfoChange = useCallback(
     (fieldId, value) => {
       if (fieldId === "serialNo" || fieldId === "serial") {
@@ -393,19 +484,13 @@ const AuditEntry = () => {
     [handleSerialChange],
   );
 
-  // Handle notes change
   const handleNotesChange = useCallback((value) => {
     setAuditData((prev) => ({ ...prev, notes: value }));
   }, []);
 
-  // Handle checkpoint entry field change
+  // UPDATED: Allow image fields too
   const handleEntryFieldChange = useCallback(
     (sectionId, stageId, checkpointId, field, value) => {
-      const allowedFields = ["observation", "remark", "status"];
-      if (!allowedFields.includes(field)) {
-        return;
-      }
-
       setSections((prev) =>
         prev.map((section) =>
           section.id === sectionId
@@ -431,21 +516,15 @@ const AuditEntry = () => {
     [],
   );
 
-  // Handle signature change
   const handleSignatureChange = useCallback((role, field, value) => {
     setSignatures((prev) => ({
       ...prev,
-      [role]: {
-        ...prev[role],
-        [field]: value,
-      },
+      [role]: { ...prev[role], [field]: value },
     }));
   }, []);
 
-  // Get visible columns from template
   const visibleColumns = template?.columns?.filter((col) => col.visible) || [];
 
-  // Get status badge
   const getStatusBadge = useCallback((status) => {
     switch (status) {
       case "pass":
@@ -475,7 +554,6 @@ const AuditEntry = () => {
     }
   }, []);
 
-  // Calculate total checkpoints in a section
   const getSectionTotalCheckpoints = useCallback((section) => {
     if (!section.stages) return 0;
     return section.stages.reduce(
@@ -484,7 +562,6 @@ const AuditEntry = () => {
     );
   }, []);
 
-  // Calculate summary
   const getSummary = useCallback(() => {
     let pass = 0,
       fail = 0,
@@ -511,25 +588,20 @@ const AuditEntry = () => {
 
   const summary = getSummary();
 
-  // ========== FIXED SAVE FUNCTION ==========
+  // Save
   const handleSave = async (asDraft = true) => {
-    // Validation
     if (!serialNo.trim()) {
       toast.error("Please enter a Serial Number");
       return;
     }
-
     if (!infoData.modelName) {
       toast.error("Please wait for model to be fetched or select a model");
       return;
     }
-
-    // Additional validation
     if (!auditData.templateId) {
       toast.error("Template is required");
       return;
     }
-
     if (!auditData.reportName?.trim()) {
       toast.error("Report name is required");
       return;
@@ -538,8 +610,6 @@ const AuditEntry = () => {
     setSaving(true);
     try {
       const currentSummary = getSummary();
-
-      // Prepare infoData with all required fields
       const finalInfoData = {
         ...infoData,
         serialNo: serialNo.trim(),
@@ -548,9 +618,8 @@ const AuditEntry = () => {
         date: infoData.date || currentDate,
       };
 
-      // ✅ FIXED: Send camelCase keys to match backend expectations
       const auditPayload = {
-        templateId: parseInt(auditData.templateId, 10), // Ensure integer
+        templateId: parseInt(auditData.templateId, 10),
         templateName: auditData.templateName,
         reportName: auditData.reportName,
         formatNo: auditData.formatNo || null,
@@ -560,28 +629,22 @@ const AuditEntry = () => {
         status: asDraft ? "draft" : "submitted",
         infoData: finalInfoData,
         sections: sections,
-        signatures: signatures, // ✅ Now handled by backend
+        signatures: signatures,
         columns: template?.columns || [],
         infoFields: template?.infoFields || [],
         headerConfig: template?.headerConfig || {},
       };
 
-      console.log("Saving audit payload:", auditPayload);
-
-      let result;
       if (id) {
-        result = await updateAudit(id, auditPayload);
-        console.log("Update result:", result);
+        await updateAudit(id, auditPayload);
       } else {
-        result = await createAudit(auditPayload);
-        console.log("Create result:", result);
+        await createAudit(auditPayload);
       }
 
       toast.success(
         asDraft ? "Audit saved as draft!" : "Audit submitted successfully!",
       );
 
-      // Small delay before navigation to ensure state is updated
       setTimeout(() => {
         navigate("/auditreport/audits");
       }, 500);
@@ -593,7 +656,7 @@ const AuditEntry = () => {
     }
   };
 
-  // Get field icon
+  // Field icon
   const getFieldIcon = useCallback((fieldId) => {
     switch (fieldId) {
       case "modelName":
@@ -612,7 +675,7 @@ const AuditEntry = () => {
     }
   }, []);
 
-  // Render info field input (keeping your existing implementation)
+  // Render info field input (unchanged from your original)
   const renderInfoFieldInput = useCallback(
     (field) => {
       const value = infoData[field.id] || "";
@@ -630,7 +693,6 @@ const AuditEntry = () => {
         );
       }
 
-      // Handle serial number field
       if (field.id === "serialNo" || field.id === "serial") {
         return (
           <div className="relative">
@@ -656,7 +718,6 @@ const AuditEntry = () => {
         );
       }
 
-      // Handle model name field
       if (field.id === "modelName") {
         return (
           <div className="relative">
@@ -724,7 +785,6 @@ const AuditEntry = () => {
         );
       }
 
-      // Handle shift field
       if (field.id === "shift") {
         return (
           <div className="relative">
@@ -742,7 +802,6 @@ const AuditEntry = () => {
         );
       }
 
-      // Handle date field
       if (field.id === "date") {
         return (
           <div className="relative">
@@ -760,7 +819,6 @@ const AuditEntry = () => {
         );
       }
 
-      // Default field types
       switch (field.type) {
         case "date":
           return (
@@ -833,6 +891,135 @@ const AuditEntry = () => {
     ],
   );
 
+  // ==================== NEW: Render Image Cell ====================
+  const renderImageCell = (column, checkpoint, section, stage) => {
+    const imageData = checkpoint[column.id];
+    const refKey = `${section.id}-${stage.id}-${checkpoint.id}-${column.id}`;
+
+    // Preview mode
+    if (showPreview) {
+      // Handle both old format (object with data) and new format (just filename string)
+      const isFilename = typeof imageData === "string" && imageData.length > 0;
+      const isOldFormat =
+        imageData && typeof imageData === "object" && imageData.data;
+
+      if (isFilename || isOldFormat) {
+        const imgSrc = isFilename
+          ? `${baseURL}audit-report/images/${imageData}`
+          : imageData.data;
+
+        return (
+          <td key={column.id} className="px-3 py-2 border-r border-gray-200">
+            <div className="flex justify-center">
+              <img
+                src={imgSrc}
+                alt={
+                  isFilename ? imageData : imageData.name || "Checkpoint image"
+                }
+                className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-all hover:shadow-md"
+                onClick={() =>
+                  setImagePreview(
+                    isFilename
+                      ? {
+                          fileName: imageData,
+                          data: imgSrc,
+                        }
+                      : imageData,
+                  )
+                }
+                onError={(e) => {
+                  e.target.src =
+                    "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzljYTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkVycm9yPC90ZXh0Pjwvc3ZnPg==";
+                }}
+              />
+            </div>
+          </td>
+        );
+      }
+
+      return (
+        <td key={column.id} className="px-3 py-2 border-r border-gray-200">
+          <span className="text-xs text-gray-400 italic">No image</span>
+        </td>
+      );
+    }
+
+    // Edit mode - keep as is (uploads base64, backend will convert to filename)
+    return (
+      <td
+        key={column.id}
+        className="px-3 py-2 border-r border-gray-200 bg-blue-50"
+      >
+        <div className="flex flex-col items-center gap-2">
+          {imageData && imageData.data ? (
+            <div className="relative group">
+              <img
+                src={imageData.data}
+                alt={imageData.name || "Checkpoint image"}
+                className="w-20 h-20 object-cover rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-all hover:shadow-md"
+                onClick={() => setImagePreview(imageData)}
+              />
+              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 rounded-lg transition-all flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
+                <button
+                  onClick={() => setImagePreview(imageData)}
+                  className="p-1.5 bg-white rounded-full text-blue-600 hover:bg-blue-50 shadow-sm"
+                  title="View Full Image"
+                >
+                  <FaSearchPlus size={12} />
+                </button>
+                <button
+                  onClick={() =>
+                    handleImageRemove(
+                      section.id,
+                      stage.id,
+                      checkpoint.id,
+                      column.id,
+                    )
+                  }
+                  className="p-1.5 bg-white rounded-full text-red-600 hover:bg-red-50 shadow-sm"
+                  title="Remove Image"
+                >
+                  <FaTrash size={12} />
+                </button>
+              </div>
+              <p
+                className="text-xs text-gray-500 mt-1 truncate max-w-[80px] text-center"
+                title={imageData.name}
+              >
+                {imageData.name}
+              </p>
+            </div>
+          ) : (
+            <label className="flex flex-col items-center justify-center w-20 h-20 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-100 transition-all group">
+              <FaCloudUploadAlt
+                className="text-blue-400 group-hover:text-blue-600 transition-colors"
+                size={20}
+              />
+              <span className="text-xs text-blue-400 group-hover:text-blue-600 mt-1">
+                Upload
+              </span>
+              <input
+                ref={(el) => (fileInputRefs.current[refKey] = el)}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                className="hidden"
+                onChange={(e) =>
+                  handleImageUpload(
+                    section.id,
+                    stage.id,
+                    checkpoint.id,
+                    column.id,
+                    e,
+                  )
+                }
+              />
+            </label>
+          )}
+        </div>
+      </td>
+    );
+  };
+
   // Loading state
   if (initialLoading) {
     return (
@@ -845,7 +1032,6 @@ const AuditEntry = () => {
     );
   }
 
-  // No template selected
   if (!template && !id) {
     return (
       <div className="min-h-screen bg-gray-100 py-6 px-4 flex items-center justify-center">
@@ -867,6 +1053,56 @@ const AuditEntry = () => {
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4">
       <div className="mx-auto">
+        {/* ==================== Image Preview Modal ==================== */}
+        {imagePreview && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[60] p-4"
+            onClick={() => setImagePreview(null)}
+          >
+            <div
+              className="relative max-w-4xl max-h-[90vh] bg-white rounded-xl overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-3 bg-gray-800 text-white">
+                <div className="flex items-center gap-2">
+                  <FaImage />
+                  <span className="font-medium text-sm">
+                    {imagePreview.name}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    ({formatFileSize(imagePreview.size)})
+                  </span>
+                </div>
+                <button
+                  onClick={() => setImagePreview(null)}
+                  className="p-1 hover:bg-gray-700 rounded transition"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+              <div className="p-4 flex items-center justify-center bg-gray-100">
+                <img
+                  src={imagePreview.data}
+                  alt={imagePreview.name}
+                  className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                />
+              </div>
+              <div className="p-3 bg-gray-50 border-t flex justify-between items-center">
+                <span className="text-xs text-gray-500">
+                  Uploaded: {new Date(imagePreview.uploadedAt).toLocaleString()}
+                </span>
+                <a
+                  href={imagePreview.data}
+                  download={imagePreview.name}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
+                >
+                  Download
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Sticky Header */}
         <div className="sticky top-0 z-40 bg-gray-100/90 backdrop-blur border-b border-gray-200 shadow-sm p-4">
           <div className="mb-4 flex flex-wrap justify-between items-center gap-3">
@@ -896,11 +1132,9 @@ const AuditEntry = () => {
                     auditData.status.slice(1)}
                 </span>
               )}
-              {/* Current Date Indicator */}
               <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 flex items-center gap-1">
                 <FaCalendarAlt /> {formatDateForDisplay(currentDate)}
               </span>
-              {/* Current Shift Indicator */}
               <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 flex items-center gap-1">
                 <FaClock /> {currentShift.label}
               </span>
@@ -917,7 +1151,6 @@ const AuditEntry = () => {
                 {showPreview ? <FaEdit /> : <FaEye />}
                 {showPreview ? "Edit Mode" : "Preview"}
               </button>
-
               <button
                 onClick={() => handleSave(true)}
                 disabled={saving || isLoadingModels}
@@ -962,7 +1195,6 @@ const AuditEntry = () => {
                 </p>
               </div>
             </div>
-
             <div className="bg-gray-50 divide-y divide-gray-300">
               {template?.headerConfig?.showFormatNo !== false && (
                 <div className="p-3 flex items-center gap-3">
@@ -1004,7 +1236,7 @@ const AuditEntry = () => {
             </div>
           </div>
 
-          {/* Info Section - Dynamic Fields from Template */}
+          {/* Info Section */}
           <div className="grid grid-cols-2 md:grid-cols-4 border-b-2 border-gray-300 bg-gray-50">
             {template?.infoFields
               ?.filter((field) => field.visible)
@@ -1052,7 +1284,7 @@ const AuditEntry = () => {
             )}
           </div>
 
-          {/* Main Table Section */}
+          {/* ==================== Main Table Section ==================== */}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -1062,11 +1294,14 @@ const AuditEntry = () => {
                       key={column.id}
                       className={`px-3 py-3 text-left font-semibold border-r border-gray-600 text-sm ${column.width} ${
                         column.entryField ? "bg-blue-900" : ""
-                      }`}
+                      } ${column.type === "image" ? "bg-blue-900" : ""}`}
                     >
                       <div className="flex items-center gap-1">
+                        {column.type === "image" && (
+                          <FaImage size={12} className="text-pink-300" />
+                        )}
                         {column.name}
-                        {column.entryField && (
+                        {column.entryField && column.type !== "image" && (
                           <span className="text-xs text-blue-300 ml-1">
                             (Entry)
                           </span>
@@ -1110,6 +1345,7 @@ const AuditEntry = () => {
                             }`}
                           >
                             {visibleColumns.map((column) => {
+                              // Section column
                               if (column.id === "section") {
                                 if (
                                   showSectionCell &&
@@ -1130,6 +1366,7 @@ const AuditEntry = () => {
                                 return null;
                               }
 
+                              // Stage column
                               if (column.id === "stage") {
                                 if (showStageCell) {
                                   return (
@@ -1147,6 +1384,17 @@ const AuditEntry = () => {
                                 return null;
                               }
 
+                              // NEW: Image column
+                              if (column.type === "image") {
+                                return renderImageCell(
+                                  column,
+                                  checkpoint,
+                                  section,
+                                  stage,
+                                );
+                              }
+
+                              // Status column
                               if (column.id === "status") {
                                 return (
                                   <td
@@ -1187,6 +1435,7 @@ const AuditEntry = () => {
                                 );
                               }
 
+                              // Other entry fields
                               if (column.entryField) {
                                 return (
                                   <td
@@ -1222,6 +1471,7 @@ const AuditEntry = () => {
                                 );
                               }
 
+                              // Read-only columns
                               return (
                                 <td
                                   key={column.id}

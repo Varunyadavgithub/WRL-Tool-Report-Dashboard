@@ -19,12 +19,17 @@ import {
   FaUserTie,
   FaUserShield,
   FaPrint,
+  FaImage,
+  FaTimes,
+  FaSearchPlus,
+  FaDownload,
 } from "react-icons/fa";
 import { MdFormatListNumbered, MdUpdate, MdDateRange } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
 import { BiSolidFactory } from "react-icons/bi";
 import useAuditData from "../../hooks/useAuditData";
 import toast from "react-hot-toast";
+import { baseURL } from "../../assets/assets.js";
 
 // Format date for display (DD/MM/YYYY)
 const formatDateForDisplay = (dateString) => {
@@ -60,6 +65,14 @@ const formatDateTimeForDisplay = (dateString) => {
   }
 };
 
+// ✅ NEW: Format file size
+const formatFileSize = (bytes) => {
+  if (!bytes) return "";
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+};
+
 const AuditView = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -83,6 +96,9 @@ const AuditView = () => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [auditHistory, setAuditHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  // ✅ NEW: Image preview state
+  const [imagePreview, setImagePreview] = useState(null);
 
   // Load audit data
   useEffect(() => {
@@ -136,7 +152,6 @@ const AuditView = () => {
       toast.error("Please enter approver name");
       return;
     }
-
     if (approvalAction === "reject" && !approvalComments.trim()) {
       toast.error("Please enter rejection reason");
       return;
@@ -256,69 +271,45 @@ const AuditView = () => {
     }
   }, []);
 
-  // Calculate total checkpoints in a section (handles stages structure)
+  // Calculate total checkpoints in a section
   const getSectionTotalCheckpoints = useCallback((section) => {
-    // New structure with stages
     if (section.stages && Array.isArray(section.stages)) {
       return section.stages.reduce(
         (total, stage) => total + (stage.checkPoints?.length || 0),
         0,
       );
     }
-    // Old flat structure
     return section.checkPoints?.length || 0;
   }, []);
 
-  // Calculate summary (handles both old and new structure) - FIXED
+  // Calculate summary
   const getSummary = useCallback(() => {
-    // 🔍 DEBUG
-    console.log("🔍 getSummary called, audit:", {
-      hasSummary: !!audit?.summary,
-      summaryType: typeof audit?.summary,
-      summary: audit?.summary,
-      hasSections: !!audit?.sections,
-      sectionsType: typeof audit?.sections,
-      sectionsLength: audit?.sections?.length,
-    });
-
-    // Try pre-calculated summary first
     if (audit?.summary) {
       let summary = audit.summary;
-
-      // Handle string summary
       if (typeof summary === "string") {
         try {
           summary = JSON.parse(summary);
         } catch (e) {
-          console.warn("Failed to parse summary string");
           summary = null;
         }
       }
-
       if (summary && typeof summary === "object") {
-        const result = {
+        return {
           pass: summary.pass ?? summary.Pass ?? 0,
           fail: summary.fail ?? summary.Fail ?? 0,
           warning: summary.warning ?? summary.Warning ?? 0,
           pending: summary.pending ?? summary.Pending ?? 0,
           total: summary.total ?? summary.Total ?? 0,
         };
-        console.log("✅ Using pre-calculated summary:", result);
-        return result;
       }
     }
 
-    console.log("⚠️ Calculating from sections...");
-
-    // Calculate from sections
     let pass = 0,
       fail = 0,
       warning = 0,
       pending = 0;
 
     let sections = audit?.sections;
-
-    // Handle string sections
     if (typeof sections === "string") {
       try {
         sections = JSON.parse(sections);
@@ -328,25 +319,14 @@ const AuditView = () => {
     }
 
     if (!sections || !Array.isArray(sections)) {
-      console.log("❌ No valid sections array");
       return { pass: 0, fail: 0, warning: 0, pending: 0, total: 0 };
     }
 
-    console.log("📊 Processing", sections.length, "sections");
-
-    sections.forEach((section, sIdx) => {
+    sections.forEach((section) => {
       if (!section) return;
-
-      // Handle new structure with stages
       if (section.stages && Array.isArray(section.stages)) {
-        console.log(`  Section ${sIdx}: has ${section.stages.length} stages`);
-
-        section.stages.forEach((stage, stIdx) => {
+        section.stages.forEach((stage) => {
           if (stage?.checkPoints && Array.isArray(stage.checkPoints)) {
-            console.log(
-              `    Stage ${stIdx}: has ${stage.checkPoints.length} checkpoints`,
-            );
-
             stage.checkPoints.forEach((cp) => {
               if (!cp) return;
               const status = (cp.status || "pending").toLowerCase();
@@ -357,13 +337,7 @@ const AuditView = () => {
             });
           }
         });
-      }
-      // Handle old flat structure
-      else if (section.checkPoints && Array.isArray(section.checkPoints)) {
-        console.log(
-          `  Section ${sIdx}: has ${section.checkPoints.length} direct checkpoints`,
-        );
-
+      } else if (section.checkPoints && Array.isArray(section.checkPoints)) {
         section.checkPoints.forEach((cp) => {
           if (!cp) return;
           const status = (cp.status || "pending").toLowerCase();
@@ -375,29 +349,21 @@ const AuditView = () => {
       }
     });
 
-    const result = {
+    return {
       pass,
       fail,
       warning,
       pending,
       total: pass + fail + warning + pending,
     };
-
-    console.log("📊 Calculated summary:", result);
-    return result;
   }, [audit]);
 
   // Get info field value with fallback
   const getInfoFieldValue = useCallback(
     (fieldId) => {
       if (!audit?.infoData) return "-";
+      if (audit.infoData[fieldId]) return audit.infoData[fieldId];
 
-      // Check direct field id
-      if (audit.infoData[fieldId]) {
-        return audit.infoData[fieldId];
-      }
-
-      // Check alternate field names
       const alternates = {
         serialNo: ["serial", "serialNumber", "serialNo"],
         modelName: ["model", "modelName", "modelVariant"],
@@ -408,15 +374,62 @@ const AuditView = () => {
 
       if (alternates[fieldId]) {
         for (const alt of alternates[fieldId]) {
-          if (audit.infoData[alt]) {
-            return audit.infoData[alt];
-          }
+          if (audit.infoData[alt]) return audit.infoData[alt];
         }
       }
-
       return "-";
     },
     [audit],
+  );
+
+  // ✅ NEW: Render image in view mode
+  const renderImageViewCell = useCallback(
+    (column, checkpoint) => {
+      const imageFilename = checkpoint[column.id]; // Now it's just a string filename
+
+      // Check if it's a filename string (not the old base64 object)
+      if (imageFilename && typeof imageFilename === "string") {
+        return (
+          <td key={column.id} className="px-3 py-2 border-r border-gray-200">
+            <div className="flex justify-center">
+              <div className="relative group cursor-pointer">
+                <img
+                  src={`${baseURL}audit-report/images/${imageFilename}`} // ✅ Fetch from backend
+                  alt="Checkpoint image"
+                  className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200 hover:border-blue-400 transition-all hover:shadow-md print:w-12 print:h-12"
+                  onClick={() =>
+                    setImagePreview({
+                      fileName: imageFilename,
+                      data: `${baseURL}audit-report/images/${imageFilename}`,
+                    })
+                  }
+                  onError={(e) => {
+                    e.target.src =
+                      "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzljYTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==";
+                    e.target.classList.add("opacity-50");
+                  }}
+                />
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg transition-all flex items-center justify-center opacity-0 group-hover:opacity-100 print:hidden">
+                  <FaSearchPlus className="text-white" size={16} />
+                </div>
+              </div>
+            </div>
+          </td>
+        );
+      }
+
+      return (
+        <td key={column.id} className="px-3 py-2 border-r border-gray-200">
+          <div className="flex justify-center">
+            <span className="text-xs text-gray-400 italic flex items-center gap-1">
+              <FaImage className="text-gray-300" size={12} />
+              No image
+            </span>
+          </div>
+        </td>
+      );
+    },
+    [baseURL],
   );
 
   // Loading state
@@ -457,6 +470,65 @@ const AuditView = () => {
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4 print:bg-white print:p-0">
       <div className="mx-auto">
+        {/* ==================== NEW: Image Preview Modal ==================== */}
+        {imagePreview && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[60] p-4 print:hidden"
+            onClick={() => setImagePreview(null)}
+          >
+            <div
+              className="relative max-w-4xl max-h-[90vh] bg-white rounded-xl overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-3 bg-gray-800 text-white">
+                <div className="flex items-center gap-2">
+                  <FaImage />
+                  <span className="font-medium text-sm">
+                    {imagePreview.fileName || imagePreview.name || "Image"}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setImagePreview(null)}
+                  className="p-1 hover:bg-gray-700 rounded transition"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              <div className="p-4 flex items-center justify-center bg-gray-100">
+                <img
+                  src={
+                    imagePreview.data ||
+                    `${baseURL}audit-report/images/${imagePreview.fileName}`
+                  }
+                  alt={imagePreview.fileName || imagePreview.name}
+                  className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                  onError={(e) => {
+                    e.target.src =
+                      "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBOb3QgRm91bmQ8L3RleHQ+PC9zdmc+";
+                  }}
+                />
+              </div>
+
+              <div className="p-3 bg-gray-50 border-t flex justify-between items-center">
+                <span className="text-xs text-gray-500">
+                  {imagePreview.uploadedAt
+                    ? `Uploaded: ${new Date(imagePreview.uploadedAt).toLocaleString()}`
+                    : "Checkpoint Image"}
+                </span>
+
+                <a
+                  href={`${baseURL}audit-report/images/${imagePreview.fileName || imagePreview.name}/download`}
+                  download
+                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
+                >
+                  <FaDownload size={12} /> Download
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Sticky Header - Hide on print */}
         <div className="sticky top-0 z-40 bg-gray-100/90 backdrop-blur border-b border-gray-200 shadow-sm p-4 print:hidden">
           <div className="mb-4 flex flex-wrap justify-between items-center gap-3">
@@ -484,7 +556,6 @@ const AuditView = () => {
               >
                 <FaHistory /> History
               </button>
-
               {audit.status !== "approved" && (
                 <button
                   onClick={() => navigate(`/auditreport/audits/${id}`)}
@@ -557,7 +628,6 @@ const AuditView = () => {
         <div className="bg-white shadow-xl rounded-lg overflow-hidden border-2 border-gray-300 print:shadow-none print:border">
           {/* Header Section */}
           <div className="grid grid-cols-1 md:grid-cols-3 border-b-2 border-gray-300">
-            {/* Left - Report Name */}
             <div className="md:col-span-2 bg-gradient-to-r from-blue-600 to-blue-800 p-6 print:bg-blue-600">
               <div className="text-center">
                 <div className="flex items-center justify-center gap-3 mb-2">
@@ -576,8 +646,6 @@ const AuditView = () => {
                 )}
               </div>
             </div>
-
-            {/* Right - Format Info */}
             <div className="bg-gray-50 divide-y divide-gray-300">
               {template?.headerConfig?.showFormatNo !== false && (
                 <div className="p-3 flex items-center gap-3">
@@ -619,7 +687,7 @@ const AuditView = () => {
             </div>
           </div>
 
-          {/* Info Section - Dynamic Fields */}
+          {/* Info Section */}
           <div className="grid grid-cols-2 md:grid-cols-4 border-b-2 border-gray-300 bg-gray-50">
             {template?.infoFields
               ?.filter((field) => field.visible)
@@ -641,7 +709,6 @@ const AuditView = () => {
                       ? formatDateForDisplay(getInfoFieldValue(field.id))
                       : getInfoFieldValue(field.id)}
                   </span>
-                  {/* Show model code if available */}
                   {field.id === "modelName" && audit.infoData?.modelCode && (
                     <span className="text-xs text-red-600 block mt-1">
                       Code: {audit.infoData.modelCode}
@@ -651,7 +718,7 @@ const AuditView = () => {
               ))}
           </div>
 
-          {/* Additional Info Data (not in template fields) */}
+          {/* Additional Info Data */}
           {audit.infoData && Object.keys(audit.infoData).length > 0 && (
             <div className="p-4 border-b-2 border-gray-300 bg-blue-50">
               <h4 className="font-semibold text-gray-700 mb-2 text-sm">
@@ -659,16 +726,14 @@ const AuditView = () => {
               </h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                 {Object.entries(audit.infoData).map(([key, value]) => {
-                  // Skip fields already shown in template
                   const templateFieldIds =
                     template?.infoFields?.map((f) => f.id) || [];
                   if (templateFieldIds.includes(key)) return null;
                   if (!value) return null;
-
                   return (
                     <div key={key} className="bg-white p-2 rounded border">
                       <span className="text-xs text-gray-500 uppercase block">
-                        {key.replace(/([A-Z])/g, " $1").trim()}
+                        {key.replace(/([A-Z])/g, " \$1").trim()}
                       </span>
                       <span className="font-medium text-gray-800">{value}</span>
                     </div>
@@ -689,7 +754,7 @@ const AuditView = () => {
             </p>
           </div>
 
-          {/* Main Table Section - Handles both old and new structure */}
+          {/* ==================== Main Table Section ==================== */}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -697,23 +762,29 @@ const AuditView = () => {
                   {visibleColumns.map((column) => (
                     <th
                       key={column.id}
-                      className={`px-3 py-3 text-left font-semibold border-r border-gray-600 text-sm ${column.width || ""}`}
+                      className={`px-3 py-3 text-left font-semibold border-r border-gray-600 text-sm ${column.width || ""} ${
+                        column.type === "image" ? "bg-gray-600" : ""
+                      }`}
                     >
-                      {column.name}
+                      <div className="flex items-center gap-1">
+                        {/* ✅ NEW: Image icon in header */}
+                        {column.type === "image" && (
+                          <FaImage size={12} className="text-pink-300" />
+                        )}
+                        {column.name}
+                      </div>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {audit.sections?.map((section) => {
-                  // Check if using new stages structure
                   const hasStages =
                     section.stages && Array.isArray(section.stages);
                   const sectionTotalRows = getSectionTotalCheckpoints(section);
                   let sectionRowRendered = false;
 
                   if (hasStages) {
-                    // NEW STRUCTURE: sections -> stages -> checkPoints
                     return section.stages.map((stage) => {
                       let stageRowRendered = false;
 
@@ -746,7 +817,7 @@ const AuditView = () => {
                               }`}
                             >
                               {visibleColumns.map((column) => {
-                                // Section column with rowSpan
+                                // Section column
                                 if (column.id === "section") {
                                   if (
                                     showSectionCell &&
@@ -767,7 +838,7 @@ const AuditView = () => {
                                   return null;
                                 }
 
-                                // Stage column with rowSpan
+                                // Stage column
                                 if (column.id === "stage") {
                                   if (showStageCell) {
                                     return (
@@ -783,6 +854,14 @@ const AuditView = () => {
                                     );
                                   }
                                   return null;
+                                }
+
+                                // ✅ NEW: Image column
+                                if (column.type === "image") {
+                                  return renderImageViewCell(
+                                    column,
+                                    checkpoint,
+                                  );
                                 }
 
                                 // Status column
@@ -815,7 +894,7 @@ const AuditView = () => {
                       );
                     });
                   } else {
-                    // OLD STRUCTURE: sections -> checkPoints (flat)
+                    // OLD flat structure
                     return section.checkPoints?.map(
                       (checkpoint, checkpointIndex) => (
                         <tr
@@ -831,7 +910,6 @@ const AuditView = () => {
                           }`}
                         >
                           {visibleColumns.map((column) => {
-                            // Section column with rowSpan
                             if (column.id === "section") {
                               if (checkpointIndex === 0) {
                                 return (
@@ -849,7 +927,11 @@ const AuditView = () => {
                               return null;
                             }
 
-                            // Status column
+                            // ✅ NEW: Image column for old structure
+                            if (column.type === "image") {
+                              return renderImageViewCell(column, checkpoint);
+                            }
+
                             if (column.id === "status") {
                               return (
                                 <td
@@ -861,7 +943,6 @@ const AuditView = () => {
                               );
                             }
 
-                            // Other columns
                             return (
                               <td
                                 key={column.id}
@@ -879,7 +960,6 @@ const AuditView = () => {
                   }
                 })}
 
-                {/* Empty state */}
                 {(!audit.sections || audit.sections.length === 0) && (
                   <tr>
                     <td
@@ -962,9 +1042,8 @@ const AuditView = () => {
             </div>
           </div>
 
-          {/* Signature Section - Now displays saved signatures */}
+          {/* Signature Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 border-t-2 border-gray-300">
-            {/* Auditor Signature */}
             <div className="p-6 border-r border-b md:border-b-0 border-gray-300">
               <div className="flex items-center gap-2 mb-4 justify-center">
                 <FaUserCheck className="text-xl text-blue-600" />
@@ -988,7 +1067,6 @@ const AuditView = () => {
               </div>
             </div>
 
-            {/* Approved By */}
             <div className="p-6">
               <div className="flex items-center gap-2 mb-4 justify-center">
                 <FaUserShield className="text-xl text-purple-600" />
@@ -1216,9 +1294,7 @@ const AuditView = () => {
                                       ? "bg-green-100 text-green-700"
                                       : record.Action === "rejected"
                                         ? "bg-red-100 text-red-700"
-                                        : record.Action === "deleted"
-                                          ? "bg-gray-100 text-gray-700"
-                                          : "bg-gray-100 text-gray-700"
+                                        : "bg-gray-100 text-gray-700"
                             }`}
                           >
                             {record.Action}

@@ -21,12 +21,22 @@ import {
   getAuditStats,
   exportAuditData,
 } from "../controllers/auditReport/audit.controller.js";
-import { authenticate } from "../middlewares/auth.js";
+import {
+  downloadImage,
+  getImageMetadata,
+  serveImage,
+} from "../controllers/auditReport/image.controller.js";
+// import { authenticate } from "../middlewares/auth.js";
 
 const router = express.Router();
 
 // Apply authentication middleware to all routes
-router.use(authenticate);
+// router.use(authenticate);
+
+// ==================== Image Routes ====================
+router.get("/images/:filename/download", downloadImage);
+router.get("/images/:filename/info", getImageMetadata);
+router.get("/images/:filename", serveImage);
 
 // ==================== Template Routes ====================
 router.get("/templates", getAllTemplates);

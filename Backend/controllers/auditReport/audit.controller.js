@@ -3,6 +3,11 @@ import { dbConfig3 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { generateAuditCode } from "../../utils/generateCode.js";
+import {
+  processAuditImages,
+  deleteAuditImages,
+  cleanupRemovedImages,
+} from "../../utils/auditImageProcessor.js";
 
 // Helper function to calculate summary - handles BOTH structures
 const calculateSummary = (sections) => {
@@ -297,18 +302,26 @@ export const createAudit = tryCatch(async (req, res) => {
     throw new AppError("Template ID and Report Name are required", 400);
   }
 
-  // 🔍 DEBUG: Log incoming sections
-  console.log(
-    "📥 createAudit - Received sections:",
-    JSON.stringify(sections, null, 2).substring(0, 500),
-  );
-
   const auditCode = await generateAuditCode("AUD");
   const createdBy = req.user?.userCode || "SYSTEM";
 
-  // ✅ Calculate summary with fixed function
-  const summary = calculateSummary(sections);
-  console.log("📊 createAudit - Calculated summary:", summary);
+  // PROCESS IMAGES - Extract base64, save to disk, replace with filenames
+  console.log("Processing images in audit sections...");
+  const { sections: processedSections, savedImages } = await processAuditImages(
+    sections,
+    auditCode,
+  );
+
+  if (savedImages.length > 0) {
+    console.log(
+      `Saved ${savedImages.length} images:`,
+      savedImages.map((img) => img.fileName),
+    );
+  }
+
+  // Calculate summary with processed sections
+  const summary = calculateSummary(processedSections);
+  console.log("createAudit - Calculated summary:", summary);
 
   let pool;
   try {
@@ -350,7 +363,7 @@ export const createAudit = tryCatch(async (req, res) => {
       .input("notes", sql.NVarChar, notes || null)
       .input("status", sql.VarChar, status)
       .input("infoData", sql.NVarChar, JSON.stringify(infoData || {}))
-      .input("sections", sql.NVarChar, JSON.stringify(sections || []))
+      .input("sections", sql.NVarChar, JSON.stringify(processedSections || []))
       .input("columns", sql.NVarChar, JSON.stringify(finalColumns || []))
       .input("infoFields", sql.NVarChar, JSON.stringify(finalInfoFields || []))
       .input(
@@ -390,6 +403,7 @@ export const createAudit = tryCatch(async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Audit created successfully",
+      imagesUploaded: savedImages.length,
       data: {
         ...audit,
         InfoData: safeJsonParse(audit.InfoData, {}),
@@ -401,6 +415,13 @@ export const createAudit = tryCatch(async (req, res) => {
         Summary: safeJsonParse(audit.Summary, {}),
       },
     });
+  } catch (error) {
+    // If database insert fails, clean up saved images
+    if (savedImages.length > 0) {
+      console.warn("Database insert failed, cleaning up saved images...");
+      await deleteMultipleImages(savedImages.map((img) => img.fileName));
+    }
+    throw error;
   } finally {
     if (pool) await pool.close();
   }
@@ -425,19 +446,13 @@ export const updateAudit = tryCatch(async (req, res) => {
     throw new AppError("Audit ID is required", 400);
   }
 
-  // 🔍 DEBUG: Log incoming sections
-  console.log(
-    "📥 updateAudit - Received sections:",
-    JSON.stringify(sections, null, 2).substring(0, 500),
-  );
-
   const updatedBy = req.user?.userCode || "SYSTEM";
 
   let pool;
   try {
     pool = await new sql.ConnectionPool(dbConfig3).connect();
 
-    // Get current audit data for history
+    // Get current audit data for history and cleanup
     const currentResult = await pool
       .request()
       .input("id", sql.Int, id)
@@ -454,12 +469,33 @@ export const updateAudit = tryCatch(async (req, res) => {
       throw new AppError("Cannot edit an approved audit", 400);
     }
 
-    // ✅ Recalculate summary if sections provided
-    const summary = sections
-      ? calculateSummary(sections)
+    let processedSections = sections;
+    let savedImages = [];
+
+    // PROCESS NEW IMAGES if sections are being updated
+    if (sections) {
+      console.log("Processing images in updated audit sections...");
+
+      const result = await processAuditImages(sections, currentAudit.AuditCode);
+
+      processedSections = result.sections;
+      savedImages = result.savedImages;
+
+      if (savedImages.length > 0) {
+        console.log(`Saved ${savedImages.length} new images`);
+      }
+
+      // CLEANUP REMOVED IMAGES
+      const oldSections = safeJsonParse(currentAudit.Sections, []);
+      await cleanupRemovedImages(oldSections, processedSections);
+    }
+
+    // Recalculate summary if sections provided
+    const summary = processedSections
+      ? calculateSummary(processedSections)
       : safeJsonParse(currentAudit.Summary, {});
 
-    console.log("📊 updateAudit - Calculated summary:", summary);
+    console.log("updateAudit - Calculated summary:", summary);
 
     const result = await pool
       .request()
@@ -494,7 +530,9 @@ export const updateAudit = tryCatch(async (req, res) => {
       .input(
         "sections",
         sql.NVarChar,
-        sections ? JSON.stringify(sections) : currentAudit.Sections,
+        processedSections
+          ? JSON.stringify(processedSections)
+          : currentAudit.Sections,
       )
       .input(
         "signatures",
@@ -538,6 +576,7 @@ export const updateAudit = tryCatch(async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Audit updated successfully",
+      imagesUploaded: savedImages.length,
       data: {
         ...audit,
         InfoData: safeJsonParse(audit.InfoData, {}),
@@ -549,6 +588,13 @@ export const updateAudit = tryCatch(async (req, res) => {
         Summary: safeJsonParse(audit.Summary, {}),
       },
     });
+  } catch (error) {
+    // If update fails, clean up any newly saved images
+    if (savedImages && savedImages.length > 0) {
+      console.warn("Audit update failed, cleaning up saved images...");
+      await deleteMultipleImages(savedImages.map((img) => img.fileName));
+    }
+    throw error;
   } finally {
     if (pool) await pool.close();
   }
@@ -568,11 +614,13 @@ export const deleteAudit = tryCatch(async (req, res) => {
   try {
     pool = await new sql.ConnectionPool(dbConfig3).connect();
 
-    // Check if audit exists
+    // Check if audit exists and get sections for image cleanup
     const checkResult = await pool
       .request()
       .input("id", sql.Int, id)
-      .query("SELECT Id, Status FROM Audits WHERE Id = @id AND IsDeleted = 0");
+      .query(
+        "SELECT Id, Status, Sections FROM Audits WHERE Id = @id AND IsDeleted = 0",
+      );
 
     if (checkResult.recordset.length === 0) {
       throw new AppError("Audit not found", 404);
@@ -585,6 +633,11 @@ export const deleteAudit = tryCatch(async (req, res) => {
       throw new AppError("Cannot delete an approved audit", 400);
     }
 
+    // DELETE ASSOCIATED IMAGES
+    const sections = safeJsonParse(currentAudit.Sections, []);
+    await deleteAuditImages(sections);
+
+    // Soft delete audit
     await pool
       .request()
       .input("id", sql.Int, id)
@@ -606,7 +659,7 @@ export const deleteAudit = tryCatch(async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Audit deleted successfully",
+      message: "Audit and associated images deleted successfully",
     });
   } finally {
     if (pool) await pool.close();
