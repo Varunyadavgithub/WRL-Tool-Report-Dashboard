@@ -291,7 +291,19 @@ export const getQuickFiltersBarcodeDetails = tryCatch(async (req, res) => {
       ) AS RowNum,
       (SELECT Name FROM Material WHERE MatCode = Psno.Material) AS Model_Name,
       ISNULL(Psno.VSerial, '') AS Asset_tag,
-      ISNULL(Psno.Serial2, '') AS CustomerQR,
+      -- NEW ? NFC UID before semicolon
+      CASE 
+          WHEN CHARINDEX('/', Psno.Serial2) > 0 
+               THEN LEFT(Psno.Serial2, CHARINDEX('/', Psno.Serial2) - 1)
+          ELSE NULL
+      END AS NFC_UID,
+
+      -- Clean CustomerQR after semicolon
+      CASE 
+          WHEN CHARINDEX('/', Psno.Serial2) > 0 
+               THEN SUBSTRING(Psno.Serial2, CHARINDEX('/', Psno.Serial2) + 1, LEN(Psno.Serial2))
+          ELSE Psno.Serial2
+      END AS CustomerQR,
       COALESCE(NULLIF(CASE WHEN SUBSTRING(Psno.Serial, 1, 1) IN ('S', 'F', 'L') THEN '' ELSE Psno.Serial END, ''),
                CASE 
                  WHEN Psno.VSerial IS NULL THEN Psno.Serial 

@@ -48,44 +48,126 @@ export const sendGateEntryAlertMail = async (gateEntries) => {
       .join("");
 
     const html = `
-      <html>
-      <head>
-        <style>
-          table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
-          th, td { border: 1px solid #ddd; padding: 5px; }
-          th { background-color: #2575fc; color: white; }
-          tr:nth-child(even) { background-color: #f2f2f2; }
-        </style>
-      </head>
-      <body>
-        <h2>Gate Entry Report</h2>
-        <table>
-          <thead><tr>${headers
-            .map((h) => `<th>${h}</th>`)
-            .join("")}</tr></thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-        <p>Regards,<br/>WRL Security Team</p>
-      </body>
-      </html>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f4f6f9;
+      font-family: Arial, sans-serif;
+    }
+
+    .container {
+      width: 95%;
+      max-width: 1200px;
+      margin: 20px auto;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      padding: 20px;
+    }
+
+    .header {
+      background: linear-gradient(90deg, #2575fc, #1a5edb);
+      color: white;
+      padding: 15px 20px;
+      border-radius: 6px 6px 0 0;
+      font-size: 18px;
+      font-weight: bold;
+      text-align: center;
+      letter-spacing: 0.5px;
+    }
+
+    .subtext {
+      font-size: 13px;
+      color: #666;
+      margin: 15px 0;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 12px;
+    }
+
+    th {
+      background-color: #2575fc;
+      color: white;
+      padding: 8px;
+      text-align: left;
+      position: sticky;
+      top: 0;
+    }
+
+    td {
+      padding: 6px;
+      border: 1px solid #e0e0e0;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f9fbff;
+    }
+
+    tr:hover {
+      background-color: #eef3ff;
+    }
+
+    .footer {
+      margin-top: 25px;
+      font-size: 12px;
+      color: #777;
+      border-top: 1px solid #eee;
+      padding-top: 10px;
+    }
+
+    .highlight {
+      color: #2575fc;
+      font-weight: bold;
+    }
+
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    
+    <div class="header">
+      Gate Entry Report
+    </div>
+
+    <p class="subtext">
+      Please find below the latest <span class="highlight">Gate Entry details</span>.
+      This is an automated notification from the WRL Security System.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          ${headers.map((h) => `<th>${h}</th>`).join("")}
+        </tr>
+      </thead>
+      <tbody>
+        ${tableRows}
+      </tbody>
+    </table>
+    
+    <div class="footer" style="margin-top:25px; font-size:12px; color:#777; border-top:1px solid #eee; padding-top:15px; text-align:center;">
+  <div style="font-size:11px; color:#9a9a9a;">
+    © 2026 MES Team | Western Refrigeration Pvt. Ltd.<br/>
+    This is a system-generated notification. Please do not reply to this email.
+  </div>
+</div>
+  </div>
+</body>
+</html>
     `;
 
     const mailOptions = {
       from: { name: "WRL Inward Alert", address: process.env.SMTP_USER },
-      to: "vikash.kumar@westernequipments.com", //sujith.s@westernequipments.com
-      cc: [
-        "rahul.bagul@westernequipments.com",
-        "shubhanshu.dixit@westernequipments.com",
-        "shubham.singh@westernequipments.com",
-        "ashutosh.jena@westernequipments.com",
-        "jenish.gandhi@westernequipments.com",
-        "mayank.garg@westernequipments.com",
-        "devesh.gaur@westernequipments.com",
-        "vinay.yadav@westernequipments.com",
-        "rushikesh.naik@westernequipments.com",
-        "harshal.prajapati@westernequipments.com",
-        "vaikunth.surve@westernequipments.com",
-      ],
+      to: ["vatsal.patel@westernequipments.com"],
       subject: "Gate Entry Report",
       html,
     };

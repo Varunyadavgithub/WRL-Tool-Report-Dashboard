@@ -48,7 +48,7 @@ const TotalProduction = () => {
       });
       if (node) observer.current.observe(node);
     },
-    [loading, hasMore]
+    [loading, hasMore],
   );
 
   /* ===================== RTK QUERY ===================== */
@@ -86,7 +86,7 @@ const TotalProduction = () => {
         setTotalProductionData((prev) => {
           const existing = new Set(prev.map((d) => d.FG_SR));
           const uniqueNew = res.data.data.filter(
-            (item) => !existing.has(item.FG_SR)
+            (item) => !existing.has(item.FG_SR),
           );
           return [...prev, ...uniqueNew];
         });
@@ -117,7 +117,7 @@ const TotalProduction = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -163,7 +163,7 @@ const TotalProduction = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -208,13 +208,13 @@ const TotalProduction = () => {
       1,
       8,
       0,
-      0
+      0,
     ); // 1st day at 08:00 AM
 
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -309,13 +309,13 @@ const TotalProduction = () => {
 
   const filteredTotalProductionData = selectedModelName
     ? totalProductionData.filter(
-        (item) => item.Model_Name === selectedModelName
+        (item) => item.Model_Name === selectedModelName,
       )
     : totalProductionData;
 
   const handleModelRowClick = (modelName) => {
     setSelectedModelName((prevSelectedModel) =>
-      prevSelectedModel === modelName ? null : modelName
+      prevSelectedModel === modelName ? null : modelName,
     );
   };
 
@@ -357,7 +357,7 @@ const TotalProduction = () => {
               value={selectedModelVariant?.value || ""}
               onChange={(e) =>
                 setSelectedModelVariant(
-                  variants.find((opt) => opt.value === e.target.value) || null
+                  variants.find((opt) => opt.value === e.target.value) || null,
                 )
               }
               className="max-w-64"
@@ -369,8 +369,8 @@ const TotalProduction = () => {
               onChange={(e) =>
                 setSelectedDep(
                   departmentOption.find(
-                    (opt) => opt.value === e.target.value
-                  ) || null
+                    (opt) => opt.value === e.target.value,
+                  ) || null,
                 )
               }
               className="max-w-64"
@@ -467,9 +467,10 @@ const TotalProduction = () => {
       {/* Summary Section */}
       <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
         <div className="bg-white border border-gray-300 rounded-md p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="max-h-[600px] overflow-x-auto w-full">
-              <table className="w-full border bg-white text-xs text-left rounded-lg table-auto">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {/* Main Table */}
+            <div className="md:col-span-3 max-h-[600px] overflow-auto w-full">
+              <table className="w-full table-fixed border bg-white text-xs text-left rounded-lg">
                 <thead className="bg-gray-200 sticky top-0 z-10 text-center">
                   <tr>
                     <th
@@ -511,6 +512,12 @@ const TotalProduction = () => {
                     >
                       Customer QR
                     </th>
+                    <th
+                      className="px-1 py-1 border min-w-[120px] cursor-pointer"
+                      onClick={() => requestSort("Nfcuid")}
+                    >
+                      NFC UID
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -526,6 +533,7 @@ const TotalProduction = () => {
                         <td className="px-1 py-1 border">{item.FG_SR}</td>
                         <td className="px-1 py-1 border">{item.Asset_tag}</td>
                         <td className="px-1 py-1 border">{item.CustomerQR}</td>
+                        <td className="px-1 py-1 border">{item.NFC_UID}</td>
                       </tr>
                     );
                   })}
@@ -546,8 +554,8 @@ const TotalProduction = () => {
             </div>
 
             {/* Model Table */}
-            <div className="max-h-[500px] overflow-x-auto w-full">
-              <table className="w-full border bg-white text-xs text-left rounded-lg table-auto">
+            <div className="md:col-span-1 max-h-[500px] overflow-auto">
+              <table className="w-full table-fixed border bg-white text-xs text-left rounded-lg">
                 <thead className="bg-gray-200 sticky top-0 z-10 text-center">
                   <tr>
                     <th className="px-1 py-1 border min-w-[80px]">
@@ -573,15 +581,15 @@ const TotalProduction = () => {
                         <td className="px-1 py-1 border">{modelName}</td>
                         <td className="px-1 py-1 border">{count}</td>
                       </tr>
-                    )
+                    ),
                   )}
                 </tbody>
               </table>
             </div>
 
             {/* Category Table */}
-            <div className="max-h-[500px] overflow-x-auto w-full">
-              <table className="w-full border bg-white text-xs text-left rounded-lg table-auto">
+            <div className="md:col-span-1 max-h-[500px] overflow-auto">
+              <table className="w-full table-fixed border bg-white text-xs text-left rounded-lg">
                 <thead className="bg-gray-200 sticky top-0 z-10 text-center">
                   <tr>
                     <th className="px-1 py-1 border min-w-[80px]">Category</th>
@@ -595,7 +603,7 @@ const TotalProduction = () => {
                         <td className="px-1 py-1 border">{category}</td>
                         <td className="px-1 py-1 border">{count}</td>
                       </tr>
-                    )
+                    ),
                   )}
                 </tbody>
               </table>

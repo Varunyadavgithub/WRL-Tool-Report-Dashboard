@@ -45,7 +45,7 @@ export const connectToDB = async (dbConfig) => {
   const key = `${dbConfig.server}_${dbConfig.database}`;
 
   if (pools.has(key)) {
-    console.log(`?? Reusing pool: ${dbConfig.database}`);
+    console.log(`Reusing pool: ${dbConfig.database}`);
     return pools.get(key);
   }
 

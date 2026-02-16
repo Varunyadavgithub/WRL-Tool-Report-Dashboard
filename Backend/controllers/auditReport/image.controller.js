@@ -147,9 +147,3 @@ export const getImageMetadata = tryCatch(async (req, res) => {
     data: imageInfo,
   });
 });
-
-export default {
-  serveImage,
-  downloadImage,
-  getImageMetadata,
-};
