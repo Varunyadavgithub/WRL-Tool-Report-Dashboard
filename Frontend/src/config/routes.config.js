@@ -21,8 +21,8 @@ const HourlyReport = lazy(() => import("../pages/Production/HourlyReport"));
 const LineHourlyReport = lazy(
   () => import("../pages/Production/LineHourlyReport"),
 );
-const StageHistoryReport = lazy(
-  () => import("../pages/Production/StageHistoryReport"),
+const ConsolidatedReport = lazy(
+  () => import("../pages/Production/ConsolidatedReport/ConsolidatedReport"),
 );
 const ModelNameUpdate = lazy(
   () => import("../pages/Production/ModelNameUpdate"),
@@ -31,9 +31,7 @@ const TotalProduction = lazy(
   () => import("../pages/Production/TotalProduction"),
 );
 const NFCReport = lazy(() => import("../pages/Production/NFCReport"));
-const ComponentDetails = lazy(
-  () => import("../pages/Production/ComponentDetails"),
-);
+
 
 const ReworkEntry = lazy(() => import("../pages/Quality/ReworkEntry"));
 const ReworkReport = lazy(() => import("../pages/Quality/ReworkReport"));
@@ -147,9 +145,9 @@ export const ROUTE_CONFIG = [
         component: LineHourlyReport,
       },
       {
-        path: "/production/stage-history-report",
-        label: "Stage History Report",
-        component: StageHistoryReport,
+        path: "/production/consolidated-report",
+        label: "Consolidated Report",
+        component: ConsolidatedReport,
       },
       {
         path: "/production/model-name-update",
@@ -157,11 +155,7 @@ export const ROUTE_CONFIG = [
         component: ModelNameUpdate,
         roles: [ROLES.ADMIN, ROLES.LOGISTIC],
       },
-      {
-        path: "/production/component-details",
-        label: "Component Details",
-        component: ComponentDetails,
-      },
+
       {
         path: "/production/total-production",
         label: "Total Production",

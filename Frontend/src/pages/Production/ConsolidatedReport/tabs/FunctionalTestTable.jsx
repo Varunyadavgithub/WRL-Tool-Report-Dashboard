@@ -1,0 +1,691 @@
+import { useState } from "react";
+import EmptyState from "../../../../components/ui/EmptyState";
+import { FiCheckCircle, FiXCircle, FiClock } from "react-icons/fi";
+import { BsLightningCharge } from "react-icons/bs";
+import { TbGasStation } from "react-icons/tb";
+import { MdOutlineMultilineChart } from "react-icons/md";
+
+// ─── Inner Tab Config ───────────────────────────────────────────
+const INNER_TABS = [
+  {
+    key: "gasCharging",
+    label: "Gas Charging",
+    icon: TbGasStation,
+    activeBg: "bg-teal-50",
+    activeBorder: "border-teal-500",
+    activeText: "text-teal-700",
+    iconActive: "text-teal-600",
+    headerGradient: "from-teal-600 to-emerald-600",
+    lightBg: "bg-teal-50/50",
+  },
+  {
+    key: "est",
+    label: "EST",
+    fullLabel: "Electrical Safety Test",
+    icon: BsLightningCharge,
+    activeBg: "bg-amber-50",
+    activeBorder: "border-amber-500",
+    activeText: "text-amber-700",
+    iconActive: "text-amber-600",
+    headerGradient: "from-amber-500 to-orange-600",
+    lightBg: "bg-amber-50/50",
+  },
+  {
+    key: "mft",
+    label: "MFT",
+    fullLabel: "Multi-Function Test",
+    icon: MdOutlineMultilineChart,
+    activeBg: "bg-indigo-50",
+    activeBorder: "border-indigo-500",
+    activeText: "text-indigo-700",
+    iconActive: "text-indigo-600",
+    headerGradient: "from-indigo-500 to-purple-600",
+    lightBg: "bg-indigo-50/50",
+  },
+];
+
+// ─── Format Date ────────────────────────────────────────────────
+function formatDate(dateStr) {
+  if (!dateStr) return null;
+  return dateStr.replace("T", " ").replace("Z", "").substring(0, 19);
+}
+
+// ─── Status Badge ───────────────────────────────────────────────
+function StatusBadge({ status }) {
+  const normalized = (status || "").toUpperCase();
+  const config = {
+    PASS: {
+      bg: "bg-emerald-50",
+      text: "text-emerald-700",
+      border: "border-emerald-200",
+      icon: <FiCheckCircle size={11} />,
+    },
+    OK: {
+      bg: "bg-emerald-50",
+      text: "text-emerald-700",
+      border: "border-emerald-200",
+      icon: <FiCheckCircle size={11} />,
+    },
+    FAIL: {
+      bg: "bg-red-50",
+      text: "text-red-700",
+      border: "border-red-200",
+      icon: <FiXCircle size={11} />,
+    },
+    NG: {
+      bg: "bg-red-50",
+      text: "text-red-700",
+      border: "border-red-200",
+      icon: <FiXCircle size={11} />,
+    },
+    PENDING: {
+      bg: "bg-amber-50",
+      text: "text-amber-700",
+      border: "border-amber-200",
+      icon: <FiClock size={11} />,
+    },
+  };
+  const s = config[normalized] || {
+    bg: "bg-gray-50",
+    text: "text-gray-600",
+    border: "border-gray-200",
+    icon: null,
+  };
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-bold rounded-full border ${s.bg} ${s.text} ${s.border}`}
+    >
+      {s.icon}
+      {status}
+    </span>
+  );
+}
+
+// ─── Gas Charging Table ─────────────────────────────────────────
+function GasChargingTable({ data, tabConfig }) {
+  const headers = [
+    "Sr No",
+    "Result ID",
+    "Date",
+    "Time",
+    "Barcode",
+    "Model Name",
+    "Model",
+    "Runtime",
+    "Refrigerant",
+    "Set Gas Weight",
+    "Actual Gas Weight",
+    "Leak Set Value",
+    "Leak Test Value",
+    "Leak Test Time",
+    "Set Evacuation Value",
+    "Actual Evacuation Value",
+    "Actual Evacuation Time",
+    "Performance",
+    "Fault Code",
+    "Fault Name",
+    "Sync Status",
+    "Machine",
+  ];
+
+  const getResult = (item) =>
+    item.PERFORMANCE ?? item.RESULT ?? item.STATUS ?? "";
+
+  return (
+    <div className="overflow-x-auto overflow-y-auto max-h-[450px]">
+      <table
+        className="w-full text-sm border-collapse"
+        style={{ minWidth: "1400px" }}
+      >
+        <thead>
+          <tr
+            className={`bg-gradient-to-r ${tabConfig.headerGradient} text-white`}
+          >
+            {headers.map((h, i) => (
+              <th
+                key={i}
+                className="px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-center border-r border-white/10 last:border-r-0"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+
+        <tbody className="divide-y divide-gray-100">
+          {data.length > 0 ? (
+            data.map((item, index) => {
+              const result = getResult(item);
+              const isFail = ["FAIL", "NG"].includes(result?.toUpperCase());
+
+              const rowBg = isFail
+                ? "bg-red-50/50"
+                : index % 2 === 0
+                  ? "bg-white"
+                  : tabConfig.lightBg;
+
+              return (
+                <tr
+                  key={index}
+                  className={`text-center transition-colors duration-150 ${rowBg} hover:bg-indigo-50/40`}
+                >
+                  <td className="px-3 py-3 font-semibold text-gray-600">
+                    {index + 1}
+                  </td>
+
+                  <td className="px-3 py-3 font-mono">
+                    {item.Result_ID || "—"}
+                  </td>
+
+                  <td className="px-3 py-3">{item.DATE || "—"}</td>
+
+                  <td className="px-3 py-3 font-mono text-xs">
+                    {item.TIME || "—"}
+                  </td>
+
+                  <td className="px-3 py-3 font-mono text-xs">
+                    {item.BARCODE || "—"}
+                  </td>
+
+                  <td className="px-3 py-3 text-left">
+                    {item.MODELNAME || "—"}
+                  </td>
+
+                  <td className="px-3 py-3">{item.MODEL || "—"}</td>
+
+                  <td className="px-3 py-3 font-mono">
+                    {item.RUNTIME_SECONDS?.trim() || "—"}
+                  </td>
+
+                  <td className="px-3 py-3 uppercase">
+                    {item.REFRIGERANT || "—"}
+                  </td>
+
+                  <td className="px-3 py-3 font-mono">
+                    {item.SET_GAS_WEIGHT?.trim() || "—"}
+                  </td>
+
+                  <td className="px-3 py-3 font-mono">
+                    {item.ACTUAL_GAS_WEIGHT?.trim() || "—"}
+                  </td>
+
+                  <td className="px-3 py-3 font-mono">
+                    {item.LEAK_SET_VALUE?.trim() || "—"}
+                  </td>
+
+                  <td className="px-3 py-3 font-mono">
+                    {item.LEAK_TEST_VALUE?.trim() || "—"}
+                  </td>
+
+                  <td className="px-3 py-3 font-mono">
+                    {item.LEAK_TEST_TIME?.trim() || "—"}
+                  </td>
+
+                  <td className="px-3 py-3 font-mono">
+                    {item.SET_EVACUATION_VALUE?.trim() || "—"}
+                  </td>
+
+                  <td className="px-3 py-3 font-mono">
+                    {item.ACTUAL_EVACUATION_VALUE?.trim() || "—"}
+                  </td>
+
+                  <td className="px-3 py-3 font-mono">
+                    {item.ACTUAL_EVACUATION_TIME?.trim() || "—"}
+                  </td>
+
+                  <td className="px-3 py-3">
+                    <StatusBadge status={result} />
+                  </td>
+
+                  <td className="px-3 py-3">{item.FaultCode || "—"}</td>
+
+                  <td className="px-3 py-3">{item.FaultName || "—"}</td>
+
+                  <td className="px-3 py-3">{item.SyncStatus || "—"}</td>
+
+                  <td className="px-3 py-3">{item.MACHINE || "—"}</td>
+                </tr>
+              );
+            })
+          ) : (
+            <tr>
+              <td colSpan={headers.length}>
+                <EmptyState message="No Gas Charging data found." />
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── EST Table ──────────────────────────────────────────────────
+// ─── EST Table ──────────────────────────────────────────────────
+function ESTTable({ data = [], tabConfig }) {
+  const headers = [
+    "Sr No",
+    "Ref No",
+    "Model No",
+    "Serial No",
+    "Date Time",
+    "Operator",
+    "Set ECT Ohms",
+    "Set ECT Time",
+    "Read ECT Ohms",
+    "ECT Result",
+    "Set HV KV",
+    "Set HV MA",
+    "Set HV Time",
+    "Read HV KV",
+    "HV Result",
+    "Set IR Mohms",
+    "Set IR Time",
+    "Read IR Mohms",
+    "IR Result",
+    "Set LCT MA",
+    "Set LCT Time",
+    "Read LCT LN MA",
+    "Read LCT LN Vtg",
+    "LCT LN Result",
+    "Read LCT NL MA",
+    "Read LCT NL Vtg",
+    "LCT NL Result",
+    "Set Wattage Lower",
+    "Set Wattage Upper",
+    "Read Voltage",
+    "Read Current",
+    "Read Wattage",
+    "Run Result",
+    "LVT Read Voltage",
+    "LVT Read Current",
+    "LVT Read Wattage",
+    "LVT Result",
+    "Final Result",
+    "Status",
+  ];
+
+  const formatDateTime = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleString();
+  };
+
+  const getFinalResult = (item) => item?.result ?? "";
+
+  return (
+    <div className="overflow-x-auto overflow-y-auto max-h-[450px]">
+      <table
+        className="w-full text-sm border-collapse"
+        style={{ minWidth: "1400px" }}
+      >
+        {/* HEADER */}
+        <thead>
+          <tr
+            className={`bg-gradient-to-r ${tabConfig?.headerGradient} text-white`}
+          >
+            {headers.map((h, i) => (
+              <th
+                key={i}
+                className="px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-center border-r border-white/10 last:border-r-0"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+
+        {/* BODY */}
+        <tbody className="divide-y divide-gray-100">
+          {data.length > 0 ? (
+            data.map((item, index) => {
+              const finalResult = getFinalResult(item);
+              const isFail =
+                finalResult && finalResult.toUpperCase() !== "PASS";
+
+              const rowBg = isFail
+                ? "bg-red-50/50"
+                : index % 2 === 0
+                  ? "bg-white"
+                  : tabConfig?.lightBg;
+
+              return (
+                <tr
+                  key={index}
+                  className={`text-center transition-colors duration-150 ${rowBg} hover:bg-indigo-50/40`}
+                >
+                  <td className="px-3 py-3 font-semibold text-gray-600">
+                    {index + 1}
+                  </td>
+                  <td className="px-3 py-3 font-mono">{item.RefNo ?? "—"}</td>
+                  <td className="px-3 py-3 text-left">
+                    {item.model_no ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 font-mono">
+                    {item.serial_no ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 text-xs">
+                    {formatDateTime(item.date_time)}
+                  </td>
+                  <td className="px-3 py-3">{item.operator ?? "—"}</td>
+
+                  {/* ECT */}
+                  <td className="px-3 py-3">{item.set_ect_ohms ?? "—"}</td>
+                  <td className="px-3 py-3">{item.set_ect_time ?? "—"}</td>
+                  <td className="px-3 py-3">{item.read_ect_ohms ?? "—"}</td>
+                  <td className="px-3 py-3">
+                    <StatusBadge status={item.ect_result} />
+                  </td>
+
+                  {/* HV */}
+                  <td className="px-3 py-3">{item.set_hv_kv ?? "—"}</td>
+                  <td className="px-3 py-3">{item.set_hv_ma ?? "—"}</td>
+                  <td className="px-3 py-3">{item.set_hv_time ?? "—"}</td>
+                  <td className="px-3 py-3">{item.read_hv_kv ?? "—"}</td>
+                  <td className="px-3 py-3">
+                    <StatusBadge status={item.hv_result} />
+                  </td>
+
+                  {/* IR */}
+                  <td className="px-3 py-3">{item.set_ir_mohms ?? "—"}</td>
+                  <td className="px-3 py-3">{item.set_ir_time ?? "—"}</td>
+                  <td className="px-3 py-3">{item.read_ir_mohms ?? "—"}</td>
+                  <td className="px-3 py-3">
+                    <StatusBadge status={item.ir_result} />
+                  </td>
+
+                  {/* LCT LN */}
+                  <td className="px-3 py-3">{item.set_lct_ma ?? "—"}</td>
+                  <td className="px-3 py-3">{item.set_lct_time ?? "—"}</td>
+                  <td className="px-3 py-3">{item.read_lct_ln_ma ?? "—"}</td>
+                  <td className="px-3 py-3">{item.read_lct_ln_Vtg ?? "—"}</td>
+                  <td className="px-3 py-3">
+                    <StatusBadge status={item.lct_ln_result} />
+                  </td>
+
+                  {/* LCT NL */}
+                  <td className="px-3 py-3">{item.read_lct_nl_ma ?? "—"}</td>
+                  <td className="px-3 py-3">{item.read_lct_nl_Vtg ?? "—"}</td>
+                  <td className="px-3 py-3">
+                    <StatusBadge status={item.lct_nl_result} />
+                  </td>
+
+                  {/* Wattage */}
+                  <td className="px-3 py-3 font-mono">
+                    {item.set_wattage_lower ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 font-mono">
+                    {item.set_wattage_upper ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 font-mono">
+                    {item.read_voltage ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 font-mono">
+                    {item.read_current ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 font-mono">
+                    {item.read_wattage ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 font-mono">
+                    {item.run_result ?? "—"}
+                  </td>
+
+                  {/* LVT */}
+                  <td className="px-3 py-3 font-mono">
+                    {item.lvt_read_voltage ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 font-mono">
+                    {item.lvt_read_current ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 font-mono">
+                    {item.lvt_read_wattage ?? "—"}
+                  </td>
+                  <td className="px-3 py-3">
+                    <StatusBadge status={item.lvt_result} />
+                  </td>
+
+                  {/* Final Result */}
+                  <td className="px-3 py-3">
+                    <StatusBadge status={item.result} />
+                  </td>
+
+                  {/* Status (numeric) */}
+                  <td className="px-3 py-3">
+                    <StatusBadge
+                      status={item.status === 1 ? "Active" : "Inactive"}
+                    />
+                  </td>
+                </tr>
+              );
+            })
+          ) : (
+            <tr>
+              <td colSpan={headers.length} className="py-10">
+                <EmptyState message="No EST data found." />
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── MFT Table ──────────────────────────────────────────────────
+function MFTTable({ data, tabConfig }) {
+  const headers = [
+    "Sr No",
+    "ID",
+    "Product Code",
+    "Equipment No",
+    "Pass/Fail Time",
+    "MFT No",
+    "Status",
+    "Error Code",
+    "Start Time",
+    "Stop Time",
+    "Reason",
+    "PDF File Name",
+    "Sync Status",
+  ];
+
+  const getResult = (item) => item.STATUS ?? "";
+
+  return (
+    <div className="overflow-x-auto overflow-y-auto max-h-[450px]">
+      <table
+        className="w-full text-sm border-collapse"
+        style={{ minWidth: "1200px" }}
+      >
+        <thead>
+          <tr
+            className={`bg-gradient-to-r ${tabConfig.headerGradient} text-white`}
+          >
+            {headers.map((h, i) => (
+              <th
+                key={i}
+                className="px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-center border-r border-white/10 last:border-r-0"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+
+        <tbody className="divide-y divide-gray-100">
+          {data.length > 0 ? (
+            data.map((item, index) => {
+              const result = getResult(item);
+              const isFail = !["PASS", "PASSED"].includes(
+                result?.toUpperCase(),
+              );
+
+              const rowBg = isFail
+                ? "bg-red-50/50"
+                : index % 2 === 0
+                  ? "bg-white"
+                  : tabConfig.lightBg;
+
+              return (
+                <tr
+                  key={index}
+                  className={`text-center transition-colors duration-150 ${rowBg} hover:bg-indigo-50/40`}
+                >
+                  <td className="px-3 py-3 font-semibold text-gray-600">
+                    {index + 1}
+                  </td>
+                  <td className="px-3 py-3 font-mono">{item.ID || "—"}</td>
+
+                  <td className="px-3 py-3">{item.PRODUCT_CODE || "—"}</td>
+
+                  <td className="px-3 py-3 font-mono text-xs">
+                    {item.EQUIPMENT_NO || "—"}
+                  </td>
+
+                  <td className="px-3 py-3">{item.PASS_FAILED_TIMES || "—"}</td>
+
+                  <td className="px-3 py-3 font-mono">{item.MFT_NO || "—"}</td>
+
+                  <td className="px-3 py-3">
+                    <StatusBadge status={item.STATUS} />
+                  </td>
+
+                  <td className="px-3 py-3">{item.ERRORCODE || "—"}</td>
+
+                  <td className="px-3 py-3 text-xs">
+                    {item.START_TIME || "—"}
+                  </td>
+
+                  <td className="px-3 py-3 text-xs">{item.STOP_TIME || "—"}</td>
+
+                  <td className="px-3 py-3 text-left">{item.REASON || "—"}</td>
+
+                  <td className="px-3 py-3">{item.PDFFileName || "—"}</td>
+
+                  <td className="px-3 py-3">
+                    {item.SYNCSTATUS === 1 ? "Synced" : "Pending"}
+                  </td>
+                </tr>
+              );
+            })
+          ) : (
+            <tr>
+              <td colSpan={headers.length}>
+                <EmptyState message="No MFT data found." />
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Inner Tab Table Map ────────────────────────────────────────
+const INNER_TABLE_MAP = {
+  gasCharging: GasChargingTable,
+  est: ESTTable,
+  mft: MFTTable,
+};
+
+// ─── Main Component ─────────────────────────────────────────────
+function FunctionalTestTable({ data }) {
+  // data = { gasCharging: [...], est: [...], mft: [...] }
+  const gasData = data?.gasCharging || [];
+  const estData = data?.est || [];
+  const mftData = data?.mft || [];
+
+  const dataMap = {
+    gasCharging: gasData,
+    est: estData,
+    mft: mftData,
+  };
+
+  // Find first tab with data
+  const firstWithData = INNER_TABS.find((t) => dataMap[t.key]?.length > 0);
+  const [activeInnerTab, setActiveInnerTab] = useState(
+    firstWithData?.key || INNER_TABS[0].key,
+  );
+
+  const activeTabConfig = INNER_TABS.find((t) => t.key === activeInnerTab);
+  const activeData = dataMap[activeInnerTab] || [];
+  const ActiveTable = INNER_TABLE_MAP[activeInnerTab];
+
+  const totalRecords = gasData.length + estData.length + mftData.length;
+
+  if (totalRecords === 0) {
+    return (
+      <EmptyState message="No functional test data found for this serial number." />
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* ─── Inner Tabs Card ─────────────────────────────────── */}
+      <div className="w-full rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Tab Bar */}
+        <div className="flex items-center bg-gray-50/80 border-b border-gray-200 px-2 pt-2">
+          {INNER_TABS.map((tab) => {
+            const TabIcon = tab.icon;
+            const isActive = activeInnerTab === tab.key;
+            const count = dataMap[tab.key]?.length || 0;
+            const hasFail = dataMap[tab.key]?.some((d) =>
+              ["FAIL", "NG"].includes(
+                (
+                  d.RESULT ??
+                  d.Result ??
+                  d.STATUS ??
+                  d.Status ??
+                  ""
+                ).toUpperCase(),
+              ),
+            );
+
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveInnerTab(tab.key)}
+                className={`relative flex items-center gap-2 px-5 py-3 text-sm font-medium
+                           whitespace-nowrap rounded-t-xl transition-all duration-200 cursor-pointer
+                  ${
+                    isActive
+                      ? `${tab.activeBg} ${tab.activeText} border-t-2 border-x ${tab.activeBorder} border-x-gray-200 -mb-[1px] shadow-sm`
+                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-100/70"
+                  }`}
+              >
+                <span
+                  className={`transition-colors ${isActive ? tab.iconActive : "text-gray-400"}`}
+                >
+                  <TabIcon size={16} />
+                </span>
+
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden">{tab.label.split(" ")[0]}</span>
+
+                <span
+                  className={`ml-1 inline-flex items-center justify-center min-w-[22px] h-5 px-1.5
+                                  rounded-full text-[10px] font-bold transition-colors
+                                  ${isActive ? `${tab.activeBg} ${tab.activeText}` : "bg-gray-200 text-gray-500"}`}
+                >
+                  {count}
+                </span>
+
+                {hasFail && !isActive && (
+                  <span className="w-2 h-2 rounded-full bg-red-400 ml-1 animate-pulse" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Table Content */}
+        <div className="animate-fadeIn">
+          <ActiveTable data={activeData} tabConfig={activeTabConfig} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default FunctionalTestTable;

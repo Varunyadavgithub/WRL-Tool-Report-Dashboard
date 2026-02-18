@@ -1,5 +1,4 @@
 import express from "express";
-import { getComponentDetails } from "../controllers/production/componentDetails.controller.js";
 import {
   componentTraceabilityExportData,
   generateReport,
@@ -42,8 +41,13 @@ import {
 } from "../controllers/production/ProductionReport.controller.js";
 import {
   getCurrentStageStatus,
+  getHistoryCard,
   getLogisticStatus,
-} from "../controllers/production/stageHistoryReport.controller.js";
+  getComponentDetails,
+  getReprintHistory,
+  getReworkReport,
+  getFunctionalTest,
+} from "../controllers/production/consolidatedReport.controller.js";
 import {
   totalProductionExportData,
   getBarcodeDetails,
@@ -99,9 +103,14 @@ router.get("/export-production-report", productionReportExportData);
 router.get("/yday-fgdata", fetchQuickFiltersData);
 router.get("/today-fgdata", fetchQuickFiltersData);
 router.get("/month-fgdata", fetchQuickFiltersData);
-// -----------------> Stage History Report
+// -----------------> Consolidated Report
 router.get("/stage-history", getCurrentStageStatus);
 router.get("/logistic-status", getLogisticStatus);
+router.get("/history-card", getHistoryCard);
+router.get("/rework-report", getReworkReport);
+router.get("/reprint-history", getReprintHistory);
+router.get("/component-details", getComponentDetails);
+router.get("/functional-test", getFunctionalTest);
 // -----------------> Total Production
 router.get("/barcode-details", getBarcodeDetails);
 router.get("/export-total-production", totalProductionExportData);
