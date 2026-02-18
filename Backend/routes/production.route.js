@@ -53,6 +53,11 @@ import {
   getBarcodeDetails,
   getQuickFiltersBarcodeDetails,
 } from "../controllers/production/totalProduction.controller.js";
+import {
+  getStopLossDetail,
+  getStopLossLocations,
+  getStopLossSummary,
+} from "../controllers/production/stopLoss.controller.js";
 
 const router = express.Router();
 
@@ -117,5 +122,9 @@ router.get("/export-total-production", totalProductionExportData);
 router.get("/yday-total-production", getQuickFiltersBarcodeDetails);
 router.get("/today-total-production", getQuickFiltersBarcodeDetails);
 router.get("/month-total-production", getQuickFiltersBarcodeDetails);
+// -----------------> Stop Loss Report
+router.get("/stop-loss/summary", getStopLossSummary);
+router.get("/stop-loss/detail", getStopLossDetail);
+router.get("/stop-loss/locations", getStopLossLocations);
 
 export default router;

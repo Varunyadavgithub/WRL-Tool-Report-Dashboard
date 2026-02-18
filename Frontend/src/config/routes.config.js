@@ -27,11 +27,11 @@ const ConsolidatedReport = lazy(
 const ModelNameUpdate = lazy(
   () => import("../pages/Production/ModelNameUpdate"),
 );
+const NFCReport = lazy(() => import("../pages/Production/NFCReport"));
 const TotalProduction = lazy(
   () => import("../pages/Production/TotalProduction"),
 );
-const NFCReport = lazy(() => import("../pages/Production/NFCReport"));
-
+const StopLossReport = lazy(() => import("../pages/Production/StopLossReport"));
 
 const ReworkEntry = lazy(() => import("../pages/Quality/ReworkEntry"));
 const ReworkReport = lazy(() => import("../pages/Quality/ReworkReport"));
@@ -155,16 +155,20 @@ export const ROUTE_CONFIG = [
         component: ModelNameUpdate,
         roles: [ROLES.ADMIN, ROLES.LOGISTIC],
       },
-
+      {
+        path: "/production/nfc-report",
+        label: "NFC Report",
+        component: NFCReport,
+      },
       {
         path: "/production/total-production",
         label: "Total Production",
         component: TotalProduction,
       },
       {
-        path: "/production/nfc-report",
-        label: "NFC Report",
-        component: NFCReport,
+        path: "/production//stop-loss-report",
+        label: "Stop Loss Report",
+        component: StopLossReport,
       },
     ],
   },
