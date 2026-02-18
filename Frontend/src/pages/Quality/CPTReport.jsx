@@ -5,11 +5,7 @@ import ExportButton from "../../components/ui/ExportButton";
 import Loader from "../../components/ui/Loader";
 import Pagination from "../../components/ui/Pagination";
 import { baseURL } from "../../assets/assets";
-
-// React Icons imports
 import {
-  FaBolt,
-  FaChartBar,
   FaThermometerHalf,
   FaClock,
   FaCheckCircle,
@@ -18,7 +14,6 @@ import {
   FaSearch,
   FaSyncAlt,
   FaClipboardList,
-  FaChartPie,
   FaBatteryFull,
   FaLightbulb,
   FaArrowUp,
@@ -29,15 +24,12 @@ import {
   FaDatabase,
   FaTimes,
   FaCheck,
-  FaCalendarDay,
   FaCalendarWeek,
   FaHistory,
 } from "react-icons/fa";
 import {
   BsLightningChargeFill,
-  BsThermometerHigh,
   BsSpeedometer2,
-  BsClockHistory,
   BsCalendar2Day,
   BsCalendar2Week,
   BsCalendar2Month,
@@ -54,9 +46,9 @@ import { HiStatusOnline, HiDatabase } from "react-icons/hi";
 import { IoSpeedometer, IoCalendarOutline } from "react-icons/io5";
 import { RiCalendarEventLine } from "react-icons/ri";
 import { TbReportAnalytics, TbCalendarStats } from "react-icons/tb";
-import { GiPowerLightning } from "react-icons/gi";
-import { AiOutlineFieldNumber, AiFillThunderbolt } from "react-icons/ai";
+import { AiOutlineFieldNumber } from "react-icons/ai";
 import { BiTargetLock } from "react-icons/bi";
+import Title from "../../components/ui/Title";
 
 const CPTReport = () => {
   const [loading, setLoading] = useState(false);
@@ -390,36 +382,6 @@ const CPTReport = () => {
     );
   };
 
-  // Stat Card Component
-  const StatCard = ({
-    title,
-    value,
-    unit,
-    icon: Icon,
-    color,
-    bgColor,
-    iconBg,
-  }) => (
-    <div
-      className={`${bgColor} rounded-xl p-4 shadow-lg border-l-4 ${color} transform hover:scale-105 transition-all duration-300`}
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-gray-500 text-sm font-medium">{title}</p>
-          <p className="text-2xl font-bold text-gray-800">
-            {value}
-            <span className="text-sm font-normal text-gray-500 ml-1">
-              {unit}
-            </span>
-          </p>
-        </div>
-        <div className={`p-3 rounded-full ${iconBg}`}>
-          <Icon className={`text-2xl ${color.replace("border-", "text-")}`} />
-        </div>
-      </div>
-    </div>
-  );
-
   // Get filter label for display
   const getFilterLabel = () => {
     const labels = {
@@ -440,30 +402,11 @@ const CPTReport = () => {
   return (
     <div className="p-6 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
       {/* Header Section */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 mb-6 shadow-xl">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-              <span className="bg-white/20 p-3 rounded-xl">
-                <BsLightningChargeFill className="text-2xl" />
-              </span>
-              CPT Performance Report
-            </h1>
-          </div>
-          <div className="text-right text-white">
-            <p className="text-sm opacity-75 flex items-center gap-1 justify-end">
-              <MdDateRange />
-              Report Generated
-            </p>
-            <p className="font-semibold">{new Date().toLocaleDateString()}</p>
-            {activeFilter && (
-              <p className="text-xs mt-1 bg-white/20 px-2 py-1 rounded-full inline-flex items-center gap-1">
-                <TbCalendarStats />
-                {getFilterLabel()}
-              </p>
-            )}
-          </div>
+      <div className="flex items-center justify-center gap-3 mb-6">
+        <div className="bg-blue-600 p-3 rounded-full">
+          <BsLightningChargeFill className="text-3xl text-white" />
         </div>
+        <Title title="CPT Performance Report" align="center" />
       </div>
 
       {/* Quick Filters Section */}
@@ -673,178 +616,6 @@ const CPTReport = () => {
           </div>
         </div>
       </div>
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-        <StatCard
-          title="Total Records"
-          value={totalRecords}
-          unit="units"
-          icon={FaChartBar}
-          color="border-blue-500"
-          bgColor="bg-white"
-          iconBg="bg-blue-100"
-        />
-        <StatCard
-          title="Avg Runtime"
-          value={stats.avgRuntime}
-          unit="min"
-          icon={BsClockHistory}
-          color="border-green-500"
-          bgColor="bg-white"
-          iconBg="bg-green-100"
-        />
-        <StatCard
-          title="Avg Temperature"
-          value={stats.avgTemp}
-          unit="°C"
-          icon={FaThermometerHalf}
-          color="border-orange-500"
-          bgColor="bg-white"
-          iconBg="bg-orange-100"
-        />
-        <StatCard
-          title="Avg Power"
-          value={stats.avgPower}
-          unit="W"
-          icon={AiFillThunderbolt}
-          color="border-yellow-500"
-          bgColor="bg-white"
-          iconBg="bg-yellow-100"
-        />
-        <StatCard
-          title="Pass Rate"
-          value={stats.passRate}
-          unit="%"
-          icon={FaCheckCircle}
-          color="border-emerald-500"
-          bgColor="bg-white"
-          iconBg="bg-emerald-100"
-        />
-        <StatCard
-          title="Fault Count"
-          value={stats.faultCount}
-          unit="units"
-          icon={FaExclamationTriangle}
-          color="border-red-500"
-          bgColor="bg-white"
-          iconBg="bg-red-100"
-        />
-      </div>
-
-      {/* Performance Gauge Section */}
-      {reportData.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {/* Temperature Gauge */}
-          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-orange-100 p-2 rounded-lg text-orange-500">
-                <BsThermometerHigh className="text-xl" />
-              </span>
-              Temperature Range
-            </h3>
-            <div className="relative pt-1">
-              <div className="flex mb-2 items-center justify-between">
-                <span className="text-xs font-semibold text-blue-600 flex items-center gap-1">
-                  <FaArrowDown /> Min
-                </span>
-                <span className="text-xs font-semibold text-red-600 flex items-center gap-1">
-                  <FaArrowUp /> Max
-                </span>
-              </div>
-              <div className="overflow-hidden h-4 text-xs flex rounded-full bg-gradient-to-r from-blue-200 via-green-200 to-red-200">
-                <div
-                  className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-blue-500 to-red-500"
-                  style={{ width: "70%" }}
-                />
-              </div>
-              <div className="flex justify-between mt-2 text-sm text-gray-600">
-                <span className="flex items-center gap-1">
-                  <FaThermometerHalf className="text-orange-500" />
-                  {stats.avgTemp}°C Avg
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Power Consumption */}
-          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-yellow-100 p-2 rounded-lg text-yellow-500">
-                <GiPowerLightning className="text-xl" />
-              </span>
-              Power Consumption
-            </h3>
-            <div className="flex items-center justify-center">
-              <div className="relative w-32 h-32">
-                <svg className="w-full h-full" viewBox="0 0 100 100">
-                  <circle
-                    className="text-gray-200"
-                    strokeWidth="10"
-                    stroke="currentColor"
-                    fill="transparent"
-                    r="40"
-                    cx="50"
-                    cy="50"
-                  />
-                  <circle
-                    className="text-yellow-500"
-                    strokeWidth="10"
-                    strokeDasharray={`${stats.passRate * 2.51} 251`}
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="transparent"
-                    r="40"
-                    cx="50"
-                    cy="50"
-                    transform="rotate(-90 50 50)"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <FaBolt className="text-yellow-500 text-xl mb-1" />
-                  <span className="text-xl font-bold text-gray-800">
-                    {stats.avgPower}W
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Pass/Fail Ratio */}
-          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-indigo-100 p-2 rounded-lg text-indigo-500">
-                <FaChartPie className="text-xl" />
-              </span>
-              Pass/Fail Ratio
-            </h3>
-            <div className="flex items-center justify-center gap-4">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-2 relative">
-                  <FaCheckCircle className="absolute -top-1 -right-1 text-green-500 text-lg" />
-                  <span className="text-2xl font-bold text-green-600">
-                    {
-                      reportData.filter((item) => item.PERFORMANCE === "PASS")
-                        .length
-                    }
-                  </span>
-                </div>
-                <span className="text-sm text-gray-600 font-medium">Pass</span>
-              </div>
-              <div className="text-3xl text-gray-300">/</div>
-              <div className="text-center">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-2 relative">
-                  <FaExclamationTriangle className="absolute -top-1 -right-1 text-red-500 text-lg" />
-                  <span className="text-2xl font-bold text-red-600">
-                    {stats.faultCount}
-                  </span>
-                </div>
-                <span className="text-sm text-gray-600 font-medium">Fail</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Data Table Section */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">

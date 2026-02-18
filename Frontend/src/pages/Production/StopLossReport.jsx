@@ -356,10 +356,7 @@ function DetailTable({ data, tabConfig }) {
 
         <button
           onClick={allExpanded ? collapseAll : expandAll}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium 
-                     rounded-lg border border-gray-200 bg-white text-gray-600
-                     hover:bg-gray-50 hover:border-gray-300 transition-all duration-200
-                     cursor-pointer active:scale-[0.97]"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 cursor-pointer active:scale-[0.97]"
         >
           {allExpanded ? (
             <>
@@ -575,7 +572,7 @@ function DetailTable({ data, tabConfig }) {
                                   size={9}
                                   className="text-gray-400"
                                 />
-                                {item.Date}
+                                {item.Date.split("T")[0]}
                               </span>
                             </div>
 

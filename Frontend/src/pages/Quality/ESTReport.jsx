@@ -6,8 +6,6 @@ import SelectField from "../../components/ui/SelectField";
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import Button from "../../components/ui/Button";
 import Pagination from "../../components/ui/Pagination.jsx";
-
-// Redux
 import {
   useGetEstReportQuery,
   useGetEstReportSummaryQuery,
@@ -26,8 +24,6 @@ import {
   setLimit,
   setPagination,
 } from "../../redux/estReportSlice";
-
-// Utils
 import {
   getTodayRange,
   getYesterdayRange,
@@ -35,8 +31,6 @@ import {
   formatDateTimeLocal,
 } from "../../utils/dateUtils";
 import { exportToXls } from "../../utils/exportToXls.js";
-
-// React Icons
 import {
   FaShieldAlt,
   FaTint,
@@ -44,7 +38,6 @@ import {
   FaCheckCircle,
   FaTimesCircle,
   FaPlug,
-  FaChartBar,
   FaTable,
   FaUser,
   FaCalendarAlt,
@@ -538,148 +531,6 @@ const ESTReport = () => {
 
       {!isLoading && estData.length > 0 && (
         <>
-          {/* Header Info Card */}
-          {currentData && (
-            <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border-l-4 border-purple-500">
-              <div className="flex flex-wrap items-center justify-between gap-6">
-                <div className="flex flex-wrap gap-8">
-                  <InfoCard
-                    icon={HiOutlineDocumentReport}
-                    label="Reference No"
-                    value={`#${currentData.RefNo}`}
-                    color="purple"
-                  />
-                  <InfoCard
-                    icon={FaCubes}
-                    label="Model"
-                    value={currentData.model_no}
-                    color="blue"
-                  />
-                  <InfoCard
-                    icon={FaBarcode}
-                    label="Serial No"
-                    value={currentData.serial_no}
-                    color="gray"
-                  />
-                  <InfoCard
-                    icon={FaCalendarAlt}
-                    label="Date & Time"
-                    value={
-                      currentData.date_time &&
-                      currentData.date_time.replace("T", " ").replace("Z", "")
-                    }
-                    color="green"
-                  />
-                  <InfoCard
-                    icon={FaUser}
-                    label="Operator"
-                    value={currentData.operator}
-                    color="purple"
-                  />
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                  <span className="text-xs text-gray-500 uppercase tracking-wide flex items-center gap-1">
-                    <VscCircuitBoard className="text-purple-500" />
-                    Overall Result
-                  </span>
-                  <StatusBadge status={currentData.result} size="lg" />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Summary Statistics */}
-          {summary && (
-            <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <FaChartBar className="text-purple-500" />
-                Test Results Overview
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                {testConfigs.map((test) => {
-                  const Icon = test.icon;
-                  const testKey = test.name.toLowerCase();
-                  const testStats = summary[testKey] || { pass: 0, fail: 0 };
-                  const isPass = testStats.fail === 0;
-
-                  return (
-                    <div
-                      key={test.name}
-                      className={`relative p-4 rounded-xl ${
-                        isPass
-                          ? "bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300"
-                          : "bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-300"
-                      } text-center transition-all hover:scale-105 hover:shadow-lg cursor-pointer`}
-                    >
-                      <div
-                        className={`w-12 h-12 mx-auto mb-2 rounded-full ${test.bgColor} flex items-center justify-center`}
-                      >
-                        <Icon className="text-white text-xl" />
-                      </div>
-                      <h3 className="font-bold text-gray-800">{test.name}</h3>
-                      <div className="mt-2 text-xs">
-                        <span className="text-green-600 font-bold">
-                          {testStats.pass} Pass
-                        </span>
-                        {" / "}
-                        <span className="text-red-600 font-bold">
-                          {testStats.fail} Fail
-                        </span>
-                      </div>
-                      <div className="mt-1 text-xs text-gray-500">
-                        {testStats.passRate}% Pass Rate
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Summary Stats Card */}
-          {summary && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-gradient-to-br from-purple-600 to-indigo-700 rounded-xl shadow-lg p-6 text-white">
-                <div className="flex items-center gap-3">
-                  <VscCircuitBoard className="text-3xl" />
-                  <div>
-                    <p className="text-sm opacity-80">Total Tests</p>
-                    <p className="text-3xl font-bold">{summary.total.tests}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg p-6 text-white">
-                <div className="flex items-center gap-3">
-                  <FaCheckCircle className="text-3xl" />
-                  <div>
-                    <p className="text-sm opacity-80">Passed</p>
-                    <p className="text-3xl font-bold">{summary.total.pass}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gradient-to-br from-red-500 to-rose-600 rounded-xl shadow-lg p-6 text-white">
-                <div className="flex items-center gap-3">
-                  <FaTimesCircle className="text-3xl" />
-                  <div>
-                    <p className="text-sm opacity-80">Failed</p>
-                    <p className="text-3xl font-bold">{summary.total.fail}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl shadow-lg p-6 text-white">
-                <div className="flex items-center gap-3">
-                  <IoMdStats className="text-3xl" />
-                  <div>
-                    <p className="text-sm opacity-80">Pass Rate</p>
-                    <p className="text-3xl font-bold">
-                      {summary.total.passRate}%
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Data Table - UPDATED WITH PAGE INFO */}
           <div className="bg-white rounded-xl shadow-lg p-6">
             {/* PAGINATION COMPONENT - ADD THIS */}
