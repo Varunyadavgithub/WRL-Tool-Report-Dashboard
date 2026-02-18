@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets";
@@ -13,9 +13,11 @@ import {
   FiCalendar,
   FiBarChart2,
   FiList,
+  FiMaximize2,
+  FiChevronDown,
+  FiMinimize2,
 } from "react-icons/fi";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { MdOutlineTableChart } from "react-icons/md";
 
 import Title from "../../components/ui/Title";
 import Loader from "../../components/ui/Loader";
@@ -33,6 +35,7 @@ const INNER_TABS = [
     activeText: "text-indigo-700",
     iconActive: "text-indigo-600",
     headerGradient: "from-indigo-600 to-purple-600",
+    lightBg: "bg-indigo-50/30",
   },
   {
     key: "detail",
@@ -43,6 +46,7 @@ const INNER_TABS = [
     activeText: "text-teal-700",
     iconActive: "text-teal-600",
     headerGradient: "from-teal-600 to-emerald-600",
+    lightBg: "bg-teal-50/30",
   },
 ];
 
@@ -57,8 +61,8 @@ function formatSeconds(seconds) {
 
 // ─── Duration Badge ─────────────────────────────────────────────
 function DurationBadge({ duration, seconds }) {
-  const isHigh = seconds > 600; // > 10 min
-  const isMedium = seconds > 120; // > 2 min
+  const isHigh = seconds > 600;
+  const isMedium = seconds > 120;
 
   const color = isHigh
     ? "bg-red-50 text-red-700 border-red-200"
@@ -76,42 +80,16 @@ function DurationBadge({ duration, seconds }) {
   );
 }
 
-// ─── Stat Card ──────────────────────────────────────────────────
-function StatCard({ icon: Icon, label, value, subValue, color }) {
-  return (
-    <div
-      className={`flex items-center gap-3 rounded-xl border px-4 py-3 shadow-sm bg-white
-                     ${color.border} hover:shadow-md transition-shadow duration-200`}
-    >
-      <div
-        className={`w-10 h-10 rounded-lg flex items-center justify-center ${color.bg}`}
-      >
-        <Icon size={18} className={color.icon} />
-      </div>
-      <div>
-        <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest leading-none">
-          {label}
-        </p>
-        <p className={`text-xl font-bold mt-0.5 ${color.text}`}>{value}</p>
-        {subValue && (
-          <p className="text-[10px] text-gray-400 mt-0.5">{subValue}</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ─── Summary Table ──────────────────────────────────────────────
 function SummaryTable({ data, tabConfig }) {
   const headers = [
-    "Rank",
+    "Sr No",
     "Station Name",
     "Total Stop Time",
     "Total Stops",
     "Avg per Stop",
   ];
 
-  // Calculate totals
   const totalStops = data.reduce(
     (sum, d) => sum + (d.Total_Stop_Count || 0),
     0,
@@ -120,109 +98,7 @@ function SummaryTable({ data, tabConfig }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Stats */}
-      {data.length > 0 && (
-        <div className="flex flex-wrap gap-3 p-4 bg-gray-50/80 rounded-xl border border-gray-100">
-          <StatCard
-            icon={FiMapPin}
-            label="Stations Affected"
-            value={data.length}
-            color={{
-              bg: "bg-indigo-50",
-              icon: "text-indigo-600",
-              text: "text-indigo-700",
-              border: "border-indigo-200",
-            }}
-          />
-          <StatCard
-            icon={FiStopCircle}
-            label="Total Stops"
-            value={totalStops}
-            color={{
-              bg: "bg-red-50",
-              icon: "text-red-600",
-              text: "text-red-700",
-              border: "border-red-200",
-            }}
-          />
-          <StatCard
-            icon={FiClock}
-            label="Total Stop Time"
-            value={formatSeconds(totalSeconds)}
-            subValue={`${Math.round(totalSeconds / 60)} minutes`}
-            color={{
-              bg: "bg-amber-50",
-              icon: "text-amber-600",
-              text: "text-amber-700",
-              border: "border-amber-200",
-            }}
-          />
-          <StatCard
-            icon={FiActivity}
-            label="Avg per Stop"
-            value={
-              totalStops > 0
-                ? formatSeconds(Math.round(totalSeconds / totalStops))
-                : "—"
-            }
-            color={{
-              bg: "bg-teal-50",
-              icon: "text-teal-600",
-              text: "text-teal-700",
-              border: "border-teal-200",
-            }}
-          />
-        </div>
-      )}
-
-      {/* Bar Visualization */}
-      {data.length > 0 && (
-        <div className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
-            Stop Time Distribution
-          </p>
-          <div className="flex flex-col gap-2">
-            {data.map((item, index) => {
-              const maxSeconds = data[0]?.Total_Seconds || 1;
-              const percentage = ((item.Total_Seconds || 0) / maxSeconds) * 100;
-              const isTop = index === 0;
-
-              return (
-                <div key={index} className="flex items-center gap-3">
-                  <span
-                    className="text-[11px] text-gray-500 font-medium w-[180px] truncate"
-                    title={item.Station_Name}
-                  >
-                    {item.Station_Name}
-                  </span>
-                  <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 flex items-center justify-end pr-2 ${
-                        isTop
-                          ? "bg-gradient-to-r from-red-400 to-red-500"
-                          : index < 3
-                            ? "bg-gradient-to-r from-amber-400 to-amber-500"
-                            : "bg-gradient-to-r from-indigo-400 to-indigo-500"
-                      }`}
-                      style={{ width: `${Math.max(percentage, 8)}%` }}
-                    >
-                      <span className="text-[10px] text-white font-bold whitespace-nowrap">
-                        {item.Total_Stop_Time}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-[11px] text-gray-500 font-mono w-[40px] text-right">
-                    {item.Total_Stop_Count}×
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Table */}
-      <div className="w-full overflow-x-auto overflow-y-auto max-h-[450px] rounded-xl border border-gray-200 shadow-sm">
+      <div className="w-full overflow-x-auto overflow-y-auto max-h-[550px] rounded-xl border border-gray-200 shadow-sm relative">
         <table
           className="w-full text-sm border-collapse"
           style={{ minWidth: "700px" }}
@@ -234,20 +110,30 @@ function SummaryTable({ data, tabConfig }) {
             <col style={{ width: "120px" }} />
             <col style={{ width: "150px" }} />
           </colgroup>
-          <thead>
+
+          {/* ── STICKY HEADER ── */}
+          <thead className="sticky top-0 z-20">
             <tr
               className={`bg-gradient-to-r ${tabConfig.headerGradient} text-white`}
             >
               {headers.map((h, i) => (
                 <th
                   key={i}
-                  className="px-4 py-3.5 text-[10px] font-semibold uppercase tracking-wider text-center border-r border-white/10 last:border-r-0"
+                  className="px-4 py-3.5 text-[10px] font-semibold uppercase tracking-wider text-center 
+                             border-r border-white/10 last:border-r-0
+                             first:rounded-tl-xl last:rounded-tr-xl
+                             backdrop-blur-sm"
+                  style={{
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                  }}
                 >
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
+
+          {/* ── BODY ── */}
           <tbody className="divide-y divide-gray-100">
             {data.length > 0 ? (
               data.map((item, index) => {
@@ -256,7 +142,7 @@ function SummaryTable({ data, tabConfig }) {
                   ? "bg-red-50/40"
                   : index % 2 === 0
                     ? "bg-white"
-                    : "bg-gray-50/60";
+                    : tabConfig.lightBg || "bg-gray-50/60";
 
                 const avgSeconds =
                   item.Total_Stop_Count > 0
@@ -268,30 +154,43 @@ function SummaryTable({ data, tabConfig }) {
                 return (
                   <tr
                     key={index}
-                    className={`text-center transition-colors duration-150 ${rowBg} hover:bg-indigo-50/50`}
+                    className={`text-center transition-all duration-200 ${rowBg} 
+                               hover:bg-indigo-50/60 hover:shadow-[inset_3px_0_0_0_theme(colors.indigo.400)]`}
                   >
                     <td className="px-4 py-3 align-middle">
                       <span
-                        className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${
-                          isTop
-                            ? "bg-red-100 text-red-700"
-                            : "bg-gray-100 text-gray-700"
-                        }`}
+                        className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold
+                                    transition-transform duration-200 hover:scale-110
+                                    ${
+                                      isTop
+                                        ? "bg-red-100 text-red-700 ring-2 ring-red-200"
+                                        : "bg-gray-100 text-gray-700"
+                                    }`}
                       >
                         {index + 1}
                       </span>
                     </td>
                     <td className="px-4 py-3 align-middle text-left">
                       <div className="flex items-center gap-2">
-                        <FiMapPin
-                          size={12}
-                          className={isTop ? "text-red-500" : "text-gray-400"}
-                        />
+                        <div
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center
+                                      ${isTop ? "bg-red-100" : "bg-gray-100"}`}
+                        >
+                          <FiMapPin
+                            size={12}
+                            className={isTop ? "text-red-500" : "text-gray-400"}
+                          />
+                        </div>
                         <span
                           className={`text-xs font-semibold ${isTop ? "text-red-700" : "text-gray-800"}`}
                         >
                           {item.Station_Name}
                         </span>
+                        {isTop && (
+                          <span className="px-1.5 py-0.5 text-[8px] font-bold uppercase bg-red-100 text-red-600 rounded-md">
+                            Highest
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 align-middle">
@@ -302,20 +201,23 @@ function SummaryTable({ data, tabConfig }) {
                     </td>
                     <td className="px-4 py-3 align-middle">
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-bold rounded-full border ${
-                          item.Total_Stop_Count > 10
-                            ? "bg-red-50 text-red-700 border-red-200"
-                            : item.Total_Stop_Count > 5
-                              ? "bg-amber-50 text-amber-700 border-amber-200"
-                              : "bg-gray-100 text-gray-700 border-gray-200"
-                        }`}
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-bold rounded-full border
+                                    ${
+                                      item.Total_Stop_Count > 10
+                                        ? "bg-red-50 text-red-700 border-red-200"
+                                        : item.Total_Stop_Count > 5
+                                          ? "bg-amber-50 text-amber-700 border-amber-200"
+                                          : "bg-gray-100 text-gray-700 border-gray-200"
+                                    }`}
                       >
                         <FiStopCircle size={10} />
                         {item.Total_Stop_Count}
                       </span>
                     </td>
-                    <td className="px-4 py-3 align-middle text-xs text-gray-600 font-mono">
-                      {formatSeconds(avgSeconds)}
+                    <td className="px-4 py-3 align-middle">
+                      <span className="text-xs text-gray-600 font-mono bg-gray-50 px-2 py-1 rounded-lg">
+                        {formatSeconds(avgSeconds)}
+                      </span>
                     </td>
                   </tr>
                 );
@@ -328,28 +230,46 @@ function SummaryTable({ data, tabConfig }) {
               </tr>
             )}
           </tbody>
-          {/* Table Footer */}
+
+          {/* ── STICKY FOOTER ── */}
           {data.length > 0 && (
-            <tfoot>
-              <tr className="bg-gray-100 font-bold">
+            <tfoot className="sticky bottom-0 z-20">
+              <tr
+                className="bg-gradient-to-r from-gray-800 to-gray-900 text-white"
+                style={{
+                  boxShadow: "0 -2px 8px rgba(0,0,0,0.1)",
+                }}
+              >
                 <td
-                  className="px-4 py-3 text-center text-xs text-gray-600"
+                  className="px-4 py-3.5 text-center text-[10px] font-bold uppercase tracking-wider
+                             first:rounded-bl-xl"
                   colSpan={2}
                 >
-                  TOTAL ({data.length} stations)
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center">
+                      <FiBarChart2 size={12} />
+                    </span>
+                    TOTAL ({data.length} stations)
+                  </div>
                 </td>
-                <td className="px-4 py-3 text-center">
-                  <span className="text-xs font-bold text-gray-700">
+                <td className="px-4 py-3.5 text-center">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-full bg-white/15 backdrop-blur-sm">
+                    <FiClock size={10} />
                     {formatSeconds(totalSeconds)}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-center text-xs font-bold text-gray-700">
-                  {totalStops}
+                <td className="px-4 py-3.5 text-center">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-full bg-white/15 backdrop-blur-sm">
+                    <FiStopCircle size={10} />
+                    {totalStops}
+                  </span>
                 </td>
-                <td className="px-4 py-3 text-center text-xs font-bold text-gray-700 font-mono">
-                  {totalStops > 0
-                    ? formatSeconds(Math.round(totalSeconds / totalStops))
-                    : "—"}
+                <td className="px-4 py-3.5 text-center last:rounded-br-xl">
+                  <span className="text-xs font-bold font-mono bg-white/10 px-3 py-1 rounded-full">
+                    {totalStops > 0
+                      ? formatSeconds(Math.round(totalSeconds / totalStops))
+                      : "—"}
+                  </span>
                 </td>
               </tr>
             </tfoot>
@@ -360,109 +280,417 @@ function SummaryTable({ data, tabConfig }) {
   );
 }
 
-// ─── Detail Table ───────────────────────────────────────────────
+// ─── Detail Table (Accordion Grouped by Station) ────────────────
 function DetailTable({ data, tabConfig }) {
-  const headers = [
-    "Sr No",
-    "Station Name",
-    "Date",
-    "Stop Time",
-    "Start Time",
-    "Duration",
-  ];
+  const [expandedStations, setExpandedStations] = useState(new Set());
+
+  // ── Group data by Station_Name ──
+  const groupedData = useMemo(() => {
+    const groups = {};
+    data.forEach((item) => {
+      const key = item.Station_Name || "Unknown Station";
+      if (!groups[key]) {
+        groups[key] = {
+          stationName: key,
+          records: [],
+          totalSeconds: 0,
+          longStops: 0,
+        };
+      }
+      groups[key].records.push(item);
+      groups[key].totalSeconds += item.Duration_Seconds || 0;
+      if ((item.Duration_Seconds || 0) > 600) {
+        groups[key].longStops += 1;
+      }
+    });
+
+    // Sort by total seconds descending (worst stations first)
+    return Object.values(groups).sort(
+      (a, b) => b.totalSeconds - a.totalSeconds,
+    );
+  }, [data]);
+
+  // ── Toggle single station ──
+  const toggleStation = (stationName) => {
+    setExpandedStations((prev) => {
+      const next = new Set(prev);
+      if (next.has(stationName)) {
+        next.delete(stationName);
+      } else {
+        next.add(stationName);
+      }
+      return next;
+    });
+  };
+
+  // ── Expand / Collapse All ──
+  const expandAll = () => {
+    setExpandedStations(new Set(groupedData.map((g) => g.stationName)));
+  };
+
+  const collapseAll = () => {
+    setExpandedStations(new Set());
+  };
+
+  const allExpanded =
+    groupedData.length > 0 && expandedStations.size === groupedData.length;
+
+  // ── Grand totals ──
+  const totalDetailSeconds = data.reduce(
+    (sum, d) => sum + (d.Duration_Seconds || 0),
+    0,
+  );
+  const totalLongStops = data.filter(
+    (d) => (d.Duration_Seconds || 0) > 600,
+  ).length;
 
   return (
-    <div className="w-full overflow-x-auto overflow-y-auto max-h-[550px] rounded-xl border border-gray-200 shadow-sm">
-      <table
-        className="w-full text-sm border-collapse"
-        style={{ minWidth: "800px" }}
-      >
-        <colgroup>
-          <col style={{ width: "60px" }} />
-          <col style={{ width: "220px" }} />
-          <col style={{ width: "120px" }} />
-          <col style={{ width: "120px" }} />
-          <col style={{ width: "120px" }} />
-          <col style={{ width: "140px" }} />
-        </colgroup>
-        <thead>
-          <tr
-            className={`bg-gradient-to-r ${tabConfig.headerGradient} text-white`}
-          >
-            {headers.map((h, i) => (
-              <th
-                key={i}
-                className="px-4 py-3.5 text-[10px] font-semibold uppercase tracking-wider text-center border-r border-white/10 last:border-r-0"
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {data.length > 0 ? (
-            data.map((item, index) => {
-              const seconds = item.Duration_Seconds || 0;
-              const isLong = seconds > 600;
-              const rowBg = isLong
-                ? "bg-red-50/40"
-                : index % 2 === 0
-                  ? "bg-white"
-                  : tabConfig.lightBg || "bg-gray-50/60";
+    <div className="flex flex-col gap-3">
+      {/* ── Toolbar ── */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            {groupedData.length} Stations · {data.length} Total Stops
+          </span>
+        </div>
+
+        <button
+          onClick={allExpanded ? collapseAll : expandAll}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium 
+                     rounded-lg border border-gray-200 bg-white text-gray-600
+                     hover:bg-gray-50 hover:border-gray-300 transition-all duration-200
+                     cursor-pointer active:scale-[0.97]"
+        >
+          {allExpanded ? (
+            <>
+              <FiMinimize2 size={12} />
+              Collapse All
+            </>
+          ) : (
+            <>
+              <FiMaximize2 size={12} />
+              Expand All
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* ── Accordion Container ── */}
+      <div className="w-full rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* ── Scrollable Area ── */}
+        <div className="overflow-y-auto max-h-[550px]">
+          {groupedData.length > 0 ? (
+            groupedData.map((group, gIndex) => {
+              const isExpanded = expandedStations.has(group.stationName);
+              const isWorst = gIndex === 0;
+              const stopCount = group.records.length;
 
               return (
-                <tr
-                  key={index}
-                  className={`text-center transition-colors duration-150 ${rowBg} hover:bg-indigo-50/50`}
+                <div
+                  key={group.stationName}
+                  className="border-b border-gray-100 last:border-b-0"
                 >
-                  <td className="px-4 py-3 align-middle">
-                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-[10px] font-bold text-gray-700">
-                      {item.Sr_No || index + 1}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 align-middle text-left">
-                    <div className="flex items-center gap-2">
-                      <FiMapPin
-                        size={12}
-                        className={isLong ? "text-red-500" : "text-gray-400"}
+                  {/* ── Station Accordion Header ── */}
+                  <button
+                    onClick={() => toggleStation(group.stationName)}
+                    className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all duration-200 cursor-pointer
+                               ${
+                                 isExpanded
+                                   ? `bg-gradient-to-r ${tabConfig.headerGradient} text-white shadow-sm`
+                                   : isWorst
+                                     ? "bg-red-50/60 hover:bg-red-50"
+                                     : gIndex % 2 === 0
+                                       ? "bg-white hover:bg-gray-50"
+                                       : "bg-gray-50/40 hover:bg-gray-100/60"
+                               }`}
+                  >
+                    {/* Chevron */}
+                    <span
+                      className={`transition-transform duration-300 ${isExpanded ? "rotate-0" : "-rotate-90"}`}
+                    >
+                      <FiChevronDown
+                        size={16}
+                        className={
+                          isExpanded ? "text-white/80" : "text-gray-400"
+                        }
                       />
-                      <span className="text-xs font-semibold text-gray-800">
-                        {item.Station_Name}
+                    </span>
+
+                    {/* Station Icon + Name */}
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0
+                                    ${
+                                      isExpanded
+                                        ? "bg-white/15"
+                                        : isWorst
+                                          ? "bg-red-100"
+                                          : "bg-gray-100"
+                                    }`}
+                      >
+                        <FiMapPin
+                          size={13}
+                          className={
+                            isExpanded
+                              ? "text-white/80"
+                              : isWorst
+                                ? "text-red-500"
+                                : "text-gray-400"
+                          }
+                        />
+                      </div>
+                      <span
+                        className={`text-sm font-bold truncate
+                                    ${isExpanded ? "text-white" : isWorst ? "text-red-700" : "text-gray-800"}`}
+                      >
+                        {group.stationName}
+                      </span>
+                      {isWorst && !isExpanded && (
+                        <span className="px-1.5 py-0.5 text-[8px] font-bold uppercase bg-red-100 text-red-600 rounded-md shrink-0">
+                          Highest
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Stats Badges */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Stop Count */}
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-full
+                                    ${
+                                      isExpanded
+                                        ? "bg-white/15 text-white"
+                                        : stopCount > 10
+                                          ? "bg-red-50 text-red-700 border border-red-200"
+                                          : stopCount > 5
+                                            ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                            : "bg-gray-100 text-gray-600 border border-gray-200"
+                                    }`}
+                      >
+                        <FiStopCircle size={10} />
+                        {stopCount} {stopCount === 1 ? "stop" : "stops"}
+                      </span>
+
+                      {/* Long Stops */}
+                      {group.longStops > 0 && (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-full
+                                      ${isExpanded ? "bg-red-400/30 text-red-100" : "bg-red-50 text-red-600 border border-red-200"}`}
+                        >
+                          {group.longStops} long
+                        </span>
+                      )}
+
+                      {/* Total Duration */}
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-full font-mono
+                                    ${
+                                      isExpanded
+                                        ? "bg-white/15 text-white"
+                                        : group.totalSeconds > 600
+                                          ? "bg-red-50 text-red-700 border border-red-200"
+                                          : group.totalSeconds > 120
+                                            ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                            : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    }`}
+                      >
+                        <FiClock size={10} />
+                        {formatSeconds(group.totalSeconds)}
                       </span>
                     </div>
-                  </td>
-                  <td className="px-4 py-3 align-middle">
-                    <span className="text-xs text-gray-600 font-medium">
-                      {item.Date}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 align-middle">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-lg bg-red-50 text-red-600 border border-red-200">
-                      <FiStopCircle size={10} />
-                      {item.Stop_Time}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 align-middle">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200">
-                      <FiPlay size={10} />
-                      {item.Start_Time}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 align-middle">
-                    <DurationBadge duration={item.Duration} seconds={seconds} />
-                  </td>
-                </tr>
+                  </button>
+
+                  {/* ── Expanded Records Table ── */}
+                  <div
+                    className={`transition-all duration-300 ease-in-out overflow-hidden
+                               ${isExpanded ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"}`}
+                  >
+                    <div className="bg-white">
+                      {/* Sub-table header */}
+                      <div
+                        className={`grid grid-cols-12 gap-0 px-4 py-2.5 text-[9px] font-bold uppercase tracking-widest
+                                    bg-gradient-to-r ${tabConfig.headerGradient} bg-opacity-5`}
+                        style={{
+                          background:
+                            "linear-gradient(to right, rgba(99,102,241,0.06), rgba(16,185,129,0.06))",
+                        }}
+                      >
+                        <div className="col-span-1 text-center text-gray-400">
+                          #
+                        </div>
+                        <div className="col-span-2 text-center text-gray-400">
+                          Date
+                        </div>
+                        <div className="col-span-3 text-center text-gray-400">
+                          Stop Time
+                        </div>
+                        <div className="col-span-3 text-center text-gray-400">
+                          Start Time
+                        </div>
+                        <div className="col-span-3 text-center text-gray-400">
+                          Duration
+                        </div>
+                      </div>
+
+                      {/* Sub-table rows */}
+                      {group.records.map((item, rIndex) => {
+                        const seconds = item.Duration_Seconds || 0;
+                        const isLong = seconds > 600;
+                        const isMedium = seconds > 120;
+
+                        return (
+                          <div
+                            key={rIndex}
+                            className={`grid grid-cols-12 gap-0 px-4 py-3 items-center border-t border-gray-100/80
+                                       transition-colors duration-150
+                                       ${
+                                         isLong
+                                           ? "bg-red-50/30"
+                                           : rIndex % 2 === 0
+                                             ? "bg-white"
+                                             : "bg-gray-50/40"
+                                       }
+                                       hover:bg-indigo-50/30`}
+                          >
+                            {/* Row Number */}
+                            <div className="col-span-1 flex justify-center">
+                              <span
+                                className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold
+                                            ${
+                                              isLong
+                                                ? "bg-red-100 text-red-600"
+                                                : isMedium
+                                                  ? "bg-amber-100 text-amber-600"
+                                                  : "bg-gray-100 text-gray-500"
+                                            }`}
+                              >
+                                {rIndex + 1}
+                              </span>
+                            </div>
+
+                            {/* Date */}
+                            <div className="col-span-2 flex justify-center">
+                              <span className="inline-flex items-center gap-1 text-[11px] text-gray-600 font-medium bg-gray-50 px-2 py-0.5 rounded-md">
+                                <FiCalendar
+                                  size={9}
+                                  className="text-gray-400"
+                                />
+                                {item.Date}
+                              </span>
+                            </div>
+
+                            {/* Stop Time */}
+                            <div className="col-span-3 flex justify-center">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-red-50 text-red-600 border border-red-200">
+                                <FiStopCircle size={10} />
+                                {item.Stop_Time}
+                              </span>
+                            </div>
+
+                            {/* Start Time */}
+                            <div className="col-span-3 flex justify-center">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200">
+                                <FiPlay size={10} />
+                                {item.Start_Time}
+                              </span>
+                            </div>
+
+                            {/* Duration */}
+                            <div className="col-span-3 flex justify-center items-center gap-2">
+                              <DurationBadge
+                                duration={item.Duration}
+                                seconds={seconds}
+                              />
+                              {isLong && (
+                                <span className="text-[8px] font-bold uppercase text-red-500 animate-pulse">
+                                  ⚠ Long
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Station subtotal */}
+                      <div className="grid grid-cols-12 gap-0 px-4 py-2.5 items-center bg-gray-100/80 border-t border-gray-200">
+                        <div className="col-span-1" />
+                        <div className="col-span-2" />
+                        <div className="col-span-3 flex justify-center">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                            Subtotal
+                          </span>
+                        </div>
+                        <div className="col-span-3 flex justify-center">
+                          <span className="text-[10px] font-bold text-gray-500">
+                            {stopCount} {stopCount === 1 ? "stop" : "stops"}
+                          </span>
+                        </div>
+                        <div className="col-span-3 flex justify-center">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-full bg-gray-200 text-gray-700">
+                            <FiClock size={9} />
+                            {formatSeconds(group.totalSeconds)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               );
             })
           ) : (
-            <tr>
-              <td colSpan={headers.length}>
-                <EmptyState message="No detail data found for the selected filters." />
-              </td>
-            </tr>
+            <div className="py-10">
+              <EmptyState message="No detail data found for the selected filters." />
+            </div>
           )}
-        </tbody>
-      </table>
+        </div>
+
+        {/* ── STICKY GRAND TOTAL FOOTER ── */}
+        {data.length > 0 && (
+          <div
+            className="sticky bottom-0 z-20 bg-gradient-to-r from-gray-800 to-gray-900 text-white px-4 py-3.5
+                       flex items-center justify-between rounded-b-xl"
+            style={{
+              boxShadow: "0 -4px 12px rgba(0,0,0,0.12)",
+            }}
+          >
+            {/* Left: Total Info */}
+            <div className="flex items-center gap-3">
+              <span className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center">
+                <FiList size={13} />
+              </span>
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-white/50">
+                  Grand Total
+                </p>
+                <p className="text-xs font-bold text-white/90">
+                  {groupedData.length} Stations · {data.length} Records
+                </p>
+              </div>
+            </div>
+
+            {/* Center: Long Stops */}
+            <div className="flex items-center gap-3">
+              {totalLongStops > 0 && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 text-[10px] font-bold rounded-full bg-red-500/25 text-red-200 border border-red-400/30">
+                  <FiStopCircle size={10} />
+                  {totalLongStops} Long Stops (&gt;10 min)
+                </span>
+              )}
+            </div>
+
+            {/* Right: Total Duration */}
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-white/50">
+                Total Duration
+              </span>
+              <span className="inline-flex items-center gap-1 px-3.5 py-1.5 text-xs font-bold rounded-full bg-white/15 backdrop-blur-sm border border-white/10">
+                <FiClock size={11} />
+                {formatSeconds(totalDetailSeconds)}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -471,7 +699,7 @@ function DetailTable({ data, tabConfig }) {
 function QueryPlaceholder() {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-      <div className="w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
+      <div className="w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center mb-4 animate-pulse">
         <FiActivity size={36} className="text-indigo-300" />
       </div>
       <p className="text-lg font-bold text-gray-500">Stop & Loss Report</p>
@@ -493,13 +721,11 @@ function StopLossReport() {
   const [activeTab, setActiveTab] = useState(INNER_TABS[0].key);
   const [queried, setQueried] = useState(false);
 
-  // ─── Data Cache ─────────────────────────────────────────────
   const [tabCache, setTabCache] = useState({
     summary: { data: [], loading: false, fetched: false },
     detail: { data: [], loading: false, fetched: false },
   });
 
-  // ─── Fetch Locations on Mount ───────────────────────────────
   useEffect(() => {
     const fetchLocations = async () => {
       try {
@@ -512,7 +738,6 @@ function StopLossReport() {
     fetchLocations();
   }, []);
 
-  // ─── Fetch Tab Data ─────────────────────────────────────────
   const fetchTabData = useCallback(
     async (tabKey) => {
       const endpoint =
@@ -549,7 +774,6 @@ function StopLossReport() {
     [fromDate, toDate, location],
   );
 
-  // ─── Handle Query ───────────────────────────────────────────
   const handleQuery = async () => {
     if (!fromDate || !toDate) {
       toast.error("Please select From Date and To Date.");
@@ -560,7 +784,6 @@ function StopLossReport() {
       return;
     }
 
-    // Reset cache
     setTabCache({
       summary: { data: [], loading: false, fetched: false },
       detail: { data: [], loading: false, fetched: false },
@@ -570,7 +793,6 @@ function StopLossReport() {
     await fetchTabData(activeTab);
   };
 
-  // ─── Handle Tab Switch ──────────────────────────────────────
   const handleTabSwitch = useCallback(
     (tabKey) => {
       setActiveTab(tabKey);
@@ -581,7 +803,6 @@ function StopLossReport() {
     [queried, tabCache, fetchTabData],
   );
 
-  // ─── Handle Reset ───────────────────────────────────────────
   const handleReset = () => {
     setFromDate("");
     setToDate("");
@@ -744,9 +965,9 @@ function StopLossReport() {
       </div>
 
       {/* ─── Tabs + Report ─────────────────────────────────── */}
-      <div className="w-full rounded-2xl bg-white shadow-sm border border-gray-100 overflow-hidden mt-5">
+      <div className="w-full rounded-2xl bg-white shadow-sm border border-gray-100 mt-5 p-4">
         {/* Tab Bar */}
-        <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/60 px-4">
+        <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/60 px-4 rounded-t-xl">
           <div className="flex gap-1 pt-2">
             {INNER_TABS.map((tab) => {
               const TabIcon = tab.icon;
@@ -836,31 +1057,6 @@ function StopLossReport() {
             </div>
           )}
         </div>
-
-        {/* Footer */}
-        {queried && currentCache.fetched && (
-          <div className="border-t border-gray-100 bg-gray-50/50 px-6 py-3 flex items-center justify-between">
-            <p className="text-xs text-gray-400 flex items-center gap-1.5">
-              <MdOutlineTableChart size={14} />
-              Showing{" "}
-              <span className="font-bold text-gray-600">
-                {currentCache.data.length}
-              </span>{" "}
-              record{currentCache.data.length !== 1 && "s"}
-            </p>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                {Object.values(tabCache).filter((c) => c.fetched).length}/
-                {INNER_TABS.length} tabs loaded
-              </div>
-              <p className="text-xs text-gray-400 flex items-center gap-1.5">
-                <FiMapPin size={12} />
-                {location}
-              </p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
