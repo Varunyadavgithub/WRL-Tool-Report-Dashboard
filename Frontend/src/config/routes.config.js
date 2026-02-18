@@ -100,6 +100,10 @@ const AuditList = lazy(() => import("../pages/AuditReport/AuditList"));
 const AuditEntry = lazy(() => import("../pages/AuditReport/AuditEntry"));
 const AuditView = lazy(() => import("../pages/AuditReport/AuditView"));
 
+const DehumidifierDashboard = lazy(
+  () => import("../pages/Readings/DehumidifierDashboard"),
+);
+
 // Role constants for consistency
 export const ROLES = {
   ADMIN: "admin",
@@ -530,6 +534,20 @@ export const ROUTE_CONFIG = [
       {
         path: "/auditreport/audits/:id/view",
         component: AuditView,
+      },
+    ],
+  },
+  {
+    key: "reading",
+    icon: FaClipboardList,
+    label: "Utility",
+    basePath: "/reading",
+    items: [
+      {
+        path: "/reading/dehumidifier",
+        label: "Utility Reading",
+        component: DehumidifierDashboard,
+        roles: [ROLES.ADMIN],
       },
     ],
   },
