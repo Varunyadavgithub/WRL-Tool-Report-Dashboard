@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-
-// Components
 import Title from "../../components/ui/Title";
 import Loader from "../../components/ui/Loader";
 import SelectField from "../../components/ui/SelectField";
@@ -9,8 +7,6 @@ import DateTimePicker from "../../components/ui/DateTimePicker";
 import Button from "../../components/ui/Button";
 import Pagination from "../../components/ui/Pagination";
 import GasChargingDetailModal from "../../components/GasChargingDetailModal";
-
-// Redux
 import {
   useGetGasChargingReportQuery,
   useGetGasChargingSummaryQuery,
@@ -31,8 +27,6 @@ import {
   setGasChargingLimit,
   setGasChargingPagination,
 } from "../../redux/gasChargingSlice";
-
-// Utils
 import {
   getTodayRange,
   getYesterdayRange,
@@ -40,12 +34,9 @@ import {
   formatDateTimeLocal,
 } from "../../utils/dateUtils";
 import { exportToXls } from "../../utils/exportToXls";
-
-// Icons
 import {
   FaCheckCircle,
   FaTimesCircle,
-  FaChartBar,
   FaTable,
   FaCalendarAlt,
   FaBarcode,
@@ -55,16 +46,13 @@ import {
   FaRedo,
   FaWeight,
   FaIndustry,
-  FaExclamationTriangle,
   FaThermometerHalf,
-  FaClock,
   FaSearch,
 } from "react-icons/fa";
 import { MdFilterAlt, MdOutlineAir } from "react-icons/md";
 import { BiSearchAlt, BiTime } from "react-icons/bi";
 import { BsLightningChargeFill, BsDropletFill } from "react-icons/bs";
-import { TbReportAnalytics, TbGasStation } from "react-icons/tb";
-import { IoMdStats } from "react-icons/io";
+import { TbReportAnalytics } from "react-icons/tb";
 import { GiGasPump } from "react-icons/gi";
 import { HiOutlineDocumentReport } from "react-icons/hi";
 
@@ -281,41 +269,9 @@ const GasChargingReport = () => {
     );
   };
 
-  const SummaryCard = ({ icon: Icon, title, value, subValue, bgGradient }) => (
-    <div
-      className={`${bgGradient} rounded-xl shadow-lg p-5 text-white transform hover:scale-105 transition-transform`}
-    >
-      <div className="flex items-center gap-4">
-        <div className="bg-white/20 p-3 rounded-full">
-          <Icon className="text-2xl" />
-        </div>
-        <div>
-          <p className="text-sm opacity-80">{title}</p>
-          <p className="text-3xl font-bold">{value}</p>
-          {subValue && <p className="text-xs opacity-70 mt-1">{subValue}</p>}
-        </div>
-      </div>
-    </div>
-  );
-
-  const InfoCard = ({ icon: Icon, label, value, color = "gray" }) => (
-    <div className="flex flex-col">
-      <span
-        className={`text-xs text-gray-500 uppercase tracking-wide flex items-center gap-1`}
-      >
-        <Icon className={`text-${color}-500`} size={12} />
-        {label}
-      </span>
-      <p className="text-lg font-semibold text-gray-800">{value || "-"}</p>
-    </div>
-  );
-
   // Data
   const gasChargingData = reportData?.data || [];
-  const currentData = gasChargingData[0];
   const totalCount = pagination.totalRecords;
-  const summary = summaryData?.data;
-  const faults = faultData?.data || [];
   const isLoading = reportLoading || reportFetching;
 
   return (
@@ -325,9 +281,7 @@ const GasChargingReport = () => {
         <div className="bg-blue-600 p-3 rounded-full">
           <GiGasPump className="text-3xl text-white" />
         </div>
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-          Gas Charging Report Dashboard
-        </h1>
+        <Title title="Gas Charging Report Dashboard" align="center" />
       </div>
 
       {/* Filters Section */}
@@ -524,206 +478,6 @@ const GasChargingReport = () => {
       {/* Data Display */}
       {!isLoading && gasChargingData.length > 0 && (
         <>
-          {/* Current Record Header */}
-          {currentData && (
-            <div className="bg-white rounded-xl shadow-lg p-5 mb-6 border-l-4 border-blue-500">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex flex-wrap gap-6">
-                  <InfoCard
-                    icon={HiOutlineDocumentReport}
-                    label="Result ID"
-                    value={`#${currentData.Result_ID}`}
-                    color="blue"
-                  />
-                  <InfoCard
-                    icon={FaCubes}
-                    label="Model"
-                    value={currentData.MODEL}
-                    color="purple"
-                  />
-                  <InfoCard
-                    icon={FaBarcode}
-                    label="Barcode"
-                    value={currentData.BARCODE}
-                    color="gray"
-                  />
-                  <InfoCard
-                    icon={FaCalendarAlt}
-                    label="Date & Time"
-                    value={`${currentData.DATE} ${currentData.TIME}`}
-                    color="green"
-                  />
-                  <InfoCard
-                    icon={FaIndustry}
-                    label="Machine"
-                    value={currentData.MACHINE}
-                    color="cyan"
-                  />
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                  <span className="text-xs text-gray-500 uppercase flex items-center gap-1">
-                    <GiGasPump className="text-blue-500" />
-                    Latest Result
-                  </span>
-                  <StatusBadge status={currentData.PERFORMANCE} size="lg" />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Summary Cards */}
-          {summary && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-              <SummaryCard
-                icon={FaChartBar}
-                title="Total Tests"
-                value={summary.total || totalCount}
-                bgGradient="bg-gradient-to-br from-blue-500 to-indigo-600"
-              />
-              <SummaryCard
-                icon={FaCheckCircle}
-                title="Passed"
-                value={summary.pass || 0}
-                subValue={`${summary.passRate || 0}% Pass Rate`}
-                bgGradient="bg-gradient-to-br from-green-500 to-emerald-600"
-              />
-              <SummaryCard
-                icon={FaTimesCircle}
-                title="Failed"
-                value={summary.fail || 0}
-                subValue={`${summary.failRate || 0}% Fail Rate`}
-                bgGradient="bg-gradient-to-br from-red-500 to-rose-600"
-              />
-              <SummaryCard
-                icon={FaWeight}
-                title="Avg Gas Weight"
-                value={`${summary.avgGasWeight || 0}g`}
-                subValue="Actual charged"
-                bgGradient="bg-gradient-to-br from-purple-500 to-violet-600"
-              />
-              <SummaryCard
-                icon={BsDropletFill}
-                title="Avg Leak Value"
-                value={`${summary.avgLeakValue || 0}`}
-                subValue="mbar"
-                bgGradient="bg-gradient-to-br from-cyan-500 to-teal-600"
-              />
-            </div>
-          )}
-
-          {/* Process Overview Cards */}
-          <div className="bg-white rounded-xl shadow-lg p-5 mb-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <FaChartBar className="text-blue-500" />
-              Process Overview
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Gas Charging */}
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-5 hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="bg-blue-500 p-2 rounded-full">
-                    <TbGasStation className="text-white text-xl" />
-                  </div>
-                  <h3 className="font-bold text-gray-800">Gas Charging</h3>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Avg Set Weight:</span>
-                    <span className="font-bold text-blue-600">
-                      {summary?.avgSetWeight || "N/A"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Avg Actual Weight:</span>
-                    <span className="font-bold text-green-600">
-                      {summary?.avgActualWeight || "N/A"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Leak Test */}
-              <div className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-xl p-5 hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="bg-red-500 p-2 rounded-full">
-                    <BsDropletFill className="text-white text-xl" />
-                  </div>
-                  <h3 className="font-bold text-gray-800">Leak Test</h3>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Avg Set Value:</span>
-                    <span className="font-bold text-blue-600">
-                      {summary?.avgLeakSetValue || "N/A"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Avg Test Value:</span>
-                    <span className="font-bold text-green-600">
-                      {summary?.avgLeakTestValue || "N/A"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Evacuation */}
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-5 hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="bg-purple-500 p-2 rounded-full">
-                    <MdOutlineAir className="text-white text-xl" />
-                  </div>
-                  <h3 className="font-bold text-gray-800">Evacuation</h3>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Avg Set Value:</span>
-                    <span className="font-bold text-blue-600">
-                      {summary?.avgEvacSetValue || "N/A"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Avg Actual Value:</span>
-                    <span className="font-bold text-green-600">
-                      {summary?.avgEvacActualValue || "N/A"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Fault Analysis */}
-          {faults.length > 0 && (
-            <div className="bg-white rounded-xl shadow-lg p-5 mb-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <FaExclamationTriangle className="text-yellow-500" />
-                Fault Analysis
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {faults.map((fault, index) => (
-                  <div
-                    key={index}
-                    className="bg-gradient-to-br from-red-50 to-orange-50 border border-red-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-gray-500">
-                          Code: {fault.FaultCode}
-                        </p>
-                        <p className="font-semibold text-gray-800 text-sm">
-                          {fault.FaultName}
-                        </p>
-                      </div>
-                      <div className="bg-red-500 text-white px-3 py-1 rounded-full text-lg font-bold">
-                        {fault.count}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Data Table */}
           <div className="bg-white rounded-xl shadow-lg overflow-hidden">
             {/* Table Header */}
