@@ -56,3 +56,13 @@
 .animate-fadeIn {
   animation: fadeIn 0.2s ease-out;
 }
+
+@keyframes alarmPulse {
+  0% { box-shadow: 0 0 0 0 rgba(220,38,38,0.7); }
+  70% { box-shadow: 0 0 0 18px rgba(220,38,38,0); }
+  100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
+}
+
+.alarm-animate {
+  animation: alarmPulse 1.5s infinite;
+}
