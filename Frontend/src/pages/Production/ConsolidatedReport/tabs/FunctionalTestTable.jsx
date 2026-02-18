@@ -262,48 +262,59 @@ function GasChargingTable({ data, tabConfig }) {
 }
 
 // ─── EST Table ──────────────────────────────────────────────────
-// ─── EST Table ──────────────────────────────────────────────────
 function ESTTable({ data = [], tabConfig }) {
-  const headers = [
-    "Sr No",
-    "Ref No",
-    "Model No",
-    "Serial No",
-    "Date Time",
-    "Operator",
-    "Set ECT Ohms",
-    "Set ECT Time",
-    "Read ECT Ohms",
-    "ECT Result",
-    "Set HV KV",
-    "Set HV MA",
-    "Set HV Time",
-    "Read HV KV",
-    "HV Result",
-    "Set IR Mohms",
-    "Set IR Time",
-    "Read IR Mohms",
-    "IR Result",
-    "Set LCT MA",
-    "Set LCT Time",
-    "Read LCT LN MA",
-    "Read LCT LN Vtg",
-    "LCT LN Result",
-    "Read LCT NL MA",
-    "Read LCT NL Vtg",
-    "LCT NL Result",
-    "Set Wattage Lower",
-    "Set Wattage Upper",
-    "Read Voltage",
-    "Read Current",
-    "Read Wattage",
-    "Run Result",
-    "LVT Read Voltage",
-    "LVT Read Current",
-    "LVT Read Wattage",
-    "LVT Result",
-    "Final Result",
-    "Status",
+  // Define grouped header structure
+  const headerGroups = [
+    { label: "Sr No", colSpan: 1, children: ["Sr No"] },
+    { label: "Ref No", colSpan: 1, children: ["Ref No"] },
+    { label: "Model No", colSpan: 1, children: ["Model No"] },
+    { label: "Serial No", colSpan: 1, children: ["Serial No"] },
+    { label: "Date Time", colSpan: 1, children: ["Date Time"] },
+    { label: "Operator", colSpan: 1, children: ["Operator"] },
+    {
+      label: "ECT",
+      colSpan: 4,
+      children: ["Set Ohms", "Set Time", "Read Ohms", "Result"],
+    },
+    {
+      label: "HV",
+      colSpan: 4,
+      children: ["Set KV", "Set MA", "Set Time", "Read KV", "Result"],
+    },
+    {
+      label: "IR",
+      colSpan: 4,
+      children: ["Set Mohms", "Set Time", "Read Mohms", "Result"],
+    },
+    {
+      label: "LCT LN",
+      colSpan: 5,
+      children: ["Set MA", "Set Time", "Read MA", "Read Vtg", "Result"],
+    },
+    {
+      label: "LCT NL",
+      colSpan: 3,
+      children: ["Read MA", "Read Vtg", "Result"],
+    },
+    {
+      label: "Wattage / Run",
+      colSpan: 6,
+      children: [
+        "Set Lower",
+        "Set Upper",
+        "Read Voltage",
+        "Read Current",
+        "Read Wattage",
+        "Run Result",
+      ],
+    },
+    {
+      label: "LVT",
+      colSpan: 4,
+      children: ["Read Voltage", "Read Current", "Read Wattage", "Result"],
+    },
+    { label: "Final Result", colSpan: 1, children: ["Final Result"] },
+    { label: "Status", colSpan: 1, children: ["Status"] },
   ];
 
   const formatDateTime = (iso) => {
@@ -314,25 +325,53 @@ function ESTTable({ data = [], tabConfig }) {
 
   const getFinalResult = (item) => item?.result ?? "";
 
+  // Check if a group is a single-column (non-grouped) header
+  const isSingleColumn = (group) => group.colSpan === 1;
+
   return (
     <div className="overflow-x-auto overflow-y-auto max-h-[450px]">
       <table
         className="w-full text-sm border-collapse"
-        style={{ minWidth: "1400px" }}
+        style={{ minWidth: "2200px" }}
       >
         {/* HEADER */}
         <thead>
+          {/* ROW 1: Parent group headers */}
           <tr
             className={`bg-gradient-to-r ${tabConfig?.headerGradient} text-white`}
           >
-            {headers.map((h, i) => (
+            {headerGroups.map((group, i) => (
               <th
                 key={i}
-                className="px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-center border-r border-white/10 last:border-r-0"
+                colSpan={group.children.length}
+                rowSpan={isSingleColumn(group) ? 2 : 1}
+                className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-center 
+                  border border-white/20
+                  ${!isSingleColumn(group) ? "border-b-2 border-b-white/40" : ""}
+                `}
               >
-                {h}
+                {group.label}
               </th>
             ))}
+          </tr>
+
+          {/* ROW 2: Child sub-headers (only for multi-column groups) */}
+          <tr
+            className={`bg-gradient-to-r ${tabConfig?.headerGradient} text-white/90`}
+          >
+            {headerGroups
+              .filter((group) => !isSingleColumn(group))
+              .flatMap((group, gi) =>
+                group.children.map((child, ci) => (
+                  <th
+                    key={`${gi}-${ci}`}
+                    className="px-2 py-2 text-[9px] font-semibold uppercase tracking-wider text-center 
+                      border border-white/10"
+                  >
+                    {child}
+                  </th>
+                )),
+              )}
           </tr>
         </thead>
 
@@ -355,103 +394,140 @@ function ESTTable({ data = [], tabConfig }) {
                   key={index}
                   className={`text-center transition-colors duration-150 ${rowBg} hover:bg-indigo-50/40`}
                 >
-                  <td className="px-3 py-3 font-semibold text-gray-600">
+                  {/* Single columns */}
+                  <td className="px-3 py-3 font-semibold text-gray-600 border border-gray-100">
                     {index + 1}
                   </td>
-                  <td className="px-3 py-3 font-mono">{item.RefNo ?? "—"}</td>
-                  <td className="px-3 py-3 text-left">
+                  <td className="px-3 py-3 font-mono border border-gray-100">
+                    {item.RefNo ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 text-left border border-gray-100">
                     {item.model_no ?? "—"}
                   </td>
-                  <td className="px-3 py-3 font-mono">
+                  <td className="px-3 py-3 font-mono border border-gray-100">
                     {item.serial_no ?? "—"}
                   </td>
-                  <td className="px-3 py-3 text-xs">
+                  <td className="px-3 py-3 text-xs border border-gray-100">
                     {formatDateTime(item.date_time)}
                   </td>
-                  <td className="px-3 py-3">{item.operator ?? "—"}</td>
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.operator ?? "—"}
+                  </td>
 
-                  {/* ECT */}
-                  <td className="px-3 py-3">{item.set_ect_ohms ?? "—"}</td>
-                  <td className="px-3 py-3">{item.set_ect_time ?? "—"}</td>
-                  <td className="px-3 py-3">{item.read_ect_ohms ?? "—"}</td>
-                  <td className="px-3 py-3">
+                  {/* ECT Group */}
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.set_ect_ohms ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.set_ect_time ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.read_ect_ohms ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
                     <StatusBadge status={item.ect_result} />
                   </td>
 
-                  {/* HV */}
-                  <td className="px-3 py-3">{item.set_hv_kv ?? "—"}</td>
-                  <td className="px-3 py-3">{item.set_hv_ma ?? "—"}</td>
-                  <td className="px-3 py-3">{item.set_hv_time ?? "—"}</td>
-                  <td className="px-3 py-3">{item.read_hv_kv ?? "—"}</td>
-                  <td className="px-3 py-3">
+                  {/* HV Group */}
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.set_hv_kv ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.set_hv_ma ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.set_hv_time ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.read_hv_kv ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
                     <StatusBadge status={item.hv_result} />
                   </td>
 
-                  {/* IR */}
-                  <td className="px-3 py-3">{item.set_ir_mohms ?? "—"}</td>
-                  <td className="px-3 py-3">{item.set_ir_time ?? "—"}</td>
-                  <td className="px-3 py-3">{item.read_ir_mohms ?? "—"}</td>
-                  <td className="px-3 py-3">
+                  {/* IR Group */}
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.set_ir_mohms ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.set_ir_time ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.read_ir_mohms ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
                     <StatusBadge status={item.ir_result} />
                   </td>
 
-                  {/* LCT LN */}
-                  <td className="px-3 py-3">{item.set_lct_ma ?? "—"}</td>
-                  <td className="px-3 py-3">{item.set_lct_time ?? "—"}</td>
-                  <td className="px-3 py-3">{item.read_lct_ln_ma ?? "—"}</td>
-                  <td className="px-3 py-3">{item.read_lct_ln_Vtg ?? "—"}</td>
-                  <td className="px-3 py-3">
+                  {/* LCT LN Group */}
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.set_lct_ma ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.set_lct_time ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.read_lct_ln_ma ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.read_lct_ln_Vtg ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
                     <StatusBadge status={item.lct_ln_result} />
                   </td>
 
-                  {/* LCT NL */}
-                  <td className="px-3 py-3">{item.read_lct_nl_ma ?? "—"}</td>
-                  <td className="px-3 py-3">{item.read_lct_nl_Vtg ?? "—"}</td>
-                  <td className="px-3 py-3">
+                  {/* LCT NL Group */}
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.read_lct_nl_ma ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.read_lct_nl_Vtg ?? "—"}
+                  </td>
+                  <td className="px-3 py-3 border border-gray-100">
                     <StatusBadge status={item.lct_nl_result} />
                   </td>
 
-                  {/* Wattage */}
-                  <td className="px-3 py-3 font-mono">
+                  {/* Wattage / Run Group */}
+                  <td className="px-3 py-3 font-mono border border-gray-100">
                     {item.set_wattage_lower ?? "—"}
                   </td>
-                  <td className="px-3 py-3 font-mono">
+                  <td className="px-3 py-3 font-mono border border-gray-100">
                     {item.set_wattage_upper ?? "—"}
                   </td>
-                  <td className="px-3 py-3 font-mono">
+                  <td className="px-3 py-3 font-mono border border-gray-100">
                     {item.read_voltage ?? "—"}
                   </td>
-                  <td className="px-3 py-3 font-mono">
+                  <td className="px-3 py-3 font-mono border border-gray-100">
                     {item.read_current ?? "—"}
                   </td>
-                  <td className="px-3 py-3 font-mono">
+                  <td className="px-3 py-3 font-mono border border-gray-100">
                     {item.read_wattage ?? "—"}
                   </td>
-                  <td className="px-3 py-3 font-mono">
+                  <td className="px-3 py-3 font-mono border border-gray-100">
                     {item.run_result ?? "—"}
                   </td>
 
-                  {/* LVT */}
-                  <td className="px-3 py-3 font-mono">
+                  {/* LVT Group */}
+                  <td className="px-3 py-3 font-mono border border-gray-100">
                     {item.lvt_read_voltage ?? "—"}
                   </td>
-                  <td className="px-3 py-3 font-mono">
+                  <td className="px-3 py-3 font-mono border border-gray-100">
                     {item.lvt_read_current ?? "—"}
                   </td>
-                  <td className="px-3 py-3 font-mono">
+                  <td className="px-3 py-3 font-mono border border-gray-100">
                     {item.lvt_read_wattage ?? "—"}
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-3 border border-gray-100">
                     <StatusBadge status={item.lvt_result} />
                   </td>
 
                   {/* Final Result */}
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-3 border border-gray-100">
                     <StatusBadge status={item.result} />
                   </td>
 
-                  {/* Status (numeric) */}
-                  <td className="px-3 py-3">
+                  {/* Status */}
+                  <td className="px-3 py-3 border border-gray-100">
                     <StatusBadge
                       status={item.status === 1 ? "Active" : "Inactive"}
                     />
@@ -461,7 +537,13 @@ function ESTTable({ data = [], tabConfig }) {
             })
           ) : (
             <tr>
-              <td colSpan={headers.length} className="py-10">
+              <td
+                colSpan={headerGroups.reduce(
+                  (sum, g) => sum + g.children.length,
+                  0,
+                )}
+                className="py-10"
+              >
                 <EmptyState message="No EST data found." />
               </td>
             </tr>
