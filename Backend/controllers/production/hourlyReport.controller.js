@@ -3,7 +3,7 @@ import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 
-// Fetches hourly production summary data for a specific station within a given date range, optionally filtered by model and line.
+// Fetches hourly production summary
 export const getHourlySummary = tryCatch(async (req, res) => {
   const { stationCode, startDate, endDate, model, line } = req.query;
 
@@ -115,7 +115,7 @@ export const getHourlySummary = tryCatch(async (req, res) => {
   }
 });
 
-// Fetches hourly model-wise production count for a specific station within a given date range, optionally filtered by model and line.
+// Fetches hourly model-wise production count
 export const getHourlyModelCount = tryCatch(async (req, res) => {
   const { stationCode, startDate, endDate, model, line } = req.query;
 
@@ -236,7 +236,7 @@ export const getHourlyModelCount = tryCatch(async (req, res) => {
   }
 });
 
-// Fetches hourly category-wise production count for a specific station within a given date range, optionally filtered by model and line.
+// Fetches hourly category-wise production count
 export const getHourlyCategoryCount = tryCatch(async (req, res) => {
   const { stationCode, startDate, endDate, model, line } = req.query;
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Title from "../../components/ui/Title";
 import { Bar } from "react-chartjs-2";
 import {
@@ -23,16 +23,32 @@ import {
 } from "../../redux/api/commonApi.js";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
-// Map Categories with TIMEHOUR grouping
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
+const formatDate = (date) => {
+  const pad = (n) => (n < 10 ? "0" + n : n);
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const getShiftRange = (offsetDays = 0) => {
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(now.getDate() + offsetDays);
+  start.setHours(8, 0, 0, 0);
+  const end = offsetDays === 0 ? now : new Date(start);
+  if (offsetDays !== 0) {
+    end.setDate(start.getDate() + 1);
+    end.setHours(8, 0, 0, 0);
+  }
+  return { start: formatDate(start), end: formatDate(end) };
+};
+
 const mapCategory = async (data, mappings = CATEGORY_MAPPINGS) => {
   if (!data) return [];
-
   const normalize = (str) => str.replace(/\s+/g, " ").trim().toUpperCase();
-
   const dataArray = Array.isArray(data) ? data : [data];
-
   const grouped = {};
-
   dataArray.forEach((item) => {
     const mappedItem = { ...item };
     if (mappedItem?.category || mappedItem?.TIMEHOUR !== undefined) {
@@ -42,10 +58,7 @@ const mapCategory = async (data, mappings = CATEGORY_MAPPINGS) => {
         mappedItem.category?.trim() ||
         "UNKNOWN";
       const timeHour = mappedItem.TIMEHOUR || 0;
-
-      // Use a combination key of category and TIMEHOUR
       const groupKey = `${finalCategory}_${timeHour}`;
-
       if (grouped[groupKey]) {
         grouped[groupKey].COUNT += mappedItem.COUNT || 0;
       } else {
@@ -57,9 +70,52 @@ const mapCategory = async (data, mappings = CATEGORY_MAPPINGS) => {
       }
     }
   });
-
   return Object.values(grouped);
 };
+
+// ─── API Layer ─────────────────────────────────────────────────────────────────
+
+const API_ENDPOINTS = {
+  summary: "prod/hourly-summary",
+  modelCount: "prod/hourly-model-count",
+  categoryCount: "prod/hourly-category-count",
+};
+
+const fetchHourly = async (endpoint, params) => {
+  const res = await axios.get(`${baseURL}${endpoint}`, { params });
+  if (!res?.data?.success) throw new Error("Request failed");
+  return res.data.data;
+};
+
+// ─── Sub-components ────────────────────────────────────────────────────────────
+const TableHeader = ({ title, subtitle }) => (
+  <div className="px-3 py-2 bg-gray-200 border-b border-gray-200 flex gap-4">
+    <h3 className="text-sm font-semibold text-black">{title}</h3>
+    {subtitle && <p className="text-xs text-black mt-0.5">{subtitle}</p>}
+  </div>
+);
+
+const StatCard = ({ label, value, color = "text-blue-700" }) => (
+  <div className="bg-white rounded-lg px-4 py-3 flex flex-col items-center shadow-sm border border-purple-200 min-w-[120px]">
+    <span className={`text-2xl font-bold ${color}`}>{value}</span>
+    <span className="text-xs text-gray-500 mt-0.5 text-center font-medium">
+      {label}
+    </span>
+  </div>
+);
+
+const EmptyRow = ({ colSpan }) => (
+  <tr>
+    <td
+      colSpan={colSpan}
+      className="text-center py-8 text-gray-400 text-xs italic"
+    >
+      No data available. Please run a query.
+    </td>
+  </tr>
+);
+
+// ─── Main Component ────────────────────────────────────────────────────────────
 
 const HourlyReport = () => {
   const [stationCode, setStationCode] = useState("");
@@ -80,7 +136,6 @@ const HourlyReport = () => {
     isLoading: modelsLoading,
     error: modelsError,
   } = useGetModelVariantsQuery();
-
   const {
     data: stages = [],
     isLoading: stagesLoading,
@@ -92,475 +147,95 @@ const HourlyReport = () => {
     if (stagesError) toast.error("Failed to load stages");
   }, [modelsError, stagesError]);
 
-  if (modelsLoading || stagesLoading) {
-    return <Loader />;
-  }
+  if (modelsLoading || stagesLoading) return <Loader />;
 
-  const fetchHourlyProduction = async () => {
-    if (!stationCode || !startTime || !endTime) {
-      return;
-    }
-    try {
-      setLoading(true);
+  // ─── Data Fetching ───────────────────────────────────────────────────────────
 
-      const params = {
-        stationCode,
-        startDate: startTime,
-        endDate: endTime,
-      };
-
-      if (selectedModel?.value && selectedModel.value !== "0") {
+  const buildParams = useCallback(
+    (startDate, endDate) => {
+      const params = { stationCode, startDate, endDate };
+      if (selectedModel?.value && selectedModel.value !== "0")
         params.model = selectedModel.value;
+      if (lineType) params.line = lineType;
+      return params;
+    },
+    [stationCode, selectedModel, lineType],
+  );
+
+  const fetchAllData = useCallback(
+    async (startDate, endDate, setLoadingFn) => {
+      if (!stationCode) {
+        toast.error("Please select a Station Code.");
+        return;
       }
-      if (lineType) {
-        params.line = lineType;
+      setLoadingFn(true);
+      setHourData([]);
+      setHourlyModelCount([]);
+      setHourlyCategoryCount([]);
+
+      try {
+        const params = buildParams(startDate, endDate);
+        const [summary, modelCount, categoryCount] = await Promise.all([
+          fetchHourly(API_ENDPOINTS.summary, params),
+          fetchHourly(API_ENDPOINTS.modelCount, params),
+          fetchHourly(API_ENDPOINTS.categoryCount, params),
+        ]);
+        setHourData(summary);
+        setHourlyModelCount(modelCount);
+        setHourlyCategoryCount(await mapCategory(categoryCount));
+      } catch (error) {
+        toast.error("Error fetching hourly data.");
+        console.error(error);
+      } finally {
+        setLoadingFn(false);
       }
+    },
+    [buildParams, stationCode],
+  );
 
-      const res = await axios.get(`${baseURL}prod/hourly-summary`, {
-        params,
-      });
-
-      if (res?.data?.success) {
-        setHourData(res?.data?.data);
-      }
-    } catch (error) {
-      console.error("Error fetching hourly production data:", error);
-      toast.error("Error fetching hourly production data.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchHourlyModelCount = async () => {
-    if (!stationCode || !startTime || !endTime) {
-      return;
-    }
-    try {
-      setLoading(true);
-
-      const params = {
-        stationCode,
-        startDate: startTime,
-        endDate: endTime,
-      };
-
-      if (selectedModel?.value && selectedModel.value !== "0") {
-        params.model = selectedModel.value;
-      }
-
-      if (lineType) {
-        params.line = lineType;
-      }
-
-      const res = await axios.get(`${baseURL}prod/hourly-model-count`, {
-        params,
-      });
-
-      if (res?.data?.success) {
-        setHourlyModelCount(res?.data?.data);
-      }
-    } catch (error) {
-      console.error("Error fetching hourly model count data:", error);
-      toast.error("Error fetching hourly model count data.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getHourlyCategoryCount = async () => {
-    if (!stationCode || !startTime || !endTime) {
+  const handleQuery = useCallback(() => {
+    if (!startTime || !endTime) {
       toast.error("Please select Station Code and Time Range.");
       return;
     }
-    try {
-      setLoading(true);
+    fetchAllData(startTime, endTime, setLoading);
+  }, [startTime, endTime, fetchAllData]);
+
+  const handleYesterday = useCallback(() => {
+    const { start, end } = getShiftRange(-1);
+    fetchAllData(start, end, setYdayLoading);
+  }, [fetchAllData]);
+
+  const handleToday = useCallback(() => {
+    const { start, end } = getShiftRange(0);
+    fetchAllData(start, end, setTodayLoading);
+  }, [fetchAllData]);
 
-      const params = {
-        stationCode,
-        startDate: startTime,
-        endDate: endTime,
-      };
-
-      if (selectedModel?.value && selectedModel.value !== "0") {
-        params.model = selectedModel.value;
-      }
-
-      if (lineType) {
-        params.line = lineType;
-      }
-
-      const res = await axios.get(`${baseURL}prod/hourly-category-count`, {
-        params,
-      });
-
-      if (res?.data?.success) {
-        const data = await mapCategory(res?.data?.data);
-        setHourlyCategoryCount(data);
-      }
-    } catch (error) {
-      console.error("Error fetching hourly Category count data:", error);
-      toast.error("Error fetching hourly Category count data.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Quick Filters
-  const fetchYesterdayHourlyProduction = async () => {
-    if (!stationCode) {
-      return;
-    }
-
-    const now = new Date();
-    const today8AM = new Date(now);
-    today8AM.setHours(8, 0, 0, 0);
-
-    const yesterday8AM = new Date(today8AM);
-    yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
-
-    const formatDate = (date) => {
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate(),
-      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
-    const formattedStart = formatDate(yesterday8AM);
-    const formattedEnd = formatDate(today8AM);
-    try {
-      setYdayLoading(true);
-      setHourData([]);
-
-      const params = {
-        stationCode,
-        startDate: formattedStart,
-        endDate: formattedEnd,
-      };
-
-      if (selectedModel?.value && selectedModel.value !== "0") {
-        params.model = selectedModel.value;
-      }
-
-      if (lineType) {
-        params.line = lineType;
-      }
-
-      const res = await axios.get(`${baseURL}prod/hourly-summary`, {
-        params,
-      });
-
-      if (res?.data?.success) {
-        setHourData(res?.data?.data);
-      }
-    } catch (error) {
-      console.error("Error fetching Yesterday hourly production data:", error);
-      toast.error("Error fetching Yesterday hourly production data.");
-    } finally {
-      setYdayLoading(false);
-    }
-  };
-
-  const fetchYesterdayHourlyModelCount = async () => {
-    if (!stationCode) {
-      return;
-    }
-
-    const now = new Date();
-    const today8AM = new Date(now);
-    today8AM.setHours(8, 0, 0, 0);
-
-    const yesterday8AM = new Date(today8AM);
-    yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
-
-    const formatDate = (date) => {
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate(),
-      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
-    const formattedStart = formatDate(yesterday8AM);
-    const formattedEnd = formatDate(today8AM);
-
-    try {
-      setYdayLoading(true);
-
-      setHourlyModelCount([]);
-
-      const params = {
-        stationCode,
-        startDate: formattedStart,
-        endDate: formattedEnd,
-      };
-      if (selectedModel?.value && selectedModel.value !== "0") {
-        params.model = selectedModel.value;
-      }
-      if (lineType) {
-        params.line = lineType;
-      }
-
-      const res = await axios.get(`${baseURL}prod/hourly-model-count`, {
-        params,
-      });
-
-      if (res?.data?.success) {
-        setHourlyModelCount(res?.data?.data);
-      }
-    } catch (error) {
-      console.error("Error fetching Yesterday hourly model count data:", error);
-      toast.error("Error fetching Yesterday hourly model count data.");
-    } finally {
-      setYdayLoading(false);
-    }
-  };
-
-  const getYesterdayHourlyCategoryCount = async () => {
-    if (!stationCode) {
-      toast.error("Please select Station Code.");
-      return;
-    }
-
-    const now = new Date();
-    const today8AM = new Date(now);
-    today8AM.setHours(8, 0, 0, 0);
-
-    const yesterday8AM = new Date(today8AM);
-    yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
-
-    const formatDate = (date) => {
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate(),
-      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
-    const formattedStart = formatDate(yesterday8AM);
-    const formattedEnd = formatDate(today8AM);
-
-    try {
-      setYdayLoading(true);
-
-      setHourlyCategoryCount([]);
-
-      const params = {
-        stationCode,
-        startDate: formattedStart,
-        endDate: formattedEnd,
-      };
-
-      if (selectedModel?.value && selectedModel.value !== "0") {
-        params.model = selectedModel.value;
-      }
-
-      if (lineType) {
-        params.line = lineType;
-      }
-
-      const res = await axios.get(`${baseURL}prod/hourly-category-count`, {
-        params,
-      });
-
-      if (res?.data?.success) {
-        const data = await mapCategory(res?.data?.data);
-        setHourlyCategoryCount(data);
-      }
-    } catch (error) {
-      console.error(
-        "Error fetching Yesterday hourly Category count data:",
-        error,
-      );
-      toast.error("Error fetching Yesterday hourly Category count data.");
-    } finally {
-      setYdayLoading(false);
-    }
-  };
-
-  const fetchTodayHourlyProduction = async () => {
-    if (!stationCode) {
-      return;
-    }
-
-    const now = new Date();
-    const today8AM = new Date(now);
-    today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
-
-    const formatDate = (date) => {
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate(),
-      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
-    const formattedStart = formatDate(today8AM);
-    const formattedEnd = formatDate(now); // Now = current time
-
-    try {
-      setTodayLoading(true);
-
-      setHourData([]);
-
-      const params = {
-        stationCode,
-        startDate: formattedStart,
-        endDate: formattedEnd,
-      };
-
-      if (selectedModel?.value && selectedModel.value !== "0") {
-        params.model = selectedModel.value;
-      }
-
-      if (lineType) {
-        params.line = lineType;
-      }
-
-      const res = await axios.get(`${baseURL}prod/hourly-summary`, {
-        params,
-      });
-
-      if (res?.data?.success) {
-        setHourData(res?.data?.data);
-      }
-    } catch (error) {
-      console.error("Error fetching Today hourly production data:", error);
-      toast.error("Error fetching Today hourly production data.");
-    } finally {
-      setTodayLoading(false);
-    }
-  };
-
-  const fetchTodayHourlyModelCount = async () => {
-    if (!stationCode) {
-      return;
-    }
-
-    const now = new Date();
-    const today8AM = new Date(now);
-    today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
-
-    const formatDate = (date) => {
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate(),
-      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
-    const formattedStart = formatDate(today8AM);
-    const formattedEnd = formatDate(now); // Now = current time
-
-    try {
-      setTodayLoading(true);
-
-      setHourlyModelCount([]);
-
-      const params = {
-        stationCode,
-        startDate: formattedStart,
-        endDate: formattedEnd,
-      };
-
-      if (selectedModel?.value && selectedModel.value !== "0") {
-        params.model = selectedModel.value;
-      }
-
-      if (lineType) {
-        params.line = lineType;
-      }
-
-      const res = await axios.get(`${baseURL}prod/hourly-model-count`, {
-        params,
-      });
-
-      if (res?.data?.success) {
-        setHourlyModelCount(res?.data?.data);
-      }
-    } catch (error) {
-      console.error("Error fetching Today hourly model count data:", error);
-      toast.error("Error fetching Today hourly model count data.");
-    } finally {
-      setTodayLoading(false);
-    }
-  };
-
-  const getTodayHourlyCategoryCount = async () => {
-    if (!stationCode) {
-      toast.error("Please select Station Code.");
-      return;
-    }
-
-    const now = new Date();
-    const today8AM = new Date(now);
-    today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
-
-    const formatDate = (date) => {
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate(),
-      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
-    const formattedStart = formatDate(today8AM);
-    const formattedEnd = formatDate(now); // Now = current time
-
-    try {
-      setTodayLoading(true);
-
-      setHourlyCategoryCount([]);
-
-      const params = {
-        stationCode,
-        startDate: formattedStart,
-        endDate: formattedEnd,
-      };
-
-      if (selectedModel?.value && selectedModel.value !== "0") {
-        params.model = selectedModel.value;
-      }
-
-      if (lineType) {
-        params.line = lineType;
-      }
-
-      const res = await axios.get(`${baseURL}prod/hourly-category-count`, {
-        params,
-      });
-
-      if (res?.data?.success) {
-        const data = await mapCategory(res?.data?.data);
-        setHourlyCategoryCount(data);
-      }
-    } catch (error) {
-      console.error("Error fetching Today hourly Category count data:", error);
-      toast.error("Error fetching Today hourly Category count data.");
-    } finally {
-      setTodayLoading(false);
-    }
-  };
-
-  const handleYesterday = async () => {
-    await fetchYesterdayHourlyProduction();
-    await fetchYesterdayHourlyModelCount();
-    await getYesterdayHourlyCategoryCount();
-  };
-
-  const handleToday = async () => {
-    await fetchTodayHourlyProduction();
-    await fetchTodayHourlyModelCount();
-    await getTodayHourlyCategoryCount();
-  };
-
-  // Auto Refresh Logic
   useEffect(() => {
-    if (autoRefresh) {
-      const interval = setInterval(fetchHourlyProduction, 300000); // auto-refresh every 5 min
-      return () => clearInterval(interval);
-    }
-  }, [autoRefresh, stationCode, startTime, endTime]);
+    if (!autoRefresh) return;
+    const interval = setInterval(handleQuery, 300000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, handleQuery]);
 
-  // Chart Data
-  const prepareChartData = () => {
-    if (!hourData || hourData.length === 0) {
+  // ─── Derived / Memoized Values ───────────────────────────────────────────────
+
+  const totalCount = useMemo(
+    () => hourData.reduce((sum, item) => sum + item.COUNT, 0),
+    [hourData],
+  );
+  const totalModels = useMemo(
+    () => new Set(hourlyModelCount.map((item) => item.Material_Name)).size,
+    [hourlyModelCount],
+  );
+  const getModelCountForHour = useCallback(
+    (timehour) =>
+      hourlyModelCount.filter((item) => item.TIMEHOUR === timehour).length,
+    [hourlyModelCount],
+  );
+
+  const { chartData, chartOptions } = useMemo(() => {
+    if (!hourData || hourData.length === 0)
       return { chartData: null, chartOptions: null };
-    }
 
     const chartData = {
       labels: hourData.map((item) => `${item.TIMEHOUR}:00`),
@@ -584,45 +259,26 @@ const HourlyReport = () => {
           ctx.font = "12px sans-serif";
           ctx.fillStyle = "#000";
           ctx.textAlign = "center";
-
           chart.data.datasets.forEach((dataset, i) => {
             const meta = chart.getDatasetMeta(i);
             meta.data.forEach((bar, index) => {
               const value = dataset.data[index];
-              if (value !== null && value !== undefined) {
-                ctx.fillText(value, bar.x, bar.y - 6); // Display above bar
-              }
+              if (value !== null && value !== undefined)
+                ctx.fillText(value, bar.x, bar.y - 6);
             });
           });
         },
       },
-      plugins: {
-        legend: {
-          display: true,
-        },
-        tooltip: {
-          enabled: true,
-        },
-      },
+      plugins: { legend: { display: true }, tooltip: { enabled: true } },
       scales: {
         x: {
           title: {
             display: true,
             text: "Hour",
-            font: {
-              size: 16,
-              weight: "bold",
-              family: "font-playfair",
-            },
+            font: { size: 14, weight: "bold" },
             color: "#333",
           },
-          ticks: {
-            font: {
-              size: 12,
-              family: "font-playfair",
-            },
-            color: "#666",
-          },
+          ticks: { font: { size: 11 }, color: "#666" },
         },
         y: {
           beginAtZero: true,
@@ -630,283 +286,344 @@ const HourlyReport = () => {
           title: {
             display: true,
             text: "Count",
-            font: {
-              size: 16,
-              weight: "bold",
-              family: "font-playfair",
-            },
+            font: { size: 14, weight: "bold" },
             color: "#333",
           },
-          ticks: {
-            font: {
-              size: 12,
-              family: "font-playfair",
-            },
-            color: "#666",
-          },
+          ticks: { font: { size: 11 }, color: "#666" },
         },
       },
     };
+
     return { chartData, chartOptions };
-  };
-  const { chartData, chartOptions } = prepareChartData();
+  }, [hourData]);
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
+
+  const isAnyLoading = loading || ydayLoading || todayLoading;
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
-      <Title title="Hourly Report" align="center" />
+    <div className="p-4 bg-gray-100 min-h-screen rounded-lg">
+      <Title title="Hourly Production Report" align="center" />
 
-      {/* Filters */}
-      <div className="flex gap-4">
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
-          <SelectField
-            label="Model Variant"
-            value={selectedModel?.value || ""}
-            options={modelVariants}
-            onChange={(e) => {
-              const selected = modelVariants.find(
-                (opt) => opt.value === e.target.value,
-              );
-              setSelectedModel(selected || null);
-            }}
-          />
+      {/* ── Filter Panel ── */}
+      <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Filters */}
+        <div className="lg:col-span-2 bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl">
+          <h2 className="text-sm font-bold text-purple-800 uppercase tracking-widest mb-3">
+            Filters
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <SelectField
+              label="Model Variant"
+              value={selectedModel?.value || ""}
+              options={modelVariants}
+              onChange={(e) => {
+                const selected = modelVariants.find(
+                  (opt) => opt.value === e.target.value,
+                );
+                setSelectedModel(selected || null);
+              }}
+            />
+            <SelectField
+              label="Stage Name"
+              name="stationCode"
+              value={stationCode}
+              options={stages}
+              onChange={(e) => setStationCode(e.target.value)}
+            />
+            <DateTimePicker
+              label="Start Time"
+              name="startTime"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+            <DateTimePicker
+              label="End Time"
+              name="endTime"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+            />
+          </div>
 
-          <SelectField
-            label="Stage Name"
-            name="stationCode"
-            value={stationCode}
-            options={stages}
-            onChange={(e) => setStationCode(e.target.value)}
-          />
-
-          <DateTimePicker
-            label="Start Time"
-            name="startTime"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-          />
-          <DateTimePicker
-            label="End Time"
-            name="endTime"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-          />
-        </div>
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
-          {/* Buttons and Checkboxes */}
-          <div className="flex flex-col flex-wrap items-center gap-4">
-            <div className="flex gap-4">
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium">
+          {/* Controls Row */}
+          <div className="flex flex-wrap items-center gap-6 mt-4 pt-3 border-t border-purple-300">
+            {/* Line Type */}
+            <div>
+              <p className="text-xs font-semibold text-purple-800 mb-1">
+                Production Line
+              </p>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-1.5 text-sm cursor-pointer">
                   <input
-                    type="checkbox"
-                    checked={autoRefresh}
-                    onChange={() => setAutoRefresh(!autoRefresh)}
+                    type="radio"
+                    name="lineType"
+                    value="1"
+                    checked={lineType === "1"}
+                    onChange={(e) => setLineType(e.target.value)}
                   />
-                  Auto Refresh
+                  Freezer Line
                 </label>
-                <div className="flex flex-col gap-1">
-                  <label>
-                    <input
-                      type="radio"
-                      name="lineType"
-                      value="1"
-                      checked={lineType === "1"}
-                      onChange={(e) => setLineType(e.target.value)}
-                    />
-                    Freezer Line
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      name="lineType"
-                      value="2"
-                      checked={lineType === "2"}
-                      onChange={(e) => setLineType(e.target.value)}
-                    />
-                    Chocolate Line
-                  </label>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <Button
-                  bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
-                  textColor={loading ? "text-white" : "text-black"}
-                  className={`font-semibold ${
-                    loading ? "cursor-not-allowed" : ""
-                  }`}
-                  onClick={async () => {
-                    await fetchHourlyProduction();
-                    await fetchHourlyModelCount();
-                    await getHourlyCategoryCount();
-                  }}
-                  disabled={loading}
-                >
-                  Query
-                </Button>
+                <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="lineType"
+                    value="2"
+                    checked={lineType === "2"}
+                    onChange={(e) => setLineType(e.target.value)}
+                  />
+                  Chocolate Line
+                </label>
               </div>
             </div>
-            {/* Count */}
-            <div className="mt-4 text-left font-bold text-lg">
-              COUNT:{" "}
-              <span className="text-blue-700">
-                {hourData?.reduce((sum, item) => sum + item.COUNT, 0)}
-              </span>
-            </div>
+
+            {/* Auto Refresh */}
+            <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={() => setAutoRefresh(!autoRefresh)}
+              />
+              Auto Refresh (5 min)
+            </label>
+
+            {/* Query Button */}
+            <Button
+              bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
+              textColor="text-white"
+              className={`font-semibold px-6 ${loading ? "cursor-not-allowed" : ""}`}
+              onClick={handleQuery}
+              disabled={loading}
+            >
+              {loading ? "Loading..." : "Query"}
+            </Button>
           </div>
         </div>
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
-            Quick Filters
-          </h2>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <Button
-              bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
-              textColor={ydayLoading ? "text-white" : "text-black"}
-              className={`font-semibold ${
-                ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
-              }`}
-              onClick={() => handleYesterday()}
-              disabled={ydayLoading}
-            >
-              YDAY
-            </Button>
-            {ydayLoading && <Loader />}
-            <Button
-              bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
-              textColor={todayLoading ? "text-white" : "text-black"}
-              className={`font-semibold ${
-                todayLoading ? "cursor-not-allowed" : "cursor-pointer"
-              }`}
-              onClick={() => handleToday()}
-              disabled={todayLoading}
-            >
-              TDAY
-            </Button>
-            {todayLoading && <Loader />}
+
+        {/* Right panel: Stats + Quick Filters */}
+        <div className="flex flex-col gap-4">
+          {/* Stats */}
+          <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl flex-1">
+            <h2 className="text-sm font-bold text-purple-800 uppercase tracking-widest mb-3">
+              Summary
+            </h2>
+            <div className="flex gap-3 flex-wrap">
+              <StatCard
+                label="Total Production Count"
+                value={totalCount}
+                color="text-blue-700"
+              />
+              <StatCard
+                label="Total Unique Models"
+                value={totalModels}
+                color="text-purple-700"
+              />
+            </div>
+          </div>
+
+          {/* Quick Filters */}
+          <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl">
+            <h2 className="text-sm font-bold text-purple-800 uppercase tracking-widest mb-3">
+              Quick Filters
+            </h2>
+            <div className="flex gap-3 items-center">
+              <Button
+                bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
+                textColor="text-black"
+                className={`font-semibold ${ydayLoading ? "cursor-not-allowed" : "cursor-pointer"}`}
+                onClick={handleYesterday}
+                disabled={ydayLoading}
+              >
+                {ydayLoading ? "Loading..." : "Yesterday"}
+              </Button>
+              <Button
+                bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
+                textColor="text-white"
+                className={`font-semibold ${todayLoading ? "cursor-not-allowed" : "cursor-pointer"}`}
+                onClick={handleToday}
+                disabled={todayLoading}
+              >
+                {todayLoading ? "Loading..." : "Today"}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-h-[80vh] overflow-auto">
-        {loading ? (
-          <Loader />
+      {/* ── Data Panel ── */}
+      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
+        {isAnyLoading ? (
+          <div className="flex justify-center items-center py-20">
+            <Loader />
+          </div>
         ) : (
-          <div className="flex flex-col md:flex-row gap-4 h-full">
-            {/* Left Column */}
-            <div className="w-full md:w-1/2 flex flex-col gap-4 max-h-[76vh]">
-              {/* Table 1 */}
-              <div className="bg-white rounded-lg overflow-auto flex-1">
-                <table className="min-w-full border text-xs text-left table-auto">
-                  <thead className="bg-gray-200 sticky top-0 z-10 text-center">
-                    <tr>
-                      <th className="px-1 py-1 border min-w-[120px]">
-                        Hour Number
-                      </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
-                        Time Hour
-                      </th>
-                      <th className="px-1 py-1 border min-w-[120px]">Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {hourData?.length > 0 ? (
-                      hourData.map((item, index) => (
-                        <tr
-                          key={index}
-                          className="hover:bg-gray-100 text-center"
-                        >
-                          <td className="px-1 py-1 border">
-                            {item.HOUR_NUMBER}
-                          </td>
-                          <td className="px-1 py-1 border">{item.TIMEHOUR}</td>
-                          <td className="px-1 py-1 border">{item.COUNT}</td>
-                        </tr>
-                      ))
-                    ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {/* ── LEFT COLUMN ── */}
+            <div className="flex flex-col gap-4">
+              {/* Table 1 – Hourly Production Summary */}
+              <div className="bg-white rounded-lg shadow-sm border border-purple-200 overflow-hidden flex flex-col">
+                <TableHeader
+                  title="Hourly Production Summary"
+                  subtitle="Total units produced and distinct models run per hour"
+                />
+                <div className="overflow-auto max-h-64">
+                  <table className="min-w-full border-collapse text-xs text-left">
+                    <thead className="bg-gray-100 sticky top-0 z-10">
                       <tr>
-                        <td colSpan={3} className="text-center py-4">
-                          No data found.
-                        </td>
+                        <th className="px-3 py-2 border border-gray-200 font-semibold text-center">
+                          Hour
+                        </th>
+                        <th className="px-3 py-2 border border-gray-200 font-semibold text-center">
+                          Time (Hour)
+                        </th>
+                        <th className="px-3 py-2 border border-gray-200 font-semibold text-center">
+                          Production Count
+                        </th>
+                        <th className="px-3 py-2 border border-gray-200 font-semibold text-center">
+                          No. of Models
+                        </th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {hourData.length > 0 ? (
+                        hourData.map((item, index) => (
+                          <tr
+                            key={index}
+                            className={`hover:bg-blue-50 text-center ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
+                          >
+                            <td className="px-3 py-1.5 border border-gray-200 font-medium text-gray-600">
+                              {item.HOUR_NUMBER}
+                            </td>
+                            <td className="px-3 py-1.5 border border-gray-200">
+                              {item.TIMEHOUR}:00
+                            </td>
+                            <td className="px-3 py-1.5 border border-gray-200 font-semibold text-blue-700">
+                              {item.COUNT}
+                            </td>
+                            <td className="px-3 py-1.5 border border-gray-200 font-semibold text-purple-700">
+                              {getModelCountForHour(item.TIMEHOUR)}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <EmptyRow colSpan={4} />
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-              {/* Bar Graph */}
-              <div className="bg-white p-4 rounded-lg shadow overflow-auto flex-1">
-                {chartData && <Bar data={chartData} options={chartOptions} />}
+              {/* Bar Chart */}
+              <div className="bg-white rounded-lg shadow-sm border border-purple-200 overflow-hidden flex flex-col">
+                <TableHeader
+                  title="Hourly Production Trend"
+                  subtitle="Bar chart showing production count per hour"
+                />
+                <div className="p-4 h-64">
+                  {chartData ? (
+                    <Bar data={chartData} options={chartOptions} />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400 text-xs italic">
+                      No chart data available.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Right Column */}
-            <div className="w-full md:w-1/2 flex flex-col gap-4 max-h-[76vh]">
-              {/* Table 2 - Model Count */}
-              <div className="bg-white rounded-lg overflow-auto flex-1">
-                <table className="min-w-full border text-xs text-left table-auto">
-                  <thead className="bg-gray-200 sticky top-0 z-10 text-center">
-                    <tr>
-                      <th className="px-1 py-1 border">Time Hour</th>
-                      <th className="px-1 py-1 border">Name</th>
-                      <th className="px-1 py-1 border">Model Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {hourlyModelCount.length > 0 ? (
-                      hourlyModelCount.map((item, index) => (
-                        <tr
-                          key={index}
-                          className="hover:bg-gray-100 text-center"
-                        >
-                          <td className="px-1 py-1 border">{item.TIMEHOUR}</td>
-                          <td className="px-1 py-1 border">
-                            {item.Material_Name}
-                          </td>
-                          <td className="px-1 py-1 border">{item.COUNT}</td>
-                        </tr>
-                      ))
-                    ) : (
+            {/* ── RIGHT COLUMN ── */}
+            <div className="flex flex-col gap-4">
+              {/* Table 2 – Model-wise Hourly Count */}
+              <div className="bg-white rounded-lg shadow-sm border border-purple-200 overflow-hidden flex flex-col">
+                <TableHeader
+                  title="Model-wise Hourly Breakdown"
+                  subtitle="Number of units produced per model variant in each hour"
+                />
+                <div className="overflow-auto max-h-64">
+                  <table className="min-w-full border-collapse text-xs text-left">
+                    <thead className="bg-gray-100 sticky top-0 z-10">
                       <tr>
-                        <td colSpan={3} className="text-center py-4">
-                          No data found.
-                        </td>
+                        <th className="px-3 py-2 border border-gray-200 font-semibold text-center">
+                          Time (Hour)
+                        </th>
+                        <th className="px-3 py-2 border border-gray-200 font-semibold text-center">
+                          Model Name
+                        </th>
+                        <th className="px-3 py-2 border border-gray-200 font-semibold text-center">
+                          Count
+                        </th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {hourlyModelCount.length > 0 ? (
+                        hourlyModelCount.map((item, index) => (
+                          <tr
+                            key={index}
+                            className={`hover:bg-blue-50 text-center ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
+                          >
+                            <td className="px-3 py-1.5 border border-gray-200">
+                              {item.TIMEHOUR}:00
+                            </td>
+                            <td className="px-3 py-1.5 border border-gray-200 text-left font-medium">
+                              {item.Material_Name}
+                            </td>
+                            <td className="px-3 py-1.5 border border-gray-200 font-semibold text-blue-700">
+                              {item.COUNT}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <EmptyRow colSpan={3} />
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-              {/* Table 3 - Category Count */}
-              <div className="bg-white rounded-lg overflow-auto flex-1">
-                <table className="min-w-full border text-xs text-left table-auto">
-                  <thead className="bg-gray-200 sticky top-0 z-10 text-center">
-                    <tr>
-                      <th className="px-1 py-1 border">Time Hour</th>
-                      <th className="px-1 py-1 border">Category</th>
-                      <th className="px-1 py-1 border">Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {hourlyCategoryCount.length > 0 ? (
-                      hourlyCategoryCount.map((item, index) => (
-                        <tr
-                          key={index}
-                          className="hover:bg-gray-100 text-center"
-                        >
-                          <td className="px-1 py-1 border">{item.TIMEHOUR}</td>
-                          <td className="px-1 py-1 border">{item.category}</td>
-                          <td className="px-1 py-1 border">{item.COUNT}</td>
-                        </tr>
-                      ))
-                    ) : (
+              {/* Table 3 – Category-wise Hourly Count */}
+              <div className="bg-white rounded-lg shadow-sm border border-purple-200 overflow-hidden flex flex-col">
+                <TableHeader
+                  title="Category-wise Hourly Breakdown"
+                  subtitle="Number of units produced per product category in each hour"
+                />
+                <div className="overflow-auto max-h-64">
+                  <table className="min-w-full border-collapse text-xs text-left">
+                    <thead className="bg-gray-100 sticky top-0 z-10">
                       <tr>
-                        <td colSpan={3} className="text-center py-4">
-                          No data found.
-                        </td>
+                        <th className="px-3 py-2 border border-gray-200 font-semibold text-center">
+                          Time (Hour)
+                        </th>
+                        <th className="px-3 py-2 border border-gray-200 font-semibold text-center">
+                          Category
+                        </th>
+                        <th className="px-3 py-2 border border-gray-200 font-semibold text-center">
+                          Count
+                        </th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {hourlyCategoryCount.length > 0 ? (
+                        hourlyCategoryCount.map((item, index) => (
+                          <tr
+                            key={index}
+                            className={`hover:bg-blue-50 text-center ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
+                          >
+                            <td className="px-3 py-1.5 border border-gray-200">
+                              {item.TIMEHOUR}:00
+                            </td>
+                            <td className="px-3 py-1.5 border border-gray-200 text-left font-medium">
+                              {item.category}
+                            </td>
+                            <td className="px-3 py-1.5 border border-gray-200 font-semibold text-blue-700">
+                              {item.COUNT}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <EmptyRow colSpan={3} />
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
