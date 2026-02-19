@@ -9,8 +9,6 @@ import Pagination from "../../components/ui/Pagination";
 import GasChargingDetailModal from "../../components/GasChargingDetailModal";
 import {
   useGetGasChargingReportQuery,
-  useGetGasChargingSummaryQuery,
-  useGetGasChargingFaultsQuery,
   useGetGasChargingModelsQuery,
   useGetGasChargingMachinesQuery,
   useGetGasChargingRefrigerantsQuery,
@@ -104,24 +102,6 @@ const GasChargingReport = () => {
       machine: filters.machine,
       page: pagination.page,
       limit: pagination.limit,
-    },
-    { skip: !filters.startDate || !filters.endDate },
-  );
-
-  const { data: summaryData } = useGetGasChargingSummaryQuery(
-    {
-      startDate: filters.startDate,
-      endDate: filters.endDate,
-      model: filters.model,
-      machine: filters.machine,
-    },
-    { skip: !filters.startDate || !filters.endDate },
-  );
-
-  const { data: faultData } = useGetGasChargingFaultsQuery(
-    {
-      startDate: filters.startDate,
-      endDate: filters.endDate,
     },
     { skip: !filters.startDate || !filters.endDate },
   );
@@ -506,7 +486,8 @@ const GasChargingReport = () => {
                   of{" "}
                   <span className="font-bold text-blue-600">
                     {pagination.totalRecords}
-                  </span>
+                  </span>{" "}
+                  records
                 </span>
               </div>
             </div>

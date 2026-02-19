@@ -124,70 +124,72 @@ export const getStopLossDetail = tryCatch(async (req, res) => {
   }
 
   const query = `
-    ;WITH EMG AS
-    (
-      SELECT 
-        T.RefID,
-        M.PLCLocation AS StationName,
-        M.Location,
-        T.EmgOn,
-        T.EmgOff,
-        DATEDIFF(SECOND, T.EmgOn, T.EmgOff) AS TotalSeconds
-      FROM EMGTrans T
-      INNER JOIN EMGMaster M
-        ON T.PLCCode = M.PLCCode
-        AND T.MEMBit = M.MEMBit
-        AND M.Active = 1
-      WHERE T.EmgOff IS NOT NULL
-        AND T.EmgOn >= @fromDate
-        AND T.EmgOn < @toDate
-        AND M.Location = @location
-    ),
 
-    BREAKS AS
-    (
-      SELECT 
-        Name,
-        CAST(CAST(@fromDate AS DATE) AS DATETIME) + CAST(StartTime AS DATETIME) AS BreakStart,
-        CAST(CAST(@fromDate AS DATE) AS DATETIME) + CAST(EndTime AS DATETIME) AS BreakEnd
-      FROM ShiftBreaks
-    ),
 
-    CALC AS
-    (
-      SELECT 
-        E.RefID,
-        E.StationName,
-        E.EmgOn,
-        E.EmgOff,
-        E.TotalSeconds,
-        ISNULL(SUM(
-          CASE 
-            WHEN B.BreakStart < E.EmgOff AND B.BreakEnd > E.EmgOn
-            THEN DATEDIFF(SECOND,
-              CASE WHEN E.EmgOn > B.BreakStart THEN E.EmgOn ELSE B.BreakStart END,
-              CASE WHEN E.EmgOff < B.BreakEnd THEN E.EmgOff ELSE B.BreakEnd END
-            )
-            ELSE 0
-          END
-        ), 0) AS BreakSeconds
-      FROM EMG E
-      CROSS JOIN BREAKS B
-      GROUP BY E.RefID, E.StationName, E.EmgOn, E.EmgOff, E.TotalSeconds
-    )
+;WITH EMG AS
+(
+  SELECT 
+    T.RefID,
+    M.PLCLocation AS StationName,
+    M.Location,
+    T.EmgOn,
+    T.EmgOff,
+    DATEDIFF(SECOND, T.EmgOn, T.EmgOff) AS TotalSeconds
+  FROM EMGTrans T
+  INNER JOIN EMGMaster M
+    ON T.PLCCode = M.PLCCode
+    AND T.MEMBit = M.MEMBit
+    AND M.Active = 1
+  WHERE T.EmgOff IS NOT NULL
+    AND T.EmgOn >= @FromDate
+    AND T.EmgOn < @ToDate
+    AND M.Location = @Location
+),
 
-    SELECT
-      ROW_NUMBER() OVER (ORDER BY EmgOn) AS [Sr_No],
-      StationName AS [Station_Name],
-      CONVERT(DATE, EmgOn) AS [Date],
-      CONVERT(VARCHAR(8), EmgOn, 108) AS [Stop_Time],
-      CONVERT(VARCHAR(8), EmgOff, 108) AS [Start_Time],
-      (TotalSeconds - BreakSeconds) AS [Duration_Seconds],
-      CONVERT(VARCHAR,
-        DATEADD(SECOND, (TotalSeconds - BreakSeconds), 0), 108) AS [Duration]
-    FROM CALC
-    WHERE (TotalSeconds - BreakSeconds) > 0
-    ORDER BY EmgOn;
+BREAKS AS
+(
+  SELECT 
+    Name,
+    CAST(CAST(@FromDate AS DATE) AS DATETIME) + CAST(StartTime AS DATETIME) AS BreakStart,
+    CAST(CAST(@FromDate AS DATE) AS DATETIME) + CAST(EndTime AS DATETIME) AS BreakEnd
+  FROM ShiftBreaks
+),
+
+CALC AS
+(
+  SELECT 
+    E.RefID,
+    E.StationName,
+    E.EmgOn,
+    E.EmgOff,
+    E.TotalSeconds,
+    ISNULL(SUM(
+      CASE 
+        WHEN B.BreakStart < E.EmgOff AND B.BreakEnd > E.EmgOn
+        THEN DATEDIFF(SECOND,
+          CASE WHEN E.EmgOn > B.BreakStart THEN E.EmgOn ELSE B.BreakStart END,
+          CASE WHEN E.EmgOff < B.BreakEnd THEN E.EmgOff ELSE B.BreakEnd END
+        )
+        ELSE 0
+      END
+    ), 0) AS BreakSeconds
+  FROM EMG E
+  CROSS JOIN BREAKS B
+  GROUP BY E.RefID, E.StationName, E.EmgOn, E.EmgOff, E.TotalSeconds
+)
+
+SELECT
+  ROW_NUMBER() OVER (PARTITION BY StationName ORDER BY EmgOn) AS [Sr_No],
+  StationName AS [Station_Name],
+  CONVERT(DATE, EmgOn) AS [Date],
+  CONVERT(VARCHAR(8), EmgOn, 108) AS [Stop_Time],
+  CONVERT(VARCHAR(8), EmgOff, 108) AS [Start_Time],
+  (TotalSeconds - BreakSeconds) AS [Duration_Seconds],
+  CONVERT(VARCHAR,
+    DATEADD(SECOND, (TotalSeconds - BreakSeconds), 0), 108) AS [Duration]
+FROM CALC
+WHERE (TotalSeconds - BreakSeconds) > 0
+ORDER BY StationName, EmgOn;
   `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();

@@ -262,65 +262,9 @@ const ESTReport = () => {
     );
   };
 
-  // Info Card Component
-  const InfoCard = ({ icon: Icon, label, value, color = "gray" }) => {
-    const colorMap = {
-      gray: "text-gray-500",
-      blue: "text-blue-500",
-      purple: "text-purple-500",
-      green: "text-green-500",
-    };
-
-    return (
-      <div className="flex flex-col">
-        <span className="text-xs text-gray-500 uppercase tracking-wide flex items-center gap-1">
-          <Icon className={colorMap[color]} size={12} />
-          {label}
-        </span>
-        <p className="text-lg font-semibold text-gray-800">{value}</p>
-      </div>
-    );
-  };
-
-  // Test configurations for overview
-  const testConfigs = [
-    {
-      name: "ECT",
-      icon: FaPlug,
-      color: "blue",
-      bgColor: "bg-blue-500",
-    },
-    {
-      name: "HV",
-      icon: HiLightningBolt,
-      color: "yellow",
-      bgColor: "bg-yellow-500",
-    },
-    {
-      name: "IR",
-      icon: FaShieldAlt,
-      color: "purple",
-      bgColor: "bg-purple-500",
-    },
-    {
-      name: "LCT",
-      icon: FaTint,
-      color: "cyan",
-      bgColor: "bg-cyan-500",
-    },
-    {
-      name: "Wattage",
-      icon: FaBatteryFull,
-      color: "green",
-      bgColor: "bg-green-500",
-    },
-  ];
-
   const estData = reportData?.data || [];
-  const currentData = estData[0];
   // USE pagination.totalRecords instead of estData.length for total count
   const totalCount = pagination.totalRecords;
-  const summary = summaryData?.data;
 
   const isLoading = reportLoading || reportFetching;
 
@@ -531,106 +475,120 @@ const ESTReport = () => {
 
       {!isLoading && estData.length > 0 && (
         <>
-          {/* Data Table - UPDATED WITH PAGE INFO */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            {/* PAGINATION COMPONENT - ADD THIS */}
-            {pagination.totalRecords > 0 && (
-              <Pagination
-                currentPage={pagination.page}
-                totalPages={pagination.totalPages}
-                totalRecords={pagination.totalRecords}
-                limit={pagination.limit}
-                onPageChange={handlePageChange}
-                onLimitChange={handleLimitChange}
-                isLoading={isLoading}
-              />
-            )}
-
-            {/* Table Header with Page Info - NEW */}
-            <div className="flex flex-wrap items-center justify-between gap-4 my-4">
+          {/* Data Table*/}
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+            {/* Table Header */}
+            <div className="p-5 border-b flex flex-wrap items-center justify-between gap-4">
               <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                 <FaTable className="text-purple-500" />
                 Test Records
               </h2>
               <div className="flex items-center gap-4 text-sm text-gray-600">
                 <span>
-                  Page <b className="text-purple-600">{pagination.page}</b> of{" "}
-                  <b className="text-purple-600">{pagination.totalPages}</b>
+                  Page{" "}
+                  <span className="font-bold text-purple-600">
+                    {pagination.page}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-bold text-purple-600">
+                    {pagination.totalPages}
+                  </span>
                 </span>
-                <span>|</span>
+                <span className="text-gray-300">|</span>
                 <span>
-                  Showing <b className="text-purple-600">{estData.length}</b> of{" "}
-                  <b className="text-purple-600">{pagination.totalRecords}</b>{" "}
+                  Showing{" "}
+                  <span className="font-bold text-purple-600">
+                    {estData.length}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-bold text-purple-600">
+                    {pagination.totalRecords}
+                  </span>{" "}
                   records
                 </span>
               </div>
             </div>
 
+            {/* PAGINATION COMPONENT - ADD THIS */}
+            {pagination.totalRecords > 0 && (
+              <div className="px-5 py-3 bg-gray-50 border-b">
+                <Pagination
+                  currentPage={pagination.page}
+                  totalPages={pagination.totalPages}
+                  totalRecords={pagination.totalRecords}
+                  limit={pagination.limit}
+                  onPageChange={handlePageChange}
+                  onLimitChange={handleLimitChange}
+                  isLoading={isLoading}
+                />
+              </div>
+            )}
+
             <div className="overflow-x-auto">
-              <table className="min-w-full text-xs text-left">
+              <table className="min-w-full text-sm">
                 <thead className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
                   <tr>
-                    <th className="px-3 py-3 rounded-tl-lg">
+                    <th className="px-4 py-3 text-left font-semibold">
                       <div className="flex items-center gap-1">
                         <HiOutlineDocumentReport />
                         Ref No
                       </div>
                     </th>
-                    <th className="px-3 py-3">
+                    <th className="px-4 py-3 text-left font-semibold">
                       <div className="flex items-center gap-1">
                         <FaCubes />
                         Model
                       </div>
                     </th>
-                    <th className="px-3 py-3">
+                    <th className="px-4 py-3 text-left font-semibold">
                       <div className="flex items-center gap-1">
                         <FaBarcode />
                         Serial
                       </div>
                     </th>
-                    <th className="px-3 py-3">
+                    <th className="px-4 py-3 text-left font-semibold">
                       <div className="flex items-center gap-1">
                         <FaCalendarAlt />
                         Date/Time
                       </div>
                     </th>
-                    <th className="px-3 py-3">
+                    <th className="px-4 py-3 text-left font-semibold">
                       <div className="flex items-center gap-1">
                         <FaUser />
                         Operator
                       </div>
                     </th>
-                    <th className="px-3 py-3">
+                    <th className="px-4 py-3 text-left font-semibold">
                       <div className="flex items-center gap-1">
                         <FaPlug />
                         ECT
                       </div>
                     </th>
-                    <th className="px-3 py-3">
+                    <th className="px-4 py-3 text-left font-semibold">
                       <div className="flex items-center gap-1">
                         <HiLightningBolt />
                         HV
                       </div>
                     </th>
-                    <th className="px-3 py-3">
+                    <th className="px-4 py-3 text-left font-semibold">
                       <div className="flex items-center gap-1">
                         <FaShieldAlt />
                         IR
                       </div>
                     </th>
-                    <th className="px-3 py-3">
+                    <th className="px-4 py-3 text-left font-semibold">
                       <div className="flex items-center gap-1">
                         <FaTint />
                         LCT
                       </div>
                     </th>
-                    <th className="px-3 py-3">
+                    <th className="px-4 py-3 text-left font-semibold">
                       <div className="flex items-center gap-1">
                         <FaBatteryFull />
                         Wattage
                       </div>
                     </th>
-                    <th className="px-3 py-3 rounded-tr-lg">
+                    <th className="px-4 py-3 text-left font-semibold">
                       <div className="flex items-center gap-1">
                         <VscCircuitBoard />
                         Result

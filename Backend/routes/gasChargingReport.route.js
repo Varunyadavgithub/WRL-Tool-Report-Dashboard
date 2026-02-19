@@ -1,8 +1,6 @@
 import express from "express";
 import {
   getGasChargingReport,
-  getGasChargingSummary,
-  getGasChargingFaults,
   getDistinctModels,
   getDistinctMachines,
   getDistinctRefrigerants,
@@ -24,12 +22,6 @@ const router = express.Router();
 
 // GET /api/v1/gas-charging/report - Get paginated report data
 router.get("/report", getGasChargingReport);
-
-// GET /api/v1/gas-charging/summary - Get summary statistics
-router.get("/summary", getGasChargingSummary);
-
-// GET /api/v1/gas-charging/faults - Get fault analysis
-router.get("/faults", getGasChargingFaults);
 
 // GET /api/v1/gas-charging/export - Export data
 router.get("/export", exportGasChargingReport);

@@ -1,4 +1,3 @@
-// src/pages/ConsolidatedReport/tabs/HistoryCardTable.jsx
 import EmptyState from "../../../../components/ui/EmptyState";
 import {
   FiCheckCircle,
@@ -80,28 +79,6 @@ function ProcessBadge({ status }) {
       {style.icon}
       {status || "NORMAL"}
     </span>
-  );
-}
-
-// ─── Summary Card ───────────────────────────────────────────────
-function SummaryCard({ icon: Icon, label, count, color }) {
-  return (
-    <div
-      className={`flex items-center gap-3 rounded-xl border px-4 py-3 shadow-sm bg-white
-                  ${color.border} hover:shadow-md transition-shadow duration-200`}
-    >
-      <div
-        className={`w-10 h-10 rounded-lg flex items-center justify-center ${color.bg}`}
-      >
-        <Icon size={18} className={color.icon} />
-      </div>
-      <div>
-        <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest leading-none">
-          {label}
-        </p>
-        <p className={`text-xl font-bold mt-0.5 ${color.text}`}>{count}</p>
-      </div>
-    </div>
   );
 }
 
@@ -242,7 +219,7 @@ function HistoryCardTable({ data }) {
                     </td>
 
                     {/* Method of Checking */}
-                    <td className="px-4 py-2.5 whitespace-nowrap max-w-[180px]">
+                    <td className="px-4 py-2.5 max-w-[180px]">
                       {get(item, "method") ? (
                         <span
                           className="bg-blue-100 px-2 py-0.5 rounded text-xs text-gray-600"

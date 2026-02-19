@@ -24,22 +24,6 @@ export const gasChargingApi = createApi({
       providesTags: ["GasCharging"],
     }),
 
-    // Get Summary
-    getGasChargingSummary: builder.query({
-      query: (params) => ({
-        url: "/gas-charging/summary",
-        params,
-      }),
-    }),
-
-    // Get Faults
-    getGasChargingFaults: builder.query({
-      query: (params) => ({
-        url: "/gas-charging/faults",
-        params,
-      }),
-    }),
-
     // Get Models
     getGasChargingModels: builder.query({
       query: () => "/gas-charging/models",
@@ -67,8 +51,6 @@ export const gasChargingApi = createApi({
 
 export const {
   useGetGasChargingReportQuery,
-  useGetGasChargingSummaryQuery,
-  useGetGasChargingFaultsQuery,
   useGetGasChargingModelsQuery,
   useGetGasChargingMachinesQuery,
   useGetGasChargingRefrigerantsQuery,

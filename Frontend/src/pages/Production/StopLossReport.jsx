@@ -59,7 +59,7 @@ function formatSeconds(seconds) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-// ─── Duration Badge ─────────────────────────────────────────────
+// Duration Badge
 function DurationBadge({ duration, seconds }) {
   const isHigh = seconds > 600;
   const isMedium = seconds > 120;
@@ -323,18 +323,6 @@ function DetailTable({ data, tabConfig }) {
     });
   };
 
-  // ── Expand / Collapse All ──
-  const expandAll = () => {
-    setExpandedStations(new Set(groupedData.map((g) => g.stationName)));
-  };
-
-  const collapseAll = () => {
-    setExpandedStations(new Set());
-  };
-
-  const allExpanded =
-    groupedData.length > 0 && expandedStations.size === groupedData.length;
-
   // ── Grand totals ──
   const totalDetailSeconds = data.reduce(
     (sum, d) => sum + (d.Duration_Seconds || 0),
@@ -353,23 +341,6 @@ function DetailTable({ data, tabConfig }) {
             {groupedData.length} Stations · {data.length} Total Stops
           </span>
         </div>
-
-        <button
-          onClick={allExpanded ? collapseAll : expandAll}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 cursor-pointer active:scale-[0.97]"
-        >
-          {allExpanded ? (
-            <>
-              <FiMinimize2 size={12} />
-              Collapse All
-            </>
-          ) : (
-            <>
-              <FiMaximize2 size={12} />
-              Expand All
-            </>
-          )}
-        </button>
       </div>
 
       {/* ── Accordion Container ── */}
@@ -561,7 +532,7 @@ function DetailTable({ data, tabConfig }) {
                                                   : "bg-gray-100 text-gray-500"
                                             }`}
                               >
-                                {rIndex + 1}
+                                {item.Sr_No}
                               </span>
                             </div>
 
