@@ -122,7 +122,7 @@ export const getCPTReport = tryCatch(async (req, res) => {
           WHERE LANGUAGE_ID=0
         ) Code_Name ON Code_Name.STATUS_CODE_ID=Step_Status.DEVICE_STATUS_CODE 
           AND Code_Name.STATUS_CODE_TYPE=Step_Status.Status_Type_ID
-        WHERE MAIN.AREA_ID IN (5, 6) AND MAIN.START_DATE BETWEEN @startDate AND @endDate
+        WHERE MAIN.AREA_ID IN (5, 6, 8) AND MAIN.START_DATE BETWEEN @startDate AND @endDate
       );
 
       -- Get total count (excluding records in GasChargeSUSDtls)
