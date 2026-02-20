@@ -1,6 +1,6 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
-import { baseURL } from "../../assets/assets.js";
+import {baseURL} from "../../assets/assets.js";
 
 export const fpaReportApi = createApi({
   reducerPath: "fpaReportApi",
@@ -33,6 +33,13 @@ export const fpaReportApi = createApi({
       }),
       providesTags: ["FpaDefects"],
     }),
+
+    // Serial search (no date range needed)
+    getFpaBySerial: builder.query({
+      query: ({ fgsrNo }) => ({
+        url: `/serial/${fgsrNo}`,
+      }),
+    }),
   }),
 });
 
@@ -40,4 +47,5 @@ export const {
   useGetFpaHistoryQuery,
   useLazyGetFpaByModelQuery,
   useLazyGetFpaDefectDetailsQuery,
+  useLazyGetFpaBySerialQuery,
 } = fpaReportApi;

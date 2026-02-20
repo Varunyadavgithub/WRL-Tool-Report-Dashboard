@@ -69,6 +69,7 @@ import {
 } from "../controllers/quality/beeCalculation.controller.js";
 import {
   getFpaByModel,
+  getFpaBySerial,
   getFpaDefectDetails,
   getFpaHistory,
 } from "../controllers/quality/fpaHistory.controller.js";
@@ -93,6 +94,7 @@ router.get("/download-fpa-defect-image/:fgSrNo", downloadDefectImage);
 router.get("/history", getFpaHistory);
 router.get("/model/:model", getFpaByModel);
 router.get("/defects/:fgsrNo", getFpaDefectDetails);
+router.get("/serial/:fgsrNo", getFpaBySerial);
 
 // -----------------> Rework Entry
 router.get("/rework-entry/details", getReworkEntryDetailsByAssemblySerial);
