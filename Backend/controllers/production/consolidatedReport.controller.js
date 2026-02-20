@@ -691,7 +691,7 @@ export const getFunctionalTest = tryCatch(async (req, res) => {
     ------------------------------------------------------------
     -- STEP 2 : Store all barcodes of same unit
     ------------------------------------------------------------
-    DECLARE @Barcodes TABLE (BarcodeNo VARCHAR(50));
+    DECLARE @Barcodes TABLE (BarcodeNo VARCHAR(50) COLLATE DATABASE_DEFAULT);
 
     INSERT INTO @Barcodes(BarcodeNo)
     SELECT BarcodeNo
@@ -724,6 +724,111 @@ export const getFunctionalTest = tryCatch(async (req, res) => {
         MFT.*
     FROM MFTStaging MFT
     WHERE MFT.EQUIPMENT_NO IN (SELECT BarcodeNo FROM @Barcodes);
+
+    ------------------------------------------------------------
+    -- RESULT 4 : CPT (Compressor Performance Test) DETAILS
+    ------------------------------------------------------------
+    IF OBJECT_ID(N'tempdb..#CPT_RESULT_SET') IS NOT NULL
+      DROP TABLE #CPT_RESULT_SET;
+
+    BEGIN
+      SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+      ;WITH CPT_SAMPLE_DATA AS (
+        SELECT 
+          RSS.RESULT_ID, 
+          RSS.PROFILE_DEVICE_NO, 
+          MAX(RSS.SAMPLE_VALUE) AS [Max], 
+          MIN(RSS.SAMPLE_VALUE) AS [Min]
+        FROM PLIS.dbo.RESULTS_SEQS_SAMPLES RSS
+        INNER JOIN PLIS.dbo.RESULTS R 
+          ON R.RESULT_ID = RSS.RESULT_ID 
+          AND R.SERVER_ID = 0
+        WHERE RSS.SERVER_ID = 0 
+          AND R.BARCODE COLLATE DATABASE_DEFAULT IN (
+            SELECT BarcodeNo FROM @Barcodes
+          )
+        GROUP BY RSS.RESULT_ID, RSS.PROFILE_DEVICE_NO
+      ), 
+      CPT_SAMPLE_DEVICE AS (
+        SELECT 
+          SD.RESULT_ID, 
+          SD.[Max], 
+          SD.[Min], 
+          PD.DEVICE_TYPE_ID
+        FROM PLIS.dbo.RESULTS R2
+        INNER JOIN CPT_SAMPLE_DATA SD 
+          ON R2.RESULT_ID = SD.RESULT_ID
+        INNER JOIN PLIS.dbo.PROFILES_DEVICES PD 
+          ON SD.PROFILE_DEVICE_NO = PD.DEVICE_NO 
+          AND R2.PROFILE_ID = PD.PROFILE_ID
+          AND R2.PROFILE_HISTORY_ID = PD.HISTORY_ID
+          AND PD.SERVER_ID = 0
+        WHERE PD.DEVICE_TYPE_ID IN (1, 2, 3, 7) 
+          AND R2.SERVER_ID = 0
+      )
+      SELECT * INTO #CPT_RESULT_SET FROM CPT_SAMPLE_DEVICE;
+
+      CREATE INDEX #IX_CPT_DEVICE ON #CPT_RESULT_SET(DEVICE_TYPE_ID);
+
+      SELECT
+        'CPT' AS TestType,
+        MAIN.Result_ID,
+        CONVERT(VARCHAR(10), MAIN.START_DATE, 105) AS DATE,
+        CONVERT(VARCHAR(8), MAIN.START_DATE, 108) AS TIME,
+        MAIN.BARCODE,
+        MAIN.MODEL_ID AS MODEL,
+        MODEL.NAME AS MODELNAME,
+        DATEDIFF(MI, MAIN.START_DATE, MAIN.END_DATE) AS RUNTIME_MINUTES,
+        TEMP.[Max] AS MAX_TEMPERATURE,
+        TEMP.[Min] AS MIN_TEMPERATURE,
+        CUR.[Max] AS MAX_CURRENT,
+        CUR.[Min] AS MIN_CURRENT,
+        VOL.[Max] AS MAX_VOLTAGE,
+        VOL.[Min] AS MIN_VOLTAGE,
+        POW.[Max] AS MAX_POWER,
+        POW.[Min] AS MIN_POWER,
+        CASE WHEN MAIN.STATUS = 1 THEN 'PASS' ELSE 'FAIL' END AS PERFORMANCE,
+        ISNULL(Step_Status.DEVICE_STATUS_CODE, 0) AS FaultCode,
+        CASE 
+          WHEN Step_Status.DEVICE_STATUS_CODE = 26 THEN 'System Already Charged'
+          WHEN Code_Name.NAME IS NULL AND MAIN.STATUS = 0 THEN 'Station Fault Stop' 
+          WHEN Code_Name.NAME IS NULL THEN 'Charging Pass'
+          ELSE Code_Name.NAME
+        END AS FaultName,
+        MAIN.AREA_ID
+      FROM PLIS.dbo.RESULTS MAIN
+      INNER JOIN #CPT_RESULT_SET TEMP 
+        ON MAIN.RESULT_ID = TEMP.RESULT_ID AND TEMP.DEVICE_TYPE_ID = 7
+      INNER JOIN #CPT_RESULT_SET CUR 
+        ON TEMP.RESULT_ID = CUR.RESULT_ID AND CUR.DEVICE_TYPE_ID = 2
+      INNER JOIN #CPT_RESULT_SET VOL 
+        ON VOL.RESULT_ID = CUR.RESULT_ID AND VOL.DEVICE_TYPE_ID = 3
+      INNER JOIN #CPT_RESULT_SET POW 
+        ON POW.RESULT_ID = VOL.RESULT_ID AND POW.DEVICE_TYPE_ID = 1
+      LEFT JOIN PLIS.dbo.MODELS MODEL 
+        ON MODEL.MODEL_ID = MAIN.MODEL_ID
+      LEFT JOIN PLIS.dbo.RESULTS_STEPS_STATUS Step_Status 
+        ON MAIN.RESULT_ID = Step_Status.RESULT_ID
+      LEFT JOIN (
+        SELECT DISTINCT STATUS_CODE_ID, NAME, STATUS_CODE_TYPE 
+        FROM PLIS.dbo.DEVICES_STATUS_CODES 
+        WHERE LANGUAGE_ID = 0
+      ) Code_Name 
+        ON Code_Name.STATUS_CODE_ID = Step_Status.DEVICE_STATUS_CODE 
+        AND Code_Name.STATUS_CODE_TYPE = Step_Status.Status_Type_ID
+      WHERE MAIN.AREA_ID IN (5, 6, 8)
+        AND MAIN.BARCODE COLLATE DATABASE_DEFAULT IN (
+          SELECT BarcodeNo FROM @Barcodes
+        )
+        AND MAIN.Result_ID NOT IN (
+          SELECT Result_ID FROM GasChargeSUSDtls
+        )
+      ORDER BY MAIN.Result_ID DESC;
+
+      IF OBJECT_ID(N'tempdb..#CPT_RESULT_SET') IS NOT NULL
+        DROP TABLE #CPT_RESULT_SET;
+    END
   `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
@@ -735,17 +840,23 @@ export const getFunctionalTest = tryCatch(async (req, res) => {
 
     const result = await request.query(query);
 
-    // ─── 3 separate recordsets from 3 SELECT statements ─────
+    // ─── 4 separate recordsets from 4 SELECT statements ─────
     const gasChargingData = result.recordsets[0] || [];
     const estData = result.recordsets[1] || [];
     const mftData = result.recordsets[2] || [];
+    const cptData = result.recordsets[3] || [];
 
     // ─── Summary ────────────────────────────────────────────
     const summary = {
       gasCharging: gasChargingData.length,
       est: estData.length,
       mft: mftData.length,
-      total: gasChargingData.length + estData.length + mftData.length,
+      cpt: cptData.length,
+      total:
+        gasChargingData.length +
+        estData.length +
+        mftData.length +
+        cptData.length,
     };
 
     res.status(200).json({
@@ -755,6 +866,7 @@ export const getFunctionalTest = tryCatch(async (req, res) => {
         gasCharging: gasChargingData,
         est: estData,
         mft: mftData,
+        cpt: cptData,
       },
       summary,
     });

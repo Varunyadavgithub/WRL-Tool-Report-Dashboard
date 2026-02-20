@@ -2,7 +2,7 @@ import { useState } from "react";
 import EmptyState from "../../../../components/ui/EmptyState";
 import { FiCheckCircle, FiXCircle, FiClock } from "react-icons/fi";
 import { BsLightningCharge } from "react-icons/bs";
-import { TbGasStation } from "react-icons/tb";
+import { TbGasStation, TbReportAnalytics } from "react-icons/tb";
 import { MdOutlineMultilineChart } from "react-icons/md";
 
 // ─── Inner Tab Config ───────────────────────────────────────────
@@ -42,13 +42,19 @@ const INNER_TABS = [
     headerGradient: "from-indigo-500 to-purple-600",
     lightBg: "bg-indigo-50/50",
   },
+  {
+    key: "cpt",
+    label: "CPT",
+    fullLabel: "Compressor Performance Test",
+    icon: TbReportAnalytics,
+    activeBg: "bg-rose-50",
+    activeBorder: "border-rose-500",
+    activeText: "text-rose-700",
+    iconActive: "text-rose-600",
+    headerGradient: "from-rose-500 to-pink-600",
+    lightBg: "bg-rose-50/50",
+  },
 ];
-
-// ─── Format Date ────────────────────────────────────────────────
-function formatDate(dateStr) {
-  if (!dateStr) return null;
-  return dateStr.replace("T", " ").replace("Z", "").substring(0, 19);
-}
 
 // ─── Status Badge ───────────────────────────────────────────────
 function StatusBadge({ status }) {
@@ -173,77 +179,56 @@ function GasChargingTable({ data, tabConfig }) {
                   <td className="px-3 py-3 font-semibold text-gray-600">
                     {index + 1}
                   </td>
-
                   <td className="px-3 py-3 font-mono">
                     {item.Result_ID || "—"}
                   </td>
-
                   <td className="px-3 py-3">{item.DATE || "—"}</td>
-
                   <td className="px-3 py-3 font-mono text-xs">
                     {item.TIME || "—"}
                   </td>
-
                   <td className="px-3 py-3 font-mono text-xs">
                     {item.BARCODE || "—"}
                   </td>
-
                   <td className="px-3 py-3 text-left">
                     {item.MODELNAME || "—"}
                   </td>
-
                   <td className="px-3 py-3">{item.MODEL || "—"}</td>
-
                   <td className="px-3 py-3 font-mono">
                     {item.RUNTIME_SECONDS?.trim() || "—"}
                   </td>
-
                   <td className="px-3 py-3 uppercase">
                     {item.REFRIGERANT || "—"}
                   </td>
-
                   <td className="px-3 py-3 font-mono">
                     {item.SET_GAS_WEIGHT?.trim() || "—"}
                   </td>
-
                   <td className="px-3 py-3 font-mono">
                     {item.ACTUAL_GAS_WEIGHT?.trim() || "—"}
                   </td>
-
                   <td className="px-3 py-3 font-mono">
                     {item.LEAK_SET_VALUE?.trim() || "—"}
                   </td>
-
                   <td className="px-3 py-3 font-mono">
                     {item.LEAK_TEST_VALUE?.trim() || "—"}
                   </td>
-
                   <td className="px-3 py-3 font-mono">
                     {item.LEAK_TEST_TIME?.trim() || "—"}
                   </td>
-
                   <td className="px-3 py-3 font-mono">
                     {item.SET_EVACUATION_VALUE?.trim() || "—"}
                   </td>
-
                   <td className="px-3 py-3 font-mono">
                     {item.ACTUAL_EVACUATION_VALUE?.trim() || "—"}
                   </td>
-
                   <td className="px-3 py-3 font-mono">
                     {item.ACTUAL_EVACUATION_TIME?.trim() || "—"}
                   </td>
-
                   <td className="px-3 py-3">
                     <StatusBadge status={result} />
                   </td>
-
                   <td className="px-3 py-3">{item.FaultCode || "—"}</td>
-
                   <td className="px-3 py-3">{item.FaultName || "—"}</td>
-
                   <td className="px-3 py-3">{item.SyncStatus || "—"}</td>
-
                   <td className="px-3 py-3">{item.MACHINE || "—"}</td>
                 </tr>
               );
@@ -263,7 +248,6 @@ function GasChargingTable({ data, tabConfig }) {
 
 // ─── EST Table ──────────────────────────────────────────────────
 function ESTTable({ data = [], tabConfig }) {
-  // Define grouped header structure
   const headerGroups = [
     { label: "Sr No", colSpan: 1, children: ["Sr No"] },
     { label: "Ref No", colSpan: 1, children: ["Ref No"] },
@@ -296,23 +280,6 @@ function ESTTable({ data = [], tabConfig }) {
       colSpan: 3,
       children: ["Read MA", "Read Vtg", "Result"],
     },
-    {
-      label: "Wattage / Run",
-      colSpan: 6,
-      children: [
-        "Set Lower",
-        "Set Upper",
-        "Read Voltage",
-        "Read Current",
-        "Read Wattage",
-        "Run Result",
-      ],
-    },
-    {
-      label: "LVT",
-      colSpan: 4,
-      children: ["Read Voltage", "Read Current", "Read Wattage", "Result"],
-    },
     { label: "Final Result", colSpan: 1, children: ["Final Result"] },
     { label: "Status", colSpan: 1, children: ["Status"] },
   ];
@@ -324,8 +291,6 @@ function ESTTable({ data = [], tabConfig }) {
   };
 
   const getFinalResult = (item) => item?.result ?? "";
-
-  // Check if a group is a single-column (non-grouped) header
   const isSingleColumn = (group) => group.colSpan === 1;
 
   return (
@@ -334,9 +299,7 @@ function ESTTable({ data = [], tabConfig }) {
         className="w-full text-sm border-collapse"
         style={{ minWidth: "2200px" }}
       >
-        {/* HEADER */}
         <thead>
-          {/* ROW 1: Parent group headers */}
           <tr
             className={`bg-gradient-to-r ${tabConfig?.headerGradient} text-white`}
           >
@@ -354,8 +317,6 @@ function ESTTable({ data = [], tabConfig }) {
               </th>
             ))}
           </tr>
-
-          {/* ROW 2: Child sub-headers (only for multi-column groups) */}
           <tr
             className={`bg-gradient-to-r ${tabConfig?.headerGradient} text-white/90`}
           >
@@ -375,7 +336,6 @@ function ESTTable({ data = [], tabConfig }) {
           </tr>
         </thead>
 
-        {/* BODY */}
         <tbody className="divide-y divide-gray-100">
           {data.length > 0 ? (
             data.map((item, index) => {
@@ -394,7 +354,6 @@ function ESTTable({ data = [], tabConfig }) {
                   key={index}
                   className={`text-center transition-colors duration-150 ${rowBg} hover:bg-indigo-50/40`}
                 >
-                  {/* Single columns */}
                   <td className="px-3 py-3 font-semibold text-gray-600 border border-gray-100">
                     {index + 1}
                   </td>
@@ -413,8 +372,6 @@ function ESTTable({ data = [], tabConfig }) {
                   <td className="px-3 py-3 border border-gray-100">
                     {item.operator ?? "—"}
                   </td>
-
-                  {/* ECT Group */}
                   <td className="px-3 py-3 border border-gray-100">
                     {item.set_ect_ohms ?? "—"}
                   </td>
@@ -427,8 +384,6 @@ function ESTTable({ data = [], tabConfig }) {
                   <td className="px-3 py-3 border border-gray-100">
                     <StatusBadge status={item.ect_result} />
                   </td>
-
-                  {/* HV Group */}
                   <td className="px-3 py-3 border border-gray-100">
                     {item.set_hv_kv ?? "—"}
                   </td>
@@ -444,8 +399,6 @@ function ESTTable({ data = [], tabConfig }) {
                   <td className="px-3 py-3 border border-gray-100">
                     <StatusBadge status={item.hv_result} />
                   </td>
-
-                  {/* IR Group */}
                   <td className="px-3 py-3 border border-gray-100">
                     {item.set_ir_mohms ?? "—"}
                   </td>
@@ -458,8 +411,6 @@ function ESTTable({ data = [], tabConfig }) {
                   <td className="px-3 py-3 border border-gray-100">
                     <StatusBadge status={item.ir_result} />
                   </td>
-
-                  {/* LCT LN Group */}
                   <td className="px-3 py-3 border border-gray-100">
                     {item.set_lct_ma ?? "—"}
                   </td>
@@ -475,8 +426,6 @@ function ESTTable({ data = [], tabConfig }) {
                   <td className="px-3 py-3 border border-gray-100">
                     <StatusBadge status={item.lct_ln_result} />
                   </td>
-
-                  {/* LCT NL Group */}
                   <td className="px-3 py-3 border border-gray-100">
                     {item.read_lct_nl_ma ?? "—"}
                   </td>
@@ -486,47 +435,9 @@ function ESTTable({ data = [], tabConfig }) {
                   <td className="px-3 py-3 border border-gray-100">
                     <StatusBadge status={item.lct_nl_result} />
                   </td>
-
-                  {/* Wattage / Run Group */}
-                  <td className="px-3 py-3 font-mono border border-gray-100">
-                    {item.set_wattage_lower ?? "—"}
-                  </td>
-                  <td className="px-3 py-3 font-mono border border-gray-100">
-                    {item.set_wattage_upper ?? "—"}
-                  </td>
-                  <td className="px-3 py-3 font-mono border border-gray-100">
-                    {item.read_voltage ?? "—"}
-                  </td>
-                  <td className="px-3 py-3 font-mono border border-gray-100">
-                    {item.read_current ?? "—"}
-                  </td>
-                  <td className="px-3 py-3 font-mono border border-gray-100">
-                    {item.read_wattage ?? "—"}
-                  </td>
-                  <td className="px-3 py-3 font-mono border border-gray-100">
-                    {item.run_result ?? "—"}
-                  </td>
-
-                  {/* LVT Group */}
-                  <td className="px-3 py-3 font-mono border border-gray-100">
-                    {item.lvt_read_voltage ?? "—"}
-                  </td>
-                  <td className="px-3 py-3 font-mono border border-gray-100">
-                    {item.lvt_read_current ?? "—"}
-                  </td>
-                  <td className="px-3 py-3 font-mono border border-gray-100">
-                    {item.lvt_read_wattage ?? "—"}
-                  </td>
-                  <td className="px-3 py-3 border border-gray-100">
-                    <StatusBadge status={item.lvt_result} />
-                  </td>
-
-                  {/* Final Result */}
                   <td className="px-3 py-3 border border-gray-100">
                     <StatusBadge status={item.result} />
                   </td>
-
-                  {/* Status */}
                   <td className="px-3 py-3 border border-gray-100">
                     <StatusBadge
                       status={item.status === 1 ? "Active" : "Inactive"}
@@ -618,33 +529,22 @@ function MFTTable({ data, tabConfig }) {
                     {index + 1}
                   </td>
                   <td className="px-3 py-3 font-mono">{item.ID || "—"}</td>
-
                   <td className="px-3 py-3">{item.PRODUCT_CODE || "—"}</td>
-
                   <td className="px-3 py-3 font-mono text-xs">
                     {item.EQUIPMENT_NO || "—"}
                   </td>
-
                   <td className="px-3 py-3">{item.PASS_FAILED_TIMES || "—"}</td>
-
                   <td className="px-3 py-3 font-mono">{item.MFT_NO || "—"}</td>
-
                   <td className="px-3 py-3">
                     <StatusBadge status={item.STATUS} />
                   </td>
-
                   <td className="px-3 py-3">{item.ERRORCODE || "—"}</td>
-
                   <td className="px-3 py-3 text-xs">
                     {item.START_TIME || "—"}
                   </td>
-
                   <td className="px-3 py-3 text-xs">{item.STOP_TIME || "—"}</td>
-
                   <td className="px-3 py-3 text-left">{item.REASON || "—"}</td>
-
                   <td className="px-3 py-3">{item.PDFFileName || "—"}</td>
-
                   <td className="px-3 py-3">
                     {item.SYNCSTATUS === 1 ? "Synced" : "Pending"}
                   </td>
@@ -664,24 +564,254 @@ function MFTTable({ data, tabConfig }) {
   );
 }
 
+// ─── CPT Table ──────────────────────────────────────────────────
+function CPTTable({ data = [], tabConfig }) {
+  const headerGroups = [
+    { label: "Sr No", colSpan: 1, children: ["Sr No"] },
+    { label: "Result ID", colSpan: 1, children: ["Result ID"] },
+    { label: "Date", colSpan: 1, children: ["Date"] },
+    { label: "Time", colSpan: 1, children: ["Time"] },
+    { label: "Barcode", colSpan: 1, children: ["Barcode"] },
+    { label: "Model", colSpan: 1, children: ["Model"] },
+    { label: "Model Name", colSpan: 1, children: ["Model Name"] },
+    { label: "Runtime (Min)", colSpan: 1, children: ["Runtime (Min)"] },
+    {
+      label: "Temperature",
+      colSpan: 2,
+      children: ["Min", "Max"],
+    },
+    {
+      label: "Current (A)",
+      colSpan: 2,
+      children: ["Min", "Max"],
+    },
+    {
+      label: "Voltage (V)",
+      colSpan: 2,
+      children: ["Min", "Max"],
+    },
+    {
+      label: "Power (W)",
+      colSpan: 2,
+      children: ["Min", "Max"],
+    },
+    { label: "Performance", colSpan: 1, children: ["Performance"] },
+    { label: "Fault Code", colSpan: 1, children: ["Fault Code"] },
+    { label: "Fault Name", colSpan: 1, children: ["Fault Name"] },
+    { label: "Area ID", colSpan: 1, children: ["Area ID"] },
+  ];
+
+  const isSingleColumn = (group) => group.colSpan === 1;
+
+  const getResult = (item) => item.PERFORMANCE ?? "";
+
+  // Format long decimal numbers to 4 decimal places
+  const formatNum = (val) => {
+    if (val === null || val === undefined) return "—";
+    const num = Number(val);
+    if (isNaN(num)) return val;
+    return num % 1 === 0 ? num.toString() : num.toFixed(4);
+  };
+
+  return (
+    <div className="overflow-x-auto overflow-y-auto max-h-[450px]">
+      <table
+        className="w-full text-sm border-collapse"
+        style={{ minWidth: "1800px" }}
+      >
+        {/* ── HEADER ── */}
+        <thead>
+          {/* ROW 1: Parent group headers */}
+          <tr
+            className={`bg-gradient-to-r ${tabConfig?.headerGradient} text-white`}
+          >
+            {headerGroups.map((group, i) => (
+              <th
+                key={i}
+                colSpan={group.children.length}
+                rowSpan={isSingleColumn(group) ? 2 : 1}
+                className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-center 
+                  border border-white/20
+                  ${!isSingleColumn(group) ? "border-b-2 border-b-white/40" : ""}
+                `}
+              >
+                {group.label}
+              </th>
+            ))}
+          </tr>
+
+          {/* ROW 2: Child sub-headers (only for multi-column groups) */}
+          <tr
+            className={`bg-gradient-to-r ${tabConfig?.headerGradient} text-white/90`}
+          >
+            {headerGroups
+              .filter((group) => !isSingleColumn(group))
+              .flatMap((group, gi) =>
+                group.children.map((child, ci) => (
+                  <th
+                    key={`${gi}-${ci}`}
+                    className="px-2 py-2 text-[9px] font-semibold uppercase tracking-wider text-center 
+                      border border-white/10"
+                  >
+                    {child}
+                  </th>
+                )),
+              )}
+          </tr>
+        </thead>
+
+        {/* ── BODY ── */}
+        <tbody className="divide-y divide-gray-100">
+          {data.length > 0 ? (
+            data.map((item, index) => {
+              const result = getResult(item);
+              const isFail = ["FAIL", "NG"].includes(result?.toUpperCase());
+
+              const rowBg = isFail
+                ? "bg-red-50/50"
+                : index % 2 === 0
+                  ? "bg-white"
+                  : tabConfig?.lightBg;
+
+              return (
+                <tr
+                  key={index}
+                  className={`text-center transition-colors duration-150 ${rowBg} hover:bg-rose-50/40`}
+                >
+                  {/* Sr No */}
+                  <td className="px-3 py-3 font-semibold text-gray-600 border border-gray-100">
+                    {index + 1}
+                  </td>
+
+                  {/* Result ID */}
+                  <td className="px-3 py-3 font-mono border border-gray-100">
+                    {item.Result_ID ?? "—"}
+                  </td>
+
+                  {/* Date */}
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.DATE ?? "—"}
+                  </td>
+
+                  {/* Time */}
+                  <td className="px-3 py-3 font-mono text-xs border border-gray-100">
+                    {item.TIME ?? "—"}
+                  </td>
+
+                  {/* Barcode */}
+                  <td className="px-3 py-3 font-mono text-xs border border-gray-100">
+                    {item.BARCODE ?? "—"}
+                  </td>
+
+                  {/* Model */}
+                  <td className="px-3 py-3 border border-gray-100">
+                    {item.MODEL ?? "—"}
+                  </td>
+
+                  {/* Model Name */}
+                  <td className="px-3 py-3 text-left border border-gray-100">
+                    {item.MODELNAME ?? "—"}
+                  </td>
+
+                  {/* Runtime Minutes */}
+                  <td className="px-3 py-3 font-mono font-semibold border border-gray-100">
+                    {item.RUNTIME_MINUTES ?? "—"}
+                  </td>
+
+                  {/* Temperature — Min, Max */}
+                  <td className="px-3 py-3 font-mono text-xs border border-gray-100">
+                    {formatNum(item.MIN_TEMPERATURE)}
+                  </td>
+                  <td className="px-3 py-3 font-mono text-xs border border-gray-100">
+                    {formatNum(item.MAX_TEMPERATURE)}
+                  </td>
+
+                  {/* Current — Min, Max */}
+                  <td className="px-3 py-3 font-mono text-xs border border-gray-100">
+                    {formatNum(item.MIN_CURRENT)}
+                  </td>
+                  <td className="px-3 py-3 font-mono text-xs border border-gray-100">
+                    {formatNum(item.MAX_CURRENT)}
+                  </td>
+
+                  {/* Voltage — Min, Max */}
+                  <td className="px-3 py-3 font-mono text-xs border border-gray-100">
+                    {formatNum(item.MIN_VOLTAGE)}
+                  </td>
+                  <td className="px-3 py-3 font-mono text-xs border border-gray-100">
+                    {formatNum(item.MAX_VOLTAGE)}
+                  </td>
+
+                  {/* Power — Min, Max */}
+                  <td className="px-3 py-3 font-mono text-xs border border-gray-100">
+                    {formatNum(item.MIN_POWER)}
+                  </td>
+                  <td className="px-3 py-3 font-mono text-xs border border-gray-100">
+                    {formatNum(item.MAX_POWER)}
+                  </td>
+
+                  {/* Performance */}
+                  <td className="px-3 py-3 border border-gray-100">
+                    <StatusBadge status={result} />
+                  </td>
+
+                  {/* Fault Code */}
+                  <td className="px-3 py-3 font-mono border border-gray-100">
+                    {item.FaultCode ?? "—"}
+                  </td>
+
+                  {/* Fault Name */}
+                  <td className="px-3 py-3 text-left text-xs border border-gray-100">
+                    {item.FaultName ?? "—"}
+                  </td>
+
+                  {/* Area ID */}
+                  <td className="px-3 py-3 font-mono border border-gray-100">
+                    {item.AREA_ID ?? "—"}
+                  </td>
+                </tr>
+              );
+            })
+          ) : (
+            <tr>
+              <td
+                colSpan={headerGroups.reduce(
+                  (sum, g) => sum + g.children.length,
+                  0,
+                )}
+                className="py-10"
+              >
+                <EmptyState message="No CPT data found." />
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ─── Inner Tab Table Map ────────────────────────────────────────
 const INNER_TABLE_MAP = {
   gasCharging: GasChargingTable,
   est: ESTTable,
   mft: MFTTable,
+  cpt: CPTTable,
 };
 
 // ─── Main Component ─────────────────────────────────────────────
 function FunctionalTestTable({ data }) {
-  // data = { gasCharging: [...], est: [...], mft: [...] }
+  // data = { gasCharging: [...], est: [...], mft: [...], cpt: [...] }
   const gasData = data?.gasCharging || [];
   const estData = data?.est || [];
   const mftData = data?.mft || [];
+  const cptData = data?.cpt || [];
 
   const dataMap = {
     gasCharging: gasData,
     est: estData,
     mft: mftData,
+    cpt: cptData,
   };
 
   // Find first tab with data
@@ -694,7 +824,8 @@ function FunctionalTestTable({ data }) {
   const activeData = dataMap[activeInnerTab] || [];
   const ActiveTable = INNER_TABLE_MAP[activeInnerTab];
 
-  const totalRecords = gasData.length + estData.length + mftData.length;
+  const totalRecords =
+    gasData.length + estData.length + mftData.length + cptData.length;
 
   if (totalRecords === 0) {
     return (
@@ -719,6 +850,8 @@ function FunctionalTestTable({ data }) {
                   d.Result ??
                   d.STATUS ??
                   d.Status ??
+                  d.result ??
+                  d.PERFORMANCE ??
                   ""
                 ).toUpperCase(),
               ),
