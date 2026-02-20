@@ -3,6 +3,7 @@ import { dbConfig3 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { sendVisitorPassMail } from "../../emailTemplates/Visitor_Management_System/visitorPass.template.js";
+import {convertToIST} from "../../utils/convertToIST.js";
 
 // Visitor Check-In
 export const visitorIn = tryCatch(async (req, res, next) => {
@@ -175,8 +176,8 @@ export const getVisitorLogs = tryCatch(async (_, res, next) => {
     0,
   );
 
-  const istStart = new Date(startDate.getTime() + 330 * 60000);
-  const istEnd = new Date(endDate.getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate)
+  const istEnd = convertToIST(endDate)
 
   const result = await pool
     .request()

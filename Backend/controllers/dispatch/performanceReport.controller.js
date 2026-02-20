@@ -2,6 +2,7 @@ import sql from "mssql";
 import { dbConfig2 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import {convertToIST} from "../../utils/convertToIST.js";
 
 // Vehicle
 export const getDispatchVehicleUPH = tryCatch(async (req, res) => {
@@ -10,12 +11,12 @@ export const getDispatchVehicleUPH = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate and endDate.",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
     WITH UniqueSessions AS (
@@ -63,7 +64,7 @@ ORDER BY TIMEHOUR;
   } catch (error) {
     throw new AppError(
       `Failed to fetch Dispatch Vehicle UPH data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -76,12 +77,12 @@ export const getDispatchVehicleSummary = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate and endDate.",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
     WITH UniqueSessions AS (
@@ -158,7 +159,7 @@ ORDER BY SortOrder, TIMEHOUR, session_ID;
   } catch (error) {
     throw new AppError(
       `Failed to fetch Dispatch Vehicle Summary data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -172,12 +173,12 @@ export const getDispatchModelCount = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate and endDate.",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
       WITH ProductionDetails AS (
@@ -226,7 +227,7 @@ ORDER BY TIMEHOUR;
   } catch (error) {
     throw new AppError(
       `Failed to fetch Dispatch Model Count data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -239,12 +240,12 @@ export const getDispatchModelSummary = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate and endDate.",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
       WITH ProductionDetails AS (
@@ -290,7 +291,7 @@ ORDER BY TIMEHOUR, ModelName;
   } catch (error) {
     throw new AppError(
       `Failed to fetch Dispatch Model Summary data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -304,12 +305,12 @@ export const getDispatchCategoryModelCount = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate and endDate.",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
      WITH ProductionDetails AS (
@@ -358,7 +359,7 @@ export const getDispatchCategoryModelCount = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch Dispatch Category Model Count data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -371,12 +372,12 @@ export const getDispatchCategorySummary = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate and endDate.",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
      WITH ProductionDetails AS (
@@ -419,7 +420,7 @@ ORDER BY ModelName;
   } catch (error) {
     throw new AppError(
       `Failed to fetch Dispatch Category Summary data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();

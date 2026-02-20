@@ -2,6 +2,7 @@ import sql from "mssql";
 import { dbConfig2 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
 export const getFgUnloading = tryCatch(async (req, res) => {
   const { startDate, endDate, page = 1, limit = 1000 } = req.query;
@@ -9,30 +10,30 @@ export const getFgUnloading = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate and endDate.",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
   const offset = (parseInt(page) - 1) * parseInt(limit);
 
   const query = `
-      WITH UnloadingData AS (
-        SELECT
-          ROW_NUMBER() OVER (ORDER BY DateTime DESC) AS RowNum,
-          FGSerialNo,
-          AssetCode,
-          ScannerNo,
-          DateTime
-        FROM DispatchUnloading
-        WHERE DateTime BETWEEN @startDate AND @endDate
-      )
+    WITH UnloadingData AS (
       SELECT
-        (SELECT COUNT(*) FROM UnloadingData) AS totalCount,
-        *
-      FROM UnloadingData
-      WHERE RowNum BETWEEN (@offset + 1) AND (@offset + @limit);
+        ROW_NUMBER() OVER (ORDER BY DateTime DESC) AS RowNum,
+        FGSerialNo,
+        AssetCode,
+        ScannerNo,
+        DateTime
+      FROM DispatchUnloading
+      WHERE DateTime BETWEEN @startDate AND @endDate
+    )
+    SELECT
+      (SELECT COUNT(*) FROM UnloadingData) AS totalCount,
+      *
+    FROM UnloadingData
+    WHERE RowNum BETWEEN (@offset + 1) AND (@offset + @limit);
   `;
 
   const pool = await new sql.ConnectionPool(dbConfig2).connect();
@@ -56,7 +57,7 @@ export const getFgUnloading = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch FG Unloading data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -69,7 +70,7 @@ export const getFgDispatch = tryCatch(async (req, res) => {
   if (!startDate || !endDate || !status) {
     throw new AppError(
       "Missing required query parameters: startDate, endDate or status.",
-      400
+      400,
     );
   }
 
@@ -88,36 +89,36 @@ export const getFgDispatch = tryCatch(async (req, res) => {
     throw new AppError("Invalid status. Use 'Completed' or 'Open'.", 400);
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
   const offset = (parseInt(page) - 1) * parseInt(limit);
 
   const query = `
-      WITH DispatchData AS (
-        SELECT 
-          ROW_NUMBER() OVER(ORDER BY DM.AddedOn DESC) AS RowNum,
-          DM.ModelName, 
-          DM.FGSerialNo, 
-          DM.AssetCode, 
-          DM.Session_ID, 
-          DM.AddedOn, 
-          DM.AddedBy, 
-          DM.Document_ID, 
-          DM.ModelCode, 
-          TD.DockNo, 
-          TD.Vehicle_No, 
-          TD.Generated_By
-          ${additionalField}
-        FROM ${tableName} DM
-        INNER JOIN Tracking_Document TD ON DM.Document_ID = TD.Document_ID
-        WHERE DM.AddedOn BETWEEN @startDate AND @endDate
-        AND TD.LatestStatus = @StatusValue
-      )
+    WITH DispatchData AS (
       SELECT 
-        (SELECT COUNT(*) FROM DispatchData) AS totalCount,
-        *
-      FROM DispatchData
-      WHERE RowNum > @offset AND RowNum <= (@offset + @limit);
+        ROW_NUMBER() OVER(ORDER BY DM.AddedOn DESC) AS RowNum,
+        DM.ModelName, 
+        DM.FGSerialNo, 
+        DM.AssetCode, 
+        DM.Session_ID, 
+        DM.AddedOn, 
+        DM.AddedBy, 
+        DM.Document_ID, 
+        DM.ModelCode, 
+        TD.DockNo, 
+        TD.Vehicle_No, 
+        TD.Generated_By
+        ${additionalField}
+      FROM ${tableName} DM
+      INNER JOIN Tracking_Document TD ON DM.Document_ID = TD.Document_ID
+      WHERE DM.AddedOn BETWEEN @startDate AND @endDate
+      AND TD.LatestStatus = @StatusValue
+    )
+    SELECT 
+      (SELECT COUNT(*) FROM DispatchData) AS totalCount,
+      *
+    FROM DispatchData
+    WHERE RowNum > @offset AND RowNum <= (@offset + @limit);
   `;
 
   const pool = await new sql.ConnectionPool(dbConfig2).connect();
@@ -142,7 +143,7 @@ export const getFgDispatch = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch FG Dispatch data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -156,20 +157,20 @@ export const getQuickFgUnloading = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate and endDate.",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
-      SELECT 
-        *,
-        (SELECT COUNT(*) FROM DispatchUnloading WHERE DateTime BETWEEN @startDate AND @endDate) AS totalCount
-      FROM DispatchUnloading
-      WHERE DateTime BETWEEN @startDate AND @endDate
-      ORDER BY DateTime DESC;
+    SELECT 
+      *,
+      (SELECT COUNT(*) FROM DispatchUnloading WHERE DateTime BETWEEN @startDate AND @endDate) AS totalCount
+    FROM DispatchUnloading
+    WHERE DateTime BETWEEN @startDate AND @endDate
+    ORDER BY DateTime DESC;
   `;
 
   const pool = await new sql.ConnectionPool(dbConfig2).connect();
@@ -191,7 +192,7 @@ export const getQuickFgUnloading = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch Quick Filter FG Unloading data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -204,7 +205,7 @@ export const getQuickFgDispatch = tryCatch(async (req, res) => {
   if (!startDate || !endDate || !status) {
     throw new AppError(
       "Missing required query parameters: startDate, endDate or status.",
-      400
+      400,
     );
   }
 
@@ -222,35 +223,35 @@ export const getQuickFgDispatch = tryCatch(async (req, res) => {
     throw new AppError("Invalid status. Use 'Completed' or 'Open'.", 400);
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
-      SELECT 
-        DM.ModelName, 
-        DM.FGSerialNo, 
-        DM.AssetCode, 
-        DM.Session_ID, 
-        DM.AddedOn, 
-        DM.AddedBy, 
-        DM.Document_ID, 
-        DM.ModelCode, 
-        TD.DockNo, 
-        TD.Vehicle_No, 
-        TD.Generated_By
-        ${additionalField},
-        (
-          SELECT COUNT(*) 
-          FROM ${tableName} AS DM 
-          INNER JOIN Tracking_Document TD ON DM.Document_ID = TD.Document_ID
-          WHERE DM.AddedOn BETWEEN @startDate AND @endDate
-            AND TD.LatestStatus = @StatusValue
-        ) AS totalCount
-      FROM ${tableName} AS DM
-      INNER JOIN Tracking_Document TD ON DM.Document_ID = TD.Document_ID
-      WHERE DM.AddedOn BETWEEN @startDate AND @endDate
-        AND TD.LatestStatus = @StatusValue
-      ORDER BY DM.AddedOn DESC;
+    SELECT 
+      DM.ModelName, 
+      DM.FGSerialNo, 
+      DM.AssetCode, 
+      DM.Session_ID, 
+      DM.AddedOn, 
+      DM.AddedBy, 
+      DM.Document_ID, 
+      DM.ModelCode, 
+      TD.DockNo, 
+      TD.Vehicle_No, 
+      TD.Generated_By
+      ${additionalField},
+      (
+        SELECT COUNT(*) 
+        FROM ${tableName} AS DM 
+        INNER JOIN Tracking_Document TD ON DM.Document_ID = TD.Document_ID
+        WHERE DM.AddedOn BETWEEN @startDate AND @endDate
+          AND TD.LatestStatus = @StatusValue
+      ) AS totalCount
+    FROM ${tableName} AS DM
+    INNER JOIN Tracking_Document TD ON DM.Document_ID = TD.Document_ID
+    WHERE DM.AddedOn BETWEEN @startDate AND @endDate
+      AND TD.LatestStatus = @StatusValue
+    ORDER BY DM.AddedOn DESC;
   `;
 
   const pool = await new sql.ConnectionPool(dbConfig2).connect();
@@ -273,7 +274,7 @@ export const getQuickFgDispatch = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch Quick Filter FG Dispatch data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();

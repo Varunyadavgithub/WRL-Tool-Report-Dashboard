@@ -2,6 +2,7 @@ import sql from "mssql";
 import { dbConfig2 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import {convertToIST} from "../../utils/convertToIST.js";
 
 export const getDispatchErrorLog = tryCatch(async (req, res) => {
   const { startDate, endDate } = req.query;
@@ -9,12 +10,12 @@ export const getDispatchErrorLog = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate and endDate.",
-      400
+      400,
     );
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   const query = `
         SELECT 
@@ -51,7 +52,7 @@ export const getDispatchErrorLog = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch Dispatch Error Log data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();

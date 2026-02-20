@@ -2,6 +2,7 @@ import sql from "mssql";
 import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
 // Fetches hourly production summary
 export const getHourlySummary = tryCatch(async (req, res) => {
@@ -11,8 +12,8 @@ export const getHourlySummary = tryCatch(async (req, res) => {
     throw new AppError("Missing stationCode, startDate, or endDate.", 400);
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   let categoryCondition = "";
   let userRoleCondition = "";
@@ -123,8 +124,8 @@ export const getHourlyModelCount = tryCatch(async (req, res) => {
     throw new AppError("Missing stationCode, startDate or endDate.", 400);
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   let categoryCondition = "";
   let userRoleCondition = "";
@@ -229,7 +230,7 @@ export const getHourlyModelCount = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch hourly model count: ${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
@@ -244,8 +245,8 @@ export const getHourlyCategoryCount = tryCatch(async (req, res) => {
     throw new AppError("Missing stationCode, startDate or endDate.", 400);
   }
 
-  const istStart = new Date(new Date(startDate).getTime() + 330 * 60000);
-  const istEnd = new Date(new Date(endDate).getTime() + 330 * 60000);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
 
   let categoryCondition = "";
   let userRoleCondition = "";
@@ -349,7 +350,10 @@ export const getHourlyCategoryCount = tryCatch(async (req, res) => {
       data: result.recordset,
     });
   } catch (error) {
-    throw new AppError(`Failed to fetch hourly category count: ${error.message}`, 500);
+    throw new AppError(
+      `Failed to fetch hourly category count: ${error.message}`,
+      500,
+    );
   } finally {
     await pool.close();
   }

@@ -1,6 +1,7 @@
 import sql from "mssql";
 import { dbConfig3 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
+import {convertToIST} from "../../utils/convertToIST.js";
 
 // Get Dashboard Statistics (Visitors, Trends, Departments)
 export const getDashboardStats = tryCatch(async (req, res, next) => {
@@ -32,8 +33,8 @@ export const getDashboardStats = tryCatch(async (req, res, next) => {
   }
 
   // Adjust for IST (+5:30)
-  const isStart = new Date(startDate.getTime() + 330 * 60000);
-  const isEnd = new Date(endDate.getTime() + 330 * 60000);
+  const isStart = convertToIST(startDate)
+  const isEnd = convertToIST(endDate)
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
 
