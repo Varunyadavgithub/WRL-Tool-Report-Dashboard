@@ -98,7 +98,7 @@ const TableHeader = ({ title, subtitle }) => (
 const StatCard = ({ label, value, color = "text-blue-700" }) => (
   <div className="bg-white rounded-lg px-4 py-3 flex flex-col items-center shadow-sm border border-purple-200 min-w-[120px]">
     <span className={`text-2xl font-bold ${color}`}>{value}</span>
-    <span className="text-xs text-gray-500 mt-0.5 text-center font-medium">
+    <span className="text-xs mt-0.5 text-center font-medium">
       {label}
     </span>
   </div>
@@ -308,8 +308,8 @@ const HourlyReport = () => {
       {/* ── Filter Panel ── */}
       <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Filters */}
-        <div className="lg:col-span-2 bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl">
-          <h2 className="text-sm font-bold text-purple-800 uppercase tracking-widest mb-3">
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide mb-3">
             Filters
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -402,8 +402,8 @@ const HourlyReport = () => {
         {/* Right panel: Stats + Quick Filters */}
         <div className="flex flex-col gap-4">
           {/* Stats */}
-          <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl flex-1">
-            <h2 className="text-sm font-bold text-purple-800 uppercase tracking-widest mb-3">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex-1">
+            <h2 className="text-xs font-semibold uppercase tracking-wide mb-3">
               Summary
             </h2>
             <div className="flex gap-3 flex-wrap">
@@ -421,8 +421,8 @@ const HourlyReport = () => {
           </div>
 
           {/* Quick Filters */}
-          <div className="bg-purple-100 border border-dashed border-purple-400 p-4 rounded-xl">
-            <h2 className="text-sm font-bold text-purple-800 uppercase tracking-widest mb-3">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wide mb-3">
               Quick Filters
             </h2>
             <div className="flex gap-3 items-center">
@@ -450,7 +450,7 @@ const HourlyReport = () => {
       </div>
 
       {/* ── Data Panel ── */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mt-4">
         {isAnyLoading ? (
           <div className="flex justify-center items-center py-20">
             <Loader />
