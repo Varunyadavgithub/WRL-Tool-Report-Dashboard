@@ -67,6 +67,11 @@ import {
   saveBeeModels,
   saveBeeRating,
 } from "../controllers/quality/beeCalculation.controller.js";
+import {
+  getFpaByModel,
+  getFpaDefectDetails,
+  getFpaHistory,
+} from "../controllers/quality/fpaHistory.controller.js";
 const router = express.Router();
 
 // -----------------> CPT Routes
@@ -85,6 +90,9 @@ router.post(
   addDefect,
 );
 router.get("/download-fpa-defect-image/:fgSrNo", downloadDefectImage);
+router.get("/history", getFpaHistory);
+router.get("/model/:model", getFpaByModel);
+router.get("/defects/:fgsrNo", getFpaDefectDetails);
 
 // -----------------> Rework Entry
 router.get("/rework-entry/details", getReworkEntryDetailsByAssemblySerial);

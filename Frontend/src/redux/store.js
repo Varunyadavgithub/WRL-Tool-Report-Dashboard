@@ -1,11 +1,15 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import authSlice from "./authSlice";
 import estReportSlice from "./estReportSlice";
-import gasChargingSlice from "./gasChargingSlice"; // ADD THIS
+import gasChargingSlice from "./gasChargingSlice";
+import fpaReportReducer from "./fpaReportSlice";
+
 import { commonApi } from "./api/commonApi.js";
 import { taskReminderApi } from "./api/taskReminder.js";
 import { estReportApi } from "./api/estReportApi.js";
-import { gasChargingApi } from "./api/gasChargingApi.js"; // ADD THIS
+import { gasChargingApi } from "./api/gasChargingApi.js";
+import { fpaReportApi } from "./api/fpaReportApi.js";
+
 import {
   persistReducer,
   FLUSH,
@@ -23,18 +27,22 @@ const persistConfig = {
   storage,
   blacklist: [
     estReportApi.reducerPath,
-    gasChargingApi.reducerPath, // ADD THIS
+    gasChargingApi.reducerPath,
+    fpaReportApi.reducerPath,
   ],
 };
 
 const rootReducer = combineReducers({
   auth: authSlice,
   estReport: estReportSlice,
-  gasCharging: gasChargingSlice, // ADD THIS
+  gasCharging: gasChargingSlice,
+  fpaReport: fpaReportReducer,
+
   [commonApi.reducerPath]: commonApi.reducer,
   [taskReminderApi.reducerPath]: taskReminderApi.reducer,
   [estReportApi.reducerPath]: estReportApi.reducer,
-  [gasChargingApi.reducerPath]: gasChargingApi.reducer, // ADD THIS
+  [gasChargingApi.reducerPath]: gasChargingApi.reducer,
+  [fpaReportApi.reducerPath]: fpaReportApi.reducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
@@ -50,7 +58,8 @@ const store = configureStore({
       commonApi.middleware,
       taskReminderApi.middleware,
       estReportApi.middleware,
-      gasChargingApi.middleware, // ADD THIS
+      gasChargingApi.middleware,
+      fpaReportApi.middleware,
     ),
 });
 

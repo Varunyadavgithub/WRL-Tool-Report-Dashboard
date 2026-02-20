@@ -43,6 +43,7 @@ const ESTReport = lazy(() => import("../pages/Quality/ESTReport"));
 const CPTReport = lazy(() => import("../pages/Quality/CPTReport"));
 const FPA = lazy(() => import("../pages/Quality/FPA"));
 const FPAReports = lazy(() => import("../pages/Quality/FPAReports"));
+const FPAHistory = lazy(() => import("../pages/Quality/FPAHistory"));
 const FPADefectReport = lazy(() => import("../pages/Quality/FPADefectReport"));
 const LPT = lazy(() => import("../pages/Quality/LPT"));
 const LPTReport = lazy(() => import("../pages/Quality/LPTReport"));
@@ -233,6 +234,11 @@ export const ROUTE_CONFIG = [
         path: "/quality/fpa-report",
         label: "FPA Report",
         component: FPAReports,
+      },
+      {
+        path: "/quality/fpa-history",
+        label: "FPA History",
+        component: FPAHistory,
       },
       {
         path: "/quality/fpa-defect-report",
