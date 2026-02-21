@@ -99,7 +99,7 @@ const FpaDefectReport = () => {
 
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
-      <Title title="📊 FPA Defect Report" align="center" />
+      <Title title="FPA Defect Report" align="center" />
 
       <div className="grid md:grid-cols-2 gap-4 mt-6">
         <div className="bg-purple-50 border p-4 rounded-xl shadow space-y-3">
