@@ -1,4 +1,5 @@
 import EmptyState from "../../../../components/ui/EmptyState";
+import { formatISODateString } from "../../../../utils/dateUtils";
 
 // ─── Activity Badge ─────────────────────────────────────────────
 function ActivityBadge({ type }) {
@@ -65,7 +66,7 @@ function StageHistoryTable({ data }) {
                     {item.UserName}
                   </td>
                   <td className="px-4 py-2.5 whitespace-nowrap text-gray-500 text-xs">
-                    {item.ActivityOn?.replace("T", " ").replace("Z", "")}
+                    {formatISODateString(item.ActivityOn)}
                   </td>
                   <td className="px-4 py-2.5 whitespace-nowrap">
                     <ActivityBadge type={item.ActivityTypeName} />

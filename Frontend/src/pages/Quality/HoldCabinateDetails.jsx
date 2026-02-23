@@ -9,6 +9,7 @@ import Loader from "../../components/ui/Loader";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets";
+import { formatISODateString } from "../../utils/dateUtils";
 
 const HoldCabinateDetails = () => {
   const groupingOptions = [
@@ -446,11 +447,7 @@ const HoldCabinateDetails = () => {
                                 {item.HoldReason}
                               </td>
                               <td className="px-1 py-1 border">
-                                {item.HoldDate &&
-                                  item.HoldDate.replace("T", " ").replace(
-                                    "Z",
-                                    ""
-                                  )}
+                                {formatISODateString(item.HoldDate)}
                               </td>
                               <td className="px-1 py-1 border">
                                 {item.HoldBy}
@@ -462,11 +459,7 @@ const HoldCabinateDetails = () => {
                                 {item.CorrectiveAction}
                               </td>
                               <td className="px-1 py-1 border">
-                                {item.ReleasedOn &&
-                                  item.ReleasedOn.replace("T", " ").replace(
-                                    "Z",
-                                    ""
-                                  )}
+                                {formatISODateString(item.ReleasedOn)}
                               </td>
                               <td className="px-1 py-1 border">
                                 {item.ReleasedBy}

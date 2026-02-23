@@ -10,6 +10,7 @@ import ExportButton from "../../components/ui/ExportButton";
 import { baseURL } from "../../assets/assets";
 import Loader from "../../components/ui/Loader";
 import { useGetModelVariantsQuery } from "../../redux/api/commonApi.js";
+import { formatISODateString } from "../../utils/dateUtils.js";
 
 const LPTReport = () => {
   const [loading, setLoading] = useState(false);
@@ -421,8 +422,7 @@ const LptReportTable = ({ data }) => {
               <tr key={index} className="hover:bg-gray-100 text-center">
                 <td className="px-1 py-1 border">{row.SrNo}</td>
                 <td className="px-1 py-1 border">
-                  {row.DateTime &&
-                    row.DateTime.replace("T", " ").replace("Z", "")}
+                  {formatISODateString(row.DateTime)}
                 </td>
                 <td className="px-1 py-1 border">{row.Shift}</td>
                 <td className="px-1 py-1 border">{row.ModelName}</td>

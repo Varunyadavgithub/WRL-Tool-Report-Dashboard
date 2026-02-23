@@ -6,6 +6,7 @@ import Button from "../../components/ui/Button";
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import { baseURL } from "../../assets/assets";
 import Loader from "../../components/ui/Loader";
+import { formatISODateString } from "../../utils/dateUtils";
 
 const Reports = () => {
   const [loading, setLoading] = useState(false);
@@ -20,7 +21,7 @@ const Reports = () => {
   const formatDate = (date) => {
     const pad = (n) => (n < 10 ? "0" + n : n);
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-      date.getDate()
+      date.getDate(),
     )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
   };
 
@@ -49,7 +50,7 @@ const Reports = () => {
     fetchVisitorData(
       formatDate(yesterday8AM),
       formatDate(today8AM),
-      setYdayLoading
+      setYdayLoading,
     );
   };
 
@@ -68,12 +69,12 @@ const Reports = () => {
       1,
       8,
       0,
-      0
+      0,
     );
     fetchVisitorData(
       formatDate(startOfMonth),
       formatDate(now),
-      setMonthLoading
+      setMonthLoading,
     );
   };
 
@@ -287,12 +288,10 @@ const Reports = () => {
                     {v.department_name}
                   </td>
                   <td className="px-1 py-1 border text-center">
-                    {v.check_in_time?.replace("T", " ").replace("Z", "")}
+                    {formatISODateString(v.check_in_time)}
                   </td>
                   <td className="px-1 py-1 border text-center">
-                    {v.check_out_time ? (
-                      v.check_out_time.replace("T", " ").replace("Z", "")
-                    ) : (
+                    {formatISODateString(v.check_out_time) || (
                       <span className="text-green-600 font-bold">
                         Currently In
                       </span>

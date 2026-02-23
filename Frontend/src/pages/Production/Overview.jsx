@@ -12,6 +12,7 @@ import {
   useGetModelVariantsQuery,
   useGetStagesQuery,
 } from "../../redux/api/commonApi.js";
+import { formatISODateString } from "../../utils/dateUtils.js";
 
 const Overview = () => {
   const [loading, setLoading] = useState(false);
@@ -458,7 +459,7 @@ const Overview = () => {
                           <td className="px-1 py-1 border">{item.UserName}</td>
                           <td className="px-1 py-1 border">{item.FG_SR}</td>
                           <td className="px-1 py-1 border">
-                            {item.CreatedOn?.replace("T", " ").replace("Z", "")}
+                            {formatISODateString(item.CreatedOn)}
                           </td>
                         </tr>
                       );

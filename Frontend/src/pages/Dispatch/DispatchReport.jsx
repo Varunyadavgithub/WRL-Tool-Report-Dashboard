@@ -8,6 +8,7 @@ import Loader from "../../components/ui/Loader";
 import toast from "react-hot-toast";
 import ExportButton from "../../components/ui/ExportButton";
 import { baseURL } from "../../assets/assets";
+import { formatISODateString } from "../../utils/dateUtils";
 
 const DispatchReport = () => {
   const Status = [
@@ -42,7 +43,7 @@ const DispatchReport = () => {
       });
       if (node) observer.current.observe(node);
     },
-    [loading, hasMore]
+    [loading, hasMore],
   );
 
   const fetchFgDispatchData = async (pageNumber = 1) => {
@@ -119,7 +120,7 @@ const DispatchReport = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -147,7 +148,7 @@ const DispatchReport = () => {
     } catch (error) {
       console.error("Failed to fetch Yesterday Fg Dispatch Data:", error);
       toast.error(
-        "Failed to fetch Yesterday Fg Dispatch Data. Please try again."
+        "Failed to fetch Yesterday Fg Dispatch Data. Please try again.",
       );
     } finally {
       setYdayLoading(false);
@@ -162,7 +163,7 @@ const DispatchReport = () => {
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -203,13 +204,13 @@ const DispatchReport = () => {
       1,
       8,
       0,
-      0
+      0,
     ); // 1st day at 08:00 AM
 
     const formatDate = (date) => {
       const pad = (n) => (n < 10 ? "0" + n : n);
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
+        date.getDate(),
       )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
@@ -236,7 +237,7 @@ const DispatchReport = () => {
     } catch (error) {
       console.error("Failed to fetch this Month Fg Dispatch Data:", error);
       toast.error(
-        "Failed to fetch this Month Fg Dispatch Data. Please try again."
+        "Failed to fetch this Month Fg Dispatch Data. Please try again.",
       );
     } finally {
       setMonthLoading(false);
@@ -296,7 +297,7 @@ const DispatchReport = () => {
             value={status.value}
             onChange={(e) => {
               const selected = Status.find(
-                (item) => item.value === e.target.value
+                (item) => item.value === e.target.value,
               );
               setStatus(selected);
             }}
@@ -439,8 +440,7 @@ const DispatchReport = () => {
                           </td>
 
                           <td className="px-1 py-1 border">
-                            {item.AddedOn &&
-                              item.AddedOn.replace("T", " ").replace("Z", "")}
+                            {formatISODateString(item.AddedOn)}
                           </td>
 
                           <td className="px-1 py-1 border">{item.AddedBy}</td>

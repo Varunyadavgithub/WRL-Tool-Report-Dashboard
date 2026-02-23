@@ -9,7 +9,7 @@ import { FaBolt } from "react-icons/fa";
 import { MdPowerSettingsNew } from "react-icons/md";
 import toast from "react-hot-toast";
 import axios from "axios";
-import { getFormattedISTDate } from "../../utils/dateUtils.js";
+import { formatISODateString, getFormattedISTDate } from "../../utils/dateUtils.js";
 import { baseURL } from "../../assets/assets.js";
 import { getCurrentShift } from "../../utils/shiftUtils.js";
 
@@ -568,11 +568,7 @@ const LPT = () => {
                           <tr key={index} className="hover:bg-gray-100">
                             <td className="px-1 py-1 border">{index + 1}</td>
                             <td className="px-1 py-1 border">
-                              {item.DateTime &&
-                                item.DateTime.replace("T", " ").replace(
-                                  "Z",
-                                  "",
-                                )}
+                              {formatISODateString(item.DateTime)}
                             </td>
                             <td className="px-1 py-1 border">
                               {item.ModelName}

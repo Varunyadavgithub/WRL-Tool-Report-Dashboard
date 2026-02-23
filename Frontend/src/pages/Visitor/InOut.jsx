@@ -20,6 +20,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets";
 import { useNavigate } from "react-router-dom";
+import { formatISODateString } from "../../utils/dateUtils";
 
 const InOut = () => {
   const [loading, setLoading] = useState(false);
@@ -79,7 +80,7 @@ const InOut = () => {
         const res = await axios.get(`${baseURL}visitor/logs`);
         if (res?.data?.success) {
           const inside = res.data.data.filter(
-            (v) => v.check_in_time && !v.check_out_time
+            (v) => v.check_in_time && !v.check_out_time,
           );
           if (inside.length > 0) {
             const message = inside
@@ -88,7 +89,7 @@ const InOut = () => {
 
             showNotification(
               "Visitors still inside",
-              `The following visitors have not checked out: ${message}`
+              `The following visitors have not checked out: ${message}`,
             );
 
             await axios.post(`${baseURL}visitor/notify-inside-visitors`);
@@ -118,13 +119,13 @@ const InOut = () => {
         toast.success(
           `Visitor ${
             type === "in" ? "checked in" : "checked out"
-          } successfully!`
+          } successfully!`,
         );
 
         // Highlight popup effect
         showNotification(
           type === "in" ? "Visitor Checked In" : "Visitor Checked Out",
-          `Pass ID: ${passId}`
+          `Pass ID: ${passId}`,
         );
 
         await fetchVisitorLogs();
@@ -157,7 +158,7 @@ const InOut = () => {
   // Visitor counts
   const totalVisitors = filteredVisitors.length;
   const currentlyIn = filteredVisitors.filter(
-    (v) => v.check_in_time && !v.check_out_time
+    (v) => v.check_in_time && !v.check_out_time,
   ).length;
   const currentlyOut = filteredVisitors.filter((v) => v.check_out_time).length;
 
@@ -281,8 +282,8 @@ const InOut = () => {
                     isCurrentlyIn
                       ? "bg-green-50 border-green-400 shadow-md"
                       : atSecurityGate
-                      ? "bg-blue-50 border-blue-400 shadow-md"
-                      : "bg-gray-50 border-gray-200"
+                        ? "bg-blue-50 border-blue-400 shadow-md"
+                        : "bg-gray-50 border-gray-200"
                   }`}
                 >
                   <div className="flex flex-col lg:flex-row items-center lg:items-start gap-6">
@@ -335,11 +336,8 @@ const InOut = () => {
                           <MdAccessTime className="text-green-600 text-xl" />
                           <span className="font-medium">Check In:</span>
                           <span>
-                            {visitor.check_in_time
-                              ? visitor.check_in_time
-                                  .replace("T", " ")
-                                  .replace("Z", "")
-                              : "N/A"}
+                            {formatISODateString(visitor.check_in_time) ||
+                              "N/A"}
                           </span>
                         </div>
 
@@ -347,11 +345,8 @@ const InOut = () => {
                           <MdAccessTime className="text-red-600 text-xl" />
                           <span className="font-medium">Check Out:</span>
                           <span>
-                            {visitor.check_out_time
-                              ? visitor.check_out_time
-                                  .replace("T", " ")
-                                  .replace("Z", "")
-                              : "N/A"}
+                            {formatISODateString(visitor.check_out_time) ||
+                              "N/A"}
                           </span>
                         </div>
                       </div>
@@ -410,7 +405,7 @@ const InOut = () => {
                               onClick={() =>
                                 handleVisitorActionForCard(
                                   "out",
-                                  visitor.pass_id
+                                  visitor.pass_id,
                                 )
                               }
                               bgColor="bg-red-600"
@@ -423,7 +418,7 @@ const InOut = () => {
                             <Button
                               onClick={() =>
                                 navigate(
-                                  `/visitor-pass-display/${visitor.pass_id}`
+                                  `/visitor-pass-display/${visitor.pass_id}`,
                                 )
                               }
                               bgColor="bg-yellow-500"

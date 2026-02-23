@@ -8,6 +8,7 @@ import axios from "axios";
 import Loader from "../../components/ui/Loader";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets";
+import { formatISODateString } from "../../utils/dateUtils";
 
 const FGCasting = () => {
   const [loading, setLoading] = useState(false);
@@ -113,7 +114,7 @@ const FGCasting = () => {
                 AssetCode: item.VSerial,
                 CustomerQR: item.CustomerQR,
                 NFCID: item.NFCID,
-                CreatedOn: item.CreatedOn.replace("T", " ").replace("Z", ""),
+                CreatedOn: formatISODateString(item.CreatedOn),
               }))}
               filename="FG_Casting_Data"
             />
@@ -265,8 +266,7 @@ const FGCasting = () => {
                           </td>
                           <td className="px-1 py-1 border">{item.NFCID}</td>
                           <td className="px-1 py-1 border">
-                            {item.CreatedOn &&
-                              item.CreatedOn.replace("T", " ").replace("Z", "")}
+                            {formatISODateString(item.CreatedOn)}
                           </td>
                         </tr>
                       ))

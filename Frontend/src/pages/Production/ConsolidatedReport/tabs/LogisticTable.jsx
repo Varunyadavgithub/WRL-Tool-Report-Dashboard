@@ -1,5 +1,6 @@
 import { BsExclamationCircle } from "react-icons/bs";
 import EmptyState from "../../../../components/ui/EmptyState";
+import { formatISODateString } from "../../../../utils/dateUtils";
 
 function LogisticTable({ data }) {
   const headers = [
@@ -63,7 +64,7 @@ function LogisticTable({ data }) {
                       ) : (
                         <span className="text-gray-700">
                           {typeof value === "string" && value.includes("T")
-                            ? value.replace("T", " ").replace("Z", "")
+                            ? formatISODateString(value)
                             : value}
                         </span>
                       )}

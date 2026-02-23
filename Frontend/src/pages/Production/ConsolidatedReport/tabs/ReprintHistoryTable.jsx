@@ -1,10 +1,6 @@
 import EmptyState from "../../../../components/ui/EmptyState";
 import { FiPrinter, FiMessageSquare, FiAlertTriangle } from "react-icons/fi";
-
-function formatDate(dateStr) {
-  if (!dateStr) return null;
-  return dateStr.replace("T", " ").replace("Z", "").substring(0, 19);
-}
+import { formatISODateString } from "../../../../utils/dateUtils";
 
 function ReprintHistoryTable({ data }) {
   const totalPrints = data.length;
@@ -37,7 +33,7 @@ function ReprintHistoryTable({ data }) {
               First printed by{" "}
               <span className="font-semibold">{data[0]?.Printed_By}</span> on{" "}
               <span className="font-semibold">
-                {formatDate(data[0]?.Printed_On)}
+                {formatISODateString(data[0]?.Printed_On)}
               </span>
             </p>
           </div>
@@ -106,13 +102,13 @@ function ReprintHistoryTable({ data }) {
 
                     {/* Printed On */}
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {formatDate(item.Printed_On) ? (
+                      {formatISODateString(item.Printed_On) ? (
                         <div className="flex flex-col items-center">
                           <span className="text-xs text-gray-700 font-medium">
-                            {formatDate(item.Printed_On)?.split(" ")[0]}
+                            {formatISODateString(item.Printed_On)?.split(" ")[0]}
                           </span>
                           <span className="text-[10px] text-gray-400">
-                            {formatDate(item.Printed_On)?.split(" ")[1]}
+                            {formatISODateString(item.Printed_On)?.split(" ")[1]}
                           </span>
                         </div>
                       ) : (

@@ -15,6 +15,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets";
 import SelectField from "../../components/ui/SelectField";
+import { formatISODateString } from "../../utils/dateUtils";
 
 // Register Chart.js components
 Chart.register(
@@ -24,7 +25,7 @@ Chart.register(
   ArcElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
 );
 
 // Function to generate a dynamic color palette
@@ -130,7 +131,7 @@ const Dashboard = () => {
 
   // Generate dataset values (visitor count)
   const barChartValues = dashboardData.visitorTrend.map(
-    (item) => item.visitors
+    (item) => item.visitors,
   );
 
   // -------------------------
@@ -279,7 +280,7 @@ const Dashboard = () => {
           value={filter.value}
           onChange={(e) => {
             const selected = Filter.find(
-              (item) => item.value === e.target.value
+              (item) => item.value === e.target.value,
             );
             setFilter(selected);
           }}
@@ -384,7 +385,7 @@ const Dashboard = () => {
                   className="inline-block w-3 h-3 mr-2 rounded-full"
                   style={{
                     backgroundColor: generateColorPalette(
-                      dashboardData.departments.length
+                      dashboardData.departments.length,
                     ).backgroundColor[index],
                   }}
                 />
@@ -418,8 +419,7 @@ const Dashboard = () => {
                   <td className="p-3">{visitor.department_name}</td>
                   <td className="p-3">{visitor.employee_name}</td>
                   <td className="p-3">
-                    {visitor.check_in_time &&
-                      visitor.check_in_time.replace("T", " ").replace("Z", "")}
+                    {formatISODateString(visitor.check_in_time)}
                   </td>
                   <td className="p-3">
                     {visitor.check_out_time === null ? (
@@ -427,7 +427,7 @@ const Dashboard = () => {
                         Currently In
                       </span>
                     ) : (
-                      visitor.check_out_time.replace("T", " ").replace("Z", "")
+                      formatISODateString(visitor.check_out_time)
                     )}
                   </td>
                 </tr>
