@@ -63,5 +63,3 @@ export const connectToDB = async (dbConfig) => {
     throw err;
   }
 };
-
-export default sql;

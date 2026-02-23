@@ -61,7 +61,11 @@ function LogisticTable({ data }) {
                           {fallback[field]}
                         </span>
                       ) : (
-                        <span className="text-gray-700">{value}</span>
+                        <span className="text-gray-700">
+                          {typeof value === "string" && value.includes("T")
+                            ? value.replace("T", " ").replace("Z", "")
+                            : value}
+                        </span>
                       )}
                     </td>
                   );

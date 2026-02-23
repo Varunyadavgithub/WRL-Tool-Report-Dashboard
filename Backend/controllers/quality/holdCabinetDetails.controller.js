@@ -1,4 +1,5 @@
-import sql, { dbConfig1 } from "../../config/db.config.js";
+import sql from "mssql";
+import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { convertToIST } from "../../utils/convertToIST.js";
@@ -9,7 +10,7 @@ export const getDispatchHoldDetails = tryCatch(async (req, res) => {
   if (!startDate || !endDate) {
     throw new AppError(
       "Missing required query parameters: startDate or endDate.",
-      400
+      400,
     );
   }
 
@@ -79,7 +80,7 @@ export const getDispatchHoldDetails = tryCatch(async (req, res) => {
   } catch (error) {
     throw new AppError(
       `Failed to fetch the Dispatch Hold Details data:${error.message}`,
-      500
+      500,
     );
   } finally {
     await pool.close();
