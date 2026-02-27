@@ -12,6 +12,7 @@ import complianceRoute from "./compliance.route.js";
 import taskReminders from "./taskReminder.route.js";
 import auditReport from "./auditReport.route.js";
 import readingRoute from "./reading.route.js";
+import manpowerRoute from "./manpower.routes.js";
 
 const routers = Router();
 
@@ -28,5 +29,6 @@ routers.use("/compliance", complianceRoute);
 routers.use("/task-reminders", taskReminders);
 routers.use("/audit-report", auditReport);
 routers.use("/reading", readingRoute);
+routers.use("/manpower", manpowerRoute);
 
 export default routers;

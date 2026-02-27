@@ -105,6 +105,11 @@ const DehumidifierDashboard = lazy(
   () => import("../pages/Readings/DehumidifierDashboard"),
 );
 
+const ManpowerForm = lazy(() => import("../pages/Forms/ManpowerForm"));
+const ManpowerApproval = lazy(() => import("../pages/Forms/ManpowerApproval"));
+const SecurityManpowerList = lazy(() => import("../pages/Forms/SecurityManpowerList"));
+
+
 // Role constants for consistency
 export const ROLES = {
   ADMIN: "admin",
@@ -554,6 +559,32 @@ export const ROUTE_CONFIG = [
         label: "Utility Reading",
         component: DehumidifierDashboard,
         roles: [ROLES.ADMIN],
+      },
+    ],
+  },
+  {
+    key: "forms",
+    icon: FaClipboardList,
+    label: "Forms",
+    basePath: "/forms",
+    items: [
+      {
+        path: "/forms/manpower-form",
+        label: "Manpower Form",
+        component: ManpowerForm,
+        roles: [ROLES.ADMIN, ROLES.PRODUCTION_MANAGER],
+      },
+      {
+        path: "/forms/manpower-approval",
+        label: "Manpower Approval",
+        component: ManpowerApproval,
+        roles: [ROLES.ADMIN, ROLES.HR],
+      },
+      {
+        path: "/forms/security-manpower",
+        label: "Security Manpower List",
+        component: SecurityManpowerList,
+        roles: [ROLES.SECURITY],
       },
     ],
   },
