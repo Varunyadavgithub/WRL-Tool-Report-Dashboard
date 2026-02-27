@@ -12,6 +12,7 @@ import {
   dbConfig3,
 } from "./config/db.config.js";
 import { startCalibrationCron } from "./cron/calibrationEscalation.js";
+import { startManpowerCron } from "../Backend/cron/manpower.cron.js";
 import { globalErrorHandler } from "./middlewares/errorHandler.js";
 // const _dirname = path.resolve();
 
@@ -64,3 +65,4 @@ app.listen(PORT, () => {
 
 // START CRON AFTER SERVER START
 startCalibrationCron();
+startManpowerCron();
