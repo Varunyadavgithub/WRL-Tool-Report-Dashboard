@@ -1,7 +1,6 @@
 import PDFDocument from "pdfkit";
 
 export const generateManpowerPDF = (res, data) => {
-
   const doc = new PDFDocument({
     size: "A4",
     layout: "landscape",
@@ -21,207 +20,258 @@ export const generateManpowerPDF = (res, data) => {
   const margin = 40;
   const usableWidth = pageWidth - margin * 2;
 
+  // ================= HELPER: draw a row and return new Y =================
+  const drawRow = (y, values, colWidths, rowHeight, isHeader = false) => {
+    let x = margin;
+    values.forEach((val, i) => {
+      doc.rect(x, y, colWidths[i], rowHeight).stroke();
+      doc
+        .font(isHeader ? "Helvetica-Bold" : "Helvetica")
+        .fontSize(10)
+        .fillColor("black")
+        .text(String(val ?? ""), x + 4, y + (rowHeight - 12) / 2, {
+          width: colWidths[i] - 8,
+          align: i === 0 ? "left" : "center",
+          lineBreak: false,
+        });
+      x += colWidths[i];
+    });
+    return y + rowHeight;
+  };
+
   // ================= HEADER =================
-  doc.rect(margin, margin, usableWidth, 60).stroke();
+  doc.rect(margin, margin, usableWidth, 55).fillAndStroke("#003366", "#003366");
 
   doc
     .font("Helvetica-Bold")
     .fontSize(18)
-    .text("Western Refrigeration Pvt. Ltd.", margin, margin + 15, {
+    .fillColor("white")
+    .text("Western Refrigeration Pvt. Ltd.", margin, margin + 10, {
       align: "center",
       width: usableWidth,
     });
 
   doc
     .font("Helvetica")
-    .fontSize(14)
-    .text("Manpower Approval Request Form", {
+    .fontSize(12)
+    .fillColor("white")
+    .text("Manpower Approval Request Form", margin, margin + 32, {
       align: "center",
+      width: usableWidth,
     });
 
-  doc.moveDown(4);
+  let y = margin + 55 + 15;
 
   // ================= BASIC DETAILS =================
-  let y = doc.y;
-  const detailHeight = 40;
+  const detailRowH = 24;
 
-  doc.rect(margin, y, usableWidth, detailHeight).stroke();
+  // Row 1
+  doc.rect(margin, y, usableWidth / 3, detailRowH).stroke();
+  doc.rect(margin + usableWidth / 3, y, usableWidth / 3, detailRowH).stroke();
+  doc.rect(margin + (usableWidth / 3) * 2, y, usableWidth / 3, detailRowH).stroke();
 
-  doc.fontSize(11);
-  doc.text(`Department: ${data.departmentName || "-"}`, margin + 10, y + 8);
-  doc.text(`Required Date: ${data.requiredDate || "-"}`, margin + usableWidth / 2, y + 8);
-  doc.text(`Required Day: ${data.requiredDay || "-"}`, margin + 10, y + 22);
+  doc.font("Helvetica-Bold").fontSize(10).fillColor("black")
+    .text("Department:", margin + 5, y + 7, { continued: true })
+    .font("Helvetica").text(` ${data.departmentName || "-"}`);
 
-  doc.y = y + detailHeight + 20;
+  doc.font("Helvetica-Bold").fontSize(10)
+    .text("HOD Name:", margin + usableWidth / 3 + 5, y + 7, { continued: true })
+    .font("Helvetica").text(` ${data.hodName || "-"}`);
+
+  doc.font("Helvetica-Bold").fontSize(10)
+    .text("Required Date:", margin + (usableWidth / 3) * 2 + 5, y + 7, { continued: true })
+    .font("Helvetica").text(` ${data.requiredDate ? new Date(data.requiredDate).toLocaleDateString("en-IN") : "-"}`);
+
+  y += detailRowH;
+
+  // Row 2
+  doc.rect(margin, y, usableWidth / 3, detailRowH).stroke();
+  doc.rect(margin + usableWidth / 3, y, usableWidth / 3, detailRowH).stroke();
+  doc.rect(margin + (usableWidth / 3) * 2, y, usableWidth / 3, detailRowH).stroke();
+
+  doc.font("Helvetica-Bold").fontSize(10)
+    .text("Required Day:", margin + 5, y + 7, { continued: true })
+    .font("Helvetica").text(` ${data.requiredDay || "-"}`);
+
+  doc.font("Helvetica-Bold").fontSize(10)
+    .text("Responsible Staff:", margin + usableWidth / 3 + 5, y + 7, { continued: true })
+    .font("Helvetica").text(` ${data.responsibleStaff || "-"}`);
+
+  doc.font("Helvetica-Bold").fontSize(10)
+    .text("Total Manpower:", margin + (usableWidth / 3) * 2 + 5, y + 7, { continued: true })
+    .font("Helvetica").text(` ${data.totalManpower ?? 0}`);
+
+  y += detailRowH + 15;
 
   // ================= MANPOWER TABLE =================
-
-  doc.font("Helvetica-Bold").fontSize(13).text("Manpower Headcount");
-  doc.moveDown(0.5);
+  doc.font("Helvetica-Bold").fontSize(11).fillColor("#003366")
+    .text("Manpower Headcount", margin, y);
+  y += 16;
 
   const headColWidths = [
-    usableWidth * 0.35,
-    usableWidth * 0.21,
-    usableWidth * 0.21,
-    usableWidth * 0.23,
+    usableWidth * 0.30,
+    usableWidth * 0.175,
+    usableWidth * 0.175,
+    usableWidth * 0.175,
+    usableWidth * 0.175,
+  ];
+  const headRowH = 26;
+
+  // Header
+  let hx = margin;
+  ["", "DET", "ITI", "CASUAL", "Total"].forEach((label, i) => {
+    doc.rect(hx, y, headColWidths[i], headRowH).fillAndStroke("#d0e4f7", "#000");
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("black")
+      .text(label, hx + 4, y + 8, { width: headColWidths[i] - 8, align: "center" });
+    hx += headColWidths[i];
+  });
+  y += headRowH;
+
+  const approvedTotal = (+data.approvedDET || 0) + (+data.approvedITI || 0) + (+data.approvedCASUAL || 0);
+  const actualTotal   = (+data.actualDET || 0)   + (+data.actualITI || 0)   + (+data.actualCASUAL || 0);
+  const additionalTotal = (+data.additionalDET || 0) + (+data.additionalITI || 0) + (+data.additionalCASUAL || 0);
+
+  const manpowerRows = [
+    ["Approved",           data.approvedDET ?? 0,   data.approvedITI ?? 0,   data.approvedCASUAL ?? 0,   approvedTotal],
+    ["Actual Required",    data.actualDET ?? 0,     data.actualITI ?? 0,     data.actualCASUAL ?? 0,     actualTotal],
+    ["Additional Required",data.additionalDET ?? 0, data.additionalITI ?? 0, data.additionalCASUAL ?? 0, additionalTotal],
   ];
 
-  const rowHeight = 28;
-  y = doc.y;
+  manpowerRows.forEach((row) => {
+    y = drawRow(y, row, headColWidths, headRowH, false);
+  });
 
-  const drawHeadRow = (values, isHeader = false) => {
-    let x = margin;
-
-    values.forEach((val, i) => {
-      doc.rect(x, y, headColWidths[i], rowHeight).stroke();
-
-      doc
-        .font(isHeader ? "Helvetica-Bold" : "Helvetica")
-        .fontSize(11)
-        .text(val, x, y + 8, {
-          width: headColWidths[i],
-          align: i === 0 ? "left" : "center",
-        });
-
-      x += headColWidths[i];
-    });
-
-    y += rowHeight;
-  };
-
-  drawHeadRow(["", "DET", "ITI", "CASUAL"], true);
-
-  drawHeadRow(["Approved", data.approvedDET ?? 0, data.approvedITI ?? 0, data.approvedCASUAL ?? 0]);
-  drawHeadRow(["Actual Required", data.actualDET ?? 0, data.actualITI ?? 0, data.actualCASUAL ?? 0]);
-  drawHeadRow(["Additional Required", data.additionalDET ?? 0, data.additionalITI ?? 0, data.additionalCASUAL ?? 0]);
-
-  doc.y = y + 25;
+  y += 15;
 
   // ================= OVERTIME =================
-  doc.font("Helvetica-Bold").text("Overtime Details");
-  doc.moveDown(0.5);
+  doc.font("Helvetica-Bold").fontSize(11).fillColor("#003366")
+    .text("Overtime Details", margin, y);
+  y += 16;
 
-  y = doc.y;
-  doc.rect(margin, y, usableWidth, 35).stroke();
+  const otColWidths = [usableWidth / 3, usableWidth / 3, usableWidth / 3];
+  const otRowH = 26;
 
-  doc.font("Helvetica").fontSize(11);
-  doc.text(`From: ${data.overtimeFrom || "-"}`, margin + 15, y + 10);
-  doc.text(`To: ${data.overtimeTo || "-"}`, margin + usableWidth / 3, y + 10);
-  doc.text(`Total Hours: ${data.overtimeTotal ?? 0}`, margin + (usableWidth / 3) * 2, y + 10);
+  // Header
+  let ox = margin;
+  ["From", "To", "Total Hours"].forEach((label, i) => {
+    doc.rect(ox, y, otColWidths[i], otRowH).fillAndStroke("#d0e4f7", "#000");
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("black")
+      .text(label, ox + 4, y + 8, { width: otColWidths[i] - 8, align: "center" });
+    ox += otColWidths[i];
+  });
+  y += otRowH;
 
-  doc.y = y + 55;
+  y = drawRow(y, [
+    data.overtimeFrom || "-",
+    data.overtimeTo || "-",
+    data.overtimeTotal ?? 0,
+  ], otColWidths, otRowH);
 
-  // ================= RESPONSIBLE =================
-  doc.font("Helvetica-Bold").text("Responsible Staff");
-  doc.moveDown(0.5);
-
-  y = doc.y;
-  doc.rect(margin, y, usableWidth, 28).stroke();
-  doc.font("Helvetica").text(data.responsibleStaff || "-", margin + 10, y + 8);
-
-  doc.y = y + 45;
+  y += 15;
 
   // ================= JUSTIFICATION =================
-  doc.font("Helvetica-Bold").text("Justification");
-  doc.moveDown(0.5);
+  doc.font("Helvetica-Bold").fontSize(11).fillColor("#003366")
+    .text("Justification for Overtime", margin, y);
+  y += 16;
 
-  y = doc.y;
-  doc.rect(margin, y, usableWidth, 40).stroke();
-  doc.font("Helvetica").text(data.justification || "-", margin + 10, y + 8);
+  const justText = data.justification || "-";
+  const justHeight = Math.max(36, doc.heightOfString(justText, { width: usableWidth - 16 }) + 16);
+  doc.rect(margin, y, usableWidth, justHeight).stroke();
+  doc.font("Helvetica").fontSize(10).fillColor("black")
+    .text(justText, margin + 8, y + 8, { width: usableWidth - 16 });
 
-  doc.y = y + 60;
+  y += justHeight + 15;
 
   // ================= EMPLOYEE TABLE =================
-  doc.font("Helvetica-Bold").fontSize(13).text("Employee List");
-  doc.moveDown(0.5);
+  // Add new page if not enough space
+  if (y + 200 > pageHeight - 100) {
+    doc.addPage();
+    y = margin;
+  }
+
+  doc.font("Helvetica-Bold").fontSize(11).fillColor("#003366")
+    .text("Employee List", margin, y);
+  y += 16;
 
   const empColWidths = [
     usableWidth * 0.05,
-    usableWidth * 0.15,
-    usableWidth * 0.25,
-    usableWidth * 0.15,
-    usableWidth * 0.15,
-    usableWidth * 0.15,
-    usableWidth * 0.10,
+    usableWidth * 0.13,
+    usableWidth * 0.22,
+    usableWidth * 0.13,
+    usableWidth * 0.17,
+    usableWidth * 0.16,
+    usableWidth * 0.14,
   ];
+  const empRowH = 22;
 
-  const empRowHeight = 24;
-  y = doc.y;
-
-  const drawEmpRow = (values, isHeader = false) => {
-    let x = margin;
-
-    values.forEach((val, i) => {
-      doc.rect(x, y, empColWidths[i], empRowHeight).stroke();
-
-      doc
-        .font(isHeader ? "Helvetica-Bold" : "Helvetica")
-        .fontSize(10)
-        .text(val, x, y + 6, {
-          width: empColWidths[i],
-          align: "center",
-        });
-
-      x += empColWidths[i];
-    });
-
-    y += empRowHeight;
-  };
-
-  drawEmpRow(["#", "Emp Code", "Name", "Category", "Location", "Contact", "Travel"], true);
+  // Header
+  let ex = margin;
+  ["#", "Emp Code", "Name", "Category", "Location", "Contact", "Travel By"].forEach((label, i) => {
+    doc.rect(ex, y, empColWidths[i], empRowH).fillAndStroke("#d0e4f7", "#000");
+    doc.font("Helvetica-Bold").fontSize(9).fillColor("black")
+      .text(label, ex + 2, y + 7, { width: empColWidths[i] - 4, align: "center" });
+    ex += empColWidths[i];
+  });
+  y += empRowH;
 
   if (data.employees && data.employees.length > 0) {
     data.employees.forEach((emp, index) => {
-
-      if (y + empRowHeight > pageHeight - 100) {
+      if (y + empRowH > pageHeight - 80) {
         doc.addPage();
         y = margin;
       }
-
-      drawEmpRow([
+      y = drawRow(y, [
         index + 1,
-        emp.empCode || "",
-        emp.empName || "",
-        emp.category || "",
-        emp.location || "",
-        emp.contactNo || "",
-        emp.travellingBy || "",
-      ]);
+        emp.empCode || "-",
+        emp.empName || "-",
+        emp.category || "-",
+        emp.location || "-",
+        emp.contactNo || "-",
+        emp.travellingBy || "-",
+      ], empColWidths, empRowH);
     });
   } else {
-    drawEmpRow(["-", "-", "-", "-", "-", "-", "-"]);
+    y = drawRow(y, ["-", "-", "-", "-", "-", "-", "-"], empColWidths, empRowH);
   }
 
-  doc.y = y + 40;
+  y += 30;
 
   // ================= SIGNATURE =================
-  const signY = doc.y;
-
-  const sigWidth = usableWidth / 3;
-
-  for (let i = 0; i < 3; i++) {
-    doc.moveTo(margin + i * sigWidth + 40, signY)
-       .lineTo(margin + i * sigWidth + sigWidth - 40, signY)
-       .stroke();
+  if (y + 60 > pageHeight - 60) {
+    doc.addPage();
+    y = margin;
   }
 
-  doc.moveDown(1);
+  const sigLabels = ["HOD Approval", "HR Approval", "Plant Head Approval"];
+  const sigWidth = usableWidth / 3;
 
-  doc.text("HOD Approval", margin + sigWidth / 2 - 30);
-  doc.text("HR Approval", margin + sigWidth + sigWidth / 2 - 30);
-  doc.text("Plant Head Approval", margin + sigWidth * 2 + sigWidth / 2 - 50);
+  sigLabels.forEach((label, i) => {
+    const sx = margin + i * sigWidth;
+    const lineStartX = sx + 20;
+    const lineEndX = sx + sigWidth - 20;
+    const lineY = y + 20;
+
+    doc.moveTo(lineStartX, lineY).lineTo(lineEndX, lineY).stroke();
+
+    doc.font("Helvetica").fontSize(9).fillColor("black")
+      .text(label, sx, lineY + 6, { width: sigWidth, align: "center" });
+  });
+
+  y += 50;
 
   // ================= FOOTER =================
-  doc.moveTo(margin, pageHeight - 50)
-     .lineTo(pageWidth - margin, pageHeight - 50)
-     .stroke();
+  doc.moveTo(margin, pageHeight - 40)
+    .lineTo(pageWidth - margin, pageHeight - 40)
+    .strokeColor("#003366")
+    .stroke();
 
-  doc.fontSize(8).fillColor("gray").text(
-    "This is a system generated document from MES.",
-    margin,
-    pageHeight - 40,
-    { align: "center", width: usableWidth }
-  );
+  doc.fontSize(8).fillColor("gray")
+    .text(
+      "This is a system generated document from MES — Western Refrigeration Pvt. Ltd.",
+      margin,
+      pageHeight - 30,
+      { align: "center", width: usableWidth }
+    );
 
   doc.end();
 };
