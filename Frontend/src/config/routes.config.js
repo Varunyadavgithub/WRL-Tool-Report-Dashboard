@@ -94,12 +94,14 @@ const ManageTasks = lazy(() => import("../pages/TaskReminders/ManageTasks"));
 const TaskOverview = lazy(() => import("../pages/TaskReminders/TaskOverview"));
 
 const TemplateBuilder = lazy(
-  () => import("../pages/AuditReport/TemplateBuilder"),
+  () => import("../pages/AuditReport/Template/TemplateBuilder"),
 );
-const TemplateList = lazy(() => import("../pages/AuditReport/TemplateList"));
-const AuditList = lazy(() => import("../pages/AuditReport/AuditList"));
-const AuditEntry = lazy(() => import("../pages/AuditReport/AuditEntry"));
-const AuditView = lazy(() => import("../pages/AuditReport/AuditView"));
+const TemplateList = lazy(
+  () => import("../pages/AuditReport/Template/TemplateList"),
+);
+const AuditList = lazy(() => import("../pages/AuditReport/Audit/AuditList"));
+const AuditEntry = lazy(() => import("../pages/AuditReport/Audit/AuditEntry"));
+const AuditView = lazy(() => import("../pages/AuditReport/Audit/AuditView"));
 
 const DehumidifierDashboard = lazy(
   () => import("../pages/Readings/DehumidifierDashboard"),
@@ -107,8 +109,9 @@ const DehumidifierDashboard = lazy(
 
 const ManpowerForm = lazy(() => import("../pages/Forms/ManpowerForm"));
 const ManpowerApproval = lazy(() => import("../pages/Forms/ManpowerApproval"));
-const SecurityManpowerList = lazy(() => import("../pages/Forms/SecurityManpowerList"));
-
+const SecurityManpowerList = lazy(
+  () => import("../pages/Forms/SecurityManpowerList"),
+);
 
 // Role constants for consistency
 export const ROLES = {

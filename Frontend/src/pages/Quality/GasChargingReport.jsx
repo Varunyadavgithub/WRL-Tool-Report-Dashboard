@@ -24,7 +24,7 @@ import {
   setGasChargingPage,
   setGasChargingLimit,
   setGasChargingPagination,
-} from "../../redux/gasChargingSlice";
+} from "../../redux/slices/gasChargingSlice.js";
 import {
   getTodayRange,
   getYesterdayRange,

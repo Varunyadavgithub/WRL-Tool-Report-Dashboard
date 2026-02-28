@@ -31,13 +31,13 @@ const transformAudit = (audit) => {
   if (!audit) return null;
 
   // DEBUG: Log raw audit data
-  console.log("transformAudit input:", {
-    id: audit.Id ?? audit.id,
-    hasSummary: !!(audit.Summary ?? audit.summary),
-    summaryValue: audit.Summary ?? audit.summary,
-    hasSections: !!(audit.Sections ?? audit.sections),
-    sectionsLength: (audit.Sections ?? audit.sections)?.length,
-  });
+  // console.log("transformAudit input:", {
+  //   id: audit.Id ?? audit.id,
+  //   hasSummary: !!(audit.Summary ?? audit.summary),
+  //   summaryValue: audit.Summary ?? audit.summary,
+  //   hasSections: !!(audit.Sections ?? audit.sections),
+  //   sectionsLength: (audit.Sections ?? audit.sections)?.length,
+  // });
 
   const transformed = {
     id: audit.Id ?? audit.id,
@@ -69,11 +69,11 @@ const transformAudit = (audit) => {
   };
 
   // DEBUG: Log transformed
-  console.log("transformAudit output:", {
-    id: transformed.id,
-    summary: transformed.summary,
-    sectionsLength: transformed.sections?.length,
-  });
+  // console.log("transformAudit output:", {
+  //   id: transformed.id,
+  //   summary: transformed.summary,
+  //   sectionsLength: transformed.sections?.length,
+  // });
 
   return transformed;
 };
@@ -93,7 +93,7 @@ export const useAuditData = () => {
     setError(null);
     try {
       const response = await axios.get(`${API_BASE}/templates`, { params });
-      console.log("loadTemplates raw response:", response.data);
+      // console.log("loadTemplates raw response:", response.data);
 
       const transformedTemplates = (response.data.data || []).map(
         transformTemplate,
@@ -222,13 +222,13 @@ export const useAuditData = () => {
       const response = await axios.get(`${API_BASE}/audits`, { params });
 
       // DEBUG: Log raw API response
-      console.log("loadAudits raw response:", response.data);
-      console.log("First audit raw:", response.data.data?.[0]);
+      // console.log("loadAudits raw response:", response.data);
+      // console.log("First audit raw:", response.data.data?.[0]);
 
       const transformedAudits = (response.data.data || []).map(transformAudit);
 
       // DEBUG: Log transformed
-      console.log("First audit transformed:", transformedAudits[0]);
+      // console.log("First audit transformed:", transformedAudits[0]);
 
       setAudits(transformedAudits);
       return {
@@ -254,16 +254,16 @@ export const useAuditData = () => {
       const response = await axios.get(`${API_BASE}/audits/${id}`);
 
       // DEBUG
-      console.log("getAuditById raw response:", response.data);
-      console.log("Raw audit data:", response.data.data);
-      console.log("Raw summary:", response.data.data?.Summary);
-      console.log("Raw sections:", response.data.data?.Sections);
+      // console.log("getAuditById raw response:", response.data);
+      // console.log("Raw audit data:", response.data.data);
+      // console.log("Raw summary:", response.data.data?.Summary);
+      // console.log("Raw sections:", response.data.data?.Sections);
 
       const transformed = transformAudit(response.data.data);
 
-      console.log("Transformed audit:", transformed);
-      console.log("Transformed summary:", transformed?.summary);
-      console.log("Transformed sections:", transformed?.sections);
+      // console.log("Transformed audit:", transformed);
+      // console.log("Transformed summary:", transformed?.summary);
+      // console.log("Transformed sections:", transformed?.sections);
 
       return transformed;
     } catch (err) {

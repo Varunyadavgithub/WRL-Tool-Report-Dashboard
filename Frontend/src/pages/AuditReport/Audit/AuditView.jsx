@@ -26,16 +26,24 @@ import {
 import { MdFormatListNumbered, MdUpdate, MdDateRange } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
 import { BiSolidFactory } from "react-icons/bi";
-import useAuditData from "../../hooks/useAuditData";
+import useAuditData from "../../../hooks/useAuditData.js";
 import toast from "react-hot-toast";
-import { baseURL } from "../../assets/assets.js";
+import { baseURL } from "../../../assets/assets.js";
 import {
   formatDateForDisplay,
   formatDateTimeForDisplay,
-} from "../../utils/dateUtils.js";
+} from "../../../utils/dateUtils.js";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+
+// ==================== HELPERS ====================
+const formatFileSize = (bytes) => {
+  if (!bytes) return "";
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+};
 
 const AuditView = () => {
   const navigate = useNavigate();
@@ -51,7 +59,10 @@ const AuditView = () => {
   const [approvalAction, setApprovalAction] = useState("approve");
   const [approverName, setApproverName] = useState("");
   const [approvalComments, setApprovalComments] = useState("");
+
+  // ==================== Image preview — same structure as AuditEntry ====================
   const [imagePreview, setImagePreview] = useState(null);
+
   const [showExportMenu, setShowExportMenu] = useState(false);
 
   // Load audit data
@@ -125,7 +136,7 @@ const AuditView = () => {
     }
   };
 
-  // Get field icon
+  // ==================== Field icon ====================
   const getFieldIcon = useCallback((fieldId) => {
     switch (fieldId) {
       case "modelName":
@@ -144,7 +155,7 @@ const AuditView = () => {
     }
   }, []);
 
-  // Get status badge for checkpoints
+  // ==================== Checkpoint status badge (with N/A) ====================
   const getStatusBadge = useCallback((status) => {
     switch (status) {
       case "pass":
@@ -165,6 +176,12 @@ const AuditView = () => {
             <FaExclamationTriangle /> Warning
           </span>
         );
+      case "na":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+            N/A
+          </span>
+        );
       default:
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
@@ -174,7 +191,7 @@ const AuditView = () => {
     }
   }, []);
 
-  // Get audit status badge
+  // ==================== Audit status badge ====================
   const getAuditStatusBadge = useCallback((status) => {
     switch (status) {
       case "draft":
@@ -206,7 +223,7 @@ const AuditView = () => {
     }
   }, []);
 
-  // Calculate total checkpoints in a section
+  // ==================== Section total checkpoints ====================
   const getSectionTotalCheckpoints = useCallback((section) => {
     if (section.stages && Array.isArray(section.stages)) {
       return section.stages.reduce(
@@ -217,7 +234,7 @@ const AuditView = () => {
     return section.checkPoints?.length || 0;
   }, []);
 
-  // Calculate summary
+  // ==================== Summary (with N/A) ====================
   const getSummary = useCallback(() => {
     if (audit?.summary) {
       let summary = audit.summary;
@@ -234,6 +251,7 @@ const AuditView = () => {
           fail: summary.fail ?? summary.Fail ?? 0,
           warning: summary.warning ?? summary.Warning ?? 0,
           pending: summary.pending ?? summary.Pending ?? 0,
+          na: summary.na ?? summary.Na ?? summary.NA ?? 0,
           total: summary.total ?? summary.Total ?? 0,
         };
       }
@@ -242,7 +260,8 @@ const AuditView = () => {
     let pass = 0,
       fail = 0,
       warning = 0,
-      pending = 0;
+      pending = 0,
+      na = 0;
 
     let sections = audit?.sections;
     if (typeof sections === "string") {
@@ -254,7 +273,7 @@ const AuditView = () => {
     }
 
     if (!sections || !Array.isArray(sections)) {
-      return { pass: 0, fail: 0, warning: 0, pending: 0, total: 0 };
+      return { pass: 0, fail: 0, warning: 0, pending: 0, na: 0, total: 0 };
     }
 
     sections.forEach((section) => {
@@ -268,6 +287,7 @@ const AuditView = () => {
               if (status === "pass") pass++;
               else if (status === "fail") fail++;
               else if (status === "warning") warning++;
+              else if (status === "na") na++;
               else pending++;
             });
           }
@@ -279,6 +299,7 @@ const AuditView = () => {
           if (status === "pass") pass++;
           else if (status === "fail") fail++;
           else if (status === "warning") warning++;
+          else if (status === "na") na++;
           else pending++;
         });
       }
@@ -289,11 +310,12 @@ const AuditView = () => {
       fail,
       warning,
       pending,
-      total: pass + fail + warning + pending,
+      na,
+      total: pass + fail + warning + pending + na,
     };
   }, [audit]);
 
-  // Get info field value with fallback
+  // ==================== Info field value ====================
   const getInfoFieldValue = useCallback(
     (fieldId) => {
       if (!audit?.infoData) return "-";
@@ -317,32 +339,43 @@ const AuditView = () => {
     [audit],
   );
 
-  // Render image in view mode
+  // ==================== Image cell — mirrors AuditEntry preview mode exactly ====================
   const renderImageViewCell = useCallback((column, checkpoint) => {
-    const imageFilename = checkpoint[column.id];
+    const imageData = checkpoint[column.id];
 
-    if (imageFilename && typeof imageFilename === "string") {
+    // New format: plain filename string saved by backend
+    const isFilename = typeof imageData === "string" && imageData.length > 0;
+    // Old format: base64 object {data, name, size, uploadedAt, ...}
+    const isOldFormat =
+      imageData && typeof imageData === "object" && imageData.data;
+
+    if (isFilename || isOldFormat) {
+      const imgSrc = isFilename
+        ? `${baseURL}audit-report/images/${imageData}`
+        : imageData.data;
+
+      const previewPayload = isFilename
+        ? { fileName: imageData, data: imgSrc }
+        : imageData;
+
       return (
         <td key={column.id} className="px-3 py-2 border-r border-gray-200">
           <div className="flex justify-center">
             <div className="relative group cursor-pointer">
               <img
-                src={`${baseURL}audit-report/images/${imageFilename}`}
-                alt="Checkpoint image"
-                className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200 hover:border-blue-400 transition-all hover:shadow-md"
-                onClick={() =>
-                  setImagePreview({
-                    fileName: imageFilename,
-                    data: `${baseURL}audit-report/images/${imageFilename}`,
-                  })
+                src={imgSrc}
+                alt={
+                  isFilename ? imageData : imageData.name || "Checkpoint image"
                 }
+                className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200 hover:border-blue-400 transition-all hover:shadow-md"
+                onClick={() => setImagePreview(previewPayload)}
                 onError={(e) => {
                   e.target.src =
                     "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzljYTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==";
                   e.target.classList.add("opacity-50");
                 }}
               />
-              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 rounded-lg transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
                 <FaSearchPlus className="text-white" size={16} />
               </div>
             </div>
@@ -363,8 +396,7 @@ const AuditView = () => {
     );
   }, []);
 
-  // ==================== EXPORT HELPERS ====================
-
+  // ==================== Export helpers ====================
   const getExportTableData = useCallback(() => {
     if (!audit || !template) return { headers: [], rows: [] };
 
@@ -374,7 +406,6 @@ const AuditView = () => {
       .map((col) => col.name);
 
     const rows = [];
-
     let sections = audit.sections;
     if (typeof sections === "string") {
       try {
@@ -383,7 +414,6 @@ const AuditView = () => {
         sections = [];
       }
     }
-
     if (!sections || !Array.isArray(sections)) return { headers, rows };
 
     sections.forEach((section) => {
@@ -399,9 +429,9 @@ const AuditView = () => {
                 } else if (col.id === "stage") {
                   row.push(stage.stageName || "-");
                 } else if (col.id === "status") {
+                  const s = checkpoint.status || "pending";
                   row.push(
-                    (checkpoint.status || "pending").charAt(0).toUpperCase() +
-                      (checkpoint.status || "pending").slice(1),
+                    s === "na" ? "N/A" : s.charAt(0).toUpperCase() + s.slice(1),
                   );
                 } else {
                   row.push(checkpoint[col.id] || "-");
@@ -419,9 +449,9 @@ const AuditView = () => {
               if (col.id === "section") {
                 row.push(section.sectionName || "-");
               } else if (col.id === "status") {
+                const s = checkpoint.status || "pending";
                 row.push(
-                  (checkpoint.status || "pending").charAt(0).toUpperCase() +
-                    (checkpoint.status || "pending").slice(1),
+                  s === "na" ? "N/A" : s.charAt(0).toUpperCase() + s.slice(1),
                 );
               } else {
                 row.push(checkpoint[col.id] || "-");
@@ -455,6 +485,7 @@ const AuditView = () => {
       ["Passed", s.pass],
       ["Warnings", s.warning],
       ["Failed", s.fail],
+      ["Not Applicable", s.na],
       ["Pending", s.pending],
       [
         "Pass Rate",
@@ -463,15 +494,13 @@ const AuditView = () => {
     ];
   }, [getSummary]);
 
-  // ==================== EXPORT AS PDF ====================
-
+  // ==================== Export PDF ====================
   const handleExportPDF = useCallback(() => {
     try {
       const doc = new jsPDF("l", "mm", "a4");
       const pageWidth = doc.internal.pageSize.getWidth();
       let yPos = 15;
 
-      // Title
       doc.setFontSize(18);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 64, 175);
@@ -480,7 +509,6 @@ const AuditView = () => {
       });
       yPos += 8;
 
-      // Template name
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 100, 100);
@@ -489,7 +517,6 @@ const AuditView = () => {
       });
       yPos += 5;
 
-      // Status
       doc.setFontSize(10);
       doc.setTextColor(0, 0, 0);
       doc.text(
@@ -500,7 +527,6 @@ const AuditView = () => {
       );
       yPos += 5;
 
-      // Audit Code
       if (audit.auditCode) {
         doc.text(`Audit Code: ${audit.auditCode}`, pageWidth / 2, yPos, {
           align: "center",
@@ -508,17 +534,13 @@ const AuditView = () => {
         yPos += 5;
       }
 
-      // Header info
       const headerItems = [];
-      if (template?.headerConfig?.showFormatNo !== false && audit.formatNo) {
+      if (template?.headerConfig?.showFormatNo !== false && audit.formatNo)
         headerItems.push(`Format No: ${audit.formatNo}`);
-      }
-      if (template?.headerConfig?.showRevNo !== false && audit.revNo) {
+      if (template?.headerConfig?.showRevNo !== false && audit.revNo)
         headerItems.push(`Rev No: ${audit.revNo}`);
-      }
-      if (template?.headerConfig?.showRevDate !== false && audit.revDate) {
+      if (template?.headerConfig?.showRevDate !== false && audit.revDate)
         headerItems.push(`Rev Date: ${formatDateForDisplay(audit.revDate)}`);
-      }
       if (headerItems.length > 0) {
         doc.setFontSize(9);
         doc.setTextColor(80, 80, 80);
@@ -530,7 +552,6 @@ const AuditView = () => {
         yPos += 3;
       }
 
-      // Info Section
       const infoData = getInfoDataForExport();
       if (infoData.length > 0) {
         doc.setFontSize(12);
@@ -538,7 +559,6 @@ const AuditView = () => {
         doc.setTextColor(0, 0, 0);
         doc.text("Audit Information", 14, yPos);
         yPos += 2;
-
         autoTable(doc, {
           startY: yPos,
           head: [["Field", "Value"]],
@@ -557,7 +577,6 @@ const AuditView = () => {
         yPos = doc.lastAutoTable.finalY + 8;
       }
 
-      // Notes
       if (audit.notes) {
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
@@ -571,20 +590,17 @@ const AuditView = () => {
         yPos += splitNotes.length * 5 + 8;
       }
 
-      // Checkpoints Table
       const { headers, rows } = getExportTableData();
       if (headers.length > 0 && rows.length > 0) {
         if (yPos > doc.internal.pageSize.getHeight() - 40) {
           doc.addPage();
           yPos = 15;
         }
-
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(0, 0, 0);
         doc.text("Checkpoint Details", 14, yPos);
         yPos += 2;
-
         autoTable(doc, {
           startY: yPos,
           head: [headers],
@@ -615,6 +631,9 @@ const AuditView = () => {
               } else if (val === "warning") {
                 data.cell.styles.textColor = [161, 98, 7];
                 data.cell.styles.fillColor = [254, 249, 195];
+              } else if (val === "n/a") {
+                data.cell.styles.textColor = [29, 78, 216];
+                data.cell.styles.fillColor = [219, 234, 254];
               }
             }
           },
@@ -622,19 +641,16 @@ const AuditView = () => {
         yPos = doc.lastAutoTable.finalY + 8;
       }
 
-      // Summary
       const summaryData = getSummaryForExport();
       if (yPos > doc.internal.pageSize.getHeight() - 50) {
         doc.addPage();
         yPos = 15;
       }
-
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(0, 0, 0);
       doc.text("Audit Summary", 14, yPos);
       yPos += 2;
-
       autoTable(doc, {
         startY: yPos,
         head: [["Metric", "Value"]],
@@ -653,19 +669,15 @@ const AuditView = () => {
       });
       yPos = doc.lastAutoTable.finalY + 8;
 
-      // Signatures
       if (yPos > doc.internal.pageSize.getHeight() - 40) {
         doc.addPage();
         yPos = 15;
       }
-
       const sigs = audit.signatures || {};
-
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.text("Signatures", 14, yPos);
       yPos += 8;
-
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       doc.text("Auditor:", 14, yPos);
@@ -675,18 +687,11 @@ const AuditView = () => {
       doc.setFontSize(9);
       doc.setTextColor(100, 100, 100);
       doc.text(
-        `Date: ${
-          sigs.auditor?.date
-            ? formatDateForDisplay(sigs.auditor.date)
-            : audit.createdAt
-              ? formatDateForDisplay(audit.createdAt)
-              : "-"
-        }`,
+        `Date: ${sigs.auditor?.date ? formatDateForDisplay(sigs.auditor.date) : audit.createdAt ? formatDateForDisplay(audit.createdAt) : "-"}`,
         60,
         yPos,
       );
       yPos += 8;
-
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
@@ -697,18 +702,11 @@ const AuditView = () => {
       doc.setFontSize(9);
       doc.setTextColor(100, 100, 100);
       doc.text(
-        `Date: ${
-          audit.approvedAt
-            ? formatDateForDisplay(audit.approvedAt)
-            : sigs.approver?.date
-              ? formatDateForDisplay(sigs.approver.date)
-              : "-"
-        }`,
+        `Date: ${audit.approvedAt ? formatDateForDisplay(audit.approvedAt) : sigs.approver?.date ? formatDateForDisplay(sigs.approver.date) : "-"}`,
         60,
         yPos,
       );
 
-      // Footer on each page
       const pageCount = doc.internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
@@ -744,13 +742,11 @@ const AuditView = () => {
     getSummaryForExport,
   ]);
 
-  // ==================== EXPORT AS EXCEL ====================
-
+  // ==================== Export Excel ====================
   const handleExportExcel = useCallback(() => {
     try {
       const wb = XLSX.utils.book_new();
 
-      // Sheet 1: Audit Info
       const infoSheetData = [
         ["Audit Report"],
         [""],
@@ -763,26 +759,18 @@ const AuditView = () => {
         ],
         ["Audit Code", audit.auditCode || "-"],
       ];
-
-      if (template?.headerConfig?.showFormatNo !== false) {
+      if (template?.headerConfig?.showFormatNo !== false)
         infoSheetData.push(["Format No", audit.formatNo || "-"]);
-      }
-      if (template?.headerConfig?.showRevNo !== false) {
+      if (template?.headerConfig?.showRevNo !== false)
         infoSheetData.push(["Rev No", audit.revNo || "-"]);
-      }
-      if (template?.headerConfig?.showRevDate !== false) {
+      if (template?.headerConfig?.showRevDate !== false)
         infoSheetData.push(["Rev Date", formatDateForDisplay(audit.revDate)]);
-      }
-
       infoSheetData.push([""]);
       infoSheetData.push(["--- Audit Information ---"]);
-
       const infoData = getInfoDataForExport();
       infoData.forEach((row) => infoSheetData.push(row));
-
       infoSheetData.push([""]);
       infoSheetData.push(["Notes", audit.notes || "No notes added."]);
-
       infoSheetData.push([""]);
       infoSheetData.push(["--- Signatures ---"]);
       const sigs = audit.signatures || {};
@@ -810,34 +798,28 @@ const AuditView = () => {
             ? formatDateForDisplay(sigs.approver.date)
             : "-",
       ]);
-      if (audit.approvalComments) {
+      if (audit.approvalComments)
         infoSheetData.push(["Approval Comments", audit.approvalComments]);
-      }
 
       const infoSheet = XLSX.utils.aoa_to_sheet(infoSheetData);
       infoSheet["!cols"] = [{ wch: 20 }, { wch: 50 }];
       XLSX.utils.book_append_sheet(wb, infoSheet, "Audit Info");
 
-      // Sheet 2: Checkpoints
       const { headers, rows } = getExportTableData();
       if (headers.length > 0) {
-        const checkpointData = [headers, ...rows];
-        const checkpointSheet = XLSX.utils.aoa_to_sheet(checkpointData);
+        const checkpointSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
         checkpointSheet["!cols"] = headers.map((h) => ({
           wch: Math.max(h.length + 5, 15),
         }));
         XLSX.utils.book_append_sheet(wb, checkpointSheet, "Checkpoints");
       }
 
-      // Sheet 3: Summary
       const summarySheetData = [["Audit Summary"], [""], ["Metric", "Value"]];
-      const summaryData = getSummaryForExport();
-      summaryData.forEach((row) => summarySheetData.push(row));
+      getSummaryForExport().forEach((row) => summarySheetData.push(row));
       const summarySheet = XLSX.utils.aoa_to_sheet(summarySheetData);
       summarySheet["!cols"] = [{ wch: 20 }, { wch: 15 }];
       XLSX.utils.book_append_sheet(wb, summarySheet, "Summary");
 
-      // Sheet 4: Metadata
       const metadataSheetData = [
         ["Audit Metadata"],
         [""],
@@ -848,18 +830,15 @@ const AuditView = () => {
         ["Created At", formatDateTimeForDisplay(audit.createdAt)],
         ["Last Updated", formatDateTimeForDisplay(audit.updatedAt)],
       ];
-      if (audit.submittedBy) {
+      if (audit.submittedBy)
         metadataSheetData.push(["Submitted By", audit.submittedBy]);
-      }
-      if (audit.submittedAt) {
+      if (audit.submittedAt)
         metadataSheetData.push([
           "Submitted At",
           formatDateTimeForDisplay(audit.submittedAt),
         ]);
-      }
       metadataSheetData.push([""]);
       metadataSheetData.push(["Generated On", new Date().toLocaleString()]);
-
       const metadataSheet = XLSX.utils.aoa_to_sheet(metadataSheetData);
       metadataSheet["!cols"] = [{ wch: 20 }, { wch: 40 }];
       XLSX.utils.book_append_sheet(wb, metadataSheet, "Metadata");
@@ -880,7 +859,7 @@ const AuditView = () => {
     getSummaryForExport,
   ]);
 
-  // Loading state
+  // ==================== Loading / not found ====================
   if (initialLoading) {
     return (
       <div className="min-h-screen bg-gray-100 py-6 px-4 flex items-center justify-center">
@@ -892,7 +871,6 @@ const AuditView = () => {
     );
   }
 
-  // Audit not found
   if (!audit) {
     return (
       <div className="min-h-screen bg-gray-100 py-6 px-4 flex items-center justify-center">
@@ -917,67 +895,87 @@ const AuditView = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4">
-      <div className="mx-auto">
-        {/* ==================== Image Preview Modal ==================== */}
-        {imagePreview && (
+      {/* ==================== Image Preview Modal — identical to AuditEntry ==================== */}
+      {imagePreview && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[60] p-4"
+          onClick={() => setImagePreview(null)}
+        >
           <div
-            className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[60] p-4"
-            onClick={() => setImagePreview(null)}
+            className="relative max-w-4xl max-h-[90vh] bg-white rounded-xl overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div
-              className="relative max-w-4xl max-h-[90vh] bg-white rounded-xl overflow-hidden shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between p-3 bg-gray-800 text-white">
-                <div className="flex items-center gap-2">
-                  <FaImage />
-                  <span className="font-medium text-sm">
-                    {imagePreview.fileName || imagePreview.name || "Image"}
-                  </span>
-                </div>
-                <button
-                  onClick={() => setImagePreview(null)}
-                  className="p-1 hover:bg-gray-700 rounded transition"
-                >
-                  <FaTimes />
-                </button>
-              </div>
-
-              <div className="p-4 flex items-center justify-center bg-gray-100">
-                <img
-                  src={
-                    imagePreview.data ||
-                    `${baseURL}audit-report/images/${imagePreview.fileName}`
-                  }
-                  alt={imagePreview.fileName || imagePreview.name}
-                  className="max-w-full max-h-[70vh] object-contain rounded-lg"
-                  onError={(e) => {
-                    e.target.src =
-                      "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBOb3QgRm91bmQ8L3RleHQ+PC9zdmc+";
-                  }}
-                />
-              </div>
-
-              <div className="p-3 bg-gray-50 border-t flex justify-between items-center">
-                <span className="text-xs text-gray-500">
-                  {imagePreview.uploadedAt
-                    ? `Uploaded: ${new Date(imagePreview.uploadedAt).toLocaleString()}`
-                    : "Checkpoint Image"}
+            {/* Modal header */}
+            <div className="flex items-center justify-between p-3 bg-gray-800 text-white">
+              <div className="flex items-center gap-2">
+                <FaImage />
+                <span className="font-medium text-sm">
+                  {imagePreview.fileName || imagePreview.name || "Image"}
                 </span>
+                {imagePreview.size && (
+                  <span className="text-xs text-gray-400">
+                    ({formatFileSize(imagePreview.size)})
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => setImagePreview(null)}
+                className="p-1 hover:bg-gray-700 rounded transition"
+              >
+                <FaTimes />
+              </button>
+            </div>
 
+            {/* Modal image */}
+            <div className="p-4 flex items-center justify-center bg-gray-100">
+              <img
+                src={
+                  imagePreview.data ||
+                  `${baseURL}audit-report/images/${imagePreview.fileName}`
+                }
+                alt={imagePreview.fileName || imagePreview.name}
+                className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                onError={(e) => {
+                  e.target.src =
+                    "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBOb3QgRm91bmQ8L3RleHQ+PC9zdmc+";
+                }}
+              />
+            </div>
+
+            {/* Modal footer */}
+            <div className="p-3 bg-gray-50 border-t flex justify-between items-center">
+              <span className="text-xs text-gray-500">
+                {imagePreview.uploadedAt
+                  ? `Uploaded: ${new Date(imagePreview.uploadedAt).toLocaleString()}`
+                  : "Checkpoint Image"}
+              </span>
+              {/* Download: use base64 data blob when available (old format), else direct server URL */}
+              {imagePreview.data ? (
                 <a
-                  href={`${baseURL}audit-report/images/${imagePreview.fileName || imagePreview.name}/download`}
+                  href={imagePreview.data}
+                  download={
+                    imagePreview.name || imagePreview.fileName || "image"
+                  }
+                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
+                >
+                  <FaDownload size={12} /> Download
+                </a>
+              ) : (
+                <a
+                  href={`${baseURL}audit-report/images/${imagePreview.fileName}/download`}
                   download
                   className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
                 >
                   <FaDownload size={12} /> Download
                 </a>
-              </div>
+              )}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Sticky Header */}
+      <div className="mx-auto">
+        {/* ==================== Sticky Header ==================== */}
         <div className="sticky top-0 z-40 bg-gray-100/90 backdrop-blur border-b border-gray-200 shadow-sm p-4">
           <div className="mb-4 flex flex-wrap justify-between items-center gap-3">
             <div className="flex items-center gap-3">
@@ -991,7 +989,7 @@ const AuditView = () => {
               {getAuditStatusBadge(audit.status)}
             </div>
             <div className="flex flex-wrap gap-2">
-              {/* Export Dropdown */}
+              {/* Export dropdown */}
               <div className="relative">
                 <button
                   onClick={() => setShowExportMenu(!showExportMenu)}
@@ -1026,8 +1024,7 @@ const AuditView = () => {
                         }}
                         className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors"
                       >
-                        <FaFilePdf className="text-red-600" />
-                        Export as PDF
+                        <FaFilePdf className="text-red-600" /> Export as PDF
                       </button>
                       <hr className="border-gray-100" />
                       <button
@@ -1037,13 +1034,14 @@ const AuditView = () => {
                         }}
                         className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors"
                       >
-                        <FaFileExcel className="text-green-600" />
-                        Export as Excel
+                        <FaFileExcel className="text-green-600" /> Export as
+                        Excel
                       </button>
                     </div>
                   </>
                 )}
               </div>
+
               {audit.status !== "approved" && (
                 <button
                   onClick={() => navigate(`/auditreport/audits/${id}`)}
@@ -1072,7 +1070,7 @@ const AuditView = () => {
           </div>
         </div>
 
-        {/* Approval Info Banner */}
+        {/* ==================== Approval banner ==================== */}
         {(audit.status === "approved" || audit.status === "rejected") &&
           audit.approvedBy && (
             <div
@@ -1089,11 +1087,7 @@ const AuditView = () => {
                   <FaTimesCircle className="text-red-600" />
                 )}
                 <span
-                  className={`font-medium ${
-                    audit.status === "approved"
-                      ? "text-green-800"
-                      : "text-red-800"
-                  }`}
+                  className={`font-medium ${audit.status === "approved" ? "text-green-800" : "text-red-800"}`}
                 >
                   {audit.status === "approved" ? "Approved" : "Rejected"} by{" "}
                   {audit.approvedBy}
@@ -1112,7 +1106,7 @@ const AuditView = () => {
             </div>
           )}
 
-        {/* Main Report Container */}
+        {/* ==================== Main Report Container ==================== */}
         <div className="bg-white shadow-xl rounded-lg overflow-hidden border-2 border-gray-300">
           {/* Header Section */}
           <div className="grid grid-cols-1 md:grid-cols-3 border-b-2 border-gray-300">
@@ -1182,9 +1176,7 @@ const AuditView = () => {
               .map((field, index, arr) => (
                 <div
                   key={field.id}
-                  className={`p-4 ${
-                    index < arr.length - 1 ? "border-r border-gray-300" : ""
-                  }`}
+                  className={`p-4 ${index < arr.length - 1 ? "border-r border-gray-300" : ""}`}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     {getFieldIcon(field.id)}
@@ -1221,7 +1213,7 @@ const AuditView = () => {
                   return (
                     <div key={key} className="bg-white p-2 rounded border">
                       <span className="text-xs text-gray-500 uppercase block">
-                        {key.replace(/([A-Z])/g, " \$1").trim()}
+                        {key.replace(/([A-Z])/g, " $1").trim()}
                       </span>
                       <span className="font-medium text-gray-800">{value}</span>
                     </div>
@@ -1242,7 +1234,7 @@ const AuditView = () => {
             </p>
           </div>
 
-          {/* ==================== Main Table Section ==================== */}
+          {/* ==================== Main Table ==================== */}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -1293,14 +1285,16 @@ const AuditView = () => {
                           return (
                             <tr
                               key={`${section.id}-${stage.id}-${checkpoint.id}-${checkpointIndex}`}
-                              className={`border-b border-gray-200 ${
+                              className={`border-b border-gray-200 hover:bg-blue-50 transition-colors ${
                                 checkpoint.status === "pass"
                                   ? "bg-green-50"
                                   : checkpoint.status === "fail"
                                     ? "bg-red-50"
                                     : checkpoint.status === "warning"
                                       ? "bg-yellow-50"
-                                      : ""
+                                      : checkpoint.status === "na"
+                                        ? "bg-blue-50"
+                                        : ""
                               }`}
                             >
                               {visibleColumns.map((column) => {
@@ -1376,18 +1370,21 @@ const AuditView = () => {
                       );
                     });
                   } else {
+                    // No stages — flat checkpoints
                     return section.checkPoints?.map(
                       (checkpoint, checkpointIndex) => (
                         <tr
                           key={`${section.id}-${checkpoint.id}-${checkpointIndex}`}
-                          className={`border-b border-gray-200 ${
+                          className={`border-b border-gray-200 hover:bg-blue-50 transition-colors ${
                             checkpoint.status === "pass"
                               ? "bg-green-50"
                               : checkpoint.status === "fail"
                                 ? "bg-red-50"
                                 : checkpoint.status === "warning"
                                   ? "bg-yellow-50"
-                                  : ""
+                                  : checkpoint.status === "na"
+                                    ? "bg-blue-50"
+                                    : ""
                           }`}
                         >
                           {visibleColumns.map((column) => {
@@ -1454,19 +1451,21 @@ const AuditView = () => {
             </table>
           </div>
 
-          {/* Summary Section */}
+          {/* ==================== Summary Section (with N/A — 6 cards like AuditEntry) ==================== */}
           <div className="p-4 bg-gray-100 border-t-2 border-gray-300">
             <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
               <FaClipboardCheck className="text-blue-600" />
               Audit Summary
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+              {/* Total */}
               <div className="bg-white rounded-lg p-3 text-center shadow-sm border">
                 <div className="text-2xl font-bold text-gray-700">
                   {summary.total}
                 </div>
                 <span className="text-xs text-gray-500">Total Checks</span>
               </div>
+              {/* Pass */}
               <div className="bg-green-50 rounded-lg p-3 text-center shadow-sm border border-green-200">
                 <div className="flex items-center justify-center gap-1 text-green-700 font-bold text-2xl">
                   <FaCheckCircle className="text-lg" />
@@ -1474,6 +1473,7 @@ const AuditView = () => {
                 </div>
                 <span className="text-xs text-green-600">Passed</span>
               </div>
+              {/* Warning */}
               <div className="bg-yellow-50 rounded-lg p-3 text-center shadow-sm border border-yellow-200">
                 <div className="flex items-center justify-center gap-1 text-yellow-700 font-bold text-2xl">
                   <FaExclamationTriangle className="text-lg" />
@@ -1481,6 +1481,7 @@ const AuditView = () => {
                 </div>
                 <span className="text-xs text-yellow-600">Warnings</span>
               </div>
+              {/* Fail */}
               <div className="bg-red-50 rounded-lg p-3 text-center shadow-sm border border-red-200">
                 <div className="flex items-center justify-center gap-1 text-red-700 font-bold text-2xl">
                   <FaTimesCircle className="text-lg" />
@@ -1488,6 +1489,14 @@ const AuditView = () => {
                 </div>
                 <span className="text-xs text-red-600">Failed</span>
               </div>
+              {/* Not Applicable */}
+              <div className="bg-blue-50 rounded-lg p-3 text-center shadow-sm border border-blue-200">
+                <div className="text-2xl font-bold text-blue-600">
+                  {summary.na}
+                </div>
+                <span className="text-xs text-blue-500">Not Applicable</span>
+              </div>
+              {/* Pending */}
               <div className="bg-gray-50 rounded-lg p-3 text-center shadow-sm border border-gray-200">
                 <div className="text-2xl font-bold text-gray-500">
                   {summary.pending}
@@ -1496,7 +1505,7 @@ const AuditView = () => {
               </div>
             </div>
 
-            {/* Pass Rate */}
+            {/* Pass Rate bar */}
             <div className="mt-4">
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-gray-600">Pass Rate</span>
@@ -1511,18 +1520,14 @@ const AuditView = () => {
                 <div
                   className="bg-green-500 h-3 rounded-full transition-all"
                   style={{
-                    width: `${
-                      summary.total > 0
-                        ? (summary.pass / summary.total) * 100
-                        : 0
-                    }%`,
+                    width: `${summary.total > 0 ? (summary.pass / summary.total) * 100 : 0}%`,
                   }}
                 ></div>
               </div>
             </div>
           </div>
 
-          {/* Signature Section */}
+          {/* ==================== Signature Section ==================== */}
           <div className="grid grid-cols-1 md:grid-cols-2 border-t-2 border-gray-300">
             <div className="p-6 border-r border-b md:border-b-0 border-gray-300">
               <div className="flex items-center gap-2 mb-4 justify-center">
@@ -1581,20 +1586,16 @@ const AuditView = () => {
           </div>
         </div>
 
-        {/* Metadata Footer */}
+        {/* ==================== Metadata Footer ==================== */}
         <div className="mt-6">
           <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl shadow-sm p-6">
-            {/* Header */}
             <div className="flex items-center justify-between mb-5">
               <h4 className="text-sm font-semibold text-gray-800 tracking-wide uppercase">
                 Audit Metadata
               </h4>
               <div className="h-px flex-1 bg-gray-200 ml-4" />
             </div>
-
-            {/* Content Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-6 text-sm">
-              {/* Audit Code */}
               <div className="space-y-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                   Audit Code
@@ -1603,8 +1604,6 @@ const AuditView = () => {
                   {audit.auditCode || "-"}
                 </p>
               </div>
-
-              {/* Created By */}
               <div className="space-y-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                   Created By
@@ -1613,8 +1612,6 @@ const AuditView = () => {
                   {audit.createdBy || "-"}
                 </p>
               </div>
-
-              {/* Created At */}
               <div className="space-y-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                   Created At
@@ -1623,8 +1620,6 @@ const AuditView = () => {
                   {formatDateTimeForDisplay(audit.createdAt)}
                 </p>
               </div>
-
-              {/* Last Updated */}
               <div className="space-y-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                   Last Updated
@@ -1633,7 +1628,6 @@ const AuditView = () => {
                   {formatDateTimeForDisplay(audit.updatedAt)}
                 </p>
               </div>
-
               {audit.submittedBy && (
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
@@ -1644,7 +1638,6 @@ const AuditView = () => {
                   </p>
                 </div>
               )}
-
               {audit.submittedAt && (
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
@@ -1655,8 +1648,6 @@ const AuditView = () => {
                   </p>
                 </div>
               )}
-
-              {/* Template ID */}
               <div className="space-y-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                   Template ID
@@ -1665,8 +1656,6 @@ const AuditView = () => {
                   {audit.templateId}
                 </p>
               </div>
-
-              {/* Audit ID */}
               <div className="space-y-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                   Audit ID
@@ -1680,7 +1669,7 @@ const AuditView = () => {
         </div>
       </div>
 
-      {/* Approval Modal */}
+      {/* ==================== Approval Modal ==================== */}
       {showApprovalModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">

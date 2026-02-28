@@ -1,5 +1,5 @@
 import { useDispatch, useSelector } from "react-redux";
-import { closeGasChargingModal } from "../redux/gasChargingSlice";
+import { closeGasChargingModal } from "../redux/slices/gasChargingSlice.js";
 import {
   FaTimes,
   FaCheckCircle,

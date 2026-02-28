@@ -12,10 +12,10 @@ import {
   FaTimesCircle,
 } from "react-icons/fa";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
-import useAuditData from "../../hooks/useAuditData";
+import useAuditData from "../../../hooks/useAuditData";
 import toast from "react-hot-toast";
 import { useSelector } from "react-redux";
-import { ROLES } from "../../config/routes.config";
+import { ROLES } from "../../../config/routes.config";
 
 const TemplateList = () => {
   const { user } = useSelector((store) => store.auth);

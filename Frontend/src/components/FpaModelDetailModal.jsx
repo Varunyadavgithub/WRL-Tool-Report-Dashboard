@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { useLazyGetFpaByModelQuery } from "../redux/api/fpaReportApi";
-import { closeModelModal, openDefectModal } from "../redux/fpaReportSlice";
+import { closeModelModal, openDefectModal } from "../redux/slices/fpaReportSlice.js";
 import Loader from "./ui/Loader";
 import { HiOutlineClipboardList } from "react-icons/hi";
 import { IoCloseOutline } from "react-icons/io5";

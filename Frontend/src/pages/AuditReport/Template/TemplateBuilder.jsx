@@ -18,7 +18,7 @@ import {
 } from "react-icons/fa";
 import { MdAddCircle, MdOutlineFactCheck } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
-import useAuditData from "../../hooks/useAuditData";
+import useAuditData from "../../../hooks/useAuditData";
 import toast from "react-hot-toast";
 
 const TemplateBuilder = () => {

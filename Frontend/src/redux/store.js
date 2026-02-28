@@ -1,8 +1,8 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
-import authSlice from "./authSlice";
-import estReportSlice from "./estReportSlice";
-import gasChargingSlice from "./gasChargingSlice";
-import fpaReportReducer from "./fpaReportSlice";
+import authSlice from "./slices/authSlice.js";
+import estReportSlice from "./slices/estReportSlice.js";
+import gasChargingSlice from "./slices/gasChargingSlice.js";
+import fpaReportReducer from "./slices/fpaReportSlice.js";
 
 import { commonApi } from "./api/commonApi.js";
 import { taskReminderApi } from "./api/taskReminder.js";

@@ -3,7 +3,7 @@ import { assets, baseURL } from "../assets/assets";
 import { Link, useNavigate } from "react-router-dom";
 import { FiLogOut } from "react-icons/fi";
 import axios from "axios";
-import { logoutUser } from "../redux/authSlice";
+import { logoutUser } from "../redux/slices/authSlice.js";
 import toast from "react-hot-toast";
 
 const NavBar = () => {

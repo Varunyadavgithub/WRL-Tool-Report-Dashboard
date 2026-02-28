@@ -1,5 +1,5 @@
 import { useDispatch, useSelector } from "react-redux";
-import { closeDetailModal } from "../redux/estReportSlice.js";
+import { closeDetailModal } from "../redux/slices/estReportSlice.js";
 import {
   FaBolt,
   FaShieldAlt,
@@ -243,7 +243,8 @@ const ESTDetailModal = () => {
                   Date & Time
                 </span>
                 <p className="text-sm">
-                  {data.date_time && data.date_time.replace("T"," ").replace("Z","")}
+                  {data.date_time &&
+                    data.date_time.replace("T", " ").replace("Z", "")}
                 </p>
               </div>
               <div>
@@ -527,7 +528,8 @@ const ESTDetailModal = () => {
                     Date
                   </span>
                   <span className="font-bold text-xs">
-                    {data.date_time && data.date_time.replace("T"," ").replace("Z","")}
+                    {data.date_time &&
+                      data.date_time.replace("T", " ").replace("Z", "")}
                   </span>
                 </div>
                 <div className="flex justify-between items-center bg-white/20 backdrop-blur rounded-lg px-3 py-2">
@@ -607,7 +609,9 @@ const ESTDetailModal = () => {
         {/* Footer */}
         <div className="bg-gray-100 px-6 py-3 flex items-center justify-between border-t">
           <p className="text-xs text-gray-500">
-            Last updated: {data.date_time && data.date_time.replace("T"," ").replace("Z","")}
+            Last updated:{" "}
+            {data.date_time &&
+              data.date_time.replace("T", " ").replace("Z", "")}
           </p>
           <div className="flex gap-2">
             <button

@@ -8,7 +8,7 @@ import {
   setActiveQuickFilter,
   setDateRange,
   setPagination,
-} from "../redux/estReportSlice";
+} from "../redux/slices/estReportSlice.js";
 import {
   getTodayRange,
   getYesterdayRange,

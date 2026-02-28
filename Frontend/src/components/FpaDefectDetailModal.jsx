@@ -1,8 +1,7 @@
-// components/FpaDefectDetailModal.jsx
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLazyGetFpaDefectDetailsQuery } from "../redux/api/fpaReportApi";
-import { closeDefectModal } from "../redux/fpaReportSlice";
+import { closeDefectModal } from "../redux/slices/fpaReportSlice.js";
 import Loader from "./ui/Loader";
 import { IoCloseOutline } from "react-icons/io5";
 import { HiOutlineSearch } from "react-icons/hi";

@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useDispatch } from "react-redux";
-import { setAuthUser } from "../../redux/authSlice.js";
+import { setAuthUser } from "../../redux/slices/authSlice.js";
 import { assets, baseURL } from "../../assets/assets.js";
 import { FaEye, FaEyeSlash, FaUser, FaLock } from "react-icons/fa";
 

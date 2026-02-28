@@ -14,7 +14,7 @@ import {
   setFpaQuickFilter,
   resetFpaFilters,
   openModelModal,
-} from "../../redux/fpaReportSlice";
+} from "../../redux/slices/fpaReportSlice.js";
 import {
   getTodayRange,
   getYesterdayRange,
