@@ -5,6 +5,19 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Add at top of file, before the export
+const formatTime = (val) => {
+  if (!val || val === "-") return "-";
+  if (/^\d{2}:\d{2}/.test(String(val))) return String(val).slice(0, 5);
+  try {
+    const date = new Date(val);
+    if (isNaN(date.getTime())) return val;
+    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  } catch {
+    return val;
+  }
+};
+
 export const sendManpowerApprovalMail = async ({
   to,
   requestCode,
@@ -26,32 +39,34 @@ export const sendManpowerApprovalMail = async ({
   justification,
   employees = [],
   role,
-  pdfBuffer,                // ✅ optional PDF buffer
-  currentStatus = "Pending" // ✅ approval status tracker
+  pdfBuffer,
+  currentStatus = "Pending",
 }) => {
   try {
-
     const baseUrl = process.env.BACKEND_URL || "http://localhost:3000";
 
     const approveUrl = `${baseUrl}/api/v1/manpower/email-action/${requestCode}/${role}/approve`;
     const rejectUrl = `${baseUrl}/api/v1/manpower/email-action/${requestCode}/${role}/reject`;
+
+    // ✅ Security only receives the final list — no action buttons
+    const isSecurityRole = role === "Security";
 
     const employeeRows = employees.length
       ? employees
           .map(
             (emp, index) => `
         <tr>
-          <td>${index + 1}</td>
-          <td>${emp.empCode || ""}</td>
-          <td>${emp.empName || ""}</td>
-          <td>${emp.category || ""}</td>
-          <td>${emp.location || ""}</td>
-          <td>${emp.contactNo || ""}</td>
-          <td>${emp.travellingBy || ""}</td>
-        </tr>`
+          <td style="padding:6px;border:1px solid #ccc;text-align:center;">${index + 1}</td>
+          <td style="padding:6px;border:1px solid #ccc;">${emp.empCode || ""}</td>
+          <td style="padding:6px;border:1px solid #ccc;">${emp.empName || ""}</td>
+          <td style="padding:6px;border:1px solid #ccc;">${emp.category || ""}</td>
+          <td style="padding:6px;border:1px solid #ccc;">${emp.location || ""}</td>
+          <td style="padding:6px;border:1px solid #ccc;">${emp.contactNo || ""}</td>
+          <td style="padding:6px;border:1px solid #ccc;">${emp.travellingBy || ""}</td>
+        </tr>`,
           )
           .join("")
-      : `<tr><td colspan="7" style="text-align:center;">No Employees Added</td></tr>`;
+      : `<tr><td colspan="7" style="padding:8px;text-align:center;border:1px solid #ccc;">No Employees Added</td></tr>`;
 
     const mailOptions = {
       from: {
@@ -59,111 +74,123 @@ export const sendManpowerApprovalMail = async ({
         address: process.env.SMTP_USER,
       },
       to,
-      subject: `Manpower Approval Request - ${departmentName}`,
+      subject: isSecurityRole
+        ? `✅ Approved Manpower List — ${departmentName} (${requestCode})`
+        : `Manpower Approval Request — ${departmentName} (${requestCode})`,
 
-      // ✅ Attachments (Logo + PDF)
       attachments: [
         {
           filename: "wrl-logo.png",
           path: path.join(__dirname, "../../assets/wrl-logo.png"),
-          cid: "wrlLogo"
+          cid: "wrlLogo",
         },
         ...(pdfBuffer
-          ? [{
-              filename: `WRL-Manpower-${requestCode}.pdf`,
-              content: pdfBuffer
-            }]
-          : [])
+          ? [
+              {
+                filename: `WRL-Manpower-${requestCode}.pdf`,
+                content: pdfBuffer,
+              },
+            ]
+          : []),
       ],
 
       html: `
       <html>
       <body style="font-family:'Times New Roman', serif; background:#ffffff; padding:40px; color:#000;">
-
         <div style="max-width:900px;margin:auto;">
 
           <!-- HEADER -->
-          <div style="text-align:center;">
-            <img src="cid:wrlLogo" height="70"/><br/>
-            <h2 style="margin:0;">Western Refrigeration Pvt. Ltd.</h2>
-            <h3 style="margin:5px 0 20px 0;">Manpower Approval Request</h3>
+          <div style="text-align:center;background:#003366;padding:20px;border-radius:6px 6px 0 0;">
+            <img src="cid:wrlLogo" height="60" style="margin-bottom:8px;"/><br/>
+            <h2 style="margin:0;color:#fff;">Western Refrigeration Pvt. Ltd.</h2>
+            <h4 style="margin:5px 0 0 0;color:#cce0ff;">
+              ${isSecurityRole ? "Approved Manpower List" : "Manpower Approval Request"}
+            </h4>
           </div>
 
-          <hr style="border:1px solid #000;"/>
+          <hr style="border:1px solid #003366;margin:0;"/>
 
-          <!-- STATUS TRACKER -->
-          <div style="margin-top:15px;padding:8px;border:1px solid #000;">
+          <!-- STATUS BANNER -->
+          <div style="margin-top:15px;padding:10px 15px;border-left:5px solid #003366;background:#f0f4ff;">
             <strong>Current Status:</strong> ${currentStatus}
           </div>
 
           <!-- BASIC DETAILS -->
-          <table width="100%" style="margin-top:20px;font-size:15px;">
+          <table width="100%" style="margin-top:20px;font-size:14px;border-collapse:collapse;">
             <tr>
-              <td><strong>Request Code:</strong> ${requestCode}</td>
-              <td><strong>Department:</strong> ${departmentName}</td>
+              <td style="padding:6px;"><strong>Request Code:</strong> ${requestCode}</td>
+              <td style="padding:6px;"><strong>Department:</strong> ${departmentName}</td>
             </tr>
             <tr>
-              <td><strong>Required Date:</strong> ${
-                requiredDate
-                  ? new Date(requiredDate).toLocaleDateString()
-                  : "-"
-              }</td>
-              <td></td>
+              <td style="padding:6px;">
+                <strong>Required Date:</strong>
+                ${requiredDate ? new Date(requiredDate).toLocaleDateString("en-IN") : "-"}
+              </td>
+              <td style="padding:6px;"><strong>Responsible Staff:</strong> ${responsibleStaff || "-"}</td>
             </tr>
           </table>
 
           <!-- MANPOWER HEADCOUNT -->
-          <h4 style="margin-top:30px;">Manpower Headcount</h4>
-
-          <table border="1" cellpadding="8" cellspacing="0" width="100%" style="border-collapse:collapse;text-align:center;">
-            <tr>
-              <th></th>
+          <h4 style="margin-top:25px;color:#003366;">Manpower Headcount</h4>
+          <table border="1" cellpadding="8" cellspacing="0" width="100%"
+                 style="border-collapse:collapse;text-align:center;font-size:13px;">
+            <tr style="background:#003366;color:#fff;">
+              <th style="text-align:left;padding:8px;"></th>
               <th>DET</th>
               <th>ITI</th>
               <th>CASUAL</th>
+              <th>Total</th>
             </tr>
             <tr>
-              <td style="text-align:left;"><strong>Approved</strong></td>
+              <td style="text-align:left;padding:8px;"><strong>Approved</strong></td>
               <td>${approvedDET ?? 0}</td>
               <td>${approvedITI ?? 0}</td>
               <td>${approvedCASUAL ?? 0}</td>
+              <td><strong>${(+approvedDET || 0) + (+approvedITI || 0) + (+approvedCASUAL || 0)}</strong></td>
             </tr>
-            <tr>
-              <td style="text-align:left;"><strong>Actual Required</strong></td>
+            <tr style="background:#f9f9f9;">
+              <td style="text-align:left;padding:8px;"><strong>Actual Required</strong></td>
               <td>${actualDET ?? 0}</td>
               <td>${actualITI ?? 0}</td>
               <td>${actualCASUAL ?? 0}</td>
+              <td><strong>${(+actualDET || 0) + (+actualITI || 0) + (+actualCASUAL || 0)}</strong></td>
             </tr>
             <tr>
-              <td style="text-align:left;"><strong>Additional Required</strong></td>
+              <td style="text-align:left;padding:8px;"><strong>Additional Required</strong></td>
               <td>${additionalDET ?? 0}</td>
               <td>${additionalITI ?? 0}</td>
               <td>${additionalCASUAL ?? 0}</td>
+              <td><strong>${(+additionalDET || 0) + (+additionalITI || 0) + (+additionalCASUAL || 0)}</strong></td>
             </tr>
           </table>
 
           <!-- OVERTIME -->
-          <h4 style="margin-top:30px;">Overtime Details</h4>
-
-          <p>
-            <strong>From:</strong> ${overtimeFrom || "-"} &nbsp;&nbsp;
-            <strong>To:</strong> ${overtimeTo || "-"} &nbsp;&nbsp;
-            <strong>Total Hours:</strong> ${overtimeTotal ?? 0}
-          </p>
-
-          <!-- RESPONSIBLE STAFF -->
-          <h4>Responsible Staff</h4>
-          <p>${responsibleStaff || "-"}</p>
+          <h4 style="margin-top:25px;color:#003366;">Overtime Details</h4>
+          <table border="1" cellpadding="8" cellspacing="0" width="100%"
+                 style="border-collapse:collapse;text-align:center;font-size:13px;">
+            <tr style="background:#003366;color:#fff;">
+              <th>From</th>
+              <th>To</th>
+              <th>Total Hours</th>
+            </tr>
+            <tr>
+              <td>${overtimeFrom || "-"}</td>
+              <td>${overtimeTo || "-"}</td>
+              <td>${overtimeTotal ?? 0}</td>
+            </tr>
+          </table>
 
           <!-- JUSTIFICATION -->
-          <h4>Justification</h4>
-          <p>${justification || "-"}</p>
+          <h4 style="margin-top:25px;color:#003366;">Justification</h4>
+          <p style="border:1px solid #ccc;padding:10px;border-radius:4px;background:#fafafa;">
+            ${justification || "-"}
+          </p>
 
           <!-- EMPLOYEE LIST -->
-          <h4 style="margin-top:30px;">Employee List</h4>
-
-          <table border="1" cellpadding="6" cellspacing="0" width="100%" style="border-collapse:collapse;font-size:14px;">
-            <tr>
+          <h4 style="margin-top:25px;color:#003366;">Employee List</h4>
+          <table border="1" cellpadding="6" cellspacing="0" width="100%"
+                 style="border-collapse:collapse;font-size:13px;">
+            <tr style="background:#003366;color:#fff;">
               <th>#</th>
               <th>Emp Code</th>
               <th>Name</th>
@@ -178,46 +205,42 @@ export const sendManpowerApprovalMail = async ({
           <!-- SIGNATURE AREA -->
           <table width="100%" style="margin-top:50px;">
             <tr>
-              <td style="text-align:left;">
-                ___________________________<br/>
-                HOD Approval
-              </td>
-              <td style="text-align:center;">
-                ___________________________<br/>
-                HR Approval
-              </td>
-              <td style="text-align:right;">
-                ___________________________<br/>
-                Plant Head Approval
-              </td>
+              <td style="text-align:left;">___________________________<br/>HOD Approval</td>
+              <td style="text-align:center;">___________________________<br/>HR Approval</td>
+              <td style="text-align:right;">___________________________<br/>Plant Head Approval</td>
             </tr>
           </table>
 
-          <!-- ACTION BUTTONS -->
+          <!-- ✅ ACTION BUTTONS — hidden for Security -->
+          ${
+            !isSecurityRole
+              ? `
           <div style="text-align:center;margin-top:40px;">
             <a href="${approveUrl}"
-               style="background:#000;color:#fff;padding:10px 25px;
-                      text-decoration:none;border-radius:4px;">
-              APPROVE
+               style="background:#003366;color:#fff;padding:12px 30px;
+                      text-decoration:none;border-radius:4px;font-size:14px;margin-right:20px;">
+              ✅ APPROVE
             </a>
-
-            &nbsp;&nbsp;&nbsp;
-
             <a href="${rejectUrl}"
-               style="background:#555;color:#fff;padding:10px 25px;
-                      text-decoration:none;border-radius:4px;">
-              REJECT
+               style="background:#cc0000;color:#fff;padding:12px 30px;
+                      text-decoration:none;border-radius:4px;font-size:14px;">
+              ❌ REJECT
             </a>
-          </div>
+          </div>`
+              : `
+          <div style="text-align:center;margin-top:40px;padding:15px;
+                      background:#e8f5e9;border-radius:6px;border:1px solid #a5d6a7;">
+            <p style="margin:0;color:#2e7d32;font-size:14px;font-weight:bold;">
+              ✅ This manpower request has been fully approved. Please allow entry accordingly.
+            </p>
+          </div>`
+          }
 
-          <!-- FOOTER DISCLAIMER -->
-          <div style="margin-top:60px;font-size:11px;color:#444;">
-            <hr/>
-            <strong>DISCLAIMER:</strong><br/>
-            The information contained in this electronic message (email) and any attachments to this email are intended for the exclusive use
-            of the addressee(s) and access to this email by anyone else is unauthorized. The email may contain proprietary,
-            confidential or privileged information relating to Western Refrigeration Pvt. Ltd.
-            Any dissemination, distribution or copying of this communication is strictly prohibited.
+          <!-- FOOTER -->
+          <div style="margin-top:40px;font-size:11px;color:#666;border-top:1px solid #ccc;padding-top:10px;">
+            <strong>DISCLAIMER:</strong> The information contained in this electronic message and any attachments
+            are intended for the exclusive use of the addressee(s). Any dissemination, distribution or copying
+            of this communication is strictly prohibited. — Western Refrigeration Pvt. Ltd.
           </div>
 
         </div>
@@ -228,7 +251,6 @@ export const sendManpowerApprovalMail = async ({
 
     await transporter.sendMail(mailOptions);
     return true;
-
   } catch (error) {
     console.error("Mail error:", error);
     return false;
