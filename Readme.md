@@ -362,9 +362,11 @@ WRL-Tool-Report-Dashboard/
 │   │   │   └── useRoleAccess.js
 │   │   ├── pages/
 │   │   │   ├── AuditReport/
+│   │   │   ├── Audit/
 │   │   │   │   └── AuditEntry.jsx
 │   │   │   │   └── AuditList.jsx
 │   │   │   │   └── AuditView.jsx
+│   │   │   ├── Template/
 │   │   │   │   └── TemplateBuilder.jsx
 │   │   │   │   └── TemplateList.jsx
 │   │   │   ├── Auth/
