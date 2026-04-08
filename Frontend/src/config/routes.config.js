@@ -331,10 +331,6 @@ export const ROUTE_CONFIG = [
         component: BISStatus,
         roles: [
           ROLES.ADMIN,
-          ROLES.LINE_QUALITY_ENGINEER,
-          ROLES.BIS_ENGINEER,
-          ROLES.FPA,
-          ROLES.QUALITY_MANAGER,
         ],
       },
       {

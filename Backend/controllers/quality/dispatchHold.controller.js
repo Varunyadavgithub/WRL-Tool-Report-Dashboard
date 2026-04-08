@@ -4,45 +4,40 @@ import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { convertToIST } from "../../utils/convertToIST.js";
 
-// Get Model Name
+// ─── shared helper ───────────────────────────────────────────────────────────
+const openPool = (config) => new sql.ConnectionPool(config).connect();
+
+// ─── Get Model Name ──────────────────────────────────────────────────────────
 export const getModlelName = tryCatch(async (req, res) => {
   const { AssemblySerial } = req.query;
 
   if (!AssemblySerial) {
-    throw new AppError(
-      "Missing required query parameters: assemblySerial.",
-      400,
-    );
+    throw new AppError("Missing required query parameter: AssemblySerial.", 400);
   }
 
-  const query = `
-    SELECT m.Name AS combinedserial
-    FROM MaterialBarcode AS mb
-    INNER JOIN Material AS m ON m.MatCode = mb.Material
-    WHERE mb.Serial = @AssemblySerial;
-  `;
-
-  const pool = await sql.connect(dbConfig1);
-
+  const pool = await openPool(dbConfig1);
   try {
     const result = await pool
       .request()
       .input("AssemblySerial", sql.VarChar, AssemblySerial)
-      .query(query);
+      .query(`
+        SELECT m.Name AS combinedserial
+        FROM MaterialBarcode AS mb
+        INNER JOIN Material AS m ON m.MatCode = mb.Material
+        WHERE mb.Serial = @AssemblySerial;
+      `);
 
     res.status(200).json({
       success: true,
       message: "Model Name data retrieved successfully.",
       combinedserial: result.recordset[0]?.combinedserial || null,
     });
-  } catch (error) {
-    throw new AppError(`Failed to fetch model name: ${error.message}`, 500);
   } finally {
     await pool.close();
   }
 });
 
-// Hold Cabinet
+// ─── Hold Cabinet ────────────────────────────────────────────────────────────
 export const holdCabinet = tryCatch(async (req, res) => {
   const holds = req.body;
 
@@ -50,109 +45,121 @@ export const holdCabinet = tryCatch(async (req, res) => {
     throw new AppError("Empty or invalid holds array.", 400);
   }
 
-  for (const hold of holds) {
-    const { modelName, fgNo, userName, defect, formattedDate } = hold;
+  // ── Deduplicate serials in the incoming payload ──────────────────────────
+  const uniqueSerials = [...new Set(holds.map((h) => h.fgNo))];
+  if (uniqueSerials.length !== holds.length) {
+    throw new AppError(
+      "Duplicate FG serial numbers found in the request payload.",
+      400
+    );
+  }
 
-    const currDate = convertToIST(formattedDate);
+  const db1Pool = await openPool(dbConfig1);
+  const db2Pool = await openPool(dbConfig2);
 
-    /* 1️⃣ Check Hold Status */
-    const statusPool = await new sql.ConnectionPool(dbConfig1).connect();
-    try {
-      const statusResult = await statusPool
+  const failed = [];   // [{ fgNo, reason }]
+  const valid  = [];   // holds that passed all checks
+
+  try {
+    // ── Pre-flight checks — collect errors, don't throw ───────────────────
+    for (const hold of holds) {
+      const { fgNo } = hold;
+
+      // 1️⃣ Already on Hold?
+      const statusResult = await db1Pool
         .request()
         .input("FGNo", sql.VarChar, fgNo)
-        .query(
-          "SELECT serial FROM MaterialBarcode WHERE status = 11 AND serial = @FGNo",
-        );
+        .query("SELECT serial FROM MaterialBarcode WHERE status = 11 AND serial = @FGNo");
 
       if (statusResult.recordset.length) {
-        throw new AppError(`FGNo ${fgNo} is already on Hold.`, 400);
+        failed.push({ fgNo, reason: "Already on Hold" });
+        continue;
       }
-    } finally {
-      await statusPool.close();
-    }
 
-    /* 2️⃣ Check TempDispatch */
-    const tempPool = await new sql.ConnectionPool(dbConfig2).connect();
-    try {
-      const tempResult = await tempPool
+      // 2️⃣ In TempDispatch?
+      const tempResult = await db2Pool
         .request()
         .input("FGNo", sql.VarChar, fgNo)
         .query("SELECT Session_ID FROM TempDispatch WHERE FGSerialNo = @FGNo");
 
       if (tempResult.recordset.length) {
-        throw new AppError(
-          `FGNo ${fgNo} is loading under session ${tempResult.recordset[0].Session_ID}`,
-          400,
-        );
+        failed.push({
+          fgNo,
+          reason: `Being loaded under session ${tempResult.recordset[0].Session_ID}`,
+        });
+        continue;
       }
-    } finally {
-      await tempPool.close();
-    }
 
-    /* 3️⃣ Check DispatchMaster */
-    const dispatchPool = await new sql.ConnectionPool(dbConfig2).connect();
-    try {
-      const dispatchResult = await dispatchPool
+      // 3️⃣ Already Dispatched?
+      const dispatchResult = await db2Pool
         .request()
         .input("FGNo", sql.VarChar, fgNo)
-        .query(
-          "SELECT Session_ID FROM DispatchMaster WHERE FGSerialNo = @FGNo",
-        );
+        .query("SELECT Session_ID FROM DispatchMaster WHERE FGSerialNo = @FGNo");
 
       if (dispatchResult.recordset.length) {
-        throw new AppError(
-          `FGNo ${fgNo} already dispatched under session ${dispatchResult.recordset[0].Session_ID}`,
-          400,
-        );
+        failed.push({
+          fgNo,
+          reason: `Already dispatched under session ${dispatchResult.recordset[0].Session_ID}`,
+        });
+        continue;
       }
-    } finally {
-      await dispatchPool.close();
+
+      valid.push(hold);
     }
 
-    /* 4️⃣ Insert Hold (Transaction) */
-    const holdPool = await new sql.ConnectionPool(dbConfig1).connect();
-    const transaction = new sql.Transaction(holdPool);
-
-    try {
+    // ── Insert only the valid ones in a single transaction ────────────────
+    if (valid.length > 0) {
+      const transaction = new sql.Transaction(db1Pool);
       await transaction.begin();
-      await new sql.Request(transaction)
-        .input("ModelName", sql.VarChar, modelName)
-        .input("UserCode", sql.Int, userName)
-        .input("Defect", sql.VarChar, defect)
-        .input("FGNo", sql.VarChar, fgNo)
-        .input("HoldDateTime", sql.DateTime, currDate).query(`
-          INSERT INTO DispatchHold
-          (material, HoldUserCode, DefectCode, serial, HoldDateTime)
-          VALUES (
-            (SELECT TOP 1 MatCode FROM Material WHERE Name=@ModelName),
-            @UserCode,
-            @Defect,
-            @FGNo,
-            @HoldDateTime
-          );
 
-          UPDATE MaterialBarcode
-          SET Status = 11
-          WHERE Serial = @FGNo;
-        `);
+      try {
+        for (const hold of valid) {
+          const { modelName, fgNo, userName, defect, formattedDate } = hold;
+          const currDate = convertToIST(formattedDate);
 
-      await transaction.commit();
-    } catch (error) {
-      await transaction.rollback();
-      throw new AppError(`Hold failed: ${error.message}`, 500);
-    } finally {
-      await holdPool.close();
+          await new sql.Request(transaction)
+            .input("ModelName", sql.VarChar, modelName)
+            .input("UserCode", sql.Int, userName)
+            .input("Defect", sql.VarChar, defect)
+            .input("FGNo", sql.VarChar, fgNo)
+            .input("HoldDateTime", sql.DateTime, currDate).query(`
+              INSERT INTO DispatchHold
+                (material, HoldUserCode, DefectCode, serial, HoldDateTime)
+              VALUES (
+                (SELECT TOP 1 MatCode FROM Material WHERE Name = @ModelName),
+                @UserCode,
+                @Defect,
+                @FGNo,
+                @HoldDateTime
+              );
+
+              UPDATE MaterialBarcode
+              SET Status = 11
+              WHERE Serial = @FGNo;
+            `);
+        }
+
+        await transaction.commit();
+      } catch (error) {
+        await transaction.rollback();
+        throw new AppError(`Hold transaction failed: ${error.message}`, 500);
+      }
     }
+  } finally {
+    await db1Pool.close();
+    await db2Pool.close();
   }
 
+  // ── Build response summary ────────────────────────────────────────────────
   res.status(200).json({
     success: true,
-    message: "All eligible FG serial numbers held successfully.",
+    message: `${valid.length} serial(s) held successfully${failed.length ? `, ${failed.length} skipped` : ""}.`,
+    held:    valid.map((h) => h.fgNo),
+    skipped: failed,   // [{ fgNo, reason }]
   });
 });
 
-// Release Cabinet
+// ─── Release Cabinet ─────────────────────────────────────────────────────────
 export const releaseCabinet = tryCatch(async (req, res) => {
   const releases = req.body;
 
@@ -160,44 +167,80 @@ export const releaseCabinet = tryCatch(async (req, res) => {
     throw new AppError("Invalid or empty request body.", 400);
   }
 
-  for (const release of releases) {
-    const { fgNo, releaseUserCode, action, formattedDate } = release;
-
-    const currDate = convertToIST(formattedDate);
-
-    const pool = await new sql.ConnectionPool(dbConfig1).connect();
-    const transaction = new sql.Transaction(pool);
-
-    try {
-      await transaction.begin();
-
-      await new sql.Request(transaction)
-        .input("FGNo", sql.VarChar, fgNo)
-        .input("UserCode", sql.Int, releaseUserCode)
-        .input("Action", sql.VarChar, action)
-        .input("ReleaseDateTime", sql.DateTime, currDate).query(`
-          UPDATE DispatchHold
-          SET [Action]=@Action,
-              ReleasedUserCode=@UserCode,
-              ReleasedDateTime=@ReleaseDateTime
-          WHERE serial=@FGNo;
-
-          UPDATE MaterialBarcode
-          SET Status=1
-          WHERE Serial=@FGNo;
-        `);
-
-      await transaction.commit();
-    } catch (error) {
-      await transaction.rollback();
-      throw new AppError(`Release failed: ${error.message}`, 500);
-    } finally {
-      await pool.close();
-    }
+  // ── Deduplicate serials in the incoming payload ──────────────────────────
+  const uniqueSerials = [...new Set(releases.map((r) => r.fgNo))];
+  if (uniqueSerials.length !== releases.length) {
+    throw new AppError(
+      "Duplicate FG serial numbers found in the request payload.",
+      400
+    );
   }
 
+  const db1Pool = await openPool(dbConfig1);
+
+  const failed = [];
+  const valid  = [];
+
+  try {
+    // ── Pre-flight check — must be on Hold (status = 11) to release ───────
+    for (const release of releases) {
+      const { fgNo } = release;
+
+      const statusResult = await db1Pool
+        .request()
+        .input("FGNo", sql.VarChar, fgNo)
+        .query("SELECT serial FROM MaterialBarcode WHERE status = 11 AND serial = @FGNo");
+
+      if (!statusResult.recordset.length) {
+        failed.push({ fgNo, reason: "Not currently on Hold" });
+        continue;
+      }
+
+      valid.push(release);
+    }
+
+    // ── Release only the valid ones in a single transaction ───────────────
+    if (valid.length > 0) {
+      const transaction = new sql.Transaction(db1Pool);
+      await transaction.begin();
+
+      try {
+        for (const release of valid) {
+          const { fgNo, releaseUserCode, action, formattedDate } = release;
+          const currDate = convertToIST(formattedDate);
+
+          await new sql.Request(transaction)
+            .input("FGNo", sql.VarChar, fgNo)
+            .input("UserCode", sql.Int, releaseUserCode)
+            .input("Action", sql.VarChar, action)
+            .input("ReleaseDateTime", sql.DateTime, currDate).query(`
+              UPDATE DispatchHold
+              SET [Action]         = @Action,
+                  ReleasedUserCode = @UserCode,
+                  ReleasedDateTime = @ReleaseDateTime
+              WHERE serial = @FGNo;
+
+              UPDATE MaterialBarcode
+              SET Status = 1
+              WHERE Serial = @FGNo;
+            `);
+        }
+
+        await transaction.commit();
+      } catch (error) {
+        await transaction.rollback();
+        throw new AppError(`Release transaction failed: ${error.message}`, 500);
+      }
+    }
+  } finally {
+    await db1Pool.close();
+  }
+
+  // ── Build response summary ────────────────────────────────────────────────
   res.status(200).json({
     success: true,
-    message: "All FG serial numbers released successfully.",
+    message: `${valid.length} serial(s) released successfully${failed.length ? `, ${failed.length} skipped` : ""}.`,
+    released: valid.map((r) => r.fgNo),
+    skipped:  failed,   // [{ fgNo, reason }]
   });
 });

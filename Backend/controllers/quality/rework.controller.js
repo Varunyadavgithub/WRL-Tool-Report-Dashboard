@@ -2,276 +2,323 @@ import sql from "mssql";
 import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 
-// GET MODEL & CATEGORY BY ASSEMBLY SERIAL
-export const getReworkEntryDetailsByAssemblySerial = tryCatch(
-  async (req, res) => {
-    const { AssemblySerial } = req.query;
+// ─── Shared CTE (reused across all three rework handlers) ───────────────────
+const REWORK_BASE_CTE = `
+  WITH ReworkBase AS (
+    SELECT
+        ROW_NUMBER() OVER (ORDER BY pr.StartedOn) AS SrNo,
+        m.Alias               AS Model_Name,
+        mc.Name               AS Category,
+        w.Name                AS Station,
+        pr.ProcessCode        AS Process_Code,
+        it.Serial             AS Assembly_Sr_No,
+        pr.StartedOn          AS Rework_IN,
+        pr.CompletedOn        AS Rework_Out,
+        us.UserName,
+        s.Status              AS Rework_Status,
+        CONCAT(
+            DATEDIFF(DAY, pr.StartedOn, pr.CompletedOn), ':',
+            FORMAT((DATEDIFF(MINUTE, pr.StartedOn, pr.CompletedOn) / 60) % 24, 'D2'), ':',
+            FORMAT(DATEDIFF(MINUTE, pr.StartedOn, pr.CompletedOn) % 60, 'D2')
+        )                     AS Duration,
+        dct.Type              AS Defect_Category,
+        dc.Name               AS Defect,
+        rc.Type               AS Root_Cause,
+        rr.Type               AS Counter_Action,
+        it.ApproverRemark     AS Remark,
+        ih.Material           AS MatCode
+    FROM InspectionTrans it
+    INNER JOIN InspectionHeader ih
+        ON it.InspectionLotNo = ih.InspectionLotNo
+    INNER JOIN Material m
+        ON ih.Material = m.MatCode
+    LEFT  JOIN MaterialCategory mc
+        ON m.Category = mc.CategoryCode
+    INNER JOIN ProcessRouting pr
+        ON ih.DocNo = pr.PSNo
+       AND pr.ProcessCode = ih.Process
+    INNER JOIN WorkCenter w
+        ON pr.StationCode = w.StationCode
+    LEFT  JOIN Status s
+        ON ih.Status = s.ID
+    LEFT  JOIN InspectionDefect idf
+        ON it.ID = idf.ID
+    LEFT  JOIN DefectCodeMaster dc
+        ON idf.Defect = dc.Code
+    LEFT  JOIN DefectCategoryType dct
+        ON dc.DefectCategory = dct.ID
+    LEFT  JOIN RootCause rc
+        ON it.RootCause = rc.ID
+    LEFT  JOIN ReworkResolution rr
+        ON it.ReworkResolution = rr.ID
+    LEFT  JOIN Users us
+        ON it.ApprovedBy = us.UserCode
+    WHERE it.NextAction = 1
+      AND it.InspectedOn BETWEEN @startTime AND @endTime
+  )
+`;
 
-    if (!AssemblySerial) {
-      throw new AppError(
-        "Missing required query parameters: assemblySerial.",
-        400,
-      );
-    }
-
-    let pool;
-    try {
-      pool = await sql.connect(dbConfig1);
-
-      const query = `
-      SELECT
-        mb.Serial AS modelName,
-        mc.Name AS category
-      FROM MaterialBarcode mb
-      INNER JOIN Material m ON m.MatCode = mb.Material
-      INNER JOIN MaterialCategory mc ON mc.CategoryCode = m.Category
-      WHERE mb.Alias = @AssemblySerial;
-    `;
-
-      const result = await pool
-        .request()
-        .input("AssemblySerial", sql.VarChar, AssemblySerial)
-        .query(query);
-
-      if (!result.recordset.length) {
-        return res.json({ modelName: null, category: null });
-      }
-
-      res.status(200).json({
-        success: true,
-        message: "Rework Entry Details data retrieved successfully.",
-        data: result.recordset[0],
-      });
-    } catch (error) {
-      throw new AppError(
-        `Failed to fetch the Rework Entry Details By Assembly Serial data:${error.message}`,
-        500,
-      );
-    } finally {
-      await pool.close();
-    }
-  },
-);
-
-// REWORK IN  → INSERT NEW ROW
-export const createReworkInEntry = tryCatch(async (req, res) => {
-  const { AssemblySerial, ModelName, Category, Defect, Part, Shift, UserCode } =
-    req.body;
-
-  if (!AssemblySerial || !Defect || !Part || !Shift) {
-    throw new AppError(
-      "Missing required fields: AssemblySerial, Defect, Part or Shift.",
-      400,
-    );
-  }
-
-  let pool;
-  try {
-    pool = await sql.connect(dbConfig1);
-
-    // Prevent duplicate active IN
-    const checkQuery = `
-      SELECT 1
-      FROM ReworkEntry
-      WHERE SerialNumber = @AssemblySerial
-        AND Status = 'IN';
-    `;
-
-    const checkResult = await pool
-      .request()
-      .input("AssemblySerial", sql.VarChar, AssemblySerial)
-      .query(checkQuery);
-
-    if (checkResult.recordset.length > 0) {
-      return res
-        .status(409)
-        .json({ message: "Rework IN already exists for this Serial Number" });
-    }
-
-    const insertQuery = `
-      INSERT INTO ReworkEntry
-      (
-        SerialNumber,
-        ModelName,
-        Category,
-        Defect,
-        Part,
-        Shift,
-        Usercode,
-        ReworkInAt,
-        Status
-      )
-      VALUES
-      (
-        @AssemblySerial,
-        @ModelName,
-        @Category,
-        @Defect,
-        @Part,
-        @Shift,
-        @Usercode,
-        GETDATE(),
-        'IN'
-      );
-    `;
-
-    await pool
-      .request()
-      .input("AssemblySerial", sql.VarChar, AssemblySerial)
-      .input("ModelName", sql.VarChar, ModelName)
-      .input("Category", sql.VarChar, Category)
-      .input("Defect", sql.VarChar, Defect)
-      .input("Part", sql.VarChar, Part)
-      .input("Shift", sql.VarChar, Shift)
-      .input("Usercode", sql.VarChar, UserCode ? String(UserCode) : "Unknown")
-      .query(insertQuery);
-
-    res.status(201).json({ message: "Rework IN completed successfully" });
-  } catch (error) {
-    throw new AppError(
-      `Failed to create the Rework In Entry data:${error.message}`,
-      500,
-    );
-  } finally {
-    await pool.close();
-  }
-});
-
-// REWORK OUT  → UPDATE EXISTING IN ROW
-export const createReworkOutEntry = tryCatch(async (req, res) => {
-  const {
-    AssemblySerial,
-    RootCause,
-    FailCategory,
-    Origin,
-    ContainmentAction,
-    UserCode,
-  } = req.body;
-
-  if (
-    !AssemblySerial ||
-    !RootCause ||
-    !FailCategory ||
-    !Origin ||
-    !ContainmentAction
-  ) {
-    throw new AppError(
-      "Missing required fields: AssemblySerial, RootCause, FailCategory, Origin or ContainmentAction.",
-      400,
-    );
-  }
-
-  let pool;
-  try {
-    pool = await sql.connect(dbConfig1);
-
-    const updateQuery = `
-      UPDATE ReworkEntry
-      SET
-        RootCause = @RootCause,
-        FailCategory = @FailCategory,
-        Origin = @Origin,
-        ContainmentAction = @ContainmentAction,
-        Usercode = @Usercode,
-        ReworkOutAt = GETDATE(),
-        Status = 'OUT'
-      WHERE
-        SerialNumber = @AssemblySerial
-        AND Status = 'IN';
-    `;
-
-    const result = await pool
-      .request()
-      .input("AssemblySerial", sql.VarChar, AssemblySerial)
-      .input("RootCause", sql.VarChar, RootCause)
-      .input("FailCategory", sql.VarChar, FailCategory)
-      .input("Origin", sql.VarChar, Origin)
-      .input("ContainmentAction", sql.VarChar, ContainmentAction)
-      .input("Usercode", sql.VarChar, UserCode ? String(UserCode) : "Unknown")
-      .query(updateQuery);
-
-    if (result.rowsAffected[0] === 0) {
-      return res
-        .status(404)
-        .json({ message: "No active Rework IN found for this Serial Number" });
-    }
-
-    res.status(200).json({ message: "Rework OUT completed successfully" });
-  } catch (error) {
-    throw new AppError(
-      `Failed to create Rework Out Entry data:${error.message}`,
-      500,
-    );
-  } finally {
-    await pool.close();
-  }
-});
-
-// REWORK REPORT  → GET REWORK REPORT
+// ─── GET /rework-report  (paginated main table) ──────────────────────────────
 export const getReworkReport = tryCatch(async (req, res) => {
-  const { stage, lineType, startTime, endTime } = req.query;
+  const {
+    startTime,
+    endTime,
+    model,
+    page  = 1,
+    limit = 1000,
+  } = req.query;
 
-  if (!stage || !lineType || !startTime || !endTime) {
+  if (!startTime || !endTime) {
     throw new AppError(
-      "Missing required query parameters: starstage, lineType, startTime or endTime.",
-      400,
+      "Missing required query parameters: startTime and endTime",
+      400
     );
   }
 
-  let pool;
+  const istStart = convertToIST(startTime);
+  const istEnd   = convertToIST(endTime);
+  const offset   = (parseInt(page) - 1) * parseInt(limit);
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
   try {
-    pool = await sql.connect(dbConfig1);
-
-    let filters = [];
-    if (stage) filters.push(`Category = @stage`);
-    if (lineType) filters.push(`Shift LIKE @lineType + '%'`);
-    if (startTime) filters.push(`ReworkInAt >= @startTime`);
-    if (endTime) filters.push(`ReworkInAt <= @endTime`);
-
-    const whereClause = filters.length ? "WHERE " + filters.join(" AND ") : "";
+    const request = pool
+      .request()
+      .input("startTime", sql.DateTime, istStart)
+      .input("endTime",   sql.DateTime, istEnd)
+      .input("offset",    sql.Int,      offset)
+      .input("limit",     sql.Int,      parseInt(limit))
+      .input("model",     sql.VarChar,  model && model !== "0" ? model : null);
 
     const query = `
-      SELECT 
-        ReworkID,
-        SerialNumber,
-        ModelName,
-        Category,
-        Defect,
-        Part,
-        RootCause,
-        FailCategory,
-        Origin,
-        ContainmentAction,
-        Shift,
-        Usercode,
-        ReworkInAt,
-        ReworkOutAt,
-        Status
-      FROM ReworkEntry
-      ${whereClause}
-      ORDER BY ReworkInAt DESC
+      ${REWORK_BASE_CTE}
+      , Filtered AS (
+        SELECT * FROM ReworkBase
+        WHERE (@model IS NULL OR MatCode = @model)
+      )
+      SELECT
+        (SELECT COUNT(*) FROM Filtered) AS totalCount,
+        *
+      FROM Filtered
+      WHERE SrNo >  @offset
+        AND SrNo <= (@offset + @limit);
     `;
 
-    const request = pool.request();
-    if (stage) request.input("stage", sql.VarChar, stage);
-    if (lineType) request.input("lineType", sql.VarChar, lineType);
-    if (startTime) request.input("startTime", sql.DateTime, startTime);
-    if (endTime) request.input("endTime", sql.DateTime, endTime);
+    const result = await request.query(query);
+
+    res.status(200).json({
+      success:    true,
+      message:    "Rework report data retrieved successfully",
+      data:       result.recordset,
+      totalCount: result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
+    });
+  } catch (error) {
+    throw new AppError(`Failed to fetch rework report: ${error.message}`, 500);
+  } finally {
+    await pool.close();
+  }
+});
+
+// ─── GET /rework-report-export  (full dump, no pagination) ──────────────────
+export const getReworkReportExport = tryCatch(async (req, res) => {
+  const { startTime, endTime, model } = req.query;
+
+  if (!startTime || !endTime) {
+    throw new AppError(
+      "Missing required query parameters: startTime and endTime",
+      400
+    );
+  }
+
+  const istStart = convertToIST(startTime);
+  const istEnd   = convertToIST(endTime);
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
+    const request = pool
+      .request()
+      .input("startTime", sql.DateTime, istStart)
+      .input("endTime",   sql.DateTime, istEnd)
+      .input("model",     sql.VarChar,  model && model !== "0" ? model : null);
+
+    const query = `
+      ${REWORK_BASE_CTE}
+      SELECT *
+      FROM ReworkBase
+      WHERE (@model IS NULL OR MatCode = @model)
+      ORDER BY SrNo;
+    `;
 
     const result = await request.query(query);
 
     res.status(200).json({
       success: true,
-      message: "Rework Report data retrieved successfully.",
+      message: "Rework report export data retrieved successfully",
+      data:    result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(`Failed to export rework report: ${error.message}`, 500);
+  } finally {
+    await pool.close();
+  }
+});
+
+// ─── GET /rework-report-quick  (YDAY / TDAY / MTD — no pagination) ──────────
+export const getReworkReportQuick = tryCatch(async (req, res) => {
+  const { startTime, endTime, model } = req.query;
+
+  if (!startTime || !endTime) {
+    throw new AppError(
+      "Missing required query parameters: startTime and endTime",
+      400
+    );
+  }
+
+  const istStart = convertToIST(startTime);
+  const istEnd   = convertToIST(endTime);
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
+    const request = pool
+      .request()
+      .input("startTime", sql.DateTime, istStart)
+      .input("endTime",   sql.DateTime, istEnd)
+      .input("model",     sql.VarChar,  model && model !== "0" ? model : null);
+
+    const query = `
+      ${REWORK_BASE_CTE}
+      SELECT *
+      FROM ReworkBase
+      WHERE (@model IS NULL OR MatCode = @model)
+      ORDER BY SrNo;
+    `;
+
+    const result = await request.query(query);
+
+    res.status(200).json({
+      success:    true,
+      message:    "Rework quick filter data retrieved successfully",
+      data:       result.recordset,
       totalCount: result.recordset.length,
-      data: result.recordset,
     });
   } catch (error) {
     throw new AppError(
-      `Failed to fetch the Rework Report data:${error.message}`,
-      500,
+      `Failed to fetch rework quick data: ${error.message}`,
+      500
     );
+  } finally {
+    await pool.close();
+  }
+});
+
+// ─── GET /production-report ──────────────────────────────────────────────────
+// Returns per-model production counts for the given time range.
+// Uses Station 1220010, ActivityType = 5 (same as production SQL provided).
+// Response shape:
+//   {
+//     success: true,
+//     totalProduction: 4820,
+//     data: [
+//       { Model_Name: "ModelX", MatCode: "1220010", production_count: 1240 },
+//       ...
+//     ]
+//   }
+export const getProductionReport = tryCatch(async (req, res) => {
+  const { startTime, endTime, model } = req.query;
+
+  if (!startTime || !endTime) {
+    throw new AppError(
+      "Missing required query parameters: startTime and endTime",
+      400
+    );
+  }
+
+  const istStart = convertToIST(startTime);
+  const istEnd   = convertToIST(endTime);
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
+    const request = pool
+      .request()
+      .input("startTime", sql.DateTime, istStart)
+      .input("endTime",   sql.DateTime, istEnd)
+      .input("model",     sql.VarChar,  model && model !== "0" ? model : null);
+
+    // Wraps the provided production query and aggregates COUNT per model.
+    // Inner query is the exact SQL provided — no changes to logic.
+    const query = `
+      WITH FilteredData AS (
+          SELECT
+              mb.Material,
+              CASE WHEN mb.VSerial IS NULL THEN mb.Serial ELSE mb.Alias END AS Assembly_Sr_No,
+              pa.ActivityOn,
+              pa.StationCode,
+              pa.Operator,
+              mb.Serial,
+              mb.VSerial,
+              mb.Serial2
+          FROM MaterialBarcode mb
+          JOIN ProcessActivity pa ON pa.PSNo = mb.DocNo
+          JOIN WorkCenter wc      ON pa.StationCode = wc.StationCode
+          WHERE mb.PrintStatus = 1
+            AND mb.Status <> 99
+            AND pa.ActivityType = 5
+            AND pa.ActivityOn BETWEEN @startTime AND @endTime
+            AND wc.StationCode = 1220010
+      ),
+      ModelStats AS (
+          SELECT
+              MIN(Assembly_Sr_No) AS StartSerial,
+              MAX(Assembly_Sr_No) AS EndSerial,
+              Material
+          FROM FilteredData
+          GROUP BY Material
+      ),
+      Production AS (
+          SELECT
+              m.Name      AS Model_Name,
+              fd.Material AS MatCode,
+              fd.Assembly_Sr_No,
+              ms.StartSerial,
+              ms.EndSerial
+          FROM FilteredData fd
+          JOIN ModelStats ms  ON ms.Material = fd.Material
+          JOIN Material m     ON m.MatCode   = fd.Material
+          WHERE (@model IS NULL OR fd.Material = @model)
+      )
+      -- Aggregate: one row per model with total production count
+      SELECT
+          Model_Name,
+          MatCode,
+          COUNT(*)       AS production_count,
+          MIN(StartSerial) AS StartSerial,
+          MAX(EndSerial)   AS EndSerial
+      FROM Production
+      GROUP BY Model_Name, MatCode
+      ORDER BY production_count DESC;
+    `;
+
+    const result = await request.query(query);
+    const rows   = result.recordset;
+
+    const totalProduction = rows.reduce(
+      (sum, r) => sum + (Number(r.production_count) || 0),
+      0
+    );
+
+    res.status(200).json({
+      success:         true,
+      message:         "Production report data retrieved successfully",
+      totalProduction,
+      data:            rows,
+    });
+  } catch (error) {
+    throw new AppError(`Failed to fetch production report: ${error.message}`, 500);
   } finally {
     await pool.close();
   }

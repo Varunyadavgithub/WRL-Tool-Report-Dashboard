@@ -18,6 +18,16 @@ export const commonApi = createApi({
       providesTags: ["Common"],
     }),
 
+    getProductionLine: builder.query({
+      query: () => "shared/production-line",
+      transformResponse: (response) =>
+        response.data.map((item) => ({
+          label: item.Name,
+          value: item.LineCode.toString(),
+        })),
+      providesTags: ["Common"],
+    }),
+
     getModelVariantsByAssembly: builder.query({
       query: (serial) => `shared/model-variants/${serial}`,
       transformResponse: (response) =>
@@ -68,4 +78,5 @@ export const {
   useGetStagesQuery,
   useGetComponentTypesQuery,
   useGetEmployeesWithDepartmentsQuery,
+  useGetProductionLineQuery,
 } = commonApi;

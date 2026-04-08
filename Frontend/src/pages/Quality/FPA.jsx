@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Title from "../../components/ui/Title";
@@ -8,12 +8,15 @@ import SelectField from "../../components/ui/SelectField";
 import Loader from "../../components/ui/Loader";
 import { getFormattedISTDate } from "../../utils/dateUtils.js";
 import { baseURL } from "../../assets/assets.js";
-import { Bar } from "react-chartjs-2";
+import { Bar, Pie, Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   BarElement,
+  ArcElement,
+  PointElement,
+  LineElement,
   Title as ChartTitle,
   Tooltip,
   Legend,
@@ -24,20 +27,161 @@ ChartJS.register(
   CategoryScale,
   LinearScale,
   BarElement,
+  ArcElement,
+  PointElement,
+  LineElement,
   ChartTitle,
   Tooltip,
   Legend,
 );
 
-const FPA = () => {
-  const DefectCategory = [
-    { label: "No Defect", value: "no-defect" },
-    { label: "Minor", value: "minor" },
-    { label: "Major", value: "major" },
-    { label: "Critical", value: "critical" },
-  ];
+// ─── Severity config ─────────────────────────────────────────────────────────
+const SEVERITY = {
+  critical: {
+    color: "#ef4444",
+    bg: "bg-red-50",
+    badge: "bg-red-100 text-red-700",
+    label: "Critical",
+  },
+  major: {
+    color: "#f97316",
+    bg: "bg-orange-50",
+    badge: "bg-orange-100 text-orange-700",
+    label: "Major",
+  },
+  minor: {
+    color: "#eab308",
+    bg: "bg-yellow-50",
+    badge: "bg-yellow-100 text-yellow-700",
+    label: "Minor",
+  },
+  "no-defect": {
+    color: "#22c55e",
+    bg: "bg-green-50",
+    badge: "bg-green-100 text-green-700",
+    label: "No Defect",
+  },
+};
 
+const DefectCategory = [
+  { label: "No Defect", value: "no-defect" },
+  { label: "Minor", value: "minor" },
+  { label: "Major", value: "major" },
+  { label: "Critical", value: "critical" },
+];
+
+// ─── Stat Card ────────────────────────────────────────────────────────────────
+const StatCard = ({ label, value, accent, sub }) => (
+  <div
+    className="relative bg-white rounded-xl p-4 shadow-sm border border-gray-100 overflow-hidden"
+    style={{ borderLeft: `4px solid ${accent}` }}
+  >
+    <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">
+      {label}
+    </p>
+    <p className="text-3xl font-black" style={{ color: accent }}>
+      {value ?? "—"}
+    </p>
+    {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    <div
+      className="absolute -right-3 -bottom-3 w-16 h-16 rounded-full opacity-10"
+      style={{ background: accent }}
+    />
+  </div>
+);
+
+// ─── Image Preview Modal ──────────────────────────────────────────────────────
+const ImageModal = ({ src, onClose }) => {
+  if (!src) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative max-w-3xl w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute -top-10 right-0 text-white text-2xl font-bold hover:text-red-400"
+        >
+          ✕
+        </button>
+        <img
+          src={src}
+          alt="Defect"
+          className="w-full rounded-2xl shadow-2xl object-contain max-h-[80vh]"
+        />
+      </div>
+    </div>
+  );
+};
+
+// ─── Export CSV helper ────────────────────────────────────────────────────────
+const exportCSV = (data, filename) => {
+  if (!data || !data.length) {
+    toast.error("No data to export.");
+    return;
+  }
+  const keys = Object.keys(data[0]);
+  const csv = [
+    keys.join(","),
+    ...data.map((row) =>
+      keys
+        .map((k) => `"${String(row[k] ?? "").replace(/"/g, '""')}"`)
+        .join(","),
+    ),
+  ].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+// ─── FPQI Gauge ───────────────────────────────────────────────────────────────
+const FPQIGauge = ({ value, target = 2.2 }) => {
+  const v = parseFloat(value) || 0;
+  const pct = Math.min((v / (target * 2)) * 100, 100);
+  const ok = v <= target;
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative w-32 h-16 overflow-hidden">
+        {/* Semi-circle track */}
+        <div
+          className="absolute inset-0 rounded-t-full border-[12px] border-gray-200"
+          style={{ borderBottomColor: "transparent" }}
+        />
+        {/* Filled arc via conic gradient trick */}
+        <div
+          className="absolute inset-0 rounded-t-full border-[12px] transition-all duration-700"
+          style={{
+            borderColor: ok ? "#22c55e" : "#ef4444",
+            borderBottomColor: "transparent",
+            transform: `rotate(${pct * 1.8 - 180}deg)`,
+            transformOrigin: "50% 100%",
+          }}
+        />
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
+          <span
+            className={`text-xl font-black ${ok ? "text-green-600" : "text-red-600"}`}
+          >
+            {v.toFixed(2)}
+          </span>
+        </div>
+      </div>
+      <p className="text-xs text-gray-400">Target ≤ {target}</p>
+    </div>
+  );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+const FPA = () => {
   const [loading, setLoading] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
   const [barcodeNumber, setBarcodeNumber] = useState("");
   const [addManually, setAddManually] = useState(false);
   const [manualCategory, setManualCategory] = useState("");
@@ -45,8 +189,8 @@ const FPA = () => {
   const [selectedFpaDefectCategory, setSelectedFpaDefectCategory] =
     useState(null);
   const [fpaCountData, setFpaCountData] = useState([]);
-  const [assetDetails, setAssetDetails] = useState([]);
-  const [fpqiDetails, setFpqiDetails] = useState([]);
+  const [assetDetails, setAssetDetails] = useState({});
+  const [fpqiDetails, setFpqiDetails] = useState({});
   const [fpaDefect, setFpaDefect] = useState([]);
   const [remark, setRemark] = useState("");
   const [country, setCountry] = useState("India");
@@ -54,40 +198,52 @@ const FPA = () => {
     DefectCategory[0],
   );
   const [defectImage, setDefectImage] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
+  const [activeTab, setActiveTab] = useState("summary"); // "log" | "summary" | "trends"
+  const [search, setSearch] = useState("");
 
+  const barcodeRef = useRef(null);
+
+  // ── Auto-focus barcode on mount ──────────────────────────────────────────
+  useEffect(() => {
+    barcodeRef.current?.focus();
+  }, []);
+
+  // ── Barcode Enter key shortcut ───────────────────────────────────────────
+  const handleBarcodeKeyDown = (e) => {
+    if (e.key === "Enter") getAssetDetails();
+  };
+
+  // ── API calls ────────────────────────────────────────────────────────────
   const getFPACountData = async () => {
     try {
-      setLoading(true);
-
       const res = await axios.get(`${baseURL}quality/fpa-count`);
-      setFpaCountData(res?.data?.data);
-    } catch (error) {
-      console.error("Failed to fetch FPA Count data:", error);
+      setFpaCountData(res?.data?.data ?? []);
+    } catch {
       toast.error("Failed to fetch FPA Count data.");
-    } finally {
-      setLoading(false);
     }
   };
 
   const getAssetDetails = async () => {
-    if (!barcodeNumber) {
-      toast.error("Please select Barcode Number");
+    if (!barcodeNumber.trim()) {
+      toast.error("Please enter a Barcode Number.");
       return;
     }
-
     try {
       setLoading(true);
-      const params = {
-        AssemblySerial: barcodeNumber,
-      };
-
       const res = await axios.get(`${baseURL}quality/asset-details`, {
-        params,
+        params: { AssemblySerial: barcodeNumber.trim() },
       });
-      setAssetDetails(res?.data);
-    } catch (error) {
-      console.error("Failed to fetch Asset Details data:", error);
-      toast.error("Failed to fetch Asset Details data.");
+      const d = res?.data;
+      if (!d?.FGNo) {
+        toast.error("No asset found for this barcode.");
+        setAssetDetails({});
+      } else {
+        setAssetDetails(d);
+        toast.success("Asset found!");
+      }
+    } catch {
+      toast.error("Failed to fetch Asset Details.");
     } finally {
       setLoading(false);
     }
@@ -96,43 +252,39 @@ const FPA = () => {
   const getFPQIDetails = async () => {
     try {
       const res = await axios.get(`${baseURL}quality/fpqi-details`);
-      setFpqiDetails(res?.data?.data);
-    } catch (error) {
-      console.error("Failed to fetch FPQI Details data:", error);
-      toast.error("Failed to fetch FPQI Details data.");
+      setFpqiDetails(res?.data?.data ?? {});
+    } catch {
+      toast.error("Failed to fetch FPQI Details.");
     }
   };
 
   const getFpaDefect = async () => {
     try {
       const res = await axios.get(`${baseURL}quality/fpa-defect`);
-      setFpaDefect(res?.data?.data);
-    } catch (error) {
-      console.error("Failed to fetch Fpa Defect data:", error);
-      toast.error("Failed to fetch Fpa Defect data.");
+      setFpaDefect(res?.data?.data ?? []);
+    } catch {
+      toast.error("Failed to fetch FPA Defects.");
     }
   };
 
   const getFpaDefectCategory = async () => {
     try {
       const res = await axios.get(`${baseURL}quality/fpa-defect-category`);
-      const formatted = res?.data?.data.map((item) => ({
+      const formatted = (res?.data?.data ?? []).map((item) => ({
         label: item.Name,
         value: item.Code.toString(),
       }));
       setFpaDefectCategory(formatted);
-    } catch (error) {
-      console.error("Failed to fetch Fpa Defect Category data:", error);
-      toast.error("Failed to fetch Fpa Defect Category data.");
+    } catch {
+      toast.error("Failed to fetch Defect Categories.");
     }
   };
 
   const handleAddDefect = async () => {
-    if (!assetDetails.FGNo || !assetDetails.ModelName) {
-      toast.error("Asset details not available. Please scan a barcode.");
+    if (!assetDetails?.FGNo || !assetDetails?.ModelName) {
+      toast.error("Scan a valid barcode first.");
       return;
     }
-
     if (!selectedDefectCategory?.value) {
       toast.error("Please select a defect category.");
       return;
@@ -145,7 +297,6 @@ const FPA = () => {
       defectToAdd = addManually
         ? manualCategory?.trim()
         : selectedFpaDefectCategory?.label;
-
       if (!defectToAdd) {
         toast.error("Please select or enter a defect.");
         return;
@@ -153,436 +304,846 @@ const FPA = () => {
     }
 
     try {
-      setLoading(true);
-
-      const dynamicShift = getCurrentShift();
-
-      // ----------- FormData ----------
+      setSubmitLoading(true);
       const formData = new FormData();
       formData.append("model", assetDetails.ModelName);
-      formData.append("shift", dynamicShift.value);
+      formData.append("shift", getCurrentShift().value);
       formData.append("FGSerialNumber", assetDetails.FGNo);
       formData.append("Category", selectedDefectCategory.value);
       formData.append("AddDefect", defectToAdd);
       formData.append("Remark", remark);
       formData.append("currentDateTime", getFormattedISTDate());
       formData.append("country", country);
-
-      if (defectImage) {
-        formData.append("image", defectImage);
-      }
+      if (defectImage) formData.append("image", defectImage);
 
       const res = await axios.post(
         `${baseURL}quality/add-fpa-defect`,
         formData,
         {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+          headers: { "Content-Type": "multipart/form-data" },
         },
       );
 
       if (res?.data?.success) {
-        toast.success(res?.data?.message || "Defect added successfully!");
+        toast.success(res?.data?.message || "Defect recorded!");
         setRemark("");
         setManualCategory("");
         setSelectedFpaDefectCategory(null);
         setAddManually(false);
         setDefectImage(null);
-
-        getFpaDefect(); // Refresh defect table
-        getFPACountData(); // Refresh count data
-        getFPQIDetails(); // Refresh FPQI values
+        getFpaDefect();
+        getFPACountData();
+        getFPQIDetails();
       }
-    } catch (error) {
-      console.error("Add Defect Error:", error.response?.data || error.message);
-      toast.error("An error occurred while adding the defect.");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Error adding defect.");
     } finally {
-      setLoading(false);
+      setSubmitLoading(false);
     }
   };
 
   useEffect(() => {
-    getFPQIDetails();
-    getFpaDefect();
-    getFPACountData();
-    getFpaDefectCategory();
+    (async () => {
+      setLoading(true);
+      await Promise.all([
+        getFPQIDetails(),
+        getFpaDefect(),
+        getFPACountData(),
+        getFpaDefectCategory(),
+      ]);
+      setLoading(false);
+    })();
   }, []);
 
-  // Right side table Graph(FPA and Sample Inspected)
-  const chartData = {
-    labels: fpaCountData.map((item) => item.SampleInspected),
+  // ── Derived stats ─────────────────────────────────────────────────────────
+  const defectCategoryCounts = fpaDefect.reduce(
+    (acc, d) => {
+      const cat = (d.Category || "").toLowerCase();
+      if (acc[cat] !== undefined) acc[cat]++;
+      return acc;
+    },
+    { critical: 0, major: 0, minor: 0, "no-defect": 0 },
+  );
+
+  // Top 5 most frequent defects
+  const defectFrequency = fpaDefect.reduce((acc, d) => {
+    const key = d.AddDefect || "Unknown";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const top5Defects = Object.entries(defectFrequency)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5);
+
+  // Hourly trend (group by hour of Date)
+  const hourlyTrend = fpaDefect.reduce((acc, d) => {
+    if (!d.Date) return acc;
+    const h = new Date(d.Date).getHours();
+    const label = `${String(h).padStart(2, "0")}:00`;
+    acc[label] = (acc[label] || 0) + 1;
+    return acc;
+  }, {});
+  const sortedHours = Object.keys(hourlyTrend).sort();
+
+  // ── Chart configs ─────────────────────────────────────────────────────────
+  // BUG FIX: was using item.SampleInspected as label — now correctly uses ModelName
+  const barChartData = {
+    labels: fpaCountData.map((item) => item.ModelName),
     datasets: [
       {
-        label: "FPA",
+        label: "FPA Required",
         data: fpaCountData.map((item) => item.FPA),
-        backgroundColor: "rgba(99, 102, 241, 0.7)", // Indigo
+        backgroundColor: "rgba(99, 102, 241, 0.8)",
+        borderRadius: 6,
       },
       {
         label: "Sample Inspected",
         data: fpaCountData.map((item) => item.SampleInspected),
-        backgroundColor: "rgba(16, 185, 129, 0.7)", // Green
+        backgroundColor: "rgba(16, 185, 129, 0.8)",
+        borderRadius: 6,
       },
     ],
   };
 
-  const chartOptions = {
+  const barChartOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
-      legend: { position: "top" },
-      title: {
-        display: true,
-        text: "FPA vs Sample Inspected",
+      legend: { position: "top", labels: { font: { size: 11 } } },
+      title: { display: false },
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+      y: { grid: { color: "#f3f4f6" }, ticks: { font: { size: 10 } } },
+    },
+  };
+
+  const pieChartData = {
+    labels: ["Critical", "Major", "Minor", "No Defect"],
+    datasets: [
+      {
+        data: [
+          defectCategoryCounts.critical,
+          defectCategoryCounts.major,
+          defectCategoryCounts.minor,
+          defectCategoryCounts["no-defect"],
+        ],
+        backgroundColor: ["#ef4444", "#f97316", "#eab308", "#22c55e"],
+        borderWidth: 2,
+        borderColor: "#fff",
+      },
+    ],
+  };
+
+  const pieOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: "bottom",
+        labels: { font: { size: 11 }, padding: 12 },
       },
     },
   };
 
+  const trendChartData = {
+    labels: sortedHours,
+    datasets: [
+      {
+        label: "Defects per Hour",
+        data: sortedHours.map((h) => hourlyTrend[h]),
+        borderColor: "#6366f1",
+        backgroundColor: "rgba(99,102,241,0.1)",
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: "#6366f1",
+        pointRadius: 4,
+      },
+    ],
+  };
+
+  const trendOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+      y: {
+        grid: { color: "#f3f4f6" },
+        ticks: { stepSize: 1, font: { size: 10 } },
+      },
+    },
+  };
+
+  // ── Filtered defect table ─────────────────────────────────────────────────
+  const filteredDefects = fpaDefect.filter(
+    (d) =>
+      !search ||
+      [d.Model, d.FGSRNo, d.Category, d.AddDefect, d.Remark, d.Shift].some(
+        (v) =>
+          String(v || "")
+            .toLowerCase()
+            .includes(search.toLowerCase()),
+      ),
+  );
+
+  const fpqiOk = parseFloat(fpqiDetails?.FPQI || 0) <= 2.2;
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
-      <Title title="FPA" align="center" />
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <ImageModal src={previewImage} onClose={() => setPreviewImage(null)} />
 
-      {/* Filters Section */}
-      <div className="flex flex-col lg:flex-row gap-4">
-        {/* Left Card */}
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            {/* Barcode & Search */}
-            <div className="flex flex-col gap-4 items-start">
-              <InputField
-                label="Scan Barcode"
-                type="text"
-                placeholder="Enter Barcode Number"
-                className="w-56"
-                name="barcodeNumber"
-                value={barcodeNumber}
-                onChange={(e) => setBarcodeNumber(e.target.value)}
+      {/* ── Header ── */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center">
+            <svg
+              className="w-5 h-5 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
               />
-              <Button
-                bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
-                textColor={loading ? "text-white" : "text-black"}
-                className={`font-semibold ${
-                  loading ? "cursor-not-allowed" : ""
-                }`}
-                onClick={getAssetDetails}
-                disabled={loading}
-              >
-                Search
-              </Button>
-              <h1 className="font-semibold text-xl mt-2">
-                No of Sample Inspected:{" "}
-                <span className="text-blue-700 text-md">
-                  {fpqiDetails.TotalFGSRNo || "0"}
-                </span>
-              </h1>
-            </div>
-
-            {/* Info Section */}
-            <div className="flex flex-col gap-3">
-              <h1 className="font-semibold text-md">
-                FG No:{" "}
-                <span className="text-blue-700 text-sm">
-                  {assetDetails.FGNo || 0}
-                </span>
-              </h1>
-              <h1 className="font-semibold text-md">
-                Asset No:{" "}
-                <span className="text-blue-700 text-sm">
-                  {assetDetails.AssetNo || 0}
-                </span>
-              </h1>
-              <h1 className="font-semibold text-md">
-                Model Name:{" "}
-                <span className="text-blue-700 text-sm">
-                  {assetDetails.ModelName || 0}
-                </span>
-              </h1>
-            </div>
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-gray-900 leading-none">
+              FPA Dashboard
+            </h1>
+            <p className="text-xs text-gray-400">
+              First Pass Audit · {getCurrentShift().label} Shift
+            </p>
           </div>
         </div>
-
-        {/* Right Card */}
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md w-full lg:max-w-xs flex flex-col items-center justify-center gap-4">
-          <h1 className="font-bold text-2xl">FPQI</h1>
-          <div className="grid grid-cols-1 gap-4">
-            <div className="flex flex-col gap-2">
-              <h1 className="font-semibold text-md">
-                No. of Criticals:{" "}
-                <span className="text-blue-700 text-sm">
-                  {fpqiDetails.NoOfCritical || "0"}
-                </span>
-              </h1>
-              <h1 className="font-semibold text-md">
-                No. of Majors:{" "}
-                <span className="text-blue-700 text-sm">
-                  {fpqiDetails.NoOfMajor || "0"}
-                </span>
-              </h1>
-              <h1 className="font-semibold text-md">
-                No. of Miniors:{" "}
-                <span className="text-blue-700 text-sm">
-                  {fpqiDetails.NoOfMinor || "0"}
-                </span>
-              </h1>
-            </div>
-            <div className="flex gap-4">
-              <h1 className="font-semibold text-md">
-                Target FPQI Value:{" "}
-                <span className="text-blue-700 text-sm">1.4</span>
-              </h1>
-            </div>
-            <div className="text-center">
-              <h1 className="font-semibold text-lg">
-                FPQI Value:{" "}
-                <span className="text-green-700">
-                  {fpqiDetails.FPQI
-                    ? Number(fpqiDetails.FPQI).toFixed(2)
-                    : "0.00"}{" "}
-                </span>
-              </h1>
-            </div>
-          </div>
-        </div>
-
-        {/* Chart Section */}
-        <div
-          className="bg-white border border-gray-300 rounded-md p-4 mt-4 
-     flex flex-col items-center justify-start shadow 
-     w-full lg:w-[420px] h-[300px]"
-        >
-          <h2 className="text-center font-semibold mb-3">
-            FPA vs Sample Inspected
-          </h2>
-
-          <div className="w-full h-[230px] flex items-center justify-center">
-            <Bar data={chartData} options={chartOptions} />
-          </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-bold ${fpqiOk ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
+          >
+            FPQI:{" "}
+            {fpqiDetails?.FPQI ? Number(fpqiDetails.FPQI).toFixed(2) : "0.00"}
+            {fpqiOk ? " ✓" : " ⚠"}
+          </span>
+          <button
+            onClick={() => exportCSV(fpaDefect, "fpa_report.csv")}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition"
+          >
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+              />
+            </svg>
+            Export CSV
+          </button>
         </div>
       </div>
 
-      {/* Summary Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-md">
-        <div className="bg-white border border-gray-300 rounded-md p-2">
-          {/* Control */}
-          <div className="flex flex-wrap gap-4 items-start justify-start bg-gradient-to-r from-purple-100 via-white to-purple-100 p-4 rounded-lg shadow-sm mb-2">
-            <SelectField
-              label="Category"
-              options={DefectCategory}
-              value={selectedDefectCategory.value || ""}
-              onChange={(e) => {
-                const selected = DefectCategory.find(
-                  (item) => item.value === e.target.value,
-                );
-                setSelectedDefectCategory(selected);
-              }}
-              className="w-60"
-            />
-            <InputField
-              label="Country"
-              type="text"
-              placeholder="Enter Country"
-              className="max-w-40"
-              name="Country"
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-            />
-            <InputField
-              label="Current Shift"
-              type="text"
-              value={getCurrentShift().label}
-              readOnly
-              className="max-w-65"
-            />
-            {selectedDefectCategory?.value !== "no-defect" && (
-              <div className="flex flex-col gap-2 w-72">
-                {/* Radio Button Toggle */}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="addManually"
-                    checked={addManually}
-                    onChange={() => setAddManually(!addManually)}
-                    className="cursor-pointer"
-                  />
-                  <label
-                    htmlFor="addManually"
-                    className="cursor-pointer font-medium"
-                  >
-                    Add Defect Manually
-                  </label>
-                </div>
+      <div className="p-4 lg:p-6 space-y-5">
+        {/* ── KPI Row ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <StatCard
+            label="Inspected"
+            value={fpqiDetails?.TotalFGSRNo || 0}
+            accent="#6366f1"
+          />
+          <StatCard
+            label="Critical"
+            value={fpqiDetails?.NoOfCritical || 0}
+            accent="#ef4444"
+          />
+          <StatCard
+            label="Major"
+            value={fpqiDetails?.NoOfMajor || 0}
+            accent="#f97316"
+          />
+          <StatCard
+            label="Minor"
+            value={fpqiDetails?.NoOfMinor || 0}
+            accent="#eab308"
+          />
+          <StatCard
+            label="FPQI Value"
+            value={
+              fpqiDetails?.FPQI ? Number(fpqiDetails.FPQI).toFixed(2) : "0.00"
+            }
+            accent={fpqiOk ? "#22c55e" : "#ef4444"}
+            sub={`Target ≤ 1.4`}
+          />
+          <StatCard
+            label="Models Tracked"
+            value={fpaCountData.length}
+            accent="#8b5cf6"
+          />
+        </div>
 
-                {/* Conditional Rendering */}
-                {addManually ? (
-                  <InputField
-                    label="Manual Defect Category"
-                    type="text"
-                    placeholder="Enter defect category"
-                    value={manualCategory}
-                    onChange={(e) => setManualCategory(e.target.value)}
-                  />
-                ) : (
-                  <SelectField
-                    label="Select Defect Category"
-                    options={fpaDefectCategory}
-                    value={selectedFpaDefectCategory?.value || ""}
-                    onChange={(e) => {
-                      const selected = fpaDefectCategory.find(
-                        (option) => option.value === e.target.value,
-                      );
-                      setSelectedFpaDefectCategory(selected);
-                    }}
-                  />
-                )}
-              </div>
-            )}
-
-            <InputField
-              label="Remark"
-              type="text"
-              placeholder="Enter Remark"
-              className="w-64"
-              name="remark"
-              value={remark}
-              onChange={(e) => setRemark(e.target.value)}
-            />
-            {/* Upload Defect Image — shown only when category !== no-defect */}
-            {selectedDefectCategory?.value !== "no-defect" && (
-              <div className="flex flex-col">
-                <label className="font-medium mb-1">Defect Image</label>
+        {/* ── Scan / Asset Panel ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+          <h2 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wider">
+            Scan & Record
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            {/* Barcode + search */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-gray-500">
+                Barcode / Serial
+              </label>
+              <div className="flex gap-2">
                 <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setDefectImage(e.target.files[0])}
-                  className="border border-gray-300 p-2 rounded-md w-40 cursor-pointer"
+                  ref={barcodeRef}
+                  type="text"
+                  placeholder="Scan or type barcode…"
+                  value={barcodeNumber}
+                  onChange={(e) => setBarcodeNumber(e.target.value)}
+                  onKeyDown={handleBarcodeKeyDown}
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-transparent outline-none"
                 />
+                <button
+                  onClick={getAssetDetails}
+                  disabled={loading}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition"
+                >
+                  {loading ? "…" : "Search"}
+                </button>
+              </div>
+            </div>
 
-                {defectImage && (
-                  <p className="text-xs text-green-600 mt-1">
-                    Selected: {defectImage.name}
-                  </p>
-                )}
+            {/* Asset info */}
+            {assetDetails?.FGNo ? (
+              <div className="col-span-1 md:col-span-3 grid grid-cols-3 gap-3">
+                {[
+                  { label: "FG Number", value: assetDetails.FGNo },
+                  { label: "Asset No", value: assetDetails.AssetNo },
+                  { label: "Model Name", value: assetDetails.ModelName },
+                ].map(({ label, value }) => (
+                  <div
+                    key={label}
+                    className="bg-indigo-50 rounded-xl px-4 py-3"
+                  >
+                    <p className="text-xs text-indigo-400 font-semibold">
+                      {label}
+                    </p>
+                    <p className="text-sm font-bold text-indigo-900 truncate">
+                      {value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="col-span-1 md:col-span-3 flex items-center justify-center rounded-xl bg-gray-50 border-2 border-dashed border-gray-200 p-4">
+                <p className="text-sm text-gray-400">
+                  Scan a barcode to load asset details
+                </p>
               </div>
             )}
-
-            <Button
-              bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
-              textColor={loading ? "text-white" : "text-black"}
-              className={`font-semibold h-fit mt-6 ${
-                loading ? "cursor-not-allowed" : ""
-              }`}
-              onClick={handleAddDefect}
-              disabled={loading}
-            >
-              Add Defect
-            </Button>
           </div>
 
-          <div className="flex flex-col md:flex-row items-start gap-1">
-            {/* Left Side */}
-            <div className="w-full md:flex-1 flex flex-col gap-2">
-              {/* Left Side Table */}
-              {loading ? (
-                <Loader />
-              ) : (
-                <div className="w-full max-h-[600px] overflow-x-auto">
-                  <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
-                    <thead className="bg-gray-200 sticky top-0 z-10 text-center">
-                      <tr>
-                        <th className="px-1 py-1 border">Sr.No.</th>
-                        <th className="px-1 py-1 border">Date</th>
-                        <th className="px-1 py-1 border">Model</th>
-                        <th className="px-1 py-1 border">Shift</th>
-                        <th className="px-1 py-1 border">FG Sr.No</th>
-                        <th className="px-1 py-1 border">Category</th>
-                        <th className="px-1 py-1 border">Add Defect</th>
-                        <th className="px-1 py-1 border">Remark</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {fpaDefect && fpaDefect.length > 0 ? (
-                        fpaDefect.map((item, index) => (
-                          <tr
-                            key={index}
-                            className="hover:bg-gray-100 text-center"
-                          >
-                            <td className="px-1 py-1 border">{item.SRNo}</td>
-                            <td className="px-1 py-1 border">
-                              {item.Date &&
-                                item.Date.replace("T", " ").replace("Z", "")}
-                            </td>
-                            <td className="px-1 py-1 border">{item.Model}</td>
-                            <td className="px-1 py-1 border">{item.Shift}</td>
+          {/* Defect Form */}
+          <div className="mt-5 pt-5 border-t border-gray-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 items-end">
+              {/* Severity */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-500">
+                  Severity
+                </label>
+                <div className="flex gap-1 flex-wrap">
+                  {DefectCategory.map((cat) => {
+                    const s = SEVERITY[cat.value];
+                    const active = selectedDefectCategory?.value === cat.value;
+                    return (
+                      <button
+                        key={cat.value}
+                        onClick={() => setSelectedDefectCategory(cat)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition ${
+                          active
+                            ? `border-current ${s.badge}`
+                            : "border-transparent bg-gray-100 text-gray-400 hover:bg-gray-200"
+                        }`}
+                        style={active ? { borderColor: s.color } : {}}
+                      >
+                        {cat.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-                            <td className="px-1 py-1 border">{item.FGSRNo}</td>
-                            <td className="px-1 py-1 border">
+              {/* Defect picker (hidden when no-defect) */}
+              {selectedDefectCategory?.value !== "no-defect" && (
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-gray-500">
+                      Defect
+                    </label>
+                    <label className="flex items-center gap-1 text-xs cursor-pointer text-indigo-600">
+                      <input
+                        type="checkbox"
+                        checked={addManually}
+                        onChange={() => setAddManually(!addManually)}
+                        className="accent-indigo-600"
+                      />
+                      Manual
+                    </label>
+                  </div>
+                  {addManually ? (
+                    <input
+                      type="text"
+                      placeholder="Type defect…"
+                      value={manualCategory}
+                      onChange={(e) => setManualCategory(e.target.value)}
+                      className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
+                    />
+                  ) : (
+                    <select
+                      value={selectedFpaDefectCategory?.value || ""}
+                      onChange={(e) => {
+                        const selected = fpaDefectCategory.find(
+                          (o) => o.value === e.target.value,
+                        );
+                        setSelectedFpaDefectCategory(selected);
+                      }}
+                      className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-white"
+                    >
+                      <option value="">-- Select defect --</option>
+                      {fpaDefectCategory.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
+              {/* Country */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-500">
+                  Country
+                </label>
+                <input
+                  type="text"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
+                />
+              </div>
+
+              {/* Remark */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-500">
+                  Remark
+                </label>
+                <input
+                  type="text"
+                  placeholder="Optional remark…"
+                  value={remark}
+                  onChange={(e) => setRemark(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
+                />
+              </div>
+
+              {/* Image upload */}
+              {selectedDefectCategory?.value !== "no-defect" && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-gray-500">
+                    Defect Image{" "}
+                    {defectImage && <span className="text-green-600">✓</span>}
+                  </label>
+                  <label className="cursor-pointer border-2 border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-400 hover:border-indigo-400 hover:text-indigo-500 transition text-center">
+                    {defectImage ? defectImage.name : "Click to upload"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => setDefectImage(e.target.files[0])}
+                    />
+                  </label>
+                </div>
+              )}
+
+              {/* Submit */}
+              <button
+                onClick={handleAddDefect}
+                disabled={submitLoading}
+                className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 disabled:opacity-50 transition shadow-md shadow-indigo-200 self-end"
+              >
+                {submitLoading ? (
+                  <svg
+                    className="animate-spin w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v8z"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                )}
+                {submitLoading ? "Saving…" : "Add Defect"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Charts Row ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Bar: FPA vs Inspected */}
+          <div className="md:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+            <h3 className="text-sm font-bold text-gray-700 mb-3">
+              FPA Required vs. Inspected by Model
+            </h3>
+            <div className="h-52">
+              {fpaCountData.length ? (
+                <Bar data={barChartData} options={barChartOptions} />
+              ) : (
+                <div className="h-full flex items-center justify-center text-sm text-gray-400">
+                  No data
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Pie: Defect category split */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+            <h3 className="text-sm font-bold text-gray-700 mb-3">
+              Defect Category Split
+            </h3>
+            <div className="h-52">
+              {fpaDefect.length ? (
+                <Pie data={pieChartData} options={pieOptions} />
+              ) : (
+                <div className="h-full flex items-center justify-center text-sm text-gray-400">
+                  No data
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Second Charts Row ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Hourly trend */}
+          <div className="md:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+            <h3 className="text-sm font-bold text-gray-700 mb-3">
+              Defect Trend (Hourly)
+            </h3>
+            <div className="h-44">
+              {sortedHours.length ? (
+                <Line data={trendChartData} options={trendOptions} />
+              ) : (
+                <div className="h-full flex items-center justify-center text-sm text-gray-400">
+                  No hourly data yet
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Top 5 defects */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+            <h3 className="text-sm font-bold text-gray-700 mb-3">
+              Top Defects Today
+            </h3>
+            {top5Defects.length ? (
+              <div className="space-y-2">
+                {top5Defects.map(([name, count], i) => {
+                  const pct = Math.round((count / fpaDefect.length) * 100);
+                  return (
+                    <div key={i}>
+                      <div className="flex justify-between text-xs mb-0.5">
+                        <span className="text-gray-600 font-medium truncate max-w-[70%]">
+                          {name}
+                        </span>
+                        <span className="font-bold text-indigo-700">
+                          {count} ({pct}%)
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-gray-100 rounded-full">
+                        <div
+                          className="h-full bg-indigo-500 rounded-full"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-32 text-sm text-gray-400">
+                No defects recorded
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Tabs: Defect Log / Model Summary ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 pt-4 pb-0 border-b border-gray-100">
+            <div className="flex gap-1">
+              {[
+                { key: "summary", label: "Model Summary" },
+                { key: "log", label: "Defect Log" },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition ${
+                    activeTab === key
+                      ? "border-indigo-600 text-indigo-700 bg-indigo-50"
+                      : "border-transparent text-gray-400 hover:text-gray-700"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Search */}
+            {activeTab === "log" && (
+              <div className="flex items-center gap-2 pb-2">
+                <input
+                  type="text"
+                  placeholder="Search defects…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-indigo-400 outline-none w-48"
+                />
+                <button
+                  onClick={() => exportCSV(filteredDefects, "fpa_defects.csv")}
+                  className="text-xs text-indigo-600 font-semibold hover:underline"
+                >
+                  Export
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 overflow-x-auto max-h-[480px] overflow-y-auto">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : activeTab === "log" ? (
+              /* Defect Log Table */
+              <table className="min-w-full text-xs">
+                <thead>
+                  <tr className="bg-gray-50 text-left text-gray-500 uppercase tracking-wider">
+                    {[
+                      "#",
+                      "Date & Time",
+                      "Model",
+                      "Shift",
+                      "FG Serial",
+                      "Category",
+                      "Defect",
+                      "Remark",
+                      "Image",
+                    ].map((h) => (
+                      <th
+                        key={h}
+                        className="px-3 py-2 font-semibold whitespace-nowrap border-b border-gray-200"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredDefects.length ? (
+                    filteredDefects.map((item, index) => {
+                      const cat = (item.Category || "").toLowerCase();
+                      const sev = SEVERITY[cat] || {};
+                      return (
+                        <tr
+                          key={index}
+                          className="hover:bg-slate-50 transition"
+                        >
+                          <td className="px-3 py-2 text-gray-400">
+                            {item.SRNo}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-gray-600">
+                            {item.Date
+                              ? new Date(item.Date).toLocaleString("en-IN")
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2 font-medium text-gray-800">
+                            {item.Model}
+                          </td>
+                          <td className="px-3 py-2">{item.Shift}</td>
+                          <td className="px-3 py-2 font-mono">{item.FGSRNo}</td>
+                          <td className="px-3 py-2">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-xs font-bold ${sev.badge || "bg-gray-100 text-gray-600"}`}
+                            >
                               {item.Category}
-                            </td>
-                            <td className="px-1 py-1 border">
-                              {item.AddDefect}
-                            </td>
-                            <td className="px-1 py-1 border">{item.Remark}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={8} className="text-center py-4">
-                            No data found.
+                            </span>
                           </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Right Side */}
-            <div className="w-full md:w-[30%] flex flex-col gap-2 overflow-x-hidden">
-              {/* Right Side Table */}
-              {loading ? (
-                <Loader />
-              ) : (
-                <div className="w-full max-h-[500px] overflow-x-auto">
-                  <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
-                    <thead className="bg-gray-200 sticky top-0 z-10 text-center">
-                      <tr>
-                        <th className="px-1 py-1 border">Model Name</th>
-                        <th className="px-1 py-1 border">Model Count</th>
-                        <th className="px-1 py-1 border">FPA</th>
-                        <th className="px-1 py-1 border">Sample Inspected</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {fpaCountData && fpaCountData.length > 0 ? (
-                        fpaCountData.map((item, index) => (
-                          <tr
-                            key={index}
-                            className="hover:bg-gray-100 text-center"
+                          <td
+                            className="px-3 py-2 max-w-[160px] truncate"
+                            title={item.AddDefect}
                           >
-                            <td className="px-1 py-1 border">
-                              {item.ModelName}
-                            </td>
-                            <td className="px-1 py-1 border">
-                              {item.ModelCount}
-                            </td>
-                            <td className="px-1 py-1 border">{item.FPA}</td>
-                            <td className="px-1 py-1 border">
-                              {item.SampleInspected}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={4} className="text-center py-4">
-                            No data found.
+                            {item.AddDefect}
+                          </td>
+                          <td
+                            className="px-3 py-2 text-gray-400 max-w-[120px] truncate"
+                            title={item.Remark}
+                          >
+                            {item.Remark || "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {item.DefectImage ? (
+                              <button
+                                onClick={() =>
+                                  setPreviewImage(
+                                    `${baseURL}uploads/FpaDefectImages/${item.DefectImage}`,
+                                  )
+                                }
+                                className="text-indigo-600 underline hover:text-indigo-800 text-xs"
+                              >
+                                View
+                              </button>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
                           </td>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={9}
+                        className="text-center py-10 text-gray-400"
+                      >
+                        No records found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              /* Model Summary Table */
+              <table className="min-w-full text-xs">
+                <thead>
+                  <tr className="bg-gray-50 text-left text-gray-500 uppercase tracking-wider">
+                    {[
+                      "Model Name",
+                      "Total Produced",
+                      "FPA Required",
+                      "Inspected",
+                      "Coverage %",
+                    ].map((h) => (
+                      <th
+                        key={h}
+                        className="px-3 py-2 font-semibold border-b border-gray-200 whitespace-nowrap"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {fpaCountData.length ? (
+                    fpaCountData.map((item, index) => {
+                      const coverage =
+                        item.FPA > 0
+                          ? Math.min(
+                              Math.round(
+                                (item.SampleInspected / item.FPA) * 100,
+                              ),
+                              100,
+                            )
+                          : 0;
+                      const coverageColor =
+                        coverage >= 100
+                          ? "text-green-600"
+                          : coverage >= 50
+                            ? "text-orange-500"
+                            : "text-red-500";
+                      return (
+                        <tr
+                          key={index}
+                          className="hover:bg-slate-50 transition"
+                        >
+                          <td className="px-3 py-2 font-medium text-gray-800">
+                            {item.ModelName}
+                          </td>
+                          <td className="px-3 py-2">{item.ModelCount}</td>
+                          <td className="px-3 py-2 font-semibold text-indigo-700">
+                            {item.FPA}
+                          </td>
+                          <td className="px-3 py-2">{item.SampleInspected}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-24 h-2 bg-gray-100 rounded-full">
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${coverage}%`,
+                                    background:
+                                      coverage >= 100
+                                        ? "#22c55e"
+                                        : coverage >= 50
+                                          ? "#f97316"
+                                          : "#ef4444",
+                                  }}
+                                />
+                              </div>
+                              <span className={`font-bold ${coverageColor}`}>
+                                {coverage}%
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="text-center py-10 text-gray-400"
+                      >
+                        No model data available.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>

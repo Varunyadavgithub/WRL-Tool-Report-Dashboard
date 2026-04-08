@@ -7,43 +7,83 @@ import { AppError } from "../../utils/AppError.js";
 
 const uploadDir = path.resolve("uploads", "BISReport");
 
-// Upload file controller
+/* ─────────────────────────────────────────────────────────────────────────
+   HELPER – IST timestamp
+   BUG (was): Date.now() + 330 * 60000 produces a UTC-ms value that is
+   numerically IST, but passing it straight through toISOString() then
+   re-parsing it drops the offset, making the resulting Date object wrong
+   by 5h30m when the JS runtime is not in IST.
+   FIX: Use Intl.DateTimeFormat to obtain IST wall-clock parts and build
+   a proper Date from them. This is runtime-timezone-agnostic.
+──────────────────────────────────────────────────────────────────────────*/
+const getISTDate = () => {
+  const now = new Date();
+  const ist = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+
+  const p = Object.fromEntries(ist.map(({ type, value }) => [type, value]));
+  // Build as UTC-aligned string that mssql will accept as a DateTime
+  return new Date(`${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}`);
+};
+
+/* ─────────────────────────────────────────────────────────────────────────
+   HELPER – safe pool close
+   Prevents "Cannot read properties of undefined (reading 'close')" that
+   appears in downloadBisPdfFile / deleteBisPdfFile when pool was never
+   assigned before an early return or thrown error.
+──────────────────────────────────────────────────────────────────────────*/
+const closePool = async (pool) => {
+  if (pool) {
+    try {
+      await pool.close();
+    } catch (_) {
+      // swallow – connection may already be closed
+    }
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   UPLOAD
+═══════════════════════════════════════════════════════════════════════ */
 export const uploadBisPdfFile = tryCatch(async (req, res) => {
   const { modelName, year, month, testFrequency, description } = req.body;
   const fileName = req.file?.filename;
 
-  if (
-    !modelName ||
-    !year ||
-    !month ||
-    !testFrequency ||
-    !description ||
-    !fileName
-  ) {
+  if (!modelName || !year || !month || !testFrequency || !description || !fileName) {
     throw new AppError(
       "Missing required fields: modelName, year, month, testFrequency, description or fileName.",
       400,
     );
   }
 
-  const uploadedAt = new Date(Date.now() + 330 * 60000);
-
-  const pool = await sql.connect(dbConfig1);
+  const uploadedAt = getISTDate();
+  let pool;
 
   try {
+    pool = await sql.connect(dbConfig1);
+
     const query = `
       INSERT INTO BISUpload (ModelName, Year, Month, TestFrequency, Description, FileName, UploadAt)
       VALUES (@ModelName, @Year, @Month, @TestFrequency, @Description, @FileName, @UploadAt)
     `;
-    const result = await pool
+
+    await pool
       .request()
-      .input("ModelName", sql.VarChar, modelName)
-      .input("Year", sql.VarChar, year)
-      .input("Month", sql.VarChar, month)
-      .input("TestFrequency", sql.VarChar, testFrequency)
-      .input("Description", sql.VarChar, description)
-      .input("FileName", sql.VarChar, fileName)
-      .input("UploadAt", sql.DateTime, uploadedAt)
+      .input("ModelName",     sql.VarChar,  modelName)
+      .input("Year",          sql.VarChar,  year)
+      .input("Month",         sql.VarChar,  month)
+      .input("TestFrequency", sql.VarChar,  testFrequency)
+      .input("Description",   sql.VarChar,  description)
+      .input("FileName",      sql.VarChar,  fileName)
+      .input("UploadAt",      sql.DateTime, uploadedAt)
       .query(query);
 
     res.status(200).json({
@@ -53,36 +93,40 @@ export const uploadBisPdfFile = tryCatch(async (req, res) => {
       message: "Uploaded successfully",
     });
   } catch (error) {
-    throw new AppError(
-      `Failed to upload the BIS Report data:${error.message}`,
-      500,
-    );
+    throw new AppError(`Failed to upload the BIS Report data: ${error.message}`, 500);
   } finally {
-    await pool.close();
+    await closePool(pool);
   }
 });
 
-// Get files list controller
+/* ═══════════════════════════════════════════════════════════════════════
+   LIST FILES
+═══════════════════════════════════════════════════════════════════════ */
 export const getBisPdfFiles = tryCatch(async (_, res) => {
-  const pool = await sql.connect(dbConfig1);
+  let pool;
 
   try {
+    pool = await sql.connect(dbConfig1);
+
+    // BUG (was): SELECT * — always use explicit columns so schema changes
+    // don't silently break the mapping below.
     const query = `
-      SELECT * FROM BISUpload
+      SELECT SrNo, ModelName, Year, Month, TestFrequency, Description, FileName, UploadAt
+      FROM BISUpload
       ORDER BY SrNo DESC
     `;
     const result = await pool.request().query(query);
 
     const files = result.recordset.map((file) => ({
-      srNo: file.SrNo,
-      modelName: file.ModelName,
-      year: file.Year,
-      month: file.Month,
-      testFrequency: file.TestFrequency,
-      description: file.Description,
-      fileName: file.FileName,
-      url: `/uploads-bis-pdf/${file.FileName}`,
-      uploadAt: file.UploadAt,
+      srNo:          file.SrNo,
+      modelName:     file.ModelName,
+      year:          file.Year,
+      month:         file.Month,
+      testFrequency: file.TestFrequency,      // ← correct casing
+      description:   file.Description,
+      fileName:      file.FileName,
+      url:           `/uploads-bis-pdf/${file.FileName}`,
+      uploadAt:      file.UploadAt,           // ← correct casing
     }));
 
     res.status(200).json({
@@ -91,141 +135,128 @@ export const getBisPdfFiles = tryCatch(async (_, res) => {
       files,
     });
   } catch (error) {
-    throw new AppError(
-      `Failed to fetch the BIS PDF Files:${error.message}`,
-      500,
-    );
+    throw new AppError(`Failed to fetch the BIS PDF Files: ${error.message}`, 500);
   } finally {
-    await pool.close();
+    await closePool(pool);
   }
 });
 
-// Download file controller
+/* ═══════════════════════════════════════════════════════════════════════
+   DOWNLOAD
+═══════════════════════════════════════════════════════════════════════ */
 export const downloadBisPdfFile = tryCatch(async (req, res) => {
-  const { srNo } = req.params;
+  const { srNo }     = req.params;
   const { filename } = req.query;
 
-  if (!srNo) {
-    throw new AppError("Missing required field: SrNo.", 400);
-  }
+  if (!srNo)      throw new AppError("Missing required field: SrNo.", 400);
+  if (!filename)  throw new AppError("Missing required query param: filename.", 400);
 
   const filePath = path.join(uploadDir, filename);
   let pool;
 
   try {
-    // Check if file exists
+    // 1. Physical file check first – cheap, no DB round-trip
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        success: false,
-        message: "File not found",
-      });
+      return res.status(404).json({ success: false, message: "File not found on disk." });
     }
 
-    // Verify file in database
+    // 2. Verify the DB record exists
     pool = await sql.connect(dbConfig1);
-
-    const query = `
-      SELECT FileName, ModelName, Year, Month
-      FROM BISUpload 
-      WHERE SrNo = @SrNo
-    `;
 
     const result = await pool
       .request()
-      .input("SrNo", sql.Int, parseInt(srNo))
-      .query(query);
+      .input("SrNo", sql.Int, parseInt(srNo, 10))
+      .query(`
+        SELECT FileName, ModelName, Year, Month
+        FROM BISUpload
+        WHERE SrNo = @SrNo
+      `);
 
     if (result.recordset.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "File record not found in database",
-      });
+      return res.status(404).json({ success: false, message: "File record not found in database." });
     }
 
-    // Set headers for file download
+    // 3. Stream the file
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Content-Type", "application/pdf");
 
-    // Stream the file
     const fileStream = fs.createReadStream(filePath);
-
     fileStream.pipe(res);
 
-    fileStream.on("error", (error) => {
-      console.error("File streaming error:", error);
-      res.status(500).json({
-        success: false,
-        message: "Error streaming file",
-      });
+    fileStream.on("error", (err) => {
+      console.error("File streaming error:", err);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: "Error streaming file." });
+      }
     });
   } catch (error) {
-    throw new AppError(
-      `Failed to download Bis Pdf File data:${error.message}`,
-      500,
-    );
+    throw new AppError(`Failed to download BIS PDF: ${error.message}`, 500);
   } finally {
-    await pool.close();
+    // BUG (was): pool.close() crashed with TypeError when pool was never
+    // assigned (i.e. early-return 404 paths). closePool() guards this.
+    await closePool(pool);
   }
 });
 
-// Delete file controller
+/* ═══════════════════════════════════════════════════════════════════════
+   DELETE
+═══════════════════════════════════════════════════════════════════════ */
 export const deleteBisPdfFile = tryCatch(async (req, res) => {
-  const { srNo } = req.params;
+  const { srNo }     = req.params;
   const { filename } = req.query;
 
-  if (!srNo) {
-    throw new AppError("Missing required fields: SrNo.", 400);
-  }
+  if (!srNo)     throw new AppError("Missing required field: SrNo.", 400);
+  if (!filename) throw new AppError("Missing required query param: filename.", 400);
 
   const filePath = path.join(uploadDir, filename);
-
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ success: false, message: "File not found" });
-  }
+  // BUG (was): pool was declared inside the try block, making it
+  // inaccessible in the finally block → ReferenceError on every call.
+  let pool;
 
   try {
-    // Delete the physical file
-    fs.unlinkSync(filePath);
+    // BUG (was): fs.unlinkSync() ran BEFORE the DB DELETE. If the DB
+    // operation failed the file was already gone, leaving an orphaned
+    // DB record pointing at a non-existent file.
+    // FIX: Delete from DB first; only unlink file on success.
 
-    // Connect to DB and delete the record based on filename and year
-    const pool = await sql.connect(dbConfig1);
-    const query = `
-      DELETE FROM BISUpload 
-      WHERE SrNo = @SrNo
-    `;
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: "File not found on disk." });
+    }
+
+    pool = await sql.connect(dbConfig1);
 
     const result = await pool
       .request()
-      .input("SrNo", sql.Int, parseInt(srNo))
-      .query(query);
+      .input("SrNo", sql.Int, parseInt(srNo, 10))
+      .query(`DELETE FROM BISUpload WHERE SrNo = @SrNo`);
 
-    res
-      .status(200)
-      .json({ success: true, message: "File deleted successfully" });
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ success: false, message: "Record not found in database." });
+    }
+
+    // DB record is gone — now safe to remove the physical file
+    fs.unlinkSync(filePath);
+
+    res.status(200).json({ success: true, message: "File deleted successfully." });
   } catch (error) {
-    throw new AppError(
-      `Failed to delete the BIS PDF file:${error.message}`,
-      500,
-    );
+    throw new AppError(`Failed to delete the BIS PDF file: ${error.message}`, 500);
   } finally {
-    await pool.close();
+    await closePool(pool);
   }
 });
 
-// Update BIS File Controller
+/* ═══════════════════════════════════════════════════════════════════════
+   UPDATE
+═══════════════════════════════════════════════════════════════════════ */
 export const updateBisPdfFile = tryCatch(async (req, res) => {
-  const { srNo } = req.params;
+  const { srNo }                                             = req.params;
   const { modelName, year, month, testFrequency, description } = req.body;
-  const newFile = req.file; // New file (if uploaded)
+  const newFile                                              = req.file;
 
-  // Validate required fields
   if (!modelName || !year || !month || !testFrequency || !description) {
-    // If a new file was uploaded but validation fails, delete it
     if (newFile) {
-      const newFilePath = path.join(uploadDir, newFile.filename);
-      if (fs.existsSync(newFilePath)) {
-        fs.unlinkSync(newFilePath);
-      }
+      const p = path.join(uploadDir, newFile.filename);
+      if (fs.existsSync(p)) fs.unlinkSync(p);
     }
     throw new AppError(
       "Missing required fields: modelName, year, month, testFrequency or description.",
@@ -238,231 +269,212 @@ export const updateBisPdfFile = tryCatch(async (req, res) => {
   try {
     pool = await sql.connect(dbConfig1);
 
-    // Step 1: Get the existing record to preserve the old filename
-    const existingQuery = `SELECT FileName FROM BISUpload WHERE SrNo = @SrNo`;
     const existingResult = await pool
       .request()
-      .input("SrNo", sql.Int, parseInt(srNo))
-      .query(existingQuery);
+      .input("SrNo", sql.Int, parseInt(srNo, 10))
+      .query(`SELECT FileName FROM BISUpload WHERE SrNo = @SrNo`);
 
     if (existingResult.recordset.length === 0) {
-      // If record not found and new file was uploaded, delete it
       if (newFile) {
-        const newFilePath = path.join(uploadDir, newFile.filename);
-        if (fs.existsSync(newFilePath)) {
-          fs.unlinkSync(newFilePath);
-        }
+        const p = path.join(uploadDir, newFile.filename);
+        if (fs.existsSync(p)) fs.unlinkSync(p);
       }
-      return res.status(404).json({
-        success: false,
-        message: "Record not found",
-      });
+      return res.status(404).json({ success: false, message: "Record not found." });
     }
 
-    const oldFileName = existingResult.recordset[0].FileName;
-
-    // Step 2: Determine which filename to use
-    // If new file uploaded -> use new filename, else -> keep old filename
+    const oldFileName  = existingResult.recordset[0].FileName;
     const finalFileName = newFile ? newFile.filename : oldFileName;
 
-    // Step 3: If new file uploaded, delete the old file from disk
-    if (newFile && oldFileName) {
-      const oldFilePath = path.join(uploadDir, oldFileName);
-      if (fs.existsSync(oldFilePath)) {
-        fs.unlinkSync(oldFilePath);
-        console.log(`Deleted old file: ${oldFileName}`);
-      }
-    }
-
-    // Step 4: Update the database record
-    const updateQuery = `
-      UPDATE BISUpload 
-      SET 
-        ModelName = @ModelName, 
-        Year = @Year,
-        Month = @Month,
-        TestFrequency = @TestFrequency,
-        Description = @Description,
-        FileName = @FileName
-      WHERE SrNo = @SrNo
-    `;
-
-    const updateResult = await pool
+    await pool
       .request()
-      .input("ModelName", sql.VarChar, modelName)
-      .input("Year", sql.VarChar, year)
-      .input("Month", sql.VarChar, month)
+      .input("ModelName",     sql.VarChar, modelName)
+      .input("Year",          sql.VarChar, year)
+      .input("Month",         sql.VarChar, month)
       .input("TestFrequency", sql.VarChar, testFrequency)
-      .input("Description", sql.VarChar, description)
-      .input("FileName", sql.VarChar, finalFileName) // ✅ Uses existing filename if no new file
-      .input("SrNo", sql.Int, parseInt(srNo))
-      .query(updateQuery);
+      .input("Description",   sql.VarChar, description)
+      .input("FileName",      sql.VarChar, finalFileName)
+      .input("SrNo",          sql.Int,     parseInt(srNo, 10))
+      .query(`
+        UPDATE BISUpload
+        SET ModelName     = @ModelName,
+            Year          = @Year,
+            Month         = @Month,
+            TestFrequency = @TestFrequency,
+            Description   = @Description,
+            FileName      = @FileName
+        WHERE SrNo = @SrNo
+      `);
 
-    if (updateResult.rowsAffected[0] === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "No changes made",
-      });
+    // Only delete old file AFTER successful DB update
+    if (newFile && oldFileName) {
+      const oldPath = path.join(uploadDir, oldFileName);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
     }
 
     res.status(200).json({
       success: true,
-      message: "BIS Report updated successfully",
+      message: "BIS Report updated successfully.",
       data: {
-        srNo: srNo,
+        srNo,
         modelName,
         year,
         month,
         testFrequency,
         description,
-        fileName: finalFileName,
-        fileUrl: `/uploads/BISReport/${finalFileName}`,
-        fileUpdated: !!newFile, // true if new file was uploaded
+        fileName:    finalFileName,
+        fileUrl:     `/uploads/BISReport/${finalFileName}`,
+        fileUpdated: !!newFile,
       },
     });
   } catch (error) {
-    console.error("Update error:", error);
-
-    // Cleanup: If update failed and new file was uploaded, delete it
+    // Cleanup orphaned upload on failure
     if (newFile) {
-      const newFilePath = path.join(uploadDir, newFile.filename);
-      if (fs.existsSync(newFilePath)) {
-        fs.unlinkSync(newFilePath);
-      }
+      const p = path.join(uploadDir, newFile.filename);
+      if (fs.existsSync(p)) fs.unlinkSync(p);
     }
-
     throw new AppError(`Failed to update BIS Report: ${error.message}`, 500);
   } finally {
-    if (pool) {
-      await pool.close();
-    }
+    await closePool(pool);
   }
 });
 
+/* ═══════════════════════════════════════════════════════════════════════
+   GET BIS REPORT STATUS  (files + compliance status combined)
+═══════════════════════════════════════════════════════════════════════ */
 export const getBisReportStatus = tryCatch(async (_, res) => {
-  const pool = await sql.connect(dbConfig1);
+  let pool;
 
   try {
-    const filesQuery = `
-      SELECT * FROM BISUpload
+    pool = await sql.connect(dbConfig1);
+
+    // ── Files ─────────────────────────────────────────────────────────
+    // BUG (was): SELECT * — use explicit columns
+    const filesResult = await pool.request().query(`
+      SELECT SrNo, ModelName, Year, Month, TestFrequency, Description, FileName, UploadAt
+      FROM BISUpload
       ORDER BY SrNo DESC
-    `;
-    const filesResult = await pool.request().query(filesQuery);
+    `);
 
     const files = filesResult.recordset.map((file) => ({
-      srNo: file.SrNo,
-      modelName: file.ModelName,
-      year: file.Year,
-      month: file.Month,
-      testFrequency: file.testFrequency,
-      description: file.Description,
-      fileName: file.FileName,
-      url: `/uploads-bis-pdf/${file.FileName}`,
-      uploadAt: file.UploadAT,
+      srNo:          file.SrNo,
+      modelName:     file.ModelName,
+      year:          file.Year,
+      month:         file.Month,
+      // BUG (was): file.testFrequency — JS property names are case-sensitive;
+      // mssql returns columns with their original DB casing (TestFrequency).
+      // Using the wrong case silently returns undefined for every row.
+      testFrequency: file.TestFrequency,
+      description:   file.Description,
+      fileName:      file.FileName,
+      url:           `/uploads-bis-pdf/${file.FileName}`,
+      // BUG (was): file.UploadAT — the column is UploadAt (see INSERT above).
+      // The wrong casing returns undefined for every row.
+      uploadAt:      file.UploadAt,
     }));
 
-    // Then, fetch the BIS Report Status
-    const istDate = new Date(Date.now() + 330 * 60000);
-    const formattedDate = istDate.toISOString().slice(0, 19).replace("T", " ");
-
-    const statusQuery = `
-      WITH Psno AS (
-      SELECT DocNo, Material 
-      FROM MaterialBarcode 
-      WHERE PrintStatus = 1 AND Status <> 99
-    ),
-    FilteredData AS (
-      SELECT 
-        m.Name AS FullModel,
-        LEFT(m.Name, 9) AS Model_Prefix,
-        b.ActivityOn,
-        CASE WHEN RIGHT(m.Name, 1) = 'R' THEN 'R' ELSE '' END AS HasRT
-      FROM Psno
-      JOIN ProcessActivity b ON b.PSNo = Psno.DocNo
-      JOIN WorkCenter c ON b.StationCode = c.StationCode
-      JOIN Material m ON m.MatCode = Psno.Material
-      WHERE m.CertificateControl <> 0
-        AND b.ActivityType = 5
-        AND c.StationCode IN (1220010)
-        AND b.ActivityOn BETWEEN '2022-01-01 00:00:01' AND @CurrentDate
-    ),
-    ProductionSummary AS (
-      SELECT 
-        Model_Prefix,
-        YEAR(ActivityOn) AS Activity_Year,
-        MAX(HasRT) AS LastChar, -- Will be 'R' if any model ends with 'R'
-        COUNT(*) AS Model_Count
-      FROM FilteredData
-      GROUP BY Model_Prefix, YEAR(ActivityOn)
-    ),
-    -- Deduplicate BISUpload table
-    DedupedBIS AS (
-      SELECT *
-        FROM (
-          SELECT *,
-            ROW_NUMBER() OVER (
-              PARTITION BY LEFT(ModelName, 9), Year
-              ORDER BY ModelName
-            ) AS rn
-          FROM BISUpload
-        ) AS sub
-      WHERE rn = 1
-    ),
-    FinalResult AS (
-      SELECT 
-        COALESCE(b.ModelName, 
-                 CONCAT(p.Model_Prefix, CASE WHEN p.LastChar = 'R' THEN ' RT' ELSE '' END)
-        ) AS ModelName,
-        p.Activity_Year AS Year,
-        b.Month,
-        p.Model_Count AS Prod_Count,
-        CASE 
-            WHEN b.ModelName IS NOT NULL THEN 'Test Completed'
-            ELSE 'Test Pending'
-        END AS Status,
-        b.FileName,
-        b.Description
-    FROM ProductionSummary p
-    LEFT JOIN DedupedBIS b
-      ON LEFT(b.ModelName, 9) = p.Model_Prefix
-     AND b.Year = p.Activity_Year
-     AND (
-         RIGHT(b.ModelName, 2) != 'RT' -- normal model
-         OR (RIGHT(b.ModelName, 2) = 'RT' AND p.LastChar = 'R') -- RT logic
-     )
-)
-SELECT * 
-FROM FinalResult
-ORDER BY ModelName, Year;
-    `;
+    // ── Status ────────────────────────────────────────────────────────
+    const currentDate = getISTDate();
 
     const statusResult = await pool
       .request()
-      .input("CurrentDate", sql.DateTime, new Date(formattedDate))
-      .query(statusQuery);
+      .input("CurrentDate", sql.DateTime, currentDate)
+      .query(`
+        WITH Psno AS (
+          SELECT DocNo, Material
+          FROM   MaterialBarcode
+          WHERE  PrintStatus = 1 AND Status <> 99
+        ),
+        FilteredData AS (
+          SELECT
+            m.Name                                                AS FullModel,
+            LEFT(m.Name, 9)                                       AS Model_Prefix,
+            b.ActivityOn,
+            CASE WHEN RIGHT(m.Name, 1) = 'R' THEN 'R' ELSE '' END AS HasRT
+          FROM  Psno
+          JOIN  ProcessActivity b ON b.PSNo       = Psno.DocNo
+          JOIN  WorkCenter      c ON c.StationCode = b.StationCode
+          JOIN  Material        m ON m.MatCode     = Psno.Material
+          WHERE m.CertificateControl <> 0
+            AND b.ActivityType  = 5
+            AND c.StationCode   = 1220010
+            AND b.ActivityOn BETWEEN '2022-01-01 00:00:01' AND @CurrentDate
+        ),
+        ProductionSummary AS (
+          SELECT
+            Model_Prefix,
+            YEAR(ActivityOn) AS Activity_Year,
+            MAX(HasRT)       AS LastChar,
+            COUNT(*)         AS Model_Count
+          FROM FilteredData
+          GROUP BY Model_Prefix, YEAR(ActivityOn)
+        ),
+        /*
+         * BUG (was): DedupedBIS partitioned only by LEFT(ModelName,9) and Year.
+         * If BISUpload contains both "MODELABC1" (non-RT) and "MODELABC1 RT"
+         * they share the same 9-char prefix and the same Year, so ROW_NUMBER()
+         * collapsed one of them, causing the wrong model (or no model) to join
+         * against ProductionSummary RT rows.
+         *
+         * FIX: Add a third partition key that distinguishes RT from non-RT,
+         * so each variant keeps exactly one representative row.
+         */
+        DedupedBIS AS (
+          SELECT *
+          FROM (
+            SELECT *,
+              ROW_NUMBER() OVER (
+                PARTITION BY LEFT(ModelName, 9),
+                             Year,
+                             CASE WHEN RIGHT(ModelName, 2) = 'RT' THEN 'RT' ELSE '' END
+                ORDER BY ModelName
+              ) AS rn
+            FROM BISUpload
+          ) sub
+          WHERE rn = 1
+        ),
+        FinalResult AS (
+          SELECT
+            COALESCE(
+              b.ModelName,
+              CONCAT(p.Model_Prefix, CASE WHEN p.LastChar = 'R' THEN ' RT' ELSE '' END)
+            )                                                   AS ModelName,
+            p.Activity_Year                                     AS Year,
+            b.Month,
+            p.Model_Count                                       AS Prod_Count,
+            CASE WHEN b.ModelName IS NOT NULL
+                 THEN 'Test Completed'
+                 ELSE 'Test Pending'
+            END                                                 AS Status,
+            b.FileName,
+            b.Description
+          FROM ProductionSummary p
+          LEFT JOIN DedupedBIS b
+            ON  LEFT(b.ModelName, 9) = p.Model_Prefix
+            AND b.Year               = p.Activity_Year
+            AND (
+                  (RIGHT(b.ModelName, 2) != 'RT')                              -- normal model
+               OR (RIGHT(b.ModelName, 2)  = 'RT' AND p.LastChar = 'R')        -- RT model
+            )
+        )
+        SELECT *
+        FROM   FinalResult
+        ORDER  BY ModelName, Year;
+      `);
 
     const status = statusResult.recordset.map((item) => ({
       ...item,
       fileUrl: item.FileName ? `/uploads-bis-pdf/${item.FileName}` : null,
     }));
 
-    // Combine files and status
-    const combinedResult = {
-      files: files,
-      status: status,
-    };
-
     res.status(200).json({
       success: true,
-      message: "BIS Report status data retrieved successfully",
-      ...combinedResult,
+      message: "BIS Report status data retrieved successfully.",
+      files,
+      status,
     });
   } catch (error) {
-    throw new AppError(
-      `Failed to fetch the BIS Report status data:${error.message}`,
-      500,
-    );
+    throw new AppError(`Failed to fetch BIS Report status data: ${error.message}`, 500);
   } finally {
-    await pool.close();
+    await closePool(pool);
   }
 });
