@@ -123,12 +123,47 @@ export const getBarcodeDetails = tryCatch(async (req, res) => {
     if (includeModel) request.input("model", sql.VarChar, model);
 
     const query = `
-      ${buildCTE(stationCodeStr, includeModel)}
-      SELECT
-          (SELECT COUNT(*) FROM FilteredData) AS totalCount,
-          *
-      FROM FilteredData
-      WHERE RowNum > @offset AND RowNum <= (@offset + @limit);
+  WITH Psno AS (
+    SELECT DocNo, Material, Serial, VSerial, Serial2, Alias 
+    FROM MaterialBarcode 
+    WHERE PrintStatus = 1 AND Status <> 99
+  ),
+  FilteredData AS (
+    SELECT 
+      ROW_NUMBER() OVER (
+        ORDER BY 
+          (SELECT Name FROM Material WHERE MatCode = Psno.Material), 
+          COALESCE(NULLIF(CASE WHEN SUBSTRING(Psno.Serial, 1, 1) IN ('S', 'F', 'L') THEN '' ELSE Psno.Serial END, ''),
+                   CASE 
+                     WHEN Psno.VSerial IS NULL THEN Psno.Serial 
+                     ELSE Psno.Alias 
+                   END)
+      ) AS RowNum,
+      (SELECT Name FROM Material WHERE MatCode = Psno.Material) AS Model_Name,
+      ISNULL(Psno.VSerial, '') AS Asset_tag,
+      ISNULL(Psno.Serial2, '') AS CustomerQR,
+      COALESCE(NULLIF(CASE WHEN SUBSTRING(Psno.Serial, 1, 1) IN ('S', 'F', 'L') THEN '' ELSE Psno.Serial END, ''),
+               CASE 
+                 WHEN Psno.VSerial IS NULL THEN Psno.Serial 
+                 ELSE Psno.Alias 
+               END
+      ) AS FG_SR,
+      ISNULL(mc.Alias, 'N/A') AS category
+    FROM Psno
+    JOIN ProcessActivity b ON b.PSNo = Psno.DocNo
+    JOIN WorkCenter c ON b.StationCode = c.StationCode
+    JOIN Material m ON m.MatCode = Psno.Material
+    LEFT JOIN MaterialCategory mc ON mc.CategoryCode = m.Category
+    WHERE b.ActivityType = 5
+      AND c.StationCode IN (${stationCodeString})          
+      AND b.ActivityOn BETWEEN @startTime AND @endTime
+      ${model && model != 0 ? "AND Psno.Material = @model" : ""}
+  )
+  SELECT 
+    (SELECT COUNT(*) FROM FilteredData) AS totalCount,
+    * 
+  FROM FilteredData
+  WHERE RowNum > @offset AND RowNum <= (@offset + @limit);
     `;
 
     const result = await request.query(query);
