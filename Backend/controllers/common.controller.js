@@ -28,6 +28,28 @@ export const getModelVariants = tryCatch(async (_, res) => {
   }
 });
 
+export const getProductionLine = tryCatch(async (_, res) => {
+  const query = `
+    Select LineCode, Name from ProductionLine where Status = 1;
+  `;
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
+    const result = await pool.request().query(query);
+
+    res.status(200).json({
+      success: true,
+      message: "Model variants fetched successfully",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError("Failed to fetch model variants", 500);
+  } finally {
+    await pool.close();
+  }
+});
+
 export const getModelVariantsByAssembly = tryCatch(async (req, res) => {
   const { serial } = req.params; // or req.query.serial if you prefer
 

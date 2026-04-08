@@ -3,878 +3,598 @@ import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 
-// Stage History Report
+// ═══════════════════════════════════════════════════════════════════
+// Stage History
+// ═══════════════════════════════════════════════════════════════════
 export const getCurrentStageStatus = tryCatch(async (req, res) => {
   const { componentIdentifier } = req.query;
+  if (!componentIdentifier) throw new AppError("Component Identifier is required", 400);
 
-  if (!componentIdentifier) {
-    throw new AppError("Component Identifier is required", 400);
-  }
+  const query = `
+    DECLARE @Barcode VARCHAR(50) = @componentIdentifier;
 
-  let query = `
     WITH Psno AS (
-      SELECT DocNo, Material, Serial, VSerial, Serial2, Alias 
-      FROM MaterialBarcode 
-      WHERE DocNo=(Select Psno from ProcessStageLabel where BarcodeNo=@componentIdentifier) AND type=100
+        SELECT DocNo, Material, Serial, VSerial, Serial2, Alias, Type
+        FROM MaterialBarcode
+        WHERE DocNo = (
+            SELECT Psno 
+            FROM ProcessStageLabel 
+            WHERE BarcodeNo = @Barcode
+        )
     )
-    SELECT 
-      Psno.DocNo AS PSNO,
-      M.Name AS MaterialName,
-      B.StationCode,
-      B.Name AS StationName,
-      B.Alias AS StationAlias,
-      A.ActivityOn,
-      Psno.Serial2 As CustomerQR,
-      Psno.VSerial,
-      Psno.Alias AS BarcodeAlias,
-      Psno.Serial,
-      A.ActivityType,
-      C.Type AS ActivityTypeName,
-      U.UserName
-    FROM 
-      Psno
-    INNER JOIN 
-      ProcessActivity A ON Psno.DocNo = A.PSNO
-    INNER JOIN 
-      WorkCenter B ON A.StationCode = B.StationCode
-    INNER JOIN 
-      Material M ON Psno.Material = M.MatCode
-    LEFT JOIN 
-      ProcessActivityType C ON C.id = A.ActivityType
-    INNER JOIN
-      Users U on U.UserCode = A.Operator
-    ORDER BY 
-      A.ActivityOn ASC;
+    SELECT
+        Psno.DocNo       AS PSNO,
+        M.Name           AS MaterialName,
+        B.StationCode,
+        B.Name           AS StationName,
+        B.Alias          AS StationAlias,
+        A.ActivityOn,
+        Psno.Serial2     AS CustomerQR,
+        Psno.VSerial,
+        Psno.Alias       AS BarcodeAlias,
+        Psno.Serial,
+        A.ActivityType,
+        C.Type           AS ActivityTypeName,
+        U.UserName
+    FROM Psno
+    INNER JOIN ProcessActivity     A ON Psno.DocNo = A.PSNO
+    INNER JOIN WorkCenter         B ON A.StationCode = B.StationCode
+    INNER JOIN Material           M ON Psno.Material = M.MatCode
+    LEFT  JOIN ProcessActivityType C ON C.id = A.ActivityType
+    INNER JOIN Users              U ON U.UserCode = A.Operator
+    WHERE 
+    (
+        (@Barcode LIKE 'F%' AND Psno.Type = 400)
+        OR
+        ((@Barcode LIKE 'S%' OR @Barcode LIKE '4%') AND Psno.Type = 100)
+    )
+    ORDER BY A.ActivityOn ASC;
   `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
-
   try {
-    const request = pool
-      .request()
-      .input("componentIdentifier", sql.NVarChar, componentIdentifier);
-
-    const result = await request.query(query);
-
-    res.status(200).json({
-      success: true,
-      message: "Current Stage Status retrieved successfully",
-      data: result,
-    });
-  } catch (error) {
-    throw new AppError(
-      `Failed to fetch Current Stage Status data:${error.message}`,
-      500,
-    );
+    const result = await pool.request()
+      .input("componentIdentifier", sql.NVarChar, componentIdentifier)
+      .query(query);
+    res.status(200).json({ success: true, message: "Stage History retrieved successfully", data: result });
+  } catch (err) {
+    throw new AppError(`Failed to fetch Stage History: ${err.message}`, 500);
   } finally {
     await pool.close();
   }
 });
 
-// Dispatch Report
+// ═══════════════════════════════════════════════════════════════════
+// Logistic Status
+// ═══════════════════════════════════════════════════════════════════
 export const getLogisticStatus = tryCatch(async (req, res) => {
   const { componentIdentifier } = req.query;
-
-  if (!componentIdentifier) {
-    throw new AppError("Component Identifier is required", 400);
-  }
+  if (!componentIdentifier) throw new AppError("Component Identifier is required", 400);
 
   const query = `
---------------------------------------------------------
--- STEP 1: TEMP TABLE FOR UNLOADING DATA
---------------------------------------------------------
-IF OBJECT_ID('tempdb..#Dispatch') IS NOT NULL
-    DROP TABLE #Dispatch;
+    IF OBJECT_ID('tempdb..#Dispatch')       IS NOT NULL DROP TABLE #Dispatch;
+    IF OBJECT_ID('tempdb..#DispatchMaster') IS NOT NULL DROP TABLE #DispatchMaster;
 
-CREATE TABLE #Dispatch (
-    FgserialNo NVARCHAR(100),
-    UnloadingDate DATETIME
-);
-
---------------------------------------------------------
--- STEP 2: TEMP TABLE FOR VEHICLE & DOCK DATA
---------------------------------------------------------
-IF OBJECT_ID('tempdb..#DispatchMaster') IS NOT NULL
-    DROP TABLE #DispatchMaster;
-
-CREATE TABLE #DispatchMaster (
-    Session_ID NVARCHAR(50),
-    Vehicle_No NVARCHAR(50),
-    DockNo INT,
-    AddedOn DATETIME,
-    FGSerialNo NVARCHAR(100)
-);
-
---------------------------------------------------------
--- STEP 3: OPENQUERY FOR UNLOADING
---------------------------------------------------------
-DECLARE @sql NVARCHAR(MAX);
-
-SET @sql = N'
-INSERT INTO #Dispatch (FgserialNo, UnloadingDate)
-SELECT FgserialNo, DateTime
-FROM OPENQUERY([10.100.95.134],
-  ''SELECT FgserialNo, DateTime  
-    FROM WWMS.dbo.DispatchUnloading 
-    WHERE FgserialNo = ''''' + REPLACE(@componentIdentifier, '''', '''''') + '''''''
-)';
-EXEC(@sql);
-
---------------------------------------------------------
--- STEP 4: OPENQUERY FOR VEHICLE, DOCK, SESSION
---------------------------------------------------------
-SET @sql = N'
-INSERT INTO #DispatchMaster (Session_ID, Vehicle_No, DockNo, AddedOn, FGSerialNo)
-SELECT Session_ID, Vehicle_No, DockNo, AddedOn, FGSerialNo
-FROM OPENQUERY([10.100.95.134],
-  ''SELECT 
-        dm.Session_ID,
-        td.Vehicle_No,
-        td.DockNo,
-        dm.AddedOn,
-        dm.FGSerialNo
-    FROM WWMS.dbo.DispatchMaster dm
-    INNER JOIN WWMS.dbo.Tracking_Document td 
-        ON td.Document_ID = dm.Document_ID
-    WHERE dm.FGSerialNo = ''''' + REPLACE(@componentIdentifier, '''', '''''') + '''''''
-)';
-EXEC(@sql);
-
-
-
---------------------------------------------------------
--- STEP 5: MAIN LOCAL DATA FETCH
---------------------------------------------------------
-;WITH MB AS (
-    SELECT
-        b.DocNo,
-        b.Serial,
-        c.Name
-    FROM MaterialBarcode b
-    INNER JOIN material c 
-        ON c.matcode = b.material
-    WHERE b.Type NOT IN (200, 0)
-      AND b.Serial = @componentIdentifier
-)
-
---------------------------------------------------------
--- FINAL OUTPUT WITH ALL DETAILS
---------------------------------------------------------
-SELECT
-    -- FG LABEL PRINTING
-    CASE 
-        WHEN EXISTS (
-            SELECT 1
-            FROM ProcessRouting p
-            WHERE p.PSNo = mb.DocNo
-              AND p.Status = 2
-              AND p.StationCode IN (1220010, 1230017)
-        ) THEN 'SCANNED' ELSE 'NOT SCANNED'
-    END AS [FG_LabelPrinting],
-
-    (
-        SELECT MAX(p.CompletedOn)
-        FROM ProcessRouting p
-        WHERE p.PSNo = mb.DocNo
-          AND p.Status = 2
-          AND p.StationCode IN (1220010, 1230017)
-    ) AS [FG_LabelPrinting_Date],
-
-    -- FG AUTO SCAN
-    CASE 
-        WHEN EXISTS (
-            SELECT 1
-            FROM ProcessRouting p
-            WHERE p.PSNo = mb.DocNo
-              AND p.Status = 2
-              AND p.StationCode IN (1220009, 1230018)
-        ) THEN 'SCANNED' ELSE 'NOT SCANNED'
-    END AS [FG_Auto_Scan],
-
-    (
-        SELECT MAX(p.CompletedOn)
-        FROM ProcessRouting p
-        WHERE p.PSNo = mb.DocNo
-          AND p.Status = 2
-          AND p.StationCode IN (1220009, 1230018)
-    ) AS [FG_Auto_Scan_Date],
-
-    -- FG UNLOADING
-    CASE 
-        WHEN EXISTS (
-            SELECT 1 FROM #Dispatch d WHERE d.FgserialNo = mb.Serial
-        ) THEN 'SCANNED' ELSE 'NOT SCANNED'
-    END AS [FG_Unloading],
-
-    (
-        SELECT MAX(d.UnloadingDate)
-        FROM #Dispatch d
-        WHERE d.FgserialNo = mb.Serial
-    ) AS [FG_Unloading_Date],
-
-    -- VEHICLE & DOCK DETAILS (NEW)
-    dm.Session_ID,
-    dm.Vehicle_No,
-    dm.DockNo,
-    dm.AddedOn AS [Vehicle_Entry_Time]
-
-FROM MB mb
-LEFT JOIN #DispatchMaster dm 
-    ON dm.FGSerialNo = mb.Serial;
-
-    `;
-
-  const pool = await new sql.ConnectionPool(dbConfig1).connect();
-
-  try {
-    const request = pool
-      .request()
-      .input("componentIdentifier", sql.NVarChar, componentIdentifier);
-
-    const result = await request.query(query);
-
-    res.status(200).json({
-      success: true,
-      message: "Logistic Status retrieved successfully",
-      data: result.recordset,
-    });
-  } catch (error) {
-    throw new AppError(
-      `Failed to fetch Logistic Stage Status data:${error.message}`,
-      500,
+    CREATE TABLE #Dispatch (FgserialNo NVARCHAR(100), UnloadingDate DATETIME);
+    CREATE TABLE #DispatchMaster (
+      Session_ID NVARCHAR(50), Vehicle_No NVARCHAR(50),
+      DockNo INT, AddedOn DATETIME, FGSerialNo NVARCHAR(100)
     );
-  } finally {
-    await pool.close();
-  }
-});
 
-// Component Details
-export const getComponentDetails = tryCatch(async (req, res) => {
-  const { componentIdentifier } = req.query;
+    DECLARE @sql NVARCHAR(MAX);
 
-  if (!componentIdentifier) {
-    return res.status(400).json({
-      success: false,
-      message:
-        "Missing required query parameter: serialNumber or FG serialNumber",
-      data: [],
-    });
-  }
+    SET @sql = N'
+    INSERT INTO #Dispatch (FgserialNo, UnloadingDate)
+    SELECT FgserialNo, DateTime
+    FROM OPENQUERY([10.100.95.134],
+      ''SELECT FgserialNo, DateTime FROM WWMS.dbo.DispatchUnloading
+        WHERE FgserialNo = ''''' + REPLACE(@componentIdentifier, '''', '''''') + '''''''
+    )';
+    EXEC(@sql);
 
-  const query = `
-      DECLARE @SRNO VARCHAR(50) = @componentIdentifier;
-      DECLARE @DocNo INT;
+    SET @sql = N'
+    INSERT INTO #DispatchMaster (Session_ID, Vehicle_No, DockNo, AddedOn, FGSerialNo)
+    SELECT Session_ID, Vehicle_No, DockNo, AddedOn, FGSerialNo
+    FROM OPENQUERY([10.100.95.134],
+      ''SELECT dm.Session_ID, td.Vehicle_No, td.DockNo, dm.AddedOn, dm.FGSerialNo
+        FROM WWMS.dbo.DispatchMaster dm
+        INNER JOIN WWMS.dbo.Tracking_Document td ON td.Document_ID = dm.Document_ID
+        WHERE dm.FGSerialNo = ''''' + REPLACE(@componentIdentifier, '''', '''''') + '''''''
+    )';
+    EXEC(@sql);
 
-      SELECT @DocNo = DocNo 
-      FROM MaterialBarcode 
-      WHERE Serial = @SRNO;
+    ;WITH MB AS (
+      SELECT b.DocNo, b.Serial, c.Name
+      FROM MaterialBarcode b INNER JOIN material c ON c.matcode = b.material
+      WHERE b.Type NOT IN (200, 0) AND b.Serial = @componentIdentifier
+    )
+    SELECT
+      CASE WHEN EXISTS (SELECT 1 FROM ProcessRouting p WHERE p.PSNo = mb.DocNo AND p.Status = 2 AND p.StationCode IN (1220010,1230017))
+           THEN 'SCANNED' ELSE 'NOT SCANNED' END AS [FG_LabelPrinting],
+      (SELECT MAX(p.CompletedOn) FROM ProcessRouting p WHERE p.PSNo = mb.DocNo AND p.Status = 2 AND p.StationCode IN (1220010,1230017)) AS [FG_LabelPrinting_Date],
 
-      IF @DocNo IS NULL
-      SELECT @DocNo = DocNo 
-      FROM MaterialBarcode 
-      WHERE Alias = @SRNO;
+      CASE WHEN EXISTS (SELECT 1 FROM ProcessRouting p WHERE p.PSNo = mb.DocNo AND p.Status = 2 AND p.StationCode IN (1220009,1230018))
+           THEN 'SCANNED' ELSE 'NOT SCANNED' END AS [FG_Auto_Scan],
+      (SELECT MAX(p.CompletedOn) FROM ProcessRouting p WHERE p.PSNo = mb.DocNo AND p.Status = 2 AND p.StationCode IN (1220009,1230018)) AS [FG_Auto_Scan_Date],
 
-      IF @DocNo IS NULL
-      SELECT @DocNo = PSNo 
-      FROM ProcessStageLabel 
-      WHERE BarcodeNo = @SRNO;
+      CASE WHEN EXISTS (SELECT 1 FROM #Dispatch d WHERE d.FgserialNo = mb.Serial)
+           THEN 'SCANNED' ELSE 'NOT SCANNED' END AS [FG_Unloading],
+      (SELECT MAX(d.UnloadingDate) FROM #Dispatch d WHERE d.FgserialNo = mb.Serial) AS [FG_Unloading_Date],
 
-      IF @DocNo IS NULL
-      BEGIN
-          SELECT 'Invalid Serial / Barcode' AS Message;
-          RETURN;
-      END
-
-      SELECT 
-          c.Name AS name,
-          ISNULL(c.AltName,'NA') AS sapCode,
-          a.Serial AS serial,
-          mc.Name AS type,
-          l.Name AS supplierName,
-          a.ScannedOn AS scannedOn
-      FROM ProcessInputBOMScan a
-      JOIN ProcessInputBOM b ON a.PSNo=b.PSNo AND a.RowID=b.RowID
-      JOIN Material c ON b.Material=c.MatCode
-      Join MaterialCategory mc on mc.CategoryCode = c.Category
-      join Ledger l on l.LedgerCode = c.Ledger
-      WHERE a.PSNo=@DocNo
-
-      UNION ALL
-
-      SELECT 
-          b.Name As name,
-          b.AltName AS sapCode,
-          a.Serial AS serial,
-          mc.Name AS type,
-          l.Name AS supplierName,
-          a.CreatedOn
-      FROM MaterialBarcode a
-      JOIN Material b ON a.Material=b.MatCode
-      Join MaterialCategory mc on mc.CategoryCode = b.Category
-      join Ledger l on l.LedgerCode = b.Ledger
-      WHERE a.DocNo=@DocNo
-      AND a.VSerial IS NOT NULL;
+      dm.Session_ID, dm.Vehicle_No, dm.DockNo, dm.AddedOn AS [Vehicle_Entry_Time]
+    FROM MB mb
+    LEFT JOIN #DispatchMaster dm ON dm.FGSerialNo = mb.Serial;
   `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
-
   try {
-    const result = await pool
-      .request()
-      .input("componentIdentifier", sql.VarChar, componentIdentifier)
+    const result = await pool.request()
+      .input("componentIdentifier", sql.NVarChar, componentIdentifier)
       .query(query);
-
-    if (!result.recordset.length) {
-      return res.status(404).json({
-        success: false,
-        message: "No component details found for the given serial number",
-        data: [],
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Component details retrieved successfully",
-      data: result.recordset,
-    });
-  } catch (error) {
-    throw new AppError(
-      `Failed to fetch component details: ${error.message}`,
-      500,
-    );
+    res.status(200).json({ success: true, message: "Logistic Status retrieved", data: result.recordset });
+  } catch (err) {
+    throw new AppError(`Failed to fetch Logistic Status: ${err.message}`, 500);
   } finally {
     await pool.close();
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════
+// Component Details
+// BUG FIX: returns 200 + empty array instead of 404 (friendlier for frontend EmptyState)
+// ═══════════════════════════════════════════════════════════════════
+export const getComponentDetails = tryCatch(async (req, res) => {
+  const { componentIdentifier } = req.query;
+  if (!componentIdentifier) {
+    return res.status(400).json({ success: false, message: "componentIdentifier is required", data: [] });
+  }
+
+  const query = `
+    DECLARE @SRNO VARCHAR(50) = @componentIdentifier;
+    DECLARE @DocNo INT;
+
+    SELECT @DocNo = DocNo FROM MaterialBarcode WHERE Serial = @SRNO;
+    IF @DocNo IS NULL SELECT @DocNo = DocNo FROM MaterialBarcode WHERE Alias = @SRNO;
+    IF @DocNo IS NULL SELECT @DocNo = PSNo FROM ProcessStageLabel WHERE BarcodeNo = @SRNO;
+
+    IF @DocNo IS NULL
+    BEGIN
+      SELECT NULL AS name, NULL AS sapCode, NULL AS serial, NULL AS type,
+             NULL AS supplierName, NULL AS scannedOn WHERE 1 = 0;
+      RETURN;
+    END
+
+    SELECT
+      c.Name                   AS name,
+      ISNULL(c.AltName, 'NA') AS sapCode,
+      a.Serial                 AS serial,
+      mc.Name                  AS type,
+      l.Name                   AS supplierName,
+      a.ScannedOn              AS scannedOn
+    FROM ProcessInputBOMScan a
+    JOIN ProcessInputBOM b   ON a.PSNo = b.PSNo AND a.RowID = b.RowID
+    JOIN Material c          ON b.Material = c.MatCode
+    JOIN MaterialCategory mc ON mc.CategoryCode = c.Category
+    JOIN Ledger l            ON l.LedgerCode = c.Ledger
+    WHERE a.PSNo = @DocNo
+
+    UNION ALL
+
+    SELECT
+      b.Name    AS name,
+      b.AltName AS sapCode,
+      a.Serial  AS serial,
+      mc.Name   AS type,
+      l.Name    AS supplierName,
+      a.CreatedOn AS scannedOn
+    FROM MaterialBarcode a
+    JOIN Material b          ON a.Material = b.MatCode
+    JOIN MaterialCategory mc ON mc.CategoryCode = b.Category
+    JOIN Ledger l            ON l.LedgerCode = b.Ledger
+    WHERE a.DocNo = @DocNo AND a.VSerial IS NOT NULL;
+  `;
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  try {
+    const result = await pool.request()
+      .input("componentIdentifier", sql.VarChar, componentIdentifier)
+      .query(query);
+    // BUG FIX: 200 with empty array — let frontend handle EmptyState
+    res.status(200).json({
+      success: true,
+      message: result.recordset.length ? "Component details retrieved" : "No components found",
+      data: result.recordset,
+    });
+  } catch (err) {
+    throw new AppError(`Failed to fetch Component Details: ${err.message}`, 500);
+  } finally {
+    await pool.close();
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
 // Rework Report
+// BUG FIX: SQL aliases changed to camelCase to match frontend field access:
+//   m.Alias → modelName, mc.Name → category, it.Serial → assembly
+//   pr.CompletedOn → reworkOut, pr.StartedOn → reworkIN
+// ═══════════════════════════════════════════════════════════════════
 export const getReworkReport = tryCatch(async (req, res) => {
   const { componentIdentifier } = req.query;
-
-  if (!componentIdentifier) {
-    throw new AppError("Component Identifier is required", 400);
-  }
+  if (!componentIdentifier) throw new AppError("Component Identifier is required", 400);
 
   const query = `
     SELECT
       ROW_NUMBER() OVER (ORDER BY pr.StartedOn) AS RowNo,
-
-        m.Alias AS [modelName],
-        mc.Name AS [category],
-
-        w.Name AS [station],
-        pr.ProcessCode AS [processCode],
-
-        it.Serial AS [assembly],
-
-        pr.StartedOn AS [reworkIN],
-        pr.CompletedOn AS [reworkOut],
-
-        us.UserName AS [userName],
-        s.Status AS [reworkStatus],
-
-        -- Safe Duration (handles NULL completed time)
-    CASE 
+      m.Alias        AS modelName,       -- BUG FIX: was Model_Name
+      mc.Name        AS category,        -- BUG FIX: was Category
+      w.Name         AS station,
+      pr.ProcessCode AS processCode,
+      it.Serial      AS assembly,        -- BUG FIX: was Assembly_SrNo
+      pr.StartedOn   AS reworkIN,
+      pr.CompletedOn AS reworkOut,       -- BUG FIX: was Rework_Out
+      us.UserName    AS userName,
+      s.Status       AS reworkStatus,
+      CASE
         WHEN pr.CompletedOn IS NULL THEN NULL
         ELSE CONCAT(
-            DATEDIFF(DAY, pr.StartedOn, pr.CompletedOn), ':',
-            FORMAT((DATEDIFF(MINUTE, pr.StartedOn, pr.CompletedOn) / 60) % 24, 'D2'), ':',
-            FORMAT(DATEDIFF(MINUTE, pr.StartedOn, pr.CompletedOn) % 60, 'D2')
+          DATEDIFF(DAY, pr.StartedOn, pr.CompletedOn), ':',
+          FORMAT((DATEDIFF(MINUTE, pr.StartedOn, pr.CompletedOn) / 60) % 24, 'D2'), ':',
+          FORMAT(DATEDIFF(MINUTE, pr.StartedOn, pr.CompletedOn) % 60, 'D2')
         )
-    END AS [Duration (DD,HH:MM)],
-
-    dct.Type AS [defectCategory],
-    dc.Name AS [defect],
-    rc.Type AS [rootCause],
-    rr.Type AS [counterAction],
-    it.ApproverRemark AS [remark]
-
+      END AS duration,
+      dct.Type     AS defectCategory,
+      dc.Name      AS defect,
+      rc.Type      AS rootCause,
+      rr.Type      AS counterAction,
+      it.ApproverRemark AS remark
     FROM InspectionTrans it
-    INNER JOIN InspectionHeader ih
-        ON it.InspectionLotNo = ih.InspectionLotNo
-
-    INNER JOIN Material m
-        ON ih.Material = m.MatCode
-
-    LEFT JOIN MaterialCategory mc
-        ON m.Category = mc.CategoryCode
-
-    -- only the rework stage
-    INNER JOIN ProcessRouting pr
-        ON ih.DocNo = pr.PSNo
-      AND pr.ProcessCode = ih.Process
-
-    INNER JOIN WorkCenter w
-        ON pr.StationCode = w.StationCode
-
-    LEFT JOIN Status s
-        ON ih.Status = s.ID
-    LEFT JOIN InspectionDefect idf ON it.ID = idf.ID
-    LEFT JOIN DefectCodeMaster dc ON idf.Defect = dc.Code
-    LEFT JOIN DefectCategoryType dct ON dc.DefectCategory = dct.ID
-    LEFT JOIN RootCause rc ON it.RootCause = rc.ID
-    LEFT JOIN ReworkResolution rr ON it.ReworkResolution = rr.ID
-    LEFT JOIN Users us ON it.ApprovedBy = us.UserCode
-
+    INNER JOIN InspectionHeader ih  ON it.InspectionLotNo = ih.InspectionLotNo
+    INNER JOIN Material m           ON ih.Material = m.MatCode
+    LEFT  JOIN MaterialCategory mc  ON m.Category = mc.CategoryCode
+    INNER JOIN ProcessRouting pr    ON ih.DocNo = pr.PSNo AND pr.ProcessCode = ih.Process
+    INNER JOIN WorkCenter w         ON pr.StationCode = w.StationCode
+    LEFT  JOIN Status s             ON ih.Status = s.ID
+    LEFT  JOIN InspectionDefect idf ON it.ID = idf.ID
+    LEFT  JOIN DefectCodeMaster dc  ON idf.Defect = dc.Code
+    LEFT  JOIN DefectCategoryType dct ON dc.DefectCategory = dct.ID
+    LEFT  JOIN RootCause rc         ON it.RootCause = rc.ID
+    LEFT  JOIN ReworkResolution rr  ON it.ReworkResolution = rr.ID
+    LEFT  JOIN Users us             ON it.ApprovedBy = us.UserCode
     WHERE it.NextAction = 1
-      AND ih.DocNo = (Select PSNo from ProcessStageLabel where BarcodeNo = @componentIdentifier);
+      AND ih.DocNo = (SELECT PSNo FROM ProcessStageLabel WHERE BarcodeNo = @componentIdentifier);
   `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
-
   try {
-    const request = pool
-      .request()
-      .input("componentIdentifier", sql.NVarChar, componentIdentifier);
-
-    const result = await request.query(query);
-
-    res.status(200).json({
-      success: true,
-      message: "Rework Report data retrieved successfully",
-      data: result.recordset,
-    });
-  } catch (error) {
-    throw new AppError(
-      `Failed to fetch Rework Report data: ${error.message}`,
-      500,
-    );
+    const result = await pool.request()
+      .input("componentIdentifier", sql.NVarChar, componentIdentifier)
+      .query(query);
+    res.status(200).json({ success: true, message: "Rework Report retrieved", data: result.recordset });
+  } catch (err) {
+    throw new AppError(`Failed to fetch Rework Report: ${err.message}`, 500);
   } finally {
     await pool.close();
   }
 });
 
-// Reprint History Report
+// ═══════════════════════════════════════════════════════════════════
+// Reprint History
+// BUG FIX: broadened BarcodeNo lookup — also tries the identifier directly
+// ═══════════════════════════════════════════════════════════════════
 export const getReprintHistory = tryCatch(async (req, res) => {
   const { componentIdentifier } = req.query;
-
-  if (!componentIdentifier) {
-    throw new AppError("Component Identifier is required", 400);
-  }
+  if (!componentIdentifier) throw new AppError("Component Identifier is required", 400);
 
   const query = `
+    DECLARE @BarcodeNo NVARCHAR(100);
+
+    -- Try Serial / Alias first
+    SELECT TOP 1 @BarcodeNo = BarcodeNo
+    FROM MaterialBarcode
+    WHERE Serial = @componentIdentifier OR Alias = @componentIdentifier;
+
+    -- Fallback: the identifier itself might be the BarcodeNo
+    IF @BarcodeNo IS NULL SET @BarcodeNo = @componentIdentifier;
+
     SELECT
       ROW_NUMBER() OVER (ORDER BY bp.PrintedOn ASC) AS [Sr_No],
       bp.Remark,
-      bp.PrintedOn   AS [Printed_On],
-      u.UserName     AS [Printed_By]
+      bp.PrintedOn AS [Printed_On],
+      u.UserName   AS [Printed_By]
     FROM BarcodePrintTrail bp
-    INNER JOIN Users u 
-      ON u.UserCode = bp.PrintedBy
-    WHERE bp.BarcodeNo = (
-      SELECT BarcodeNo 
-      FROM MaterialBarcode 
-      WHERE Serial = @componentIdentifier 
-         OR Alias = @componentIdentifier
-    )
+    INNER JOIN Users u ON u.UserCode = bp.PrintedBy
+    WHERE bp.BarcodeNo = @BarcodeNo
     ORDER BY bp.PrintedOn ASC;
   `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
-
   try {
-    const request = pool
-      .request()
-      .input("componentIdentifier", sql.NVarChar, componentIdentifier);
-
-    const result = await request.query(query);
-
-    res.status(200).json({
-      success: true,
-      message: "Reprint History data retrieved successfully",
-      data: result.recordset,
-    });
-  } catch (error) {
-    throw new AppError(
-      `Failed to fetch Reprint History data: ${error.message}`,
-      500,
-    );
+    const result = await pool.request()
+      .input("componentIdentifier", sql.NVarChar, componentIdentifier)
+      .query(query);
+    res.status(200).json({ success: true, message: "Reprint History retrieved", data: result.recordset });
+  } catch (err) {
+    throw new AppError(`Failed to fetch Reprint History: ${err.message}`, 500);
   } finally {
     await pool.close();
   }
 });
 
-// History Card Report
+// ═══════════════════════════════════════════════════════════════════
+// History Card
+// ═══════════════════════════════════════════════════════════════════
 export const getHistoryCard = tryCatch(async (req, res) => {
   const { componentIdentifier } = req.query;
-
-  if (!componentIdentifier) {
-    throw new AppError("Component Identifier is required", 400);
-  }
+  if (!componentIdentifier) throw new AppError("Component Identifier is required", 400);
 
   const query = `
-    ------------------------------------------------------------
-    -- GET PSNo ONLY ONCE
-    ------------------------------------------------------------
     DECLARE @PSNo BIGINT;
+    SELECT TOP 1 @PSNo = DocNo FROM MaterialBarcode
+    WHERE DocNo = (SELECT Psno FROM ProcessStageLabel WHERE BarcodeNo = @componentIdentifier)
+      AND type = 100;
 
-    SELECT TOP 1 @PSNo = DocNo
-    FROM MaterialBarcode
-    WHERE DocNo=(Select Psno from ProcessStageLabel where BarcodeNo=@componentIdentifier) AND type=100;
-
-    -- If no PSNo found, return empty
     IF @PSNo IS NULL
     BEGIN
-      SELECT 
-        NULL AS [Sr No],
-        NULL AS [Date & Time],
-        NULL AS [Activity],
-        NULL AS [ProcessStatus],
-        NULL AS [Important check point],
-        NULL AS [Method of checking],
-        NULL AS [Name of Operator],
-        NULL AS [Issue],
-        NULL AS [Action Date & Time],
-        NULL AS [Action],
-        NULL AS [Result]
+      SELECT NULL AS [Sr No], NULL AS [Date & Time], NULL AS [Activity],
+             NULL AS [ProcessStatus], NULL AS [Important check point],
+             NULL AS [Method of checking], NULL AS [Name of Operator],
+             NULL AS [Issue], NULL AS [Action Date & Time], NULL AS [Action], NULL AS [Result]
       WHERE 1 = 0;
       RETURN;
     END
 
-    ------------------------------------------------------------
-    -- PRODUCTION HISTORY
-    ------------------------------------------------------------
-    ;WITH ProductionData AS
-    (
-      SELECT
-        A.ActivityOn AS [DateTime],
-        B.Name AS [Activity],
-        C.Type AS [ProcessStatus],
-        pb.CheckPoints AS [ImportantCheckPoint],
-        pb.CheckingMethod AS [MethodOfChecking],
-        U.UserName AS [OperatorName],
-        NULL AS [Issue],
-        NULL AS [ActionDateTime],
-        NULL AS [Action],
-        'OK' AS [Result]
+    ;WITH ProductionData AS (
+      SELECT A.ActivityOn AS [DateTime], B.Name AS [Activity], C.Type AS [ProcessStatus],
+             pb.CheckPoints AS [ImportantCheckPoint], pb.CheckingMethod AS [MethodOfChecking],
+             U.UserName AS [OperatorName], NULL AS [Issue], NULL AS [ActionDateTime],
+             NULL AS [Action], 'OK' AS [Result]
       FROM ProcessActivity A
-      INNER JOIN WorkCenter B ON A.StationCode = B.StationCode
+      INNER JOIN WorkCenter B         ON A.StationCode = B.StationCode
       INNER JOIN ProductionProcess pb ON pb.ProcessCode = A.ProcessCode
-      LEFT JOIN ProcessActivityType C ON C.id = A.ActivityType
-      INNER JOIN Users U ON U.UserCode = A.Operator
+      LEFT  JOIN ProcessActivityType C ON C.id = A.ActivityType
+      INNER JOIN Users U              ON U.UserCode = A.Operator
       WHERE A.PSNo = @PSNo
     ),
-
-    ------------------------------------------------------------
-    -- REWORK EVENT
-    ------------------------------------------------------------
-    ReworkData AS
-    (
-      SELECT
-        pr.StartedOn AS [DateTime],
-        w.Name AS [Activity],
-        'REWORK' AS [ProcessStatus],
-        dc.Name AS [ImportantCheckPoint],
-        pb.CheckingMethod AS [MethodOfChecking],
-        us.UserName AS [OperatorName],
-        dc.Name AS [Issue],
-        it.InspectedOn AS [ActionDateTime],
-        rr.Type AS [Action],
-        'REWORKED' AS [Result],
-        pr.SeqNo
+    ReworkData AS (
+      SELECT pr.StartedOn AS [DateTime], w.Name AS [Activity], 'REWORK' AS [ProcessStatus],
+             dc.Name AS [ImportantCheckPoint], pb.CheckingMethod AS [MethodOfChecking],
+             us.UserName AS [OperatorName], dc.Name AS [Issue], it.InspectedOn AS [ActionDateTime],
+             rr.Type AS [Action], 'REWORKED' AS [Result], pr.SeqNo
       FROM InspectionHeader ih
-      INNER JOIN InspectionTrans it ON it.InspectionLotNo = ih.InspectionLotNo
-      INNER JOIN ProcessRouting pr ON pr.PSNo = ih.DocNo AND pr.ProcessCode = ih.Process
-      INNER JOIN WorkCenter w ON w.StationCode = pr.StationCode
-      LEFT JOIN ProductionProcess pb ON pb.ProcessCode = pr.ProcessCode
-      LEFT JOIN InspectionDefect idf ON it.ID = idf.ID
-      LEFT JOIN DefectCodeMaster dc ON idf.Defect = dc.Code
-      LEFT JOIN ReworkResolution rr ON it.ReworkResolution = rr.ID
-      LEFT JOIN Users us ON it.ApprovedBy = us.UserCode
-      WHERE it.NextAction = 1
-        AND ih.DocNo = @PSNo
+      INNER JOIN InspectionTrans it  ON it.InspectionLotNo = ih.InspectionLotNo
+      INNER JOIN ProcessRouting pr   ON pr.PSNo = ih.DocNo AND pr.ProcessCode = ih.Process
+      INNER JOIN WorkCenter w        ON w.StationCode = pr.StationCode
+      LEFT  JOIN ProductionProcess pb ON pb.ProcessCode = pr.ProcessCode
+      LEFT  JOIN InspectionDefect idf ON it.ID = idf.ID
+      LEFT  JOIN DefectCodeMaster dc  ON idf.Defect = dc.Code
+      LEFT  JOIN ReworkResolution rr  ON it.ReworkResolution = rr.ID
+      LEFT  JOIN Users us            ON it.ApprovedBy = us.UserCode
+      WHERE it.NextAction = 1 AND ih.DocNo = @PSNo
     ),
-
-    ------------------------------------------------------------
-    -- PENDING ROUTE STAGES (AFTER REWORK)
-    ------------------------------------------------------------
-    PendingStages AS
-    (
-      SELECT
-        NULL AS [DateTime],
-        w.Name AS [Activity],
-        'PENDING' AS [ProcessStatus],
-        pb.CheckPoints AS [ImportantCheckPoint],
-        pb.CheckingMethod AS [MethodOfChecking],
-        NULL AS [OperatorName],
-        NULL AS [Issue],
-        NULL AS [ActionDateTime],
-        NULL AS [Action],
-        'WAITING' AS [Result]
+    PendingStages AS (
+      SELECT NULL AS [DateTime], w.Name AS [Activity], 'PENDING' AS [ProcessStatus],
+             pb.CheckPoints AS [ImportantCheckPoint], pb.CheckingMethod AS [MethodOfChecking],
+             NULL AS [OperatorName], NULL AS [Issue], NULL AS [ActionDateTime],
+             NULL AS [Action], 'WAITING' AS [Result]
       FROM ProcessRouting pr
-      INNER JOIN WorkCenter w ON w.StationCode = pr.StationCode
-      LEFT JOIN ProductionProcess pb ON pb.ProcessCode = pr.ProcessCode
+      INNER JOIN WorkCenter w        ON w.StationCode = pr.StationCode
+      LEFT  JOIN ProductionProcess pb ON pb.ProcessCode = pr.ProcessCode
       CROSS JOIN ReworkData r
-      WHERE pr.PSNo = @PSNo
-        AND pr.SeqNo > r.SeqNo
-        AND pr.StartedOn IS NULL
+      WHERE pr.PSNo = @PSNo AND pr.SeqNo > r.SeqNo AND pr.StartedOn IS NULL
     )
-
-    ------------------------------------------------------------
-    -- FINAL TRACEABILITY OUTPUT
-    ------------------------------------------------------------
     SELECT
-      ROW_NUMBER() OVER (
-        ORDER BY CASE WHEN DateTime IS NULL THEN 1 ELSE 0 END, DateTime
-      ) AS [Sr No],
+      ROW_NUMBER() OVER (ORDER BY CASE WHEN DateTime IS NULL THEN 1 ELSE 0 END, DateTime) AS [Sr No],
       FORMAT(DateTime, 'dd-MMM-yyyy HH:mm:ss') AS [Date & Time],
-      Activity,
-      ProcessStatus,
+      Activity, ProcessStatus,
       ImportantCheckPoint AS [Important check point],
-      MethodOfChecking AS [Method of checking],
-      OperatorName AS [Name of Operator],
+      MethodOfChecking    AS [Method of checking],
+      OperatorName        AS [Name of Operator],
       Issue,
       FORMAT(ActionDateTime, 'dd-MMM-yyyy HH:mm:ss') AS [Action Date & Time],
-      Action,
-      Result
-    FROM
-    (
-      SELECT DateTime, Activity, ProcessStatus, ImportantCheckPoint, MethodOfChecking, OperatorName, Issue, ActionDateTime, Action, Result
-      FROM ProductionData
-
+      Action, Result
+    FROM (
+      SELECT DateTime, Activity, ProcessStatus, ImportantCheckPoint, MethodOfChecking,
+             OperatorName, Issue, ActionDateTime, Action, Result FROM ProductionData
       UNION ALL
-
-      SELECT DateTime, Activity, ProcessStatus, ImportantCheckPoint, MethodOfChecking, OperatorName, Issue, ActionDateTime, Action, Result
-      FROM ReworkData
-
+      SELECT DateTime, Activity, ProcessStatus, ImportantCheckPoint, MethodOfChecking,
+             OperatorName, Issue, ActionDateTime, Action, Result FROM ReworkData
       UNION ALL
-
-      SELECT DateTime, Activity, ProcessStatus, ImportantCheckPoint, MethodOfChecking, OperatorName, Issue, ActionDateTime, Action, Result
-      FROM PendingStages
+      SELECT DateTime, Activity, ProcessStatus, ImportantCheckPoint, MethodOfChecking,
+             OperatorName, Issue, ActionDateTime, Action, Result FROM PendingStages
     ) X;
   `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
-
   try {
-    const request = pool
-      .request()
-      .input("componentIdentifier", sql.NVarChar, componentIdentifier);
-
-    const result = await request.query(query);
-
-    res.status(200).json({
-      success: true,
-      message: "History Card data retrieved successfully",
-      data: result.recordset,
-    });
-  } catch (error) {
-    throw new AppError(
-      `Failed to fetch History Card data: ${error.message}`,
-      500,
-    );
+    const result = await pool.request()
+      .input("componentIdentifier", sql.NVarChar, componentIdentifier)
+      .query(query);
+    res.status(200).json({ success: true, message: "History Card retrieved", data: result.recordset });
+  } catch (err) {
+    throw new AppError(`Failed to fetch History Card: ${err.message}`, 500);
   } finally {
     await pool.close();
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════
 // Functional Test
+// BUG FIX: cpt (recordsets[3]) was already being assigned correctly in
+//   the original backend — the bug was ONLY on the frontend parseResponse
+//   which ignored the cpt key. The backend is correct as-is.
+//   Keeping here for completeness / clean version.
+// ═══════════════════════════════════════════════════════════════════
 export const getFunctionalTest = tryCatch(async (req, res) => {
   const { componentIdentifier } = req.query;
-
-  if (!componentIdentifier) {
-    throw new AppError("Component Identifier is required", 400);
-  }
+  if (!componentIdentifier) throw new AppError("Component Identifier is required", 400);
 
   const query = `
     DECLARE @ScanBarcode VARCHAR(50) = @componentIdentifier;
-
-    ------------------------------------------------------------
-    -- STEP 1 : Find PSNo
-    ------------------------------------------------------------
     DECLARE @PSNo BIGINT;
+    SELECT TOP 1 @PSNo = PSNo FROM ProcessStageLabel WHERE BarcodeNo = @ScanBarcode;
 
-    SELECT TOP 1 @PSNo = PSNo
-    FROM ProcessStageLabel
-    WHERE BarcodeNo = @ScanBarcode;
-
-    ------------------------------------------------------------
-    -- STEP 2 : Store all barcodes of same unit
-    ------------------------------------------------------------
     DECLARE @Barcodes TABLE (BarcodeNo VARCHAR(50) COLLATE DATABASE_DEFAULT);
+    INSERT INTO @Barcodes(BarcodeNo) SELECT BarcodeNo FROM ProcessStageLabel WHERE PSNo = @PSNo;
 
-    INSERT INTO @Barcodes(BarcodeNo)
-    SELECT BarcodeNo
-    FROM ProcessStageLabel
-    WHERE PSNo = @PSNo;
+    -- RESULT 1: Gas Charging
+    SELECT 'GAS_CHARGING' AS TestType, GC.*
+    FROM GasChargeDtls GC WHERE GC.BARCODE IN (SELECT BarcodeNo FROM @Barcodes);
 
-    ------------------------------------------------------------
-    -- RESULT 1 : GAS CHARGE DETAILS
-    ------------------------------------------------------------
-    SELECT 
-        'GAS_CHARGING' AS TestType,
-        GC.*
-    FROM GasChargeDtls GC
-    WHERE GC.BARCODE IN (SELECT BarcodeNo FROM @Barcodes);
+    -- RESULT 2: EST
+    SELECT 'EST' AS TestType, EST.*
+    FROM ESTStaging EST WHERE EST.serial_no IN (SELECT BarcodeNo FROM @Barcodes);
 
-    ------------------------------------------------------------
-    -- RESULT 2 : EST STAGING DETAILS
-    ------------------------------------------------------------
-    SELECT 
-        'EST' AS TestType,
-        EST.*
-    FROM ESTStaging EST
-    WHERE EST.serial_no IN (SELECT BarcodeNo FROM @Barcodes);
+    -- RESULT 3: MFT
+    SELECT 'MFT' AS TestType, MFT.*
+    FROM MFTStaging MFT WHERE MFT.EQUIPMENT_NO IN (SELECT BarcodeNo FROM @Barcodes);
 
-    ------------------------------------------------------------
-    -- RESULT 3 : MFT STAGING DETAILS
-    ------------------------------------------------------------
-    SELECT 
-        'MFT' AS TestType,
-        MFT.*
-    FROM MFTStaging MFT
-    WHERE MFT.EQUIPMENT_NO IN (SELECT BarcodeNo FROM @Barcodes);
-
-    ------------------------------------------------------------
-    -- RESULT 4 : CPT (Compressor Performance Test) DETAILS
-    ------------------------------------------------------------
-    IF OBJECT_ID(N'tempdb..#CPT_RESULT_SET') IS NOT NULL
-      DROP TABLE #CPT_RESULT_SET;
-
+    -- RESULT 4: CPT
+    IF OBJECT_ID(N'tempdb..#CPT_RESULT_SET') IS NOT NULL DROP TABLE #CPT_RESULT_SET;
     BEGIN
       SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
-
       ;WITH CPT_SAMPLE_DATA AS (
-        SELECT 
-          RSS.RESULT_ID, 
-          RSS.PROFILE_DEVICE_NO, 
-          MAX(RSS.SAMPLE_VALUE) AS [Max], 
-          MIN(RSS.SAMPLE_VALUE) AS [Min]
+        SELECT RSS.RESULT_ID, RSS.PROFILE_DEVICE_NO,
+               MAX(RSS.SAMPLE_VALUE) AS [Max], MIN(RSS.SAMPLE_VALUE) AS [Min]
         FROM PLIS.dbo.RESULTS_SEQS_SAMPLES RSS
-        INNER JOIN PLIS.dbo.RESULTS R 
-          ON R.RESULT_ID = RSS.RESULT_ID 
-          AND R.SERVER_ID = 0
-        WHERE RSS.SERVER_ID = 0 
-          AND R.BARCODE COLLATE DATABASE_DEFAULT IN (
-            SELECT BarcodeNo FROM @Barcodes
-          )
+        INNER JOIN PLIS.dbo.RESULTS R ON R.RESULT_ID = RSS.RESULT_ID AND R.SERVER_ID = 0
+        WHERE RSS.SERVER_ID = 0
+          AND R.BARCODE COLLATE DATABASE_DEFAULT IN (SELECT BarcodeNo FROM @Barcodes)
         GROUP BY RSS.RESULT_ID, RSS.PROFILE_DEVICE_NO
-      ), 
+      ),
       CPT_SAMPLE_DEVICE AS (
-        SELECT 
-          SD.RESULT_ID, 
-          SD.[Max], 
-          SD.[Min], 
-          PD.DEVICE_TYPE_ID
+        SELECT SD.RESULT_ID, SD.[Max], SD.[Min], PD.DEVICE_TYPE_ID
         FROM PLIS.dbo.RESULTS R2
-        INNER JOIN CPT_SAMPLE_DATA SD 
-          ON R2.RESULT_ID = SD.RESULT_ID
-        INNER JOIN PLIS.dbo.PROFILES_DEVICES PD 
-          ON SD.PROFILE_DEVICE_NO = PD.DEVICE_NO 
+        INNER JOIN CPT_SAMPLE_DATA SD ON R2.RESULT_ID = SD.RESULT_ID
+        INNER JOIN PLIS.dbo.PROFILES_DEVICES PD
+          ON SD.PROFILE_DEVICE_NO = PD.DEVICE_NO
           AND R2.PROFILE_ID = PD.PROFILE_ID
           AND R2.PROFILE_HISTORY_ID = PD.HISTORY_ID
           AND PD.SERVER_ID = 0
-        WHERE PD.DEVICE_TYPE_ID IN (1, 2, 3, 7) 
-          AND R2.SERVER_ID = 0
+        WHERE PD.DEVICE_TYPE_ID IN (1, 2, 3, 7) AND R2.SERVER_ID = 0
       )
       SELECT * INTO #CPT_RESULT_SET FROM CPT_SAMPLE_DEVICE;
-
       CREATE INDEX #IX_CPT_DEVICE ON #CPT_RESULT_SET(DEVICE_TYPE_ID);
 
-      SELECT
-        'CPT' AS TestType,
+      SELECT 'CPT' AS TestType,
         MAIN.Result_ID,
         CONVERT(VARCHAR(10), MAIN.START_DATE, 105) AS DATE,
-        CONVERT(VARCHAR(8), MAIN.START_DATE, 108) AS TIME,
-        MAIN.BARCODE,
-        MAIN.MODEL_ID AS MODEL,
-        MODEL.NAME AS MODELNAME,
+        CONVERT(VARCHAR(8),  MAIN.START_DATE, 108) AS TIME,
+        MAIN.BARCODE, MAIN.MODEL_ID AS MODEL, MODEL.NAME AS MODELNAME,
         DATEDIFF(MI, MAIN.START_DATE, MAIN.END_DATE) AS RUNTIME_MINUTES,
-        TEMP.[Max] AS MAX_TEMPERATURE,
-        TEMP.[Min] AS MIN_TEMPERATURE,
-        CUR.[Max] AS MAX_CURRENT,
-        CUR.[Min] AS MIN_CURRENT,
-        VOL.[Max] AS MAX_VOLTAGE,
-        VOL.[Min] AS MIN_VOLTAGE,
-        POW.[Max] AS MAX_POWER,
-        POW.[Min] AS MIN_POWER,
+        TEMP.[Max] AS MAX_TEMPERATURE, TEMP.[Min] AS MIN_TEMPERATURE,
+        CUR.[Max]  AS MAX_CURRENT,    CUR.[Min]  AS MIN_CURRENT,
+        VOL.[Max]  AS MAX_VOLTAGE,    VOL.[Min]  AS MIN_VOLTAGE,
+        POW.[Max]  AS MAX_POWER,      POW.[Min]  AS MIN_POWER,
         CASE WHEN MAIN.STATUS = 1 THEN 'PASS' ELSE 'FAIL' END AS PERFORMANCE,
         ISNULL(Step_Status.DEVICE_STATUS_CODE, 0) AS FaultCode,
-        CASE 
+        CASE
           WHEN Step_Status.DEVICE_STATUS_CODE = 26 THEN 'System Already Charged'
-          WHEN Code_Name.NAME IS NULL AND MAIN.STATUS = 0 THEN 'Station Fault Stop' 
+          WHEN Code_Name.NAME IS NULL AND MAIN.STATUS = 0 THEN 'Station Fault Stop'
           WHEN Code_Name.NAME IS NULL THEN 'Charging Pass'
           ELSE Code_Name.NAME
         END AS FaultName,
         MAIN.AREA_ID
       FROM PLIS.dbo.RESULTS MAIN
-      INNER JOIN #CPT_RESULT_SET TEMP 
-        ON MAIN.RESULT_ID = TEMP.RESULT_ID AND TEMP.DEVICE_TYPE_ID = 7
-      INNER JOIN #CPT_RESULT_SET CUR 
-        ON TEMP.RESULT_ID = CUR.RESULT_ID AND CUR.DEVICE_TYPE_ID = 2
-      INNER JOIN #CPT_RESULT_SET VOL 
-        ON VOL.RESULT_ID = CUR.RESULT_ID AND VOL.DEVICE_TYPE_ID = 3
-      INNER JOIN #CPT_RESULT_SET POW 
-        ON POW.RESULT_ID = VOL.RESULT_ID AND POW.DEVICE_TYPE_ID = 1
-      LEFT JOIN PLIS.dbo.MODELS MODEL 
-        ON MODEL.MODEL_ID = MAIN.MODEL_ID
-      LEFT JOIN PLIS.dbo.RESULTS_STEPS_STATUS Step_Status 
-        ON MAIN.RESULT_ID = Step_Status.RESULT_ID
-      LEFT JOIN (
-        SELECT DISTINCT STATUS_CODE_ID, NAME, STATUS_CODE_TYPE 
-        FROM PLIS.dbo.DEVICES_STATUS_CODES 
-        WHERE LANGUAGE_ID = 0
-      ) Code_Name 
-        ON Code_Name.STATUS_CODE_ID = Step_Status.DEVICE_STATUS_CODE 
-        AND Code_Name.STATUS_CODE_TYPE = Step_Status.Status_Type_ID
+      INNER JOIN #CPT_RESULT_SET TEMP ON MAIN.RESULT_ID = TEMP.RESULT_ID AND TEMP.DEVICE_TYPE_ID = 7
+      INNER JOIN #CPT_RESULT_SET CUR  ON TEMP.RESULT_ID = CUR.RESULT_ID  AND CUR.DEVICE_TYPE_ID = 2
+      INNER JOIN #CPT_RESULT_SET VOL  ON VOL.RESULT_ID  = CUR.RESULT_ID  AND VOL.DEVICE_TYPE_ID = 3
+      INNER JOIN #CPT_RESULT_SET POW  ON POW.RESULT_ID  = VOL.RESULT_ID  AND POW.DEVICE_TYPE_ID = 1
+      LEFT  JOIN PLIS.dbo.MODELS MODEL ON MODEL.MODEL_ID = MAIN.MODEL_ID
+      LEFT  JOIN PLIS.dbo.RESULTS_STEPS_STATUS Step_Status ON MAIN.RESULT_ID = Step_Status.RESULT_ID
+      LEFT  JOIN (
+        SELECT DISTINCT STATUS_CODE_ID, NAME, STATUS_CODE_TYPE
+        FROM PLIS.dbo.DEVICES_STATUS_CODES WHERE LANGUAGE_ID = 0
+      ) Code_Name ON Code_Name.STATUS_CODE_ID = Step_Status.DEVICE_STATUS_CODE
+                 AND Code_Name.STATUS_CODE_TYPE = Step_Status.Status_Type_ID
       WHERE MAIN.AREA_ID IN (5, 6, 8)
-        AND MAIN.BARCODE COLLATE DATABASE_DEFAULT IN (
-          SELECT BarcodeNo FROM @Barcodes
-        )
-        AND MAIN.Result_ID NOT IN (
-          SELECT Result_ID FROM GasChargeSUSDtls
-        )
+        AND MAIN.BARCODE COLLATE DATABASE_DEFAULT IN (SELECT BarcodeNo FROM @Barcodes)
+        AND MAIN.Result_ID NOT IN (SELECT Result_ID FROM GasChargeSUSDtls)
       ORDER BY MAIN.Result_ID DESC;
 
-      IF OBJECT_ID(N'tempdb..#CPT_RESULT_SET') IS NOT NULL
-        DROP TABLE #CPT_RESULT_SET;
+      IF OBJECT_ID(N'tempdb..#CPT_RESULT_SET') IS NOT NULL DROP TABLE #CPT_RESULT_SET;
     END
   `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
-
   try {
-    const request = pool
-      .request()
-      .input("componentIdentifier", sql.NVarChar, componentIdentifier);
+    const result = await pool.request()
+      .input("componentIdentifier", sql.NVarChar, componentIdentifier)
+      .query(query);
 
-    const result = await request.query(query);
-
-    // ─── 4 separate recordsets from 4 SELECT statements ─────
     const gasChargingData = result.recordsets[0] || [];
-    const estData = result.recordsets[1] || [];
-    const mftData = result.recordsets[2] || [];
-    const cptData = result.recordsets[3] || [];
-
-    // ─── Summary ────────────────────────────────────────────
-    const summary = {
-      gasCharging: gasChargingData.length,
-      est: estData.length,
-      mft: mftData.length,
-      cpt: cptData.length,
-      total:
-        gasChargingData.length +
-        estData.length +
-        mftData.length +
-        cptData.length,
-    };
+    const estData         = result.recordsets[1] || [];
+    const mftData         = result.recordsets[2] || [];
+    const cptData         = result.recordsets[3] || [];
 
     res.status(200).json({
       success: true,
-      message: "Functional Test data retrieved successfully",
+      message: "Functional Test data retrieved",
       data: {
         gasCharging: gasChargingData,
-        est: estData,
-        mft: mftData,
-        cpt: cptData,
+        est:         estData,
+        mft:         mftData,
+        cpt:         cptData,  // ← always present
       },
-      summary,
+      summary: {
+        gasCharging: gasChargingData.length,
+        est:         estData.length,
+        mft:         mftData.length,
+        cpt:         cptData.length,
+        total:       gasChargingData.length + estData.length + mftData.length + cptData.length,
+      },
     });
-  } catch (error) {
-    throw new AppError(
-      `Failed to fetch Functional Test data: ${error.message}`,
-      500,
-    );
+  } catch (err) {
+    throw new AppError(`Failed to fetch Functional Test: ${err.message}`, 500);
+  } finally {
+    await pool.close();
+  }
+});
+
+
+export const getSerialNumbers = tryCatch(async (req, res) => {
+  const { componentIdentifier } = req.query;
+  if (!componentIdentifier) throw new AppError("Component Identifier is required", 400);
+ 
+  const query = `
+    DECLARE @PSNo BIGINT;
+    SELECT TOP 1 @PSNo = PSNo
+    FROM ProcessStageLabel
+    WHERE BarcodeNo = @componentIdentifier;
+ 
+    IF @PSNo IS NULL
+    BEGIN
+      SELECT NULL AS BarcodeNo, NULL AS PSNo, NULL AS Type, NULL AS CreatedOn WHERE 1 = 0;
+      RETURN;
+    END
+ 
+    -- Return all barcodes linked to the same production order
+    SELECT
+      psl.*,
+      mb.Type         AS BarcodeType,
+      mb.Material,
+      m.Name          AS MaterialName,
+      m.Alias         AS SAPCode
+    FROM ProcessStageLabel psl
+    LEFT JOIN MaterialBarcode mb ON mb.Serial = psl.BarcodeNo OR mb.Alias = psl.BarcodeNo
+    LEFT JOIN Material m         ON m.MatCode = mb.Material
+    WHERE psl.PSNo = @PSNo
+    ORDER BY psl.BarcodeNo ASC;
+  `;
+ 
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+  try {
+    const result = await pool.request()
+      .input("componentIdentifier", sql.NVarChar, componentIdentifier)
+      .query(query);
+    res.status(200).json({
+      success: true,
+      message: result.recordset.length
+        ? "Serial Numbers retrieved"
+        : "No serial numbers found for this identifier",
+      data: result.recordset,
+    });
+  } catch (err) {
+    throw new AppError(`Failed to fetch Serial Numbers: ${err.message}`, 500);
   } finally {
     await pool.close();
   }

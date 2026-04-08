@@ -197,7 +197,8 @@ export const getVisitorLogs = tryCatch(async (_, res, next) => {
         vp.visitor_photo,
         vl.check_in_time,
         vl.check_out_time,
-        vp.created_at
+        vp.created_at,
+        vp.city
       FROM visit_logs vl
       RIGHT JOIN visitor_passes vp ON vp.pass_id = vl.unique_pass_id
       INNER JOIN users u ON u.employee_id = vp.employee_to_visit

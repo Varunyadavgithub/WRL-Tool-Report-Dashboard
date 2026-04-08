@@ -18,12 +18,15 @@ export const getFgUnloading = tryCatch(async (req, res) => {
   const istEnd = convertToIST(endDate);
   const offset = (parseInt(page) - 1) * parseInt(limit);
 
+  // Fixed: ModelName and BatchCode added to SELECT
   const query = `
     WITH UnloadingData AS (
       SELECT
         ROW_NUMBER() OVER (ORDER BY DateTime DESC) AS RowNum,
+        ModelName,
         FGSerialNo,
         AssetCode,
+        BatchCode,
         ScannerNo,
         DateTime
       FROM DispatchUnloading
@@ -211,6 +214,7 @@ export const getQuickFgDispatch = tryCatch(async (req, res) => {
 
   const lowerStatus = status.toLowerCase();
   let tableName, statusValue, additionalField;
+
   if (lowerStatus === "completed") {
     tableName = "DispatchMaster";
     statusValue = "Completed";

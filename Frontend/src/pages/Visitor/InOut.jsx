@@ -361,7 +361,7 @@ const InOut = () => {
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 justify-center lg:justify-start">
                             <MdBusiness className="text-purple-500" />
-                            <span>{visitor.name || "N/A"}</span>
+                            <span>{visitor.employee_name || "N/A"}</span>
                           </div>
                           <div className="flex items-center gap-2 justify-center lg:justify-start">
                             <MdPhone className="text-blue-500" />
@@ -384,7 +384,7 @@ const InOut = () => {
                           </div>
                           <div className="flex items-center gap-2 justify-center lg:justify-start">
                             <MdLocationOn className="text-red-500" />
-                            <span>{visitor.vehicle_details || "N/A"}</span>
+                            <span>{visitor.city || "N/A"}</span>
                           </div>
                         </div>
                       </div>

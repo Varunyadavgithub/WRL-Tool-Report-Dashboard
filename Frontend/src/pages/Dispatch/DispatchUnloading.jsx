@@ -1,12 +1,35 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
-import Title from "../../components/ui/Title";
-import DateTimePicker from "../../components/ui/DateTimePicker";
-import Button from "../../components/ui/Button";
-import Loader from "../../components/ui/Loader";
 import toast from "react-hot-toast";
-import ExportButton from "../../components/ui/ExportButton";
 import { baseURL } from "../../assets/assets";
+import DateTimePicker from "../../components/ui/DateTimePicker";
+import ExportButton from "../../components/ui/ExportButton";
+
+import { FiSearch, FiXCircle, FiBox } from "react-icons/fi";
+import { MdOutlineInventory2 } from "react-icons/md";
+import { BsCalendarDay, BsCalendarCheck, BsCalendarRange } from "react-icons/bs";
+import { HiOutlineChip } from "react-icons/hi";
+import { TbFilterOff } from "react-icons/tb";
+import { AiOutlineLoading3Quarters } from "react-icons/ai";
+import { RiBarChartBoxLine } from "react-icons/ri";
+
+// ─── Spinner ──────────────────────────────────────────────────────────────────
+const Spinner = ({ size = 16 }) => (
+  <AiOutlineLoading3Quarters
+    size={size}
+    className="animate-spin text-amber-400 inline-block"
+  />
+);
+
+// ─── Stat Card ────────────────────────────────────────────────────────────────
+const StatCard = ({ label, value }) => (
+  <div className="flex flex-col gap-0.5 px-5 py-3 rounded-xl bg-amber-50 border border-amber-200">
+    <span className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold">
+      {label}
+    </span>
+    <span className="text-2xl font-black tabular-nums text-amber-700">{value ?? "—"}</span>
+  </div>
+);
 
 const DispatchUnloading = () => {
   const [loading, setLoading] = useState(false);
@@ -27,11 +50,8 @@ const DispatchUnloading = () => {
     (node) => {
       if (loading) return;
       if (observer.current) observer.current.disconnect();
-
       observer.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && hasMore) {
-          setPage((prevPage) => prevPage + 1);
-        }
+        if (entries[0].isIntersecting && hasMore) setPage((p) => p + 1);
       });
       if (node) observer.current.observe(node);
     },
@@ -40,73 +60,52 @@ const DispatchUnloading = () => {
 
   const fetchFgUnloadingData = async (pageNumber = 1) => {
     if (!startTime || !endTime) {
-      toast.error("Please select Time Range.");
+      toast.error("Please select a time range.");
       return;
     }
-
     try {
       setLoading(true);
-
-      const res = await axios.get(`${baseURL}dispatch/fg-unloading`, {
-        params: {
-          startDate: startTime,
-          endDate: endTime,
-          page: pageNumber,
-          limit,
-        },
-      });
-
-      if (res?.data?.success) {
-        setFgUnloadingData((prev) => [...prev, ...res?.data?.data]);
-        if (pageNumber === 1) {
-          setTotalCount(res?.data?.totalCount);
-        }
-        setHasMore(res?.data?.data.length > 0);
+      if (pageNumber === 1) {
+        setFgUnloadingData([]);
+        setTotalCount(0);
       }
-    } catch (error) {
-      console.error("Failed to fetch Fg Unloading Data:", error);
-      toast.error("Failed to fetch Fg Unloading Data. Please try again.");
+      const res = await axios.get(`${baseURL}dispatch/fg-unloading`, {
+        params: { startDate: startTime, endDate: endTime, page: pageNumber, limit },
+      });
+      if (res?.data?.success) {
+        setFgUnloadingData((prev) =>
+          pageNumber === 1 ? res.data.data : [...prev, ...res.data.data]
+        );
+        if (pageNumber === 1) setTotalCount(res.data.totalCount);
+        setHasMore(res.data.data.length === limit);
+      }
+    } catch {
+      toast.error("Failed to fetch FG Unloading data.");
     } finally {
       setLoading(false);
     }
   };
 
   const aggregateFgUnloadingData = () => {
-    const aggregatedData = {};
-
-    fgUnloadingData.forEach((item) => {
-      const modelName = item.ModelName;
-      const serial = item.FGSerialNo;
-
-      if (!serial) return;
-
-      if (!aggregatedData[modelName]) {
-        aggregatedData[modelName] = {
-          startSerial: serial,
-          endSerial: serial,
-          count: 1,
-        };
+    const agg = {};
+    fgUnloadingData.forEach(({ ModelName, FGSerialNo }) => {
+      if (!FGSerialNo || !ModelName) return;
+      if (!agg[ModelName]) {
+        agg[ModelName] = { startSerial: FGSerialNo, endSerial: FGSerialNo, count: 1 };
       } else {
-        if (serial > aggregatedData[modelName].endSerial) {
-          aggregatedData[modelName].endSerial = serial;
-        }
-
-        if (serial < aggregatedData[modelName].startSerial) {
-          aggregatedData[modelName].startSerial = serial;
-        }
-
-        aggregatedData[modelName].count += 1;
+        if (FGSerialNo > agg[ModelName].endSerial) agg[ModelName].endSerial = FGSerialNo;
+        if (FGSerialNo < agg[ModelName].startSerial) agg[ModelName].startSerial = FGSerialNo;
+        agg[ModelName].count += 1;
       }
     });
-
-    return Object.entries(aggregatedData)
-      .map(([modelName, data]) => ({
-        ModelName: modelName,
-        StartSerial: data.startSerial,
-        EndSerial: data.endSerial,
-        TotalCount: data.count,
+    return Object.entries(agg)
+      .map(([ModelName, d]) => ({
+        ModelName,
+        StartSerial: d.startSerial,
+        EndSerial: d.endSerial,
+        TotalCount: d.count,
       }))
-      .sort((a, b) => a.ModelName.localeCompare(b.ModelName)); // DESC by ModelName
+      .sort((a, b) => a.ModelName.localeCompare(b.ModelName));
   };
 
   useEffect(() => {
@@ -114,408 +113,364 @@ const DispatchUnloading = () => {
     fetchFgUnloadingData(page);
   }, [page]);
 
-  // Quick Filters
-  const fetchYesterdayFgUnloadingData = async () => {
+  const pad = (n) => String(n).padStart(2, "0");
+  const fmt = (d) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  const runQuickFilter = async (type) => {
     const now = new Date();
-    const today8AM = new Date(now);
-    today8AM.setHours(8, 0, 0, 0);
+    const today8 = new Date(now);
+    today8.setHours(8, 0, 0, 0);
 
-    const yesterday8AM = new Date(today8AM);
-    yesterday8AM.setDate(today8AM.getDate() - 1); // Go to yesterday 8 AM
-
-    const formatDate = (date) => {
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
-      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
-    const formattedStart = formatDate(yesterday8AM);
-    const formattedEnd = formatDate(today8AM);
-
-    try {
-      setYdayLoading(true);
-
-      setFgUnloadingData([]);
-      setTotalCount(0);
-
-      const res = await axios.get(`${baseURL}dispatch/quick-fg-unloading`, {
-        params: {
-          startDate: formattedStart,
-          endDate: formattedEnd,
-        },
-      });
-
-      if (res?.data?.success) {
-        setFgUnloadingData(res?.data?.data);
-        setTotalCount(res?.data?.totalCount);
-      }
-    } catch (error) {
-      console.error("Failed to fetch Yesterday Fg Unloading Data:", error);
-      toast.error(
-        "Failed to fetch Yesterday Fg Unloading Data. Please try again."
-      );
-    } finally {
-      setYdayLoading(false);
+    let start, end;
+    if (type === "yday") {
+      const y8 = new Date(today8);
+      y8.setDate(y8.getDate() - 1);
+      start = fmt(y8);
+      end = fmt(today8);
+    } else if (type === "tday") {
+      start = fmt(today8);
+      end = fmt(now);
+    } else {
+      const som = new Date(now.getFullYear(), now.getMonth(), 1, 8, 0, 0);
+      start = fmt(som);
+      end = fmt(now);
     }
-  };
 
-  const fetchTodayFgUnloadingData = async () => {
-    const now = new Date();
-    const today8AM = new Date(now);
-    today8AM.setHours(8, 0, 0, 0); // Set to today 08:00 AM
-
-    const formatDate = (date) => {
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
-      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
-    const formattedStart = formatDate(today8AM);
-    const formattedEnd = formatDate(now); // Now = current time
+    const setters = { yday: setYdayLoading, tday: setTodayLoading, mtd: setMonthLoading };
     try {
-      setTodayLoading(true);
-
+      setters[type](true);
       setFgUnloadingData([]);
       setTotalCount(0);
-
+      setSelectedModelName(null);
       const res = await axios.get(`${baseURL}dispatch/quick-fg-unloading`, {
-        params: {
-          startDate: formattedStart,
-          endDate: formattedEnd,
-        },
+        params: { startDate: start, endDate: end },
       });
-
       if (res?.data?.success) {
-        setFgUnloadingData(res?.data?.data);
-        setTotalCount(res?.data?.totalCount);
+        setFgUnloadingData(res.data.data);
+        setTotalCount(res.data.totalCount);
       }
-    } catch (error) {
-      console.error("Failed to fetch Today Fg Unloading Data:", error);
-      toast.error("Failed to fetch Today Fg Unloading Data. Please try again.");
+    } catch {
+      toast.error(`Failed to fetch ${type.toUpperCase()} data.`);
     } finally {
-      setTodayLoading(false);
-    }
-  };
-
-  const fetchMTDFgUnloadingData = async () => {
-    const now = new Date();
-    const startOfMonth = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      1,
-      8,
-      0,
-      0
-    ); // 1st day at 08:00 AM
-
-    const formatDate = (date) => {
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-        date.getDate()
-      )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
-    const formattedStart = formatDate(startOfMonth);
-    const formattedEnd = formatDate(now);
-    try {
-      setMonthLoading(true);
-
-      setFgUnloadingData([]);
-      setTotalCount(0);
-
-      const res = await axios.get(`${baseURL}dispatch/quick-fg-unloading`, {
-        params: {
-          startDate: formattedStart,
-          endDate: formattedEnd,
-        },
-      });
-
-      if (res?.data?.success) {
-        setFgUnloadingData(res?.data?.data);
-        setTotalCount(res?.data?.totalCount);
-      }
-    } catch (error) {
-      console.error("Failed to fetch this Month Fg Unloading Data:", error);
-      toast.error(
-        "Failed to fetch this Month Fg Unloading Data. Please try again."
-      );
-    } finally {
-      setMonthLoading(false);
+      setters[type](false);
     }
   };
 
   const handleQuery = () => {
+    setPage(1);
+    setSelectedModelName(null);
     fetchFgUnloadingData(1);
   };
 
-  const handleYesterdayQuery = () => {
-    fetchYesterdayFgUnloadingData();
-  };
+  const anyLoading = ydayLoading || todayLoading || monthLoading;
 
-  const handleTodayQuery = () => {
-    fetchTodayFgUnloadingData();
-  };
+  const filteredData = selectedModelName
+    ? [...fgUnloadingData]
+        .filter((i) => i.ModelName === selectedModelName)
+        .sort((a, b) => b.FGSerialNo.localeCompare(a.FGSerialNo))
+    : [...fgUnloadingData].sort((a, b) => b.FGSerialNo.localeCompare(a.FGSerialNo));
 
-  const handleMonthQuery = () => {
-    fetchMTDFgUnloadingData();
-  };
-
-  const filteredFgUnloadingData = selectedModelName
-    ? fgUnloadingData
-        .filter((item) => item.ModelName === selectedModelName)
-        .sort((a, b) => b.FGSerialNo.localeCompare(a.FGSerialNo)) // Descending for alphanumeric
-    : fgUnloadingData.sort((a, b) => b.FGSerialNo.localeCompare(a.FGSerialNo));
-
-  const handleModelRowClick = (modelName) => {
-    setSelectedModelName(modelName === selectedModelName ? null : modelName);
-  };
-
-  const handleClearFilters = () => {
-    setSelectedModelName(null);
-  };
+  const aggregated = aggregateFgUnloadingData();
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
-      <Title title="Dispatch Unloading" align="center" />
-
-      {/* Filters Section */}
-      <div className="flex gap-2">
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl items-center">
-          <DateTimePicker
-            label="Start Time"
-            name="startTime"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-          />
-          <DateTimePicker
-            label="End Time"
-            name="endTime"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-          />
+    <div className="min-h-screen bg-slate-50">
+      {/* ── Page Header ── */}
+      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3 shadow-sm">
+        <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-amber-100 text-amber-600">
+          <MdOutlineInventory2 size={22} />
         </div>
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
-          {/* Buttons and Checkboxes */}
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex flex-col items-center gap-4">
-              <div className="flex gap-2">
-                <Button
-                  bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
-                  textColor={loading ? "text-white" : "text-black"}
-                  className={`font-semibold ${
-                    loading ? "cursor-not-allowed" : ""
-                  }`}
-                  onClick={handleQuery}
-                  disabled={loading}
+        <div>
+          <h1 className="text-lg font-black tracking-tight text-slate-800 leading-none">
+            Dispatch Unloading
+          </h1>
+          <p className="text-xs text-slate-400 mt-0.5">FG serial tracking &amp; model summary</p>
+        </div>
+        {totalCount > 0 && (
+          <div className="ml-auto">
+            <StatCard label="Total Records" value={totalCount} />
+          </div>
+        )}
+      </div>
+
+      <div className="px-6 py-5 space-y-4">
+        {/* ── Filter Bar ── */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex-1 min-w-[170px]">
+              <DateTimePicker
+                label="Start Time"
+                name="startTime"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
+            <div className="flex-1 min-w-[170px]">
+              <DateTimePicker
+                label="End Time"
+                name="endTime"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+              />
+            </div>
+
+            <button
+              onClick={handleQuery}
+              disabled={loading}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:bg-slate-300 text-white text-sm font-bold transition-all shadow-sm cursor-pointer disabled:cursor-not-allowed"
+            >
+              {loading ? <Spinner size={14} /> : <FiSearch size={14} />}
+              Query
+            </button>
+
+            {fgUnloadingData.length > 0 && <ExportButton data={fgUnloadingData} />}
+
+            {/* Divider */}
+            <div className="hidden md:block w-px h-9 bg-slate-200 mx-1" />
+
+            {/* Quick Filters */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Quick
+              </span>
+              {[
+                {
+                  key: "yday",
+                  label: "Yesterday",
+                  icon: <BsCalendarDay size={13} />,
+                  isLoading: ydayLoading,
+                  cls: "bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700",
+                },
+                {
+                  key: "tday",
+                  label: "Today",
+                  icon: <BsCalendarCheck size={13} />,
+                  isLoading: todayLoading,
+                  cls: "bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700",
+                },
+                {
+                  key: "mtd",
+                  label: "MTD",
+                  icon: <BsCalendarRange size={13} />,
+                  isLoading: monthLoading,
+                  cls: "bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700",
+                },
+              ].map(({ key, label, icon, isLoading, cls }) => (
+                <button
+                  key={key}
+                  onClick={() => runQuickFilter(key)}
+                  disabled={anyLoading}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${cls}`}
                 >
-                  Query
-                </Button>
-                {fgUnloadingData && fgUnloadingData.length > 0 && (
-                  <ExportButton data={fgUnloadingData} />
-                )}
-              </div>
-              <div className="text-left font-bold text-lg">
-                COUNT: <span className="text-blue-700">{totalCount}</span>
-              </div>
+                  {isLoading ? <Spinner size={12} /> : icon}
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
-            Quick Filters
-          </h2>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <Button
-              bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
-              textColor={ydayLoading ? "text-white" : "text-black"}
-              className={`font-semibold ${
-                ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
-              }`}
-              onClick={() => handleYesterdayQuery()}
-              disabled={ydayLoading}
-            >
-              YDAY
-            </Button>
-            {ydayLoading && <Loader />}
-            <Button
-              bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
-              textColor={todayLoading ? "text-white" : "text-black"}
-              className={`font-semibold ${
-                todayLoading ? "cursor-not-allowed" : "cursor-pointer"
-              }`}
-              onClick={() => handleTodayQuery()}
-              disabled={todayLoading}
-            >
-              TDAY
-            </Button>
-            {todayLoading && <Loader />}
-            <Button
-              bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
-              textColor={monthLoading ? "text-white" : "text-black"}
-              className={`font-semibold ${
-                monthLoading ? "cursor-not-allowed" : "cursor-pointer"
-              }`}
-              onClick={() => handleMonthQuery()}
-              disabled={monthLoading}
-            >
-              MTD
-            </Button>
-            {monthLoading && <Loader />}
-          </div>
-        </div>
-      </div>
 
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
-        <div className="bg-white border border-gray-300 rounded-md p-4">
-          <div className="flex flex-wrap gap-4">
-            <div className="w-full md:flex-1">
-              <div className="w-full max-h-[600px] overflow-x-auto">
-                <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
-                  <thead className="bg-gray-200 sticky top-0 z-10 text-center">
+        {/* ── Active Filter Banner ── */}
+        {selectedModelName && (
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2.5 rounded-xl text-sm font-semibold">
+            <HiOutlineChip size={16} />
+            Filtering by model:&nbsp;
+            <span className="font-black">{selectedModelName}</span>
+            <span className="mx-1 text-amber-300">|</span>
+            <span className="text-amber-600 font-medium">{filteredData.length} records shown</span>
+            <button
+              onClick={() => setSelectedModelName(null)}
+              className="ml-auto flex items-center gap-1 text-xs text-amber-500 hover:text-amber-800 font-bold transition-colors cursor-pointer"
+            >
+              <TbFilterOff size={14} /> Clear
+            </button>
+          </div>
+        )}
+
+        {/* ── Tables Row ── */}
+        <div className="flex gap-4 items-start">
+          {/* Production Records */}
+          <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2 bg-slate-50">
+              <FiBox size={14} className="text-slate-400" />
+              <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                Production Records
+              </span>
+              {filteredData.length > 0 && (
+                <span className="ml-auto bg-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums">
+                  {filteredData.length.toLocaleString()}
+                </span>
+              )}
+            </div>
+            <div className="max-h-[560px] overflow-auto">
+              <table className="min-w-full text-xs">
+                <thead className="sticky top-0 z-10 bg-white border-b border-slate-100">
+                  <tr>
+                    {["#", "Model Name", "FG Serial No.", "Asset Code", "Batch Code", "Scanner No.", "Date Time"].map(
+                      (h) => (
+                        <th
+                          key={h}
+                          className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest text-slate-400 font-semibold whitespace-nowrap"
+                        >
+                          {h}
+                        </th>
+                      )
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredData.map((item, index) => {
+                    const isLast = index === filteredData.length - 1;
+                    return (
+                      <tr
+                        key={index}
+                        ref={isLast ? lastRowRef : null}
+                        className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
+                      >
+                        <td className="px-3 py-2 text-slate-300 tabular-nums select-none">
+                          {index + 1}
+                        </td>
+                        <td className="px-3 py-2 font-semibold text-slate-700 whitespace-nowrap">
+                          {item.ModelName}
+                        </td>
+                        <td className="px-3 py-2 text-slate-600 font-mono whitespace-nowrap">
+                          {item.FGSerialNo}
+                        </td>
+                        <td className="px-3 py-2 text-slate-500 font-mono whitespace-nowrap">
+                          {item.AssetCode}
+                        </td>
+                        <td className="px-3 py-2 text-slate-500 whitespace-nowrap">
+                          {item.BatchCode}
+                        </td>
+                        <td className="px-3 py-2 text-slate-500 whitespace-nowrap">
+                          {item.ScannerNo}
+                        </td>
+                        <td className="px-3 py-2 text-slate-400 whitespace-nowrap font-mono">
+                          {item.DateTime?.replace("T", " ").replace("Z", "")}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {!loading && fgUnloadingData.length === 0 && (
                     <tr>
-                      <th className="px-1 py-1 border min-w-[120px]">
-                        Model Name
-                      </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
-                        FG Serial No.
-                      </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
-                        Asset Code
-                      </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
-                        Batch Code
-                      </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
-                        Scanner No.
-                      </th>
-                      <th className="px-1 py-1 border min-w-[120px]">
-                        Date Time
-                      </th>
+                      <td colSpan={7} className="py-20 text-center">
+                        <FiBox size={36} className="mx-auto mb-3 text-slate-200" />
+                        <p className="text-sm font-semibold text-slate-300">No records found</p>
+                        <p className="text-xs text-slate-300 mt-1">
+                          Select a time range and click Query
+                        </p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+              {loading && (
+                <div className="flex items-center justify-center py-10 gap-2 text-slate-400 text-sm">
+                  <Spinner /> Loading records…
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Model Summary Panel */}
+          <div className="flex-shrink-0 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+              <RiBarChartBoxLine size={14} className="text-slate-400" />
+              <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                By Model
+              </span>
+              {aggregated.length > 0 && (
+                <div className="ml-auto flex items-center gap-2">
+                  {selectedModelName && (
+                    <button
+                      onClick={() => setSelectedModelName(null)}
+                      title="Clear filter"
+                      className="text-slate-300 hover:text-red-400 transition-colors cursor-pointer"
+                    >
+                      <FiXCircle size={14} />
+                    </button>
+                  )}
+                  <ExportButton
+                    fetchData={aggregateFgUnloadingData}
+                    filename="Dispatch_Unloading_Report"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="max-h-[560px] overflow-auto">
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-2 text-slate-400 text-sm">
+                  <Spinner size={22} />
+                  <span>Calculating…</span>
+                </div>
+              ) : aggregated.length > 0 ? (
+                <table className="min-w-full text-xs">
+                  <thead className="sticky top-0 z-10 bg-white border-b border-slate-100">
+                    <tr>
+                      {["Model", "Start", "End", "Qty"].map((h) => (
+                        <th
+                          key={h}
+                          className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest text-slate-400 font-semibold whitespace-nowrap"
+                        >
+                          {h}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredFgUnloadingData.map((item, index) => {
-                      const isLast =
-                        index === filteredFgUnloadingData.length - 1;
+                    {aggregated.map((item, index) => {
+                      const isSelected = selectedModelName === item.ModelName;
                       return (
                         <tr
                           key={index}
-                          ref={isLast ? lastRowRef : null}
-                          className="hover:bg-gray-100 text-center"
+                          onClick={() =>
+                            setSelectedModelName(isSelected ? null : item.ModelName)
+                          }
+                          className={`border-b border-slate-50 cursor-pointer transition-all ${
+                            isSelected
+                              ? "bg-amber-50"
+                              : "hover:bg-slate-50"
+                          }`}
                         >
-                          <td className="px-1 py-1 border">{item.ModelName}</td>
-                          <td className="px-1 py-1 border">
-                            {item.FGSerialNo}
+                          <td
+                            className={`px-3 py-2.5 font-bold whitespace-nowrap ${
+                              isSelected ? "text-amber-700" : "text-slate-700"
+                            }`}
+                          >
+                            {isSelected && (
+                              <span className="inline-block w-1 h-1 rounded-full bg-amber-400 mr-1.5 mb-0.5" />
+                            )}
+                            {item.ModelName}
                           </td>
-                          <td className="px-1 py-1 border">{item.AssetCode}</td>
-                          <td className="px-1 py-1 border">{item.BatchCode}</td>
-                          <td className="px-1 py-1 border">{item.ScannerNo}</td>
-                          <td className="px-1 py-1 border">
-                            {item.DateTime &&
-                              item.DateTime.replace("T", " ").replace("Z", "")}
+                          <td className="px-3 py-2.5 text-slate-400 font-mono text-[10px] whitespace-nowrap">
+                            {item.StartSerial}
+                          </td>
+                          <td className="px-3 py-2.5 text-slate-400 font-mono text-[10px] whitespace-nowrap">
+                            {item.EndSerial}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span
+                              className={`inline-flex items-center justify-center px-2 py-0.5 rounded-lg text-xs font-black tabular-nums ${
+                                isSelected
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
+                              {item.TotalCount}
+                            </span>
                           </td>
                         </tr>
                       );
                     })}
-
-                    {!loading && fgUnloadingData.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="text-center py-4">
-                          No data found.
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
-                {loading && <Loader />}
-              </div>
-            </div>
-
-            {/* Left Side - Controls and Summary */}
-            <div className="md:w-[30%] flex flex-col overflow-x-hidden">
-              <div className="flex flex-wrap gap-2 items-center justify-center">
-                {fgUnloadingData && fgUnloadingData.length > 0 && (
-                  <>
-                    <div className="flex my-4 gap-2">
-                      <Button
-                        bgColor="bg-white"
-                        textColor="text-black"
-                        className="border border-gray-400 hover:bg-gray-100 px-3 py-1"
-                        onClick={handleClearFilters}
-                      >
-                        Clear Filter
-                      </Button>
-                      <ExportButton
-                        fetchData={aggregateFgUnloadingData}
-                        filename="Dispatch_Unloading_Report"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-              <div className="w-full max-h-[500px] overflow-x-auto">
-                {loading ? (
-                  <Loader />
-                ) : (
-                  <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
-                    <thead className="bg-gray-200 sticky top-0 z-10 text-center">
-                      <tr>
-                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                          Model Name
-                        </th>
-                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                          StartSerial
-                        </th>
-                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                          EndSerial
-                        </th>
-                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                          Count
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {fgUnloadingData.length > 0 ? (
-                        aggregateFgUnloadingData().map((item, index) => (
-                          <tr
-                            key={index}
-                            className={`hover:bg-gray-100 text-center cursor-pointer ${
-                              selectedModelName === item.ModelName
-                                ? "bg-blue-100"
-                                : "bg-white"
-                            }`}
-                            onClick={() => handleModelRowClick(item.ModelName)}
-                          >
-                            <td className="px-1 py-1 border">
-                              {item.ModelName}
-                            </td>
-
-                            <td className="px-1 py-1 border">
-                              {item.StartSerial}
-                            </td>
-
-                            <td className="px-1 py-1 border">
-                              {item.EndSerial}
-                            </td>
-
-                            <td className="px-1 py-1 border">
-                              {item.TotalCount}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={4} className="text-center py-4">
-                            No data found.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-200">
+                  <RiBarChartBoxLine size={36} className="mb-3" />
+                  <p className="text-sm font-semibold text-slate-300">No summary yet</p>
+                  <p className="text-xs text-slate-300 mt-1">Run a query to see model breakdown</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

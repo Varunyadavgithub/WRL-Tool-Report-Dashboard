@@ -28,10 +28,10 @@ export const runCalibrationEscalation = async () => {
     let level = null;
 
     /* ===== ESCALATION RULES ===== */
-    if (a.DaysLeft <= -5) level = 3;
-    else if (a.DaysLeft <= 5) level = 2;
-    else if (a.DaysLeft <= 10) level = 1;
-    else if (a.DaysLeft <= 15) level = 0;
+    if (a.DaysLeft <= 10) level = 3;
+    else if (a.DaysLeft <= 15) level = 2;
+    else if (a.DaysLeft <= 30) level = 1;
+    else if (a.DaysLeft <= 45) level = 0;
     else continue;
 
     const previousLevel =

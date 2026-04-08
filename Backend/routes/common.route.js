@@ -6,6 +6,7 @@ import {
   getCompType,
   getEmployeesWithDepartments,
   getModelVariantsByAssembly,
+  getProductionLine,
 } from "../controllers/common.controller.js";
 
 const router = express.Router();
@@ -16,5 +17,6 @@ router.get("/stage-names", getStageNames);
 router.get("/departments", getDepartments);
 router.get("/Comp-type", getCompType);
 router.get("/employees-with-departments", getEmployeesWithDepartments);
+router.get("/production-line", getProductionLine);
 
 export default router;

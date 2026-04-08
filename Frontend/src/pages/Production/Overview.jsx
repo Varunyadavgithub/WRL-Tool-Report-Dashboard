@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import Title from "../../components/ui/Title";
-import Button from "../../components/ui/Button";
 import SelectField from "../../components/ui/SelectField";
 import axios from "axios";
 import DateTimePicker from "../../components/ui/DateTimePicker";
@@ -13,17 +11,102 @@ import {
   useGetStagesQuery,
 } from "../../redux/api/commonApi.js";
 
+/* ── Icons ── */
+const SearchIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    viewBox="0 0 24 24"
+  >
+    <circle cx="11" cy="11" r="8" />
+    <path strokeLinecap="round" d="m21 21-4.35-4.35" />
+  </svg>
+);
+const ClearIcon = () => (
+  <svg
+    className="w-3.5 h-3.5"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M6 18L18 6M6 6l12 12"
+    />
+  </svg>
+);
+const Spinner = ({ cls = "w-4 h-4" }) => (
+  <svg className={`animate-spin ${cls}`} fill="none" viewBox="0 0 24 24">
+    <circle
+      className="opacity-25"
+      cx="12"
+      cy="12"
+      r="10"
+      stroke="currentColor"
+      strokeWidth="4"
+    />
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+  </svg>
+);
+const EmptyIcon = () => (
+  <svg
+    className="w-12 h-12 opacity-20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.2}
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"
+    />
+  </svg>
+);
+
+/* ── Quick filter button ── */
+const QuickBtn = ({ label, sublabel, loading, onClick, colorClass }) => (
+  <button
+    disabled={loading}
+    onClick={onClick}
+    className={`w-full flex flex-col items-center justify-center gap-0.5 px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-150 ${
+      loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : colorClass
+    }`}
+  >
+    {loading ? (
+      <span className="flex items-center gap-2">
+        <Spinner /> Loading…
+      </span>
+    ) : (
+      <>
+        <span className="text-[15px] font-bold tracking-widest">{label}</span>
+        <span className="text-[10px] opacity-75 font-normal">{sublabel}</span>
+      </>
+    )}
+  </button>
+);
+
+/* ════════════════════════════════════════════
+   MAIN COMPONENT
+════════════════════════════════════════════ */
 const Overview = () => {
+  /* ── Loading states ── */
   const [loading, setLoading] = useState(false);
   const [ydayLoading, setYdayLoading] = useState(false);
   const [todayLoading, setTodayLoading] = useState(false);
   const [monthLoading, setMonthLoading] = useState(false);
 
+  /* ── Filter state ── */
   const [selectedModelVariant, setSelectedModelVariant] = useState(null);
   const [selectedStage, setSelectedStage] = useState(null);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
 
+  /* ── Data state ── */
   const [productionData, setProductionData] = useState([]);
   const [page, setPage] = useState(1);
   const [limit] = useState(1000);
@@ -31,13 +114,21 @@ const Overview = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [selectedModelName, setSelectedModelName] = useState(null);
 
-  /* ===================== RTK QUERY ===================== */
+  /*
+   * FIX: isQuickMode tracks whether current data came from a quick-filter
+   * (no pagination needed). Infinite scroll observer is disabled in this mode.
+   * Without this flag, the observer fires on the last row of the filtered/smaller
+   * list → increments page → fetchProductionData runs without startTime/endTime
+   * → toast loop + ghost loading spinner.
+   */
+  const [isQuickMode, setIsQuickMode] = useState(false);
+
+  /* ── RTK Query ── */
   const {
     data: variants = [],
     isLoading: variantsLoading,
     error: variantsError,
   } = useGetModelVariantsQuery();
-
   const {
     data: stages = [],
     isLoading: stagesLoading,
@@ -49,73 +140,72 @@ const Overview = () => {
     if (stagesError) toast.error("Failed to load stages");
   }, [variantsError, stagesError]);
 
-  /* ===================== INFINITE SCROLL ===================== */
+  /* ── Infinite scroll observer ──
+     Key guard: skip when isQuickMode is true so clicking a model row in quick mode
+     doesn't accidentally trigger pagination fetches.
+  ── */
   const observer = useRef();
-
   const lastRowRef = useCallback(
     (node) => {
-      if (loading) return;
+      if (loading || isQuickMode) return;
       if (observer.current) observer.current.disconnect();
-
       observer.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && hasMore) {
-          setPage((prev) => prev + 1);
-        }
+        if (entries[0].isIntersecting && hasMore) setPage((p) => p + 1);
       });
-
       if (node) observer.current.observe(node);
     },
-    [loading, hasMore]
+    [loading, hasMore, isQuickMode],
   );
 
-  /* ===================== API CALLS ===================== */
-  const fetchProductionData = async (pageNumber = 1) => {
+  /* ── Date helpers (no mutation) ── */
+  const pad = (n) => (n < 10 ? `0${n}` : `${n}`);
+  const fmt = (d) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  /* ── Paginated fetch ── */
+  const fetchProductionData = async (pageNum = 1) => {
     if (!startTime || !endTime || (!selectedModelVariant && !selectedStage)) {
-      toast.error("Please select Stage and Time Range.");
+      toast.error("Please select a Stage and a Time Range.");
       return;
     }
-
     try {
       setLoading(true);
-
       const params = {
         startTime,
         endTime,
-        page: pageNumber,
+        page: pageNum,
         limit,
         stationCode: selectedStage?.value || null,
         model: selectedModelVariant ? Number(selectedModelVariant.value) : 0,
       };
-
       const res = await axios.get(`${baseURL}prod/fgdata`, { params });
-
       if (res?.data?.success) {
         setProductionData((prev) =>
-          pageNumber === 1 ? res.data.data : [...prev, ...res.data.data]
+          pageNum === 1 ? res.data.data : [...prev, ...res.data.data],
         );
-        if (pageNumber === 1) setTotalCount(res.data.totalCount);
-        setHasMore(res.data.data.length > 0);
+        if (pageNum === 1) setTotalCount(res.data.totalCount);
+        setHasMore(res.data.data.length >= limit);
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to fetch production data.");
     } finally {
       setLoading(false);
     }
   };
 
-  /* ===================== QUICK FILTERS ===================== */
-  const getFormattedDate = (date) => {
-    const pad = (n) => (n < 10 ? `0${n}` : n);
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-      date.getDate()
-    )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  };
-
+  /* ── Quick fetch (no pagination) ── */
   const fetchQuickData = async (url, start, end, setLoader) => {
+    if (!selectedStage) {
+      toast.error("Please select a Stage before using quick filters.");
+      return;
+    }
     try {
       setLoader(true);
       setProductionData([]);
       setTotalCount(0);
+      /* FIX: clear model filter so stale selection doesn't hide fresh data */
+      setSelectedModelName(null);
+      setIsQuickMode(true);
 
       const params = {
         startTime: start,
@@ -123,9 +213,7 @@ const Overview = () => {
         stationCode: selectedStage?.value || null,
         model: selectedModelVariant ? Number(selectedModelVariant.value) : 0,
       };
-
       const res = await axios.get(`${baseURL}${url}`, { params });
-
       if (res?.data?.success) {
         setProductionData(res.data.data);
         setTotalCount(res.data.totalCount);
@@ -137,32 +225,43 @@ const Overview = () => {
     }
   };
 
+  /* ── Quick filter shortcuts ── */
   const fetchYesterdayProductionData = () => {
     const now = new Date();
-    const today8AM = new Date(now.setHours(8, 0, 0, 0));
-    const yesterday8AM = new Date(today8AM);
-    yesterday8AM.setDate(today8AM.getDate() - 1);
-
+    const today8AM = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      8,
+      0,
+      0,
+    );
+    const yest8AM = new Date(today8AM);
+    yest8AM.setDate(today8AM.getDate() - 1);
     fetchQuickData(
       "prod/yday-fgdata",
-      getFormattedDate(yesterday8AM),
-      getFormattedDate(today8AM),
-      setYdayLoading
+      fmt(yest8AM),
+      fmt(today8AM),
+      setYdayLoading,
     );
   };
-
   const fetchTodayProductionData = () => {
     const now = new Date();
-    const today8AM = new Date(now.setHours(8, 0, 0, 0));
-
+    const today8AM = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      8,
+      0,
+      0,
+    );
     fetchQuickData(
       "prod/today-fgdata",
-      getFormattedDate(today8AM),
-      getFormattedDate(new Date()),
-      setTodayLoading
+      fmt(today8AM),
+      fmt(now),
+      setTodayLoading,
     );
   };
-
   const fetchMTDProductionData = () => {
     const now = new Date();
     const startOfMonth = new Date(
@@ -171,35 +270,32 @@ const Overview = () => {
       1,
       8,
       0,
-      0
+      0,
     );
-
     fetchQuickData(
       "prod/month-fgdata",
-      getFormattedDate(startOfMonth),
-      getFormattedDate(now),
-      setMonthLoading
+      fmt(startOfMonth),
+      fmt(now),
+      setMonthLoading,
     );
   };
 
-  /* ===================== AGGREGATION ===================== */
+  /* ── Aggregation (string-safe serial comparison) ── */
   const aggregateProductionData = () => {
     const map = {};
-
     productionData.forEach((item) => {
       const model = item.Model_Name;
       const serial = item.FG_SR || item.Assembly_Sr_No;
       if (!serial) return;
-
       if (!map[model]) {
         map[model] = { start: serial, end: serial, count: 1 };
       } else {
         map[model].count += 1;
-        map[model].start = Math.min(map[model].start, serial);
-        map[model].end = Math.max(map[model].end, serial);
+        if (String(serial) < String(map[model].start))
+          map[model].start = serial;
+        if (String(serial) > String(map[model].end)) map[model].end = serial;
       }
     });
-
     return Object.entries(map).map(([k, v]) => ({
       Model_Name: k,
       StartSerial: v.start,
@@ -208,355 +304,435 @@ const Overview = () => {
     }));
   };
 
-  /* ===================== EFFECTS ===================== */
+  /* ── Pagination side-effect ── */
   useEffect(() => {
     if (page > 1) fetchProductionData(page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
+  /* ── Export ── */
   const fetchExportData = async () => {
-    if (startTime && endTime && (selectedModelVariant || selectedStage)) {
-      try {
-        const params = {
+    if (!startTime || !endTime || (!selectedModelVariant && !selectedStage)) {
+      toast.error("Please select Stage and Time Range.");
+      return [];
+    }
+    try {
+      const res = await axios.get(`${baseURL}prod/export-production-report`, {
+        params: {
           startTime,
           endTime,
           stationCode: selectedStage?.value || null,
           model: selectedModelVariant
             ? parseInt(selectedModelVariant.value, 10)
             : 0,
-        };
-
-        const res = await axios.get(`${baseURL}prod/export-production-report`, {
-          params,
-        });
-
-        if (res?.data?.success) {
-          return res?.data?.data;
-        }
-        return [];
-      } catch (error) {
-        console.error("Failed to fetch export production data:", error);
-        toast.error("Failed to fetch export production data.");
-        return [];
-      }
-    } else {
-      toast.error("Please select Stage and Time Range.");
+        },
+      });
+      return res?.data?.success ? res.data.data : [];
+    } catch {
+      toast.error("Failed to fetch export data.");
+      return [];
     }
   };
 
+  /* ── Handlers ── */
   const handleFgData = () => {
     setProductionData([]);
     setPage(1);
-    fetchProductionData(1);
     setSelectedModelName(null);
+    setIsQuickMode(false); // back to paginated mode
+    fetchProductionData(1);
   };
 
-  const handleClearFilters = () => {
-    setSelectedModelName(null);
+  /* FIX: this is purely a client-side filter toggle — no API call, no loading */
+  const handleModelRowClick = (modelName) => {
+    setSelectedModelName((prev) => (prev === modelName ? null : modelName));
+    setIsQuickMode(true); // disable infinite scroll observer while row-filtering
   };
 
   const filteredProductionData = selectedModelName
     ? productionData.filter((item) => item.Model_Name === selectedModelName)
     : productionData;
 
-  const handleModelRowClick = (modelName) => {
-    setSelectedModelName(modelName === selectedModelName ? null : modelName);
-  };
+  const aggregated = aggregateProductionData();
+  const anyLoading = ydayLoading || todayLoading || monthLoading;
 
   if (variantsLoading || stagesLoading) return <Loader />;
 
+  /* ════════════════════════════════════════════
+     RENDER
+  ════════════════════════════════════════════ */
   return (
-    <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
-      <Title title="Production Overview" align="center" />
-
-      {/* Filters Section */}
-      <div className="flex gap-4">
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit items-center">
-          <div className="flex flex-wrap gap-2">
-            <SelectField
-              label="Model Variant"
-              options={variants}
-              value={selectedModelVariant?.value || ""}
-              onChange={(e) =>
-                setSelectedModelVariant(
-                  variants.find((opt) => opt.value === e.target.value) || 0
-                )
-              }
-              className="max-w-64"
-            />
-
-            <SelectField
-              label="Stage Name"
-              options={stages}
-              value={selectedStage?.value || ""}
-              onChange={(e) =>
-                setSelectedStage(
-                  stages.find((opt) => opt.value === e.target.value) || 0
-                )
-              }
-              className="max-w-64"
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <DateTimePicker
-              label="Start Time"
-              name="startTime"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-            />
-            <DateTimePicker
-              label="End Time"
-              name="endTime"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-            />
-          </div>
+    /* FIX: removed max-w constraint — true full width, full height layout */
+    <div className="h-screen flex flex-col bg-slate-100 overflow-hidden">
+      {/* ── Sticky top bar ── */}
+      <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shrink-0 shadow-sm z-20">
+        <div>
+          <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
+            Production Overview
+          </h1>
+          <p className="text-[11px] text-slate-400">
+            FG assembly monitoring · Real-time data
+          </p>
         </div>
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit items-center">
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex flex-wrap gap-2 mt-4">
-              <Button
-                bgColor={loading ? "bg-gray-400" : "bg-blue-500"}
-                textColor={loading ? "text-white" : "text-black"}
-                className={`font-semibold ${
-                  loading ? "cursor-not-allowed" : ""
-                }`}
-                onClick={() => handleFgData()}
-                disabled={loading}
-              >
-                Query
-              </Button>
-              {productionData && productionData.length > 0 && (
-                <ExportButton
-                  fetchData={fetchExportData}
-                  filename="Production_Report"
-                />
-              )}
-            </div>
-
-            <div className="mt-4 text-left font-bold text-lg">
-              COUNT: <span className="text-blue-700">{totalCount || 0}</span>
-            </div>
+        <div className="flex items-center gap-2">
+          <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-blue-50 border border-blue-100 min-w-[90px]">
+            <span className="text-xl font-bold font-mono text-blue-700">
+              {totalCount ?? 0}
+            </span>
+            <span className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">
+              Total Records
+            </span>
           </div>
-        </div>
-        <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl max-w-fit">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
-            Quick Filters
-          </h2>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <Button
-              bgColor={ydayLoading ? "bg-gray-400" : "bg-yellow-500"}
-              textColor={ydayLoading ? "text-white" : "text-black"}
-              className={`font-semibold ${
-                ydayLoading ? "cursor-not-allowed" : "cursor-pointer"
-              }`}
-              onClick={() => fetchYesterdayProductionData()}
-              disabled={ydayLoading}
-            >
-              YDAY
-            </Button>
-            {ydayLoading && <Loader />}
-            <Button
-              bgColor={todayLoading ? "bg-gray-400" : "bg-blue-500"}
-              textColor={todayLoading ? "text-white" : "text-black"}
-              className={`font-semibold ${
-                todayLoading ? "cursor-not-allowed" : "cursor-pointer"
-              }`}
-              onClick={() => fetchTodayProductionData()}
-              disabled={todayLoading}
-            >
-              TDAY
-            </Button>
-            {todayLoading && <Loader />}
-            <Button
-              bgColor={monthLoading ? "bg-gray-400" : "bg-green-500"}
-              textColor={monthLoading ? "text-white" : "text-black"}
-              className={`font-semibold ${
-                monthLoading ? "cursor-not-allowed" : "cursor-pointer"
-              }`}
-              onClick={() => fetchMTDProductionData()}
-              disabled={monthLoading}
-            >
-              MTD
-            </Button>
-            {monthLoading && <Loader />}
-          </div>
+          {aggregated.length > 0 && (
+            <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100 min-w-[90px]">
+              <span className="text-xl font-bold font-mono text-emerald-700">
+                {aggregated.length}
+              </span>
+              <span className="text-[10px] text-emerald-500 font-medium uppercase tracking-wide">
+                Model Types
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Summary Section */}
-      <div className="bg-purple-100 border border-dashed border-purple-400 p-4 mt-4 rounded-xl">
-        <div className="flex flex-col items-center mb-4">
-          <span className="text-xl font-semibold">Summary</span>
+      {/* ── Body ── */}
+      <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3 min-h-0">
+        {/* ── Filters + Quick filters ── */}
+        <div className="flex gap-3 shrink-0">
+          {/* Filters card */}
+          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
+              Filters
+            </p>
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="min-w-[190px] flex-1">
+                <SelectField
+                  label="Model Variant"
+                  options={variants}
+                  value={selectedModelVariant?.value || ""}
+                  onChange={(e) =>
+                    setSelectedModelVariant(
+                      variants.find((o) => o.value === e.target.value) || null,
+                    )
+                  }
+                />
+              </div>
+              <div className="min-w-[190px] flex-1">
+                <SelectField
+                  label="Stage Name"
+                  options={stages}
+                  value={selectedStage?.value || ""}
+                  onChange={(e) =>
+                    setSelectedStage(
+                      stages.find((o) => o.value === e.target.value) || null,
+                    )
+                  }
+                />
+              </div>
+              <div className="min-w-[185px] flex-1">
+                <DateTimePicker
+                  label="Start Time"
+                  name="startTime"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                />
+              </div>
+              <div className="min-w-[185px] flex-1">
+                <DateTimePicker
+                  label="End Time"
+                  name="endTime"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2 pb-0.5 shrink-0">
+                <button
+                  onClick={handleFgData}
+                  disabled={loading}
+                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    loading
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                  }`}
+                >
+                  {loading ? <Spinner /> : <SearchIcon />}
+                  {loading ? "Fetching…" : "Query"}
+                </button>
+                {productionData.length > 0 && !isQuickMode && (
+                  <ExportButton
+                    fetchData={fetchExportData}
+                    filename="Production_Report"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick filters card */}
+          <div className="w-60 shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">
+              Quick Filters
+            </p>
+            <p className="text-[10px] text-slate-400 mb-3">
+              Select a stage first.
+            </p>
+            <div className="flex flex-col gap-2">
+              <QuickBtn
+                label="YESTERDAY"
+                sublabel="Prev day 08:00 → today 08:00"
+                loading={ydayLoading}
+                onClick={fetchYesterdayProductionData}
+                colorClass="bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+              />
+              <QuickBtn
+                label="TODAY"
+                sublabel="08:00 → now"
+                loading={todayLoading}
+                onClick={fetchTodayProductionData}
+                colorClass="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+              />
+              <QuickBtn
+                label="MTD"
+                sublabel="Month to date"
+                loading={monthLoading}
+                onClick={fetchMTDProductionData}
+                colorClass="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white border border-gray-300 rounded-md p-2">
-          <div className="flex flex-wrap gap-1">
-            {/* Right Side - Detailed Table */}
-            <div className="w-full md:flex-1">
-              <div className="w-full max-h-[600px] overflow-x-auto">
-                <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
-                  <thead className="bg-gray-200 sticky top-0 z-10 text-center">
-                    <tr>
-                      <th className="px-1 py-1 border max-w-[100px]">Sr.No.</th>
-                      <th className="px-1 py-1 border min-w-[100px]">
-                        Model_Name
-                      </th>
-                      <th className="px-1 py-1 border min-w-[100px]">
-                        Model_No.
-                      </th>
-                      <th className="px-1 py-1 border min-w-[100px]">
-                        Station_Code
-                      </th>
-                      <th className="px-1 py-1 border min-w-[100px]">
-                        Assembly Sr.No
-                      </th>
-                      <th className="px-1 py-1 border min-w-[100px]">
-                        Asset tag
-                      </th>
-                      <th className="px-1 py-1 border max-w-[100px]">
-                        Customer_QR
-                      </th>
-                      <th className="px-1 py-1 border min-w-[100px]">
-                        UserName
-                      </th>
-                      <th className="px-1 py-1 border min-w-[100px]">
-                        FG Serial_No.
-                      </th>
-                      <th className="px-1 py-1 border min-w-[100px]">
-                        CreatedOn
-                      </th>
+        {/* ── Summary — fills remaining height ── */}
+        <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-0">
+          {/* Section header */}
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 shrink-0">
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                Summary
+              </span>
+              {selectedModelName && (
+                <span className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium">
+                  Filtered: {selectedModelName}
+                  <button
+                    onClick={() =>{ setSelectedModelName(null); setIsQuickMode(false); }}
+                    className="ml-1 hover:text-red-500 transition-colors"
+                  >
+                    <ClearIcon />
+                  </button>
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {isQuickMode && (
+                <span className="bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-medium text-[11px]">
+                  Quick filter mode
+                </span>
+              )}
+              <span className="text-[11px] text-slate-400">
+                {selectedModelName
+                  ? `${filteredProductionData.length} of ${productionData.length} records`
+                  : productionData.length > 0
+                    ? `${productionData.length} records`
+                    : ""}
+              </span>
+            </div>
+          </div>
+
+          {/* Two-panel body */}
+          <div className="flex-1 flex min-h-0 overflow-hidden">
+            {/* ── Detail table ── */}
+            <div className="flex-1 overflow-auto min-w-0 overflow-x-auto">
+              {anyLoading && productionData.length === 0 ? (
+                <div className="flex items-center justify-center h-full gap-2 text-blue-600">
+                  <Spinner cls="w-5 h-5" />{" "}
+                  <span className="text-sm">Loading…</span>
+                </div>
+              ) : (
+                <table className="min-w-[1200px] w-full text-xs text-left border-separate border-spacing-0">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-slate-100">
+                      {[
+                        "#",
+                        "Model Name",
+                        "Model No.",
+                        "Station",
+                        "Assembly Sr.",
+                        "Asset Tag",
+                        "Customer QR",
+                        "User",
+                        "FG Serial",
+                        "Created On",
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap"
+                        >
+                          {h}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredProductionData.map((item, index) => {
-                      const isLast =
-                        index === filteredProductionData.length - 1;
-                      return (
-                        <tr
-                          key={index}
-                          ref={isLast ? lastRowRef : null}
-                          className="hover:bg-gray-100 text-center"
-                        >
-                          <td className="px-1 py-1 border">
-                            {item.SrNo || index + 1}
-                          </td>
-                          <td className="px-1 py-1 border">
-                            {item.Model_Name}
-                          </td>
-                          <td className="px-1 py-1 border">{item.ModelName}</td>
-                          <td className="px-1 py-1 border">
-                            {item.StationCode}
-                          </td>
-                          <td className="px-1 py-1 border">
-                            {item.Assembly_Sr_No}
-                          </td>
-                          <td className="px-1 py-1 border">{item.Asset_tag}</td>
-                          <td className="px-1 py-1 border">
-                            {item.Customer_QR}
-                          </td>
-                          <td className="px-1 py-1 border">{item.UserName}</td>
-                          <td className="px-1 py-1 border">{item.FG_SR}</td>
-                          <td className="px-1 py-1 border">
-                            {item.CreatedOn?.replace("T", " ").replace("Z", "")}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {!loading && productionData.length === 0 && (
+                    {filteredProductionData.length > 0 ? (
+                      filteredProductionData.map((item, idx) => {
+                        /* Only attach scroll observer in paginated mode */
+                        const isLast =
+                          !isQuickMode &&
+                          idx === filteredProductionData.length - 1;
+                        return (
+                          <tr
+                            key={idx}
+                            ref={isLast ? lastRowRef : null}
+                            className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
+                          >
+                            <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-400 whitespace-nowrap">
+                              {item.SrNo || idx + 1}
+                            </td>
+                            <td className="px-3 py-2 border-b border-slate-100 font-medium text-slate-800 whitespace-nowrap">
+                              {item.Model_Name}
+                            </td>
+                            <td className="px-3 py-2 border-b border-slate-100 text-slate-600 whitespace-nowrap">
+                              {item.ModelName}
+                            </td>
+                            <td className="px-3 py-2 border-b border-slate-100 text-slate-600 whitespace-nowrap">
+                              {item.StationCode}
+                            </td>
+                            <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-700 whitespace-nowrap">
+                              {item.Assembly_Sr_No}
+                            </td>
+                            <td className="px-3 py-2 border-b border-slate-100 text-slate-600 whitespace-nowrap">
+                              {item.Asset_tag}
+                            </td>
+                            <td className="px-3 py-2 border-b border-slate-100 text-slate-600 whitespace-nowrap">
+                              {item.Customer_QR}
+                            </td>
+                            <td className="px-3 py-2 border-b border-slate-100 text-slate-600 whitespace-nowrap">
+                              {item.UserName}
+                            </td>
+                            <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-700 whitespace-nowrap">
+                              {item.FG_SR}
+                            </td>
+                            <td className="px-3 py-2 border-b border-slate-100 text-slate-500 whitespace-nowrap font-mono text-[10px]">
+                              {item.CreatedOn?.replace("T", " ").replace(
+                                "Z",
+                                "",
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
                       <tr>
-                        <td colSpan={10} className="text-center py-4">
-                          No data found.
+                        <td colSpan={10} className="py-16 text-center">
+                          <div className="flex flex-col items-center gap-3 text-slate-400">
+                            <EmptyIcon />
+                            <p className="text-sm">
+                              {productionData.length > 0 && selectedModelName
+                                ? `No records match model "${selectedModelName}"`
+                                : "No data found. Apply filters and click Query."}
+                            </p>
+                          </div>
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
-                {loading && <Loader />}
-              </div>
+              )}
+              {loading && productionData.length > 0 && (
+                <div className="flex items-center justify-center py-4 gap-2 text-blue-600 text-xs border-t border-slate-100">
+                  <Spinner /> Loading more records…
+                </div>
+              )}
             </div>
 
-            {/* Left Side - Controls and Summary */}
-            <div className="w-full md:w-[30%] flex flex-col overflow-x-hidden">
-              <div className="flex flex-wrap gap-2 items-center justify-center">
-                {productionData && productionData.length > 0 && (
-                  <>
-                    <div className="flex my-4 gap-2">
-                      <Button
-                        bgColor="bg-white"
-                        textColor="text-black"
-                        className="border border-gray-400 hover:bg-gray-100 px-3 py-1"
-                        onClick={handleClearFilters}
-                      >
-                        Clear Filter
-                      </Button>
-                      <ExportButton
-                        fetchData={aggregateProductionData}
-                        filename="Production_Report"
-                      />
-                    </div>
-                  </>
+            {/* ── By Model panel ── */}
+            <div className="w-80 xl:w-96 shrink-0 border-l border-slate-200 flex flex-col bg-slate-50/50">
+              <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 shrink-0">
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  By Model
+                </span>
+                {productionData.length > 0 && (
+                  <ExportButton
+                    fetchData={aggregateProductionData}
+                    filename="Production_Summary"
+                  />
                 )}
               </div>
 
-              <div className="w-full max-h-[500px] overflow-x-auto">
-                {loading ? (
-                  <Loader />
+              <div className="flex-1 overflow-auto overflow-x-auto">
+                {anyLoading && productionData.length === 0 ? (
+                  <div className="flex items-center justify-center h-20 gap-2 text-slate-400 text-xs">
+                    <Spinner /> Loading…
+                  </div>
+                ) : aggregated.length === 0 ? (
+                  <p className="text-center text-slate-400 text-xs py-10">
+                    No summary yet.
+                  </p>
                 ) : (
-                  <table className="min-w-full border bg-white text-xs text-left rounded-lg table-auto">
-                    <thead className="bg-gray-200 sticky top-0 z-10 text-center">
-                      <tr>
-                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                          Model_Name
+                  <table className="w-full text-xs border-separate border-spacing-0">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="bg-slate-100">
+                        <th className="px-3 py-2.5 font-semibold text-slate-500 border-b border-slate-200 text-left">
+                          Model
                         </th>
-                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                          StartSerial
+                        <th className="px-3 py-2.5 font-semibold text-slate-500 border-b border-slate-200 text-right">
+                          Start
                         </th>
-                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                          EndSerial
+                        <th className="px-3 py-2.5 font-semibold text-slate-500 border-b border-slate-200 text-right">
+                          End
                         </th>
-                        <th className="px-1 py-1 border min-w-[80px] md:min-w-[100px]">
-                          Count
+                        <th className="px-3 py-2.5 font-semibold text-slate-500 border-b border-slate-200 text-right">
+                          Qty
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {productionData.length > 0 ? (
-                        aggregateProductionData().map((item, index) => (
-                          <tr
-                            key={index}
-                            className={`hover:bg-gray-100 text-center cursor-pointer ${
-                              selectedModelName === item.Model_Name
-                                ? "bg-blue-100"
-                                : "bg-white"
-                            }`}
-                            onClick={() => handleModelRowClick(item.Model_Name)}
+                      {aggregated.map((item, idx) => (
+                        <tr
+                          key={idx}
+                          onClick={() => handleModelRowClick(item.Model_Name)}
+                          className={`cursor-pointer transition-colors ${
+                            selectedModelName === item.Model_Name
+                              ? "bg-blue-100"
+                              : "hover:bg-white even:bg-white/60"
+                          }`}
+                        >
+                          <td
+                            className="px-3 py-2 border-b border-slate-100 font-medium text-slate-700 break-all"
+                            title={item.Model_Name}
                           >
-                            <td className="px-1 py-1 border">
-                              {item.Model_Name}
-                            </td>
-                            <td className="px-1 py-1 border">
-                              {item.StartSerial}
-                            </td>
-                            <td className="px-1 py-1 border">
-                              {item.EndSerial}
-                            </td>
-                            <td className="px-1 py-1 border">
+                            {item.Model_Name}
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-500 text-right break-all">
+                            {item.StartSerial}
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-500 text-right break-all">
+                            {item.EndSerial}
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 text-right">
+                            <span
+                              className={`inline-block font-bold px-2 py-0.5 rounded-md text-[11px] ${
+                                selectedModelName === item.Model_Name
+                                  ? "bg-blue-200 text-blue-800"
+                                  : "bg-slate-200 text-slate-700"
+                              }`}
+                            >
                               {item.TotalCount}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={4} className="text-center py-4">
-                            No data found.
+                            </span>
                           </td>
                         </tr>
-                      )}
+                      ))}
                     </tbody>
                   </table>
                 )}
               </div>
+
+              {aggregated.length > 0 && (
+                <p className="text-[10px] text-slate-400 text-center px-3 py-2 border-t border-slate-200">
+                  Tap a row to filter · tap again to clear
+                </p>
+              )}
             </div>
           </div>
         </div>

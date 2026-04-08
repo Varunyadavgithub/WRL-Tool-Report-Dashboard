@@ -24,6 +24,9 @@ import {
   getPostHPCAT,
   getPostHPFrz,
   getPostHPSUS,
+  getFinalLoadingHPVISI,
+  getFinalHPVISI,
+  getPostHPVISI,
 } from "../controllers/production/lineHourlyReport.controller.js";
 import {
   getModelName,
@@ -47,6 +50,7 @@ import {
   getReprintHistory,
   getReworkReport,
   getFunctionalTest,
+  getSerialNumbers,
 } from "../controllers/production/consolidatedReport.controller.js";
 import {
   totalProductionExportData,
@@ -71,28 +75,34 @@ router.get("/hourly-summary", getHourlySummary);
 router.get("/hourly-model-count", getHourlyModelCount);
 router.get("/hourly-category-count", getHourlyCategoryCount);
 // -----------------> Line Hourly Report
-// FinalHP Routes
+// Final Loading Routes
 router.get("/final-loading-hp-frz", getFinalLoadingHPFrz);
 router.get("/final-loading-hp-choc", getFinalLoadingHPChoc);
 router.get("/final-loading-hp-sus", getFinalLoadingHPSUS);
 router.get("/final-loading-hp-cat", getFinalLoadingHPCAT);
 
-// FinalHP Routes
+// Final Line Routes
 router.get("/final-hp-frz", getFinalHPFrz);
 router.get("/final-hp-choc", getFinalHPChoc);
 router.get("/final-hp-sus", getFinalHPSUS);
 router.get("/final-hp-cat", getFinalHPCAT);
 
-// PostHP Routes
+// Post Foaming Routes
 router.get("/post-hp-frz", getPostHPFrz);
 router.get("/manual-post-hp", getManualPostHP);
 router.get("/post-hp-sus", getPostHPSUS);
 router.get("/post-hp-cat", getPostHPCAT);
 
-// FoamingHP Routes
+// Foaming Routes
 router.get("/Foaming-hp-fom-a", getFoamingHpFomA);
 router.get("/Foaming-hp-fom-b", getFoamingHpFomB);
 router.get("/Foaming-hp-fom-cat", getFoamingHpFomCat);
+
+// VISI Cooler Routes (merged into existing tabs — no new tab)
+router.get("/visi-loading-hp", getFinalLoadingHPVISI);
+router.get("/visi-final-hp",   getFinalHPVISI);
+router.get("/visi-post-hp",    getPostHPVISI);
+
 // -----------------> Model Name Update
 router.get("/get-model-name", getModelName);
 router.put("/update-model-name", modelNameUpdate);
@@ -116,6 +126,7 @@ router.get("/rework-report", getReworkReport);
 router.get("/reprint-history", getReprintHistory);
 router.get("/component-details", getComponentDetails);
 router.get("/functional-test", getFunctionalTest);
+router.get("/serial-numbers", getSerialNumbers);
 // -----------------> Total Production
 router.get("/barcode-details", getBarcodeDetails);
 router.get("/export-total-production", totalProductionExportData);
