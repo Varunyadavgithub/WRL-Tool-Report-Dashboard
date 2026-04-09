@@ -29,6 +29,23 @@ import {
   getPostHPVISI,
 } from "../controllers/production/lineHourlyReport.controller.js";
 import {
+  getFinalLoadingModelBreakdown,
+  getFinalLoadingHPFrzModelBreakdown,
+  getFinalLoadingHPChocModelBreakdown,
+  getFinalLoadingHPVISIModelBreakdown,
+  getFinalLoadingHPSUSModelBreakdown,
+  getFinalHPFrzModelBreakdown,
+  getFinalHPChocModelBreakdown,
+  getFinalHPVISIModelBreakdown,
+  getFinalHPSUSModelBreakdown,
+  getPostHPFrzModelBreakdown,
+  getManualPostHPModelBreakdown,
+  getPostHPVISIModelBreakdown,
+  getPostHPSUSModelBreakdown,
+  getFoamingHpFomAModelBreakdown,
+  getFoamingHpFomBModelBreakdown,
+} from "../controllers/production/modelBreakdown.controller.js";
+import {
   getModelName,
   modelNameUpdate,
 } from "../controllers/production/modelNameUpdate.controller.js";
@@ -100,8 +117,8 @@ router.get("/Foaming-hp-fom-cat", getFoamingHpFomCat);
 
 // VISI Cooler Routes (merged into existing tabs — no new tab)
 router.get("/visi-loading-hp", getFinalLoadingHPVISI);
-router.get("/visi-final-hp",   getFinalHPVISI);
-router.get("/visi-post-hp",    getPostHPVISI);
+router.get("/visi-final-hp", getFinalHPVISI);
+router.get("/visi-post-hp", getPostHPVISI);
 
 // -----------------> Model Name Update
 router.get("/get-model-name", getModelName);
@@ -137,5 +154,27 @@ router.get("/month-total-production", getQuickFiltersBarcodeDetails);
 router.get("/stop-loss/summary", getStopLossSummary);
 router.get("/stop-loss/detail", getStopLossDetail);
 router.get("/stop-loss/locations", getStopLossLocations);
+// Final Loading — model breakdown
+router.get("/final-loading-model",           getFinalLoadingModelBreakdown);
+router.get("/final-loading-hp-frz-model",    getFinalLoadingHPFrzModelBreakdown);
+router.get("/final-loading-hp-choc-model",   getFinalLoadingHPChocModelBreakdown);
+router.get("/final-loading-hp-visi-model",   getFinalLoadingHPVISIModelBreakdown);
+router.get("/final-loading-hp-sus-model",    getFinalLoadingHPSUSModelBreakdown);
+ 
+// Final Line — model breakdown
+router.get("/final-hp-frz-model",            getFinalHPFrzModelBreakdown);
+router.get("/final-hp-choc-model",           getFinalHPChocModelBreakdown);
+router.get("/visi-final-hp-model",           getFinalHPVISIModelBreakdown);
+router.get("/final-hp-sus-model",            getFinalHPSUSModelBreakdown);
+ 
+// Post Foaming — model breakdown
+router.get("/post-hp-frz-model",             getPostHPFrzModelBreakdown);
+router.get("/manual-post-hp-model",          getManualPostHPModelBreakdown);
+router.get("/visi-post-hp-model",            getPostHPVISIModelBreakdown);
+router.get("/post-hp-sus-model",             getPostHPSUSModelBreakdown);
+ 
+// Foaming — model breakdown
+router.get("/Foaming-hp-fom-a-model",        getFoamingHpFomAModelBreakdown);
+router.get("/Foaming-hp-fom-b-model",        getFoamingHpFomBModelBreakdown);
 
 export default router;
