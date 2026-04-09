@@ -33,9 +33,7 @@ const TotalProduction = lazy(
 );
 const StopLossReport = lazy(() => import("../pages/Production/StopLossReport"));
 
-const ReworkEntry = lazy(() => import("../pages/Quality/ReworkEntry"));
 const ReworkReport = lazy(() => import("../pages/Quality/ReworkReport"));
-const BrazingReport = lazy(() => import("../pages/Quality/BrazingReport"));
 const GasChargingReport = lazy(
   () => import("../pages/Quality/GasChargingReport"),
 );
@@ -55,7 +53,6 @@ const TagUpdate = lazy(() => import("../pages/Quality/TagUpdate"));
 const LPTRecipe = lazy(() => import("../pages/Quality/LPTRecipe"));
 const UploadBISReport = lazy(() => import("../pages/Quality/UploadBISReport"));
 const BISReports = lazy(() => import("../pages/Quality/BISReports"));
-const BISStatus = lazy(() => import("../pages/Quality/BISStatus"));
 const BEECalculation = lazy(() => import("../pages/Quality/BEECalculation"));
 
 const DispatchPerformanceReport = lazy(
@@ -191,21 +188,9 @@ export const ROUTE_CONFIG = [
     basePath: "/quality",
     items: [
       {
-        path: "/quality/rework-entry",
-        label: "Rework Entry",
-        component: ReworkEntry,
-        roles: [ROLES.ADMIN],
-      },
-      {
         path: "/quality/rework-report",
         label: "Rework Report",
         component: ReworkReport,
-        roles: [ROLES.ADMIN],
-      },
-      {
-        path: "/quality/brazing-report",
-        label: "Brazing Report",
-        component: BrazingReport,
         roles: [ROLES.ADMIN],
       },
       {
@@ -323,14 +308,6 @@ export const ROUTE_CONFIG = [
           ROLES.BIS_ENGINEER,
           ROLES.FPA,
           ROLES.QUALITY_MANAGER,
-        ],
-      },
-      {
-        path: "/quality/bis-status",
-        label: "BIS Status",
-        component: BISStatus,
-        roles: [
-          ROLES.ADMIN,
         ],
       },
       {
