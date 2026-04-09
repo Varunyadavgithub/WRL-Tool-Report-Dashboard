@@ -31,25 +31,76 @@ import {
   FiList,
   FiTag,
   FiPackage,
-  FiZap,
   FiAlignJustify,
-  FiChevronDown,
   FiActivity,
   FiCpu,
   FiFilter,
+  FiToggleLeft,
+  FiToggleRight,
 } from "react-icons/fi";
 import { MdOutlineFactory } from "react-icons/md";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
+// ─── Constants ─────────────────────────────────────────────────────────────────
+
+/**
+ * Maps each Line → Stage → { linecodes[], stationCodes[] }
+ * Multiple codes are supported; the backend receives them as comma-separated strings.
+ */
+const LINE_STAGE_MAPPING = {
+  "Freezer Line": {
+    "FG Label":     { linecodes: [12501],         stationCodes: [1220010] },
+    MFT:            { linecodes: [12501],         stationCodes: [1220014] },
+    EST:            { linecodes: [12501],         stationCodes: [1220008] },
+    "Gas Charging": { linecodes: [12501],         stationCodes: [1220011] },
+    "Comp Scan":    { linecodes: [12501],         stationCodes: [1220005] },
+    "Post Foaming": { linecodes: [12301, 12302],  stationCodes: [1220003, 1220004] },
+    Foaming:        { linecodes: [12301, 12302],  stationCodes: [1220001, 1220002] },
+  },
+  "Chocolate Line": {
+    "FG Label":     { linecodes: [12305], stationCodes: [1220010] },
+    MFT:            { linecodes: [12305], stationCodes: [1220014] },
+    EST:            { linecodes: [12305], stationCodes: [1220008] },
+    "Gas Charging": { linecodes: [12305], stationCodes: [1220011] },
+    "Comp Scan":    { linecodes: [12305], stationCodes: [1220005] },
+    "Post Foaming": { linecodes: [12305], stationCodes: [1230007] },
+    Foaming:        { linecodes: [12305], stationCodes: [] },
+  },
+  "VISI Cooler Line": {
+    "FG Label":       { linecodes: [12605], stationCodes: [1220010] },
+    MFT:              { linecodes: [12605], stationCodes: [1220014] },
+    EST:              { linecodes: [12605], stationCodes: [1220008] },
+    "Gas Charging":   { linecodes: [12605], stationCodes: [1220011] },
+    "Comp Scan":      { linecodes: [12605], stationCodes: [1220005] },
+    "Post Comp Scan": { linecodes: [12605], stationCodes: [1240003] },
+    "Post Foaming":   { linecodes: [12605], stationCodes: [1230012] },
+    Foaming:          { linecodes: [12605], stationCodes: [] },
+  },
+  "SUS Line": {
+    "FG Label":    { linecodes: [12304], stationCodes: [1230017] },
+    MFT:           { linecodes: [12304], stationCodes: [1230028] },
+    EST:           { linecodes: [12304], stationCodes: [1230015] },
+    "Gas Charging":{ linecodes: [12304], stationCodes: [1260010] },
+    "Comp Scan 1": { linecodes: [12304], stationCodes: [1230013] },
+    "Comp Scan 2": { linecodes: [12304], stationCodes: [1230014] },
+    "Post Foaming":{ linecodes: [12304], stationCodes: [1230012] },
+    Foaming:       { linecodes: [12304], stationCodes: [] },
+  },
+};
+
+const SIMPLE_LINE_OPTIONS = Object.keys(LINE_STAGE_MAPPING).map((l) => ({
+  value: l,
+  label: l,
+}));
+
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
-const formatDate = (date) => {
-  const pad = (n) => (n < 10 ? "0" + n : n);
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-    date.getDate(),
-  )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
+const pad = (n) => (n < 10 ? "0" + n : n);
+
+const formatDate = (date) =>
+  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+  `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 
 const getShiftRange = (offsetDays = 0) => {
   const now = new Date();
@@ -64,30 +115,26 @@ const getShiftRange = (offsetDays = 0) => {
   return { start: formatDate(start), end: formatDate(end) };
 };
 
-const mapCategory = async (data, mappings = CATEGORY_MAPPINGS) => {
+const mapCategory = (data, mappings = CATEGORY_MAPPINGS) => {
   if (!data) return [];
   const normalize = (str) => str.replace(/\s+/g, " ").trim().toUpperCase();
   const dataArray = Array.isArray(data) ? data : [data];
   const grouped = {};
   dataArray.forEach((item) => {
-    const mappedItem = { ...item };
-    if (mappedItem?.category || mappedItem?.TIMEHOUR !== undefined) {
-      const normalizedCategory = normalize(mappedItem.category || "");
-      const finalCategory =
-        mappings[normalizedCategory] ||
-        mappedItem.category?.trim() ||
-        "UNKNOWN";
-      const timeHour = mappedItem.TIMEHOUR || 0;
-      const groupKey = `${finalCategory}_${timeHour}`;
-      if (grouped[groupKey]) {
-        grouped[groupKey].COUNT += mappedItem.COUNT || 0;
-      } else {
-        grouped[groupKey] = {
-          category: finalCategory,
-          TIMEHOUR: timeHour,
-          COUNT: mappedItem.COUNT || 0,
-        };
-      }
+    if (!item?.category && item?.TIMEHOUR === undefined) return;
+    const normalizedCategory = normalize(item.category || "");
+    const finalCategory =
+      mappings[normalizedCategory] || item.category?.trim() || "UNKNOWN";
+    const timeHour = item.TIMEHOUR || 0;
+    const groupKey = `${finalCategory}_${timeHour}`;
+    if (grouped[groupKey]) {
+      grouped[groupKey].COUNT += item.COUNT || 0;
+    } else {
+      grouped[groupKey] = {
+        category: finalCategory,
+        TIMEHOUR: timeHour,
+        COUNT: item.COUNT || 0,
+      };
     }
   });
   return Object.values(grouped);
@@ -96,8 +143,8 @@ const mapCategory = async (data, mappings = CATEGORY_MAPPINGS) => {
 // ─── API Layer ─────────────────────────────────────────────────────────────────
 
 const API_ENDPOINTS = {
-  summary: "prod/hourly-summary",
-  modelCount: "prod/hourly-model-count",
+  summary:       "prod/hourly-summary",
+  modelCount:    "prod/hourly-model-count",
   categoryCount: "prod/hourly-category-count",
 };
 
@@ -113,13 +160,9 @@ const SectionHeader = ({ icon: Icon, title, subtitle }) => (
   <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-100 to-slate-50 border-b border-slate-200">
     {Icon && <Icon size={14} className="text-blue-500 flex-shrink-0" />}
     <div className="flex items-center gap-3">
-      <h3 className="text-xs font-semibold text-slate-700 tracking-wide">
-        {title}
-      </h3>
+      <h3 className="text-xs font-semibold text-slate-700 tracking-wide">{title}</h3>
       {subtitle && (
-        <span className="text-xs text-slate-400 hidden sm:block">
-          {subtitle}
-        </span>
+        <span className="text-xs text-slate-400 hidden sm:block">{subtitle}</span>
       )}
     </div>
   </div>
@@ -133,23 +176,16 @@ const StatCard = ({
   bg = "from-blue-50 to-blue-100/60",
   border = "border-blue-200",
 }) => (
-  <div
-    className={`bg-gradient-to-br ${bg} rounded-xl px-5 py-4 flex flex-col items-center gap-1 border ${border} flex-1 min-w-[130px]`}
-  >
+  <div className={`bg-gradient-to-br ${bg} rounded-xl px-5 py-4 flex flex-col items-center gap-1 border ${border} flex-1 min-w-[130px]`}>
     {Icon && <Icon size={18} className={`${color} mb-0.5`} />}
     <span className={`text-3xl font-bold ${color} tabular-nums`}>{value}</span>
-    <span className="text-xs text-slate-500 text-center font-medium leading-tight">
-      {label}
-    </span>
+    <span className="text-xs text-slate-500 text-center font-medium leading-tight">{label}</span>
   </div>
 );
 
 const EmptyRow = ({ colSpan }) => (
   <tr>
-    <td
-      colSpan={colSpan}
-      className="text-center py-10 text-slate-400 text-xs italic"
-    >
+    <td colSpan={colSpan} className="text-center py-10 text-slate-400 text-xs italic">
       <div className="flex flex-col items-center gap-2 opacity-60">
         <FiAlignJustify size={20} />
         No data available. Run a query to see results.
@@ -158,13 +194,7 @@ const EmptyRow = ({ colSpan }) => (
   </tr>
 );
 
-const TableWrapper = ({
-  icon,
-  title,
-  subtitle,
-  children,
-  maxH = "max-h-64",
-}) => (
+const TableWrapper = ({ icon, title, subtitle, children, maxH = "max-h-64" }) => (
   <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col shadow-sm">
     <SectionHeader icon={icon} title={title} subtitle={subtitle} />
     <div className={`overflow-auto ${maxH}`}>{children}</div>
@@ -175,79 +205,126 @@ const TableWrapper = ({
 
 const HourlyReport = () => {
   // ── State ──────────────────────────────────────────────────────────────────
+  const [isDetailReport, setIsDetailReport] = useState(false);
+
+  // Detail-mode state
   const [stationCode, setStationCode] = useState("");
+  const [lineType, setLineType] = useState("");
+  const [selectedLine, setSelectedLine] = useState(null);
+
+  // Simple-mode state
+  const [simpleLine, setSimpleLine] = useState("");
+  const [simpleStage, setSimpleStage] = useState("");
+
+  // Shared state
+  const [selectedModel, setSelectedModel] = useState(null);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [autoRefresh, setAutoRefresh] = useState(false);
+
+  // Data state
   const [loading, setLoading] = useState(false);
   const [ydayLoading, setYdayLoading] = useState(false);
   const [todayLoading, setTodayLoading] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(false);
   const [hourData, setHourData] = useState([]);
   const [hourlyModelCount, setHourlyModelCount] = useState([]);
   const [hourlyCategoryCount, setHourlyCategoryCount] = useState([]);
-  const [selectedModel, setSelectedModel] = useState(null);
-  const [selectedLine, setSelectedLine] = useState(null); // FIX: kept as object for label lookup
-  const [lineType, setLineType] = useState(""); // FIX: string value sent to API
 
   // ── RTK Queries ────────────────────────────────────────────────────────────
-  const {
-    data: modelVariants = [],
-    isLoading: modelsLoading,
-    error: modelsError,
-  } = useGetModelVariantsQuery();
+  const { data: modelVariants = [], isLoading: modelsLoading, error: modelsError } = useGetModelVariantsQuery();
+  const { data: stages = [],        isLoading: stagesLoading,  error: stagesError  } = useGetStagesQuery();
+  const { data: lines = [],         isLoading: linesLoading,   error: linesError   } = useGetProductionLineQuery();
 
-  const {
-    data: stages = [],
-    isLoading: stagesLoading,
-    error: stagesError,
-  } = useGetStagesQuery();
+  // ── Stage options filtered by selected simple line ─────────────────────────
+  const simpleStageOptions = useMemo(() => {
+    if (!simpleLine || !LINE_STAGE_MAPPING[simpleLine]) return [];
+    return Object.keys(LINE_STAGE_MAPPING[simpleLine]).map((s) => ({
+      value: s,
+      label: s,
+    }));
+  }, [simpleLine]);
 
-  const {
-    data: lines = [],
-    isLoading: linesLoading,
-    error: linesError,
-  } = useGetProductionLineQuery();
+  // Reset stage when line changes
+  useEffect(() => { setSimpleStage(""); }, [simpleLine]);
 
   // ── Side-effects ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (modelsError) toast.error("Failed to load model variants");
-    if (stagesError) toast.error("Failed to load stages");
-    if (linesError) toast.error("Failed to load production lines"); // FIX: corrected typo
+    if (stagesError)  toast.error("Failed to load stages");
+    if (linesError)   toast.error("Failed to load production lines");
   }, [modelsError, stagesError, linesError]);
+
+  // ── Param Builder ──────────────────────────────────────────────────────────
+
+  /**
+   * Builds query params.
+   * Simple mode: looks up linecodes/stationCodes from LINE_STAGE_MAPPING and
+   *              sends them as comma-separated strings so the backend can handle
+   *              multiple values (e.g. Post Foaming on Freezer Line).
+   * Detail mode: uses the raw stationCode + lineType strings from the dropdowns.
+   *
+   * Returns null if validation fails (toast shown inside).
+   */
+  const buildParams = useCallback(
+    (startDate, endDate) => {
+      const params = { startDate, endDate };
+
+      if (isDetailReport) {
+        if (!stationCode || !lineType) {
+          toast.error("Please select a Stage and Production Line.");
+          return null;
+        }
+        params.stationCode = stationCode;
+        params.linecode    = lineType;
+      } else {
+        if (!simpleLine || !simpleStage) {
+          toast.error("Please select a Line and Stage.");
+          return null;
+        }
+        const mapping = LINE_STAGE_MAPPING[simpleLine]?.[simpleStage];
+        if (!mapping) {
+          toast.error("Invalid Line / Stage selection.");
+          return null;
+        }
+        if (!mapping.stationCodes.length || !mapping.linecodes.length) {
+          toast.error(`No station configured for "${simpleStage}" on "${simpleLine}".`);
+          return null;
+        }
+        // Send all codes as comma-separated; backend unpacks them.
+        params.stationCode = mapping.stationCodes.join(",");
+        params.linecode    = mapping.linecodes.join(",");
+      }
+
+      if (selectedModel?.value && selectedModel.value !== "0") {
+        params.model = selectedModel.value;
+      }
+
+      return params;
+    },
+    [isDetailReport, stationCode, lineType, simpleLine, simpleStage, selectedModel],
+  );
 
   // ── Data Fetching ──────────────────────────────────────────────────────────
 
-  const buildParams = useCallback(
-    (startDate, endDate) => {
-      const params = { stationCode, startDate, endDate, linecode: lineType };
-      if (selectedModel?.value && selectedModel.value !== "0")
-        params.model = selectedModel.value;
-      return params;
-    },
-    [stationCode, selectedModel, lineType],
-  );
-
   const fetchAllData = useCallback(
     async (startDate, endDate, setLoadingFn) => {
-      if (!stationCode || !selectedLine) {
-        toast.error("Please select a Stage / Station Code / Production Line .");
-        return;
-      }
+      const params = buildParams(startDate, endDate);
+      if (!params) return; // validation already toasted
+
       setLoadingFn(true);
       setHourData([]);
       setHourlyModelCount([]);
       setHourlyCategoryCount([]);
 
       try {
-        const params = buildParams(startDate, endDate);
         const [summary, modelCount, categoryCount] = await Promise.all([
-          fetchHourly(API_ENDPOINTS.summary, params),
-          fetchHourly(API_ENDPOINTS.modelCount, params),
+          fetchHourly(API_ENDPOINTS.summary,       params),
+          fetchHourly(API_ENDPOINTS.modelCount,    params),
           fetchHourly(API_ENDPOINTS.categoryCount, params),
         ]);
         setHourData(summary ?? []);
         setHourlyModelCount(modelCount ?? []);
-        setHourlyCategoryCount(await mapCategory(categoryCount));
+        setHourlyCategoryCount(mapCategory(categoryCount));
       } catch (error) {
         toast.error("Error fetching hourly data.");
         console.error(error);
@@ -255,7 +332,7 @@ const HourlyReport = () => {
         setLoadingFn(false);
       }
     },
-    [buildParams, stationCode],
+    [buildParams],
   );
 
   const handleQuery = useCallback(() => {
@@ -295,16 +372,19 @@ const HourlyReport = () => {
   );
 
   const getModelCountForHour = useCallback(
-    (timehour) =>
-      hourlyModelCount.filter((item) => item.TIMEHOUR === timehour).length,
+    (timehour) => hourlyModelCount.filter((item) => item.TIMEHOUR === timehour).length,
     [hourlyModelCount],
   );
 
+  const activeLineName = useMemo(() => {
+    if (isDetailReport) return selectedLine?.label ?? lineType ?? null;
+    if (simpleLine && simpleStage) return `${simpleLine} → ${simpleStage}`;
+    return null;
+  }, [isDetailReport, selectedLine, lineType, simpleLine, simpleStage]);
+
   const { chartData, chartOptions } = useMemo(() => {
     if (!hourData?.length) return { chartData: null, chartOptions: null };
-
     const maxVal = Math.max(...hourData.map((d) => d.COUNT || 0), 10);
-
     return {
       chartData: {
         labels: hourData.map((item) => `${item.TIMEHOUR}:00`),
@@ -351,24 +431,14 @@ const HourlyReport = () => {
         scales: {
           x: {
             grid: { color: "rgba(148,163,184,0.15)" },
-            title: {
-              display: true,
-              text: "Hour",
-              font: { size: 12, weight: "bold" },
-              color: "#94a3b8",
-            },
+            title: { display: true, text: "Hour", font: { size: 12, weight: "bold" }, color: "#94a3b8" },
             ticks: { font: { size: 11 }, color: "#94a3b8" },
           },
           y: {
             beginAtZero: true,
             max: maxVal + Math.ceil(maxVal * 0.15) + 5,
             grid: { color: "rgba(148,163,184,0.15)" },
-            title: {
-              display: true,
-              text: "Count",
-              font: { size: 12, weight: "bold" },
-              color: "#94a3b8",
-            },
+            title: { display: true, text: "Count", font: { size: 12, weight: "bold" }, color: "#94a3b8" },
             ticks: { font: { size: 11 }, color: "#94a3b8" },
           },
         },
@@ -421,54 +491,103 @@ const HourlyReport = () => {
             subtitle="Configure your query parameters"
           />
           <div className="p-4 space-y-4">
-            {/* Row 1: Selects */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+
+            {/* ── Mode Toggle Row ── */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsDetailReport((v) => !v)}
+                className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg border transition-colors ${
+                  isDetailReport
+                    ? "bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-200"
+                    : "bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-600"
+                }`}
+              >
+                {isDetailReport ? <FiToggleRight size={14} /> : <FiToggleLeft size={14} />}
+                {isDetailReport ? "Detail Mode" : "Simple Mode"}
+              </button>
+              <span className="text-xs text-slate-400">
+                {isDetailReport
+                  ? "Manually select station code and production line"
+                  : "Pick a line and stage — codes resolved automatically"}
+              </span>
+            </div>
+
+            {/* ── Selector Row ── */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+              {/* Model Variant — always visible */}
               <SelectField
                 label="Model Variant"
                 value={selectedModel?.value || ""}
                 options={[{ value: "", label: "All Models" }, ...modelVariants]}
                 onChange={(e) => {
-                  const found = modelVariants.find(
-                    (o) => o.value === e.target.value,
-                  );
+                  const found = modelVariants.find((o) => o.value === e.target.value);
                   setSelectedModel(found || null);
                 }}
               />
-              <SelectField
-                label="Stage Name"
-                name="stationCode"
-                value={stationCode}
-                options={[{ value: "", label: "Select Stage" }, ...stages]}
-                onChange={(e) => setStationCode(e.target.value)}
-              />
+
+              {isDetailReport ? (
+                <>
+                  {/* Detail: Stage dropdown from API */}
+                  <SelectField
+                    label="Stage Name"
+                    value={stationCode}
+                    options={[{ value: "", label: "Select Stage" }, ...stages]}
+                    onChange={(e) => setStationCode(e.target.value)}
+                  />
+                  {/* Detail: Production Line from API */}
+                  <SelectField
+                    label="Production Line"
+                    value={lineType}
+                    options={[{ value: "", label: "Select Line" }, ...lines]}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setLineType(val);
+                      setSelectedLine(lines.find((l) => l.value === val) || null);
+                    }}
+                  />
+                </>
+              ) : (
+                <>
+                  {/* Simple: Line from mapping */}
+                  <SelectField
+                    label="Line"
+                    value={simpleLine}
+                    options={[{ value: "", label: "Select Line" }, ...SIMPLE_LINE_OPTIONS]}
+                    onChange={(e) => setSimpleLine(e.target.value)}
+                  />
+                  {/* Simple: Stage filtered by chosen line */}
+                  <SelectField
+                    label="Stage"
+                    value={simpleStage}
+                    options={[
+                      {
+                        value: "",
+                        label: simpleLine ? "Select Stage" : "Select a line first",
+                      },
+                      ...simpleStageOptions,
+                    ]}
+                    onChange={(e) => setSimpleStage(e.target.value)}
+                    disabled={!simpleLine}
+                  />
+                </>
+              )}
+
+              {/* Date pickers — always visible */}
               <DateTimePicker
                 label="Start Time"
                 name="startTime"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
               />
+            </div>
+
+            {/* End time + controls row */}
+            <div className="flex flex-wrap items-end gap-4 pt-3 border-t border-slate-100">
               <DateTimePicker
                 label="End Time"
                 name="endTime"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-              />
-            </div>
-
-            {/* Row 2: Production Line Select + Controls */}
-            <div className="flex flex-wrap items-end gap-4 pt-3 border-t border-slate-100">
-              {/* FIX: value uses lineType (string), onChange sets both lineType and selectedLine */}
-              <SelectField
-                label="Production Line"
-                name="lines"
-                value={lineType}
-                options={[{ value: "", label: "Select Line" }, ...lines]}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setLineType(val);
-                  const found = lines.find((l) => l.value === val);
-                  setSelectedLine(found || null);
-                }}
               />
 
               {/* Auto Refresh Toggle */}
@@ -490,34 +609,33 @@ const HourlyReport = () => {
                 </span>
               </label>
 
-              {/* Spacer */}
               <div className="flex-1" />
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleYesterday}
-                  disabled={ydayLoading || isAnyLoading}
+                  disabled={isAnyLoading}
                   className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-400 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                 >
                   <FiCalendar size={13} />
-                  {ydayLoading ? "Loading..." : "Yesterday"}
+                  {ydayLoading ? "Loading…" : "Yesterday"}
                 </button>
                 <button
                   onClick={handleToday}
-                  disabled={todayLoading || isAnyLoading}
+                  disabled={isAnyLoading}
                   className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                 >
                   <FiClock size={13} />
-                  {todayLoading ? "Loading..." : "Today"}
+                  {todayLoading ? "Loading…" : "Today"}
                 </button>
                 <button
                   onClick={handleQuery}
-                  disabled={loading || isAnyLoading}
+                  disabled={isAnyLoading}
                   className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm shadow-blue-200"
                 >
                   <FiSearch size={13} />
-                  {loading ? "Loading..." : "Query"}
+                  {loading ? "Loading…" : "Query"}
                 </button>
               </div>
             </div>
@@ -526,11 +644,7 @@ const HourlyReport = () => {
 
         {/* Summary Card */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-          <SectionHeader
-            icon={FiActivity}
-            title="Summary"
-            subtitle="Current query results"
-          />
+          <SectionHeader icon={FiActivity} title="Summary" subtitle="Current query results" />
           <div className="p-4 flex flex-col gap-3 flex-1 justify-center">
             <div className="flex gap-3">
               <StatCard
@@ -550,14 +664,13 @@ const HourlyReport = () => {
                 border="border-violet-200"
               />
             </div>
-            {/* FIX: use selectedLine?.label from lines array instead of undefined PRODUCTION_LINES */}
-            {lineType && (
+            {activeLineName && (
               <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200">
                 <MdOutlineFactory size={13} className="text-slate-400" />
-                <span className="text-xs text-slate-400">Line:</span>
-                <span className="text-xs font-semibold text-slate-700">
-                  {selectedLine?.label ?? lineType}
+                <span className="text-xs text-slate-400">
+                  {isDetailReport ? "Line:" : "Selection:"}
                 </span>
+                <span className="text-xs font-semibold text-slate-700">{activeLineName}</span>
               </div>
             )}
           </div>
@@ -569,15 +682,12 @@ const HourlyReport = () => {
         {isAnyLoading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader />
-            <p className="text-xs text-slate-400 animate-pulse">
-              Fetching production data…
-            </p>
+            <p className="text-xs text-slate-400 animate-pulse">Fetching production data…</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             {/* ── LEFT COLUMN ── */}
             <div className="flex flex-col gap-4">
-              {/* Table 1 – Hourly Production Summary */}
               <TableWrapper
                 icon={FiList}
                 title="Hourly Production Summary"
@@ -586,12 +696,7 @@ const HourlyReport = () => {
                 <table className="min-w-full border-collapse text-xs text-left">
                   <thead className="bg-slate-50 sticky top-0 z-10">
                     <tr>
-                      {[
-                        "Hour",
-                        "Time",
-                        "Production Count",
-                        "No. of Models",
-                      ].map((h) => (
+                      {["Hour", "Time", "Production Count", "No. of Models"].map((h) => (
                         <th
                           key={h}
                           className="px-3 py-2.5 border-b border-slate-200 font-semibold text-slate-500 text-center whitespace-nowrap"
@@ -631,7 +736,6 @@ const HourlyReport = () => {
                 </table>
               </TableWrapper>
 
-              {/* Bar Chart */}
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col shadow-sm">
                 <SectionHeader
                   icon={FiBarChart2}
@@ -653,7 +757,6 @@ const HourlyReport = () => {
 
             {/* ── RIGHT COLUMN ── */}
             <div className="flex flex-col gap-4">
-              {/* Table 2 – Model-wise Hourly Count */}
               <TableWrapper
                 icon={FiCpu}
                 title="Model-wise Hourly Breakdown"
@@ -699,7 +802,6 @@ const HourlyReport = () => {
                 </table>
               </TableWrapper>
 
-              {/* Table 3 – Category-wise Hourly Count */}
               <TableWrapper
                 icon={FiTag}
                 title="Category-wise Hourly Breakdown"
