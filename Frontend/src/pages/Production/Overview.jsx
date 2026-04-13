@@ -10,62 +10,11 @@ import {
   useGetModelVariantsQuery,
   useGetStagesQuery,
 } from "../../redux/api/commonApi.js";
+import { Search, X, Loader2, PackageOpen, Zap } from "lucide-react";
 
-/* ── Icons ── */
-const SearchIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={2}
-    viewBox="0 0 24 24"
-  >
-    <circle cx="11" cy="11" r="8" />
-    <path strokeLinecap="round" d="m21 21-4.35-4.35" />
-  </svg>
-);
-const ClearIcon = () => (
-  <svg
-    className="w-3.5 h-3.5"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={2}
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M6 18L18 6M6 6l12 12"
-    />
-  </svg>
-);
+/* ── Spinner using Lucide ── */
 const Spinner = ({ cls = "w-4 h-4" }) => (
-  <svg className={`animate-spin ${cls}`} fill="none" viewBox="0 0 24 24">
-    <circle
-      className="opacity-25"
-      cx="12"
-      cy="12"
-      r="10"
-      stroke="currentColor"
-      strokeWidth="4"
-    />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-  </svg>
-);
-const EmptyIcon = () => (
-  <svg
-    className="w-12 h-12 opacity-20"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={1.2}
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"
-    />
-  </svg>
+  <Loader2 className={`animate-spin ${cls}`} />
 );
 
 /* ── Quick filter button ── */
@@ -113,14 +62,6 @@ const Overview = () => {
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [selectedModelName, setSelectedModelName] = useState(null);
-
-  /*
-   * FIX: isQuickMode tracks whether current data came from a quick-filter
-   * (no pagination needed). Infinite scroll observer is disabled in this mode.
-   * Without this flag, the observer fires on the last row of the filtered/smaller
-   * list → increments page → fetchProductionData runs without startTime/endTime
-   * → toast loop + ghost loading spinner.
-   */
   const [isQuickMode, setIsQuickMode] = useState(false);
 
   /* ── RTK Query ── */
@@ -140,10 +81,7 @@ const Overview = () => {
     if (stagesError) toast.error("Failed to load stages");
   }, [variantsError, stagesError]);
 
-  /* ── Infinite scroll observer ──
-     Key guard: skip when isQuickMode is true so clicking a model row in quick mode
-     doesn't accidentally trigger pagination fetches.
-  ── */
+  /* ── Infinite scroll observer ── */
   const observer = useRef();
   const lastRowRef = useCallback(
     (node) => {
@@ -157,7 +95,7 @@ const Overview = () => {
     [loading, hasMore, isQuickMode],
   );
 
-  /* ── Date helpers (no mutation) ── */
+  /* ── Date helpers ── */
   const pad = (n) => (n < 10 ? `0${n}` : `${n}`);
   const fmt = (d) =>
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -193,7 +131,7 @@ const Overview = () => {
     }
   };
 
-  /* ── Quick fetch (no pagination) ── */
+  /* ── Quick fetch ── */
   const fetchQuickData = async (url, start, end, setLoader) => {
     if (!selectedStage) {
       toast.error("Please select a Stage before using quick filters.");
@@ -203,7 +141,6 @@ const Overview = () => {
       setLoader(true);
       setProductionData([]);
       setTotalCount(0);
-      /* FIX: clear model filter so stale selection doesn't hide fresh data */
       setSelectedModelName(null);
       setIsQuickMode(true);
 
@@ -280,7 +217,7 @@ const Overview = () => {
     );
   };
 
-  /* ── Aggregation (string-safe serial comparison) ── */
+  /* ── Aggregation ── */
   const aggregateProductionData = () => {
     const map = {};
     productionData.forEach((item) => {
@@ -339,14 +276,13 @@ const Overview = () => {
     setProductionData([]);
     setPage(1);
     setSelectedModelName(null);
-    setIsQuickMode(false); // back to paginated mode
+    setIsQuickMode(false);
     fetchProductionData(1);
   };
 
-  /* FIX: this is purely a client-side filter toggle — no API call, no loading */
   const handleModelRowClick = (modelName) => {
     setSelectedModelName((prev) => (prev === modelName ? null : modelName));
-    setIsQuickMode(true); // disable infinite scroll observer while row-filtering
+    setIsQuickMode(true);
   };
 
   const filteredProductionData = selectedModelName
@@ -360,15 +296,18 @@ const Overview = () => {
 
   /* ════════════════════════════════════════════
      RENDER
+     — Overview lives inside Layout's <Outlet />.
+     — The outlet wrapper has: overflow-auto (scrolls the page).
+     — So Overview uses h-full + flex-col, with sticky for its own sub-header.
+     — NO fixed/h-screen — those would escape the layout.
   ════════════════════════════════════════════ */
   return (
-    /* FIX: removed max-w constraint — true full width, full height layout */
-    <div className="h-screen flex flex-col bg-slate-100 overflow-hidden">
-      {/* ── Sticky top bar ── */}
-      <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shrink-0 shadow-sm z-20">
+    <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
+      {/* ── Page sub-header — sticky within the outlet's scroll container ── */}
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
         <div>
           <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
-            Production Overview
+            Production Report
           </h1>
           <p className="text-[11px] text-slate-400">
             FG assembly monitoring · Real-time data
@@ -398,7 +337,7 @@ const Overview = () => {
 
       {/* ── Body ── */}
       <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3 min-h-0">
-        {/* ── Filters + Quick filters ── */}
+        {/* ── Filters + Quick filters row ── */}
         <div className="flex gap-3 shrink-0">
           {/* Filters card */}
           <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
@@ -456,7 +395,11 @@ const Overview = () => {
                       : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
                   }`}
                 >
-                  {loading ? <Spinner /> : <SearchIcon />}
+                  {loading ? (
+                    <Spinner cls="w-4 h-4" />
+                  ) : (
+                    <Search className="w-4 h-4" />
+                  )}
                   {loading ? "Fetching…" : "Query"}
                 </button>
                 {productionData.length > 0 && !isQuickMode && (
@@ -515,17 +458,21 @@ const Overview = () => {
                 <span className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium">
                   Filtered: {selectedModelName}
                   <button
-                    onClick={() =>{ setSelectedModelName(null); setIsQuickMode(false); }}
+                    onClick={() => {
+                      setSelectedModelName(null);
+                      setIsQuickMode(false);
+                    }}
                     className="ml-1 hover:text-red-500 transition-colors"
                   >
-                    <ClearIcon />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </span>
               )}
             </div>
             <div className="flex items-center gap-2">
               {isQuickMode && (
-                <span className="bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-medium text-[11px]">
+                <span className="flex items-center gap-1 bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-medium text-[11px]">
+                  <Zap className="w-3 h-3" />
                   Quick filter mode
                 </span>
               )}
@@ -542,10 +489,10 @@ const Overview = () => {
           {/* Two-panel body */}
           <div className="flex-1 flex min-h-0 overflow-hidden">
             {/* ── Detail table ── */}
-            <div className="flex-1 overflow-auto min-w-0 overflow-x-auto">
+            <div className="flex-1 overflow-auto min-w-0">
               {anyLoading && productionData.length === 0 ? (
                 <div className="flex items-center justify-center h-full gap-2 text-blue-600">
-                  <Spinner cls="w-5 h-5" />{" "}
+                  <Spinner cls="w-5 h-5" />
                   <span className="text-sm">Loading…</span>
                 </div>
               ) : (
@@ -553,7 +500,7 @@ const Overview = () => {
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-100">
                       {[
-                        "#",
+                        "Sr. No.",
                         "Model Name",
                         "Model No.",
                         "Station",
@@ -576,7 +523,6 @@ const Overview = () => {
                   <tbody>
                     {filteredProductionData.length > 0 ? (
                       filteredProductionData.map((item, idx) => {
-                        /* Only attach scroll observer in paginated mode */
                         const isLast =
                           !isQuickMode &&
                           idx === filteredProductionData.length - 1;
@@ -626,7 +572,10 @@ const Overview = () => {
                       <tr>
                         <td colSpan={10} className="py-16 text-center">
                           <div className="flex flex-col items-center gap-3 text-slate-400">
-                            <EmptyIcon />
+                            <PackageOpen
+                              className="w-12 h-12 opacity-20"
+                              strokeWidth={1.2}
+                            />
                             <p className="text-sm">
                               {productionData.length > 0 && selectedModelName
                                 ? `No records match model "${selectedModelName}"`
@@ -641,14 +590,14 @@ const Overview = () => {
               )}
               {loading && productionData.length > 0 && (
                 <div className="flex items-center justify-center py-4 gap-2 text-blue-600 text-xs border-t border-slate-100">
-                  <Spinner /> Loading more records…
+                  <Spinner cls="w-4 h-4" /> Loading more records…
                 </div>
               )}
             </div>
 
             {/* ── By Model panel ── */}
             <div className="w-80 xl:w-96 shrink-0 border-l border-slate-200 flex flex-col bg-slate-50/50">
-              <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 shrink-0">
+              <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 bg-slate-100 shrink-0">
                 <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                   By Model
                 </span>
@@ -660,10 +609,10 @@ const Overview = () => {
                 )}
               </div>
 
-              <div className="flex-1 overflow-auto overflow-x-auto">
+              <div className="flex-1 overflow-auto">
                 {anyLoading && productionData.length === 0 ? (
                   <div className="flex items-center justify-center h-20 gap-2 text-slate-400 text-xs">
-                    <Spinner /> Loading…
+                    <Spinner cls="w-4 h-4" /> Loading…
                   </div>
                 ) : aggregated.length === 0 ? (
                   <p className="text-center text-slate-400 text-xs py-10">
