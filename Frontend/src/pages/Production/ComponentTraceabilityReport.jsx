@@ -614,7 +614,7 @@ const ComponentTraceabilityReport = () => {
       <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
         <div>
           <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
-            Component Traceability
+            Component Traceability Report
           </h1>
           <p className="text-[11px] text-slate-400">
             Track components across finished goods production
