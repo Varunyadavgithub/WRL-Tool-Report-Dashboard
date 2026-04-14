@@ -197,6 +197,7 @@ const FPA = () => {
   const [selectedDefectCategory, setSelectedDefectCategory] = useState(
     DefectCategory[0],
   );
+  const [filteredDefectOptions, setFilteredDefectOptions] = useState([]);
   const [defectImage, setDefectImage] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
   const [activeTab, setActiveTab] = useState("summary"); // "log" | "summary" | "trends"
@@ -679,10 +680,9 @@ const FPA = () => {
                   })}
                 </div>
               </div>
-
               {/* Defect picker (hidden when no-defect) */}
               {selectedDefectCategory?.value !== "no-defect" && (
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 relative">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-semibold text-gray-500">
                       Defect
@@ -697,6 +697,7 @@ const FPA = () => {
                       Manual
                     </label>
                   </div>
+
                   {addManually ? (
                     <input
                       type="text"
@@ -706,23 +707,45 @@ const FPA = () => {
                       className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
                     />
                   ) : (
-                    <select
-                      value={selectedFpaDefectCategory?.value || ""}
-                      onChange={(e) => {
-                        const selected = fpaDefectCategory.find(
-                          (o) => o.value === e.target.value,
-                        );
-                        setSelectedFpaDefectCategory(selected);
-                      }}
-                      className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-white"
-                    >
-                      <option value="">-- Select defect --</option>
-                      {fpaDefectCategory.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                    <>
+                      <input
+                        type="text"
+                        placeholder="Search defect…"
+                        value={selectedFpaDefectCategory?.label || ""}
+                        onChange={(e) => {
+                          const value = e.target.value;
+
+                          setSelectedFpaDefectCategory({
+                            label: value,
+                            value: value,
+                          });
+
+                          const filtered = fpaDefectCategory.filter((o) =>
+                            o.label.toLowerCase().includes(value.toLowerCase()),
+                          );
+
+                          setFilteredDefectOptions(filtered);
+                        }}
+                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
+                      />
+
+                      {filteredDefectOptions.length > 0 && (
+                        <div className="absolute top-full mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-md max-h-40 overflow-y-auto z-10">
+                          {filteredDefectOptions.map((opt) => (
+                            <div
+                              key={opt.value}
+                              onClick={() => {
+                                setSelectedFpaDefectCategory(opt);
+                                setFilteredDefectOptions([]);
+                              }}
+                              className="px-3 py-2 text-sm cursor-pointer hover:bg-indigo-100"
+                            >
+                              {opt.label}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
