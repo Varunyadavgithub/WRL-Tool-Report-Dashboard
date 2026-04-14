@@ -2,6 +2,7 @@ import Title from "../../components/ui/Title";
 import SelectField from "../../components/ui/SelectField";
 import InputField from "../../components/ui/InputField";
 import Button from "../../components/ui/Button";
+import Loader from "../../components/ui/Loader";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { useEffect, useState } from "react";

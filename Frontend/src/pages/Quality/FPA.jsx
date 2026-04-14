@@ -35,7 +35,7 @@ ChartJS.register(
   Legend,
 );
 
-// ─── Severity config ─────────────────────────────────────────────────────────
+// --- Severity config ---------------------------------------------------------
 const SEVERITY = {
   critical: {
     color: "#ef4444",
@@ -70,7 +70,7 @@ const DefectCategory = [
   { label: "Critical", value: "critical" },
 ];
 
-// ─── Stat Card ────────────────────────────────────────────────────────────────
+// --- Stat Card ----------------------------------------------------------------
 const StatCard = ({ label, value, accent, sub }) => (
   <div
     className="relative bg-white rounded-xl p-4 shadow-sm border border-gray-100 overflow-hidden"
@@ -90,7 +90,7 @@ const StatCard = ({ label, value, accent, sub }) => (
   </div>
 );
 
-// ─── Image Preview Modal ──────────────────────────────────────────────────────
+// --- Image Preview Modal ------------------------------------------------------
 const ImageModal = ({ src, onClose }) => {
   if (!src) return null;
   return (
@@ -106,7 +106,7 @@ const ImageModal = ({ src, onClose }) => {
           onClick={onClose}
           className="absolute -top-10 right-0 text-white text-2xl font-bold hover:text-red-400"
         >
-          ✕
+          ?
         </button>
         <img
           src={src}
@@ -118,7 +118,7 @@ const ImageModal = ({ src, onClose }) => {
   );
 };
 
-// ─── Export CSV helper ────────────────────────────────────────────────────────
+// --- Export CSV helper --------------------------------------------------------
 const exportCSV = (data, filename) => {
   if (!data || !data.length) {
     toast.error("No data to export.");
@@ -142,7 +142,7 @@ const exportCSV = (data, filename) => {
   URL.revokeObjectURL(url);
 };
 
-// ─── FPQI Gauge ───────────────────────────────────────────────────────────────
+// --- FPQI Gauge ---------------------------------------------------------------
 const FPQIGauge = ({ value, target = 2.2 }) => {
   const v = parseFloat(value) || 0;
   const pct = Math.min((v / (target * 2)) * 100, 100);
@@ -173,12 +173,12 @@ const FPQIGauge = ({ value, target = 2.2 }) => {
           </span>
         </div>
       </div>
-      <p className="text-xs text-gray-400">Target ≤ {target}</p>
+      <p className="text-xs text-gray-400">Target = {target}</p>
     </div>
   );
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// --- Main Component -----------------------------------------------------------
 const FPA = () => {
   const [loading, setLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
@@ -204,17 +204,17 @@ const FPA = () => {
 
   const barcodeRef = useRef(null);
 
-  // ── Auto-focus barcode on mount ──────────────────────────────────────────
+  // -- Auto-focus barcode on mount ------------------------------------------
   useEffect(() => {
     barcodeRef.current?.focus();
   }, []);
 
-  // ── Barcode Enter key shortcut ───────────────────────────────────────────
+  // -- Barcode Enter key shortcut -------------------------------------------
   const handleBarcodeKeyDown = (e) => {
     if (e.key === "Enter") getAssetDetails();
   };
 
-  // ── API calls ────────────────────────────────────────────────────────────
+  // -- API calls ------------------------------------------------------------
   const getFPACountData = async () => {
     try {
       const res = await axios.get(`${baseURL}quality/fpa-count`);
@@ -355,7 +355,7 @@ const FPA = () => {
     })();
   }, []);
 
-  // ── Derived stats ─────────────────────────────────────────────────────────
+  // -- Derived stats ---------------------------------------------------------
   const defectCategoryCounts = fpaDefect.reduce(
     (acc, d) => {
       const cat = (d.Category || "").toLowerCase();
@@ -385,7 +385,7 @@ const FPA = () => {
   }, {});
   const sortedHours = Object.keys(hourlyTrend).sort();
 
-  // ── Chart configs ─────────────────────────────────────────────────────────
+  // -- Chart configs ---------------------------------------------------------
   // BUG FIX: was using item.SampleInspected as label — now correctly uses ModelName
   const barChartData = {
     labels: fpaCountData.map((item) => item.ModelName),
@@ -475,7 +475,7 @@ const FPA = () => {
     },
   };
 
-  // ── Filtered defect table ─────────────────────────────────────────────────
+  // -- Filtered defect table -------------------------------------------------
   const filteredDefects = fpaDefect.filter(
     (d) =>
       !search ||
@@ -489,12 +489,12 @@ const FPA = () => {
 
   const fpqiOk = parseFloat(fpqiDetails?.FPQI || 0) <= 2.2;
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // -- Render ----------------------------------------------------------------
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
       <ImageModal src={previewImage} onClose={() => setPreviewImage(null)} />
 
-      {/* ── Header ── */}
+      {/* -- Header -- */}
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center">
@@ -527,7 +527,7 @@ const FPA = () => {
           >
             FPQI:{" "}
             {fpqiDetails?.FPQI ? Number(fpqiDetails.FPQI).toFixed(2) : "0.00"}
-            {fpqiOk ? " ✓" : " ⚠"}
+            {fpqiOk ? " ?" : " ?"}
           </span>
           <button
             onClick={() => exportCSV(fpaDefect, "fpa_report.csv")}
@@ -552,7 +552,7 @@ const FPA = () => {
       </div>
 
       <div className="p-4 lg:p-6 space-y-5">
-        {/* ── KPI Row ── */}
+        {/* -- KPI Row -- */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard
             label="Inspected"
@@ -580,7 +580,7 @@ const FPA = () => {
               fpqiDetails?.FPQI ? Number(fpqiDetails.FPQI).toFixed(2) : "0.00"
             }
             accent={fpqiOk ? "#22c55e" : "#ef4444"}
-            sub={`Target ≤ 1.4`}
+            sub={`Target = 2.2`}
           />
           <StatCard
             label="Models Tracked"
@@ -589,7 +589,7 @@ const FPA = () => {
           />
         </div>
 
-        {/* ── Scan / Asset Panel ── */}
+        {/* -- Scan / Asset Panel -- */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
           <h2 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wider">
             Scan & Record
@@ -759,7 +759,7 @@ const FPA = () => {
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-semibold text-gray-500">
                     Defect Image{" "}
-                    {defectImage && <span className="text-green-600">✓</span>}
+                    {defectImage && <span className="text-green-600">?</span>}
                   </label>
                   <label className="cursor-pointer border-2 border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-400 hover:border-indigo-400 hover:text-indigo-500 transition text-center">
                     {defectImage ? defectImage.name : "Click to upload"}
@@ -820,7 +820,7 @@ const FPA = () => {
           </div>
         </div>
 
-        {/* ── Charts Row ── */}
+        {/* -- Charts Row -- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Bar: FPA vs Inspected */}
           <div className="md:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
@@ -855,7 +855,7 @@ const FPA = () => {
           </div>
         </div>
 
-        {/* ── Second Charts Row ── */}
+        {/* -- Second Charts Row -- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Hourly trend */}
           <div className="md:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
@@ -910,7 +910,7 @@ const FPA = () => {
           </div>
         </div>
 
-        {/* ── Tabs: Defect Log / Model Summary ── */}
+        {/* -- Tabs: Defect Log / Model Summary -- */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 pt-4 pb-0 border-b border-gray-100">
             <div className="flex gap-1">

@@ -13,7 +13,6 @@ import {
   FaCalendarAlt,
   FaSearch,
   FaSyncAlt,
-  FaClipboardList,
   FaBatteryFull,
   FaLightbulb,
   FaArrowUp,
@@ -26,6 +25,7 @@ import {
   FaCheck,
   FaCalendarWeek,
   FaHistory,
+  FaFilter,
 } from "react-icons/fa";
 import {
   BsLightningChargeFill,
@@ -34,6 +34,7 @@ import {
   BsCalendar2Week,
   BsCalendar2Month,
   BsCalendar3,
+  BsThermometerHalf,
 } from "react-icons/bs";
 import {
   MdElectricBolt,
@@ -47,8 +48,91 @@ import { IoSpeedometer, IoCalendarOutline } from "react-icons/io5";
 import { RiCalendarEventLine } from "react-icons/ri";
 import { TbReportAnalytics, TbCalendarStats } from "react-icons/tb";
 import { AiOutlineFieldNumber } from "react-icons/ai";
-import { BiTargetLock } from "react-icons/bi";
-import Title from "../../components/ui/Title";
+import {
+  getTodayRange,
+  getYesterdayRange,
+  getMTDRange,
+  formatDateTimeLocal,
+} from "../../utils/dateUtils";
+
+// --- Helpers ------------------------------------------------------------------
+
+// Convert datetime-local value ? "YYYY-MM-DD HH:mm:ss" for the API
+const toAPIDateTime = (datetimeLocalValue) => {
+  if (!datetimeLocalValue) return "";
+  const dt = new Date(datetimeLocalValue);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+};
+
+// Build datetime-local string for ranges NOT in dateUtils (isEndOfDay ? 23:59)
+const buildDatetimeLocal = (date, isEndOfDay = false) => {
+  const pad = (n) => String(n).padStart(2, "0");
+  const h = isEndOfDay ? "23" : "00";
+  const m = isEndOfDay ? "59" : "00";
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${h}:${m}`;
+};
+
+const AREA_LABELS = { 5: "Other", 6: "SUS", 8: "Choc", 9: "VISI Cooler" };
+
+const QuickFilterBtn = ({
+  filterType,
+  label,
+  icon: Icon,
+  activeFilter,
+  onClick,
+  loading,
+}) => {
+  const isActive = activeFilter === filterType;
+  return (
+    <button
+      onClick={() => onClick(filterType)}
+      disabled={loading}
+      className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 border
+        ${
+          isActive
+            ? "bg-slate-800 text-white border-slate-800 shadow-md scale-105"
+            : "bg-white text-gray-600 border-gray-200 hover:border-slate-400 hover:bg-slate-50"
+        }
+        ${loading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+    >
+      <Icon className={isActive ? "text-white" : "text-gray-400"} />
+      {label}
+    </button>
+  );
+};
+
+const StatusBadge = ({ status }) => {
+  const isPass = status === "PASS";
+  return (
+    <span
+      className={`px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 tracking-wide
+      ${isPass ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200" : "bg-red-100 text-red-700 ring-1 ring-red-200"}`}
+    >
+      {isPass ? (
+        <FaCheck className="w-2.5 h-2.5" />
+      ) : (
+        <FaTimes className="w-2.5 h-2.5" />
+      )}
+      {status}
+    </span>
+  );
+};
+
+const MinMaxCell = ({ max, min }) => (
+  <div className="flex flex-col items-center gap-0.5">
+    <span className="flex items-center gap-1 text-rose-500 text-xs font-medium">
+      <FaArrowUp className="text-[9px]" />
+      {max ?? "—"}
+    </span>
+    <span className="flex items-center gap-1 text-sky-500 text-xs font-medium">
+      <FaArrowDown className="text-[9px]" />
+      {min ?? "—"}
+    </span>
+  </div>
+);
+
+// --- Main Component -----------------------------------------------------------
 
 const CPTReport = () => {
   const [loading, setLoading] = useState(false);
@@ -58,7 +142,6 @@ const CPTReport = () => {
   const [reportData, setReportData] = useState([]);
   const [activeFilter, setActiveFilter] = useState("");
 
-  // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -70,153 +153,92 @@ const CPTReport = () => {
     avgPower: 0,
     passRate: 0,
     faultCount: 0,
+    passCount: 0,
   });
 
-  // Helper function to format date to YYYY-MM-DD
-  const formatDate = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  // Quick filter functions
+  // -- Quick filter date resolver --------------------------------------------
+  //
+  // Strategy:
+  //   today / yesterday / thisMonth  ? use dateUtils (getTodayRange, getYesterdayRange, getMTDRange)
+  //                                    then format with the util's formatDateTimeLocal
+  //   everything else               ? compute locally with buildDatetimeLocal
+  //
   const getQuickFilterDates = (filterType) => {
     const today = new Date();
-    let start, end;
 
     switch (filterType) {
-      case "today":
-        start = new Date(today);
-        end = new Date(today);
-        break;
-
-      case "yesterday":
-        start = new Date(today);
-        start.setDate(start.getDate() - 1);
-        end = new Date(start);
-        break;
-
-      case "thisWeek":
-        start = new Date(today);
-        const dayOfWeek = start.getDay();
-        const diff = start.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Adjust for Sunday
-        start.setDate(diff);
-        end = new Date(today);
-        break;
-
-      case "lastWeek":
-        start = new Date(today);
-        const currentDayOfWeek = start.getDay();
-        const diffToLastMonday =
-          start.getDate() -
-          currentDayOfWeek -
-          6 +
-          (currentDayOfWeek === 0 ? -7 : 0);
-        start.setDate(diffToLastMonday);
-        end = new Date(start);
-        end.setDate(end.getDate() + 6);
-        break;
-
-      case "thisMonth":
-        start = new Date(today.getFullYear(), today.getMonth(), 1);
-        end = new Date(today);
-        break;
-
-      case "lastMonth":
-        start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        end = new Date(today.getFullYear(), today.getMonth(), 0);
-        break;
-
-      case "last7Days":
-        start = new Date(today);
-        start.setDate(start.getDate() - 6);
-        end = new Date(today);
-        break;
-
-      case "last30Days":
-        start = new Date(today);
-        start.setDate(start.getDate() - 29);
-        end = new Date(today);
-        break;
-
-      case "last90Days":
-        start = new Date(today);
-        start.setDate(start.getDate() - 89);
-        end = new Date(today);
-        break;
-
+      // -- Backed by dateUtils ----------------------------------------------
+      case "today": {
+        const { startDate, endDate } = getTodayRange();
+        return {
+          start: formatDateTimeLocal(startDate),
+          end: formatDateTimeLocal(endDate),
+        };
+      }
+      case "yesterday": {
+        const { startDate, endDate } = getYesterdayRange();
+        return {
+          start: formatDateTimeLocal(startDate),
+          end: formatDateTimeLocal(endDate),
+        };
+      }
+      case "thisMonth": {
+        // getMTDRange ? 1st of current month 00:00 ? today 23:59
+        const { startDate, endDate } = getMTDRange();
+        return {
+          start: formatDateTimeLocal(startDate),
+          end: formatDateTimeLocal(endDate),
+        };
+      }
       default:
         return null;
     }
-
-    return {
-      start: formatDate(start),
-      end: formatDate(end),
-    };
   };
 
-  const handleQuickFilter = (filterType) => {
-    const dates = getQuickFilterDates(filterType);
-    if (dates) {
-      setStartTime(dates.start);
-      setEndTime(dates.end);
-      setActiveFilter(filterType);
-      // Auto-query when quick filter is selected
-      fetchDataWithDates(dates.start, dates.end, 1, limit);
-    }
-  };
-
+  // -- Stats -----------------------------------------------------------------
   const calculateStats = (data) => {
-    if (!data || data.length === 0) {
+    if (!data?.length) {
       setStats({
         avgRuntime: 0,
         avgTemp: 0,
         avgPower: 0,
         passRate: 0,
         faultCount: 0,
+        passCount: 0,
       });
       return;
     }
-
+    const n = data.length;
     const avgRuntime =
-      data.reduce(
-        (acc, item) => acc + (parseFloat(item.RUNTIME_MINUTES) || 0),
-        0,
-      ) / data.length;
+      data.reduce((a, i) => a + (parseFloat(i.RUNTIME_MINUTES) || 0), 0) / n;
     const avgTemp =
       data.reduce(
-        (acc, item) =>
-          acc +
-          ((parseFloat(item.MAX_TEMPERATURE) || 0) +
-            (parseFloat(item.MIN_TEMPERATURE) || 0)) /
+        (a, i) =>
+          a +
+          ((parseFloat(i.MAX_TEMPERATURE) || 0) +
+            (parseFloat(i.MIN_TEMPERATURE) || 0)) /
             2,
         0,
-      ) / data.length;
+      ) / n;
     const avgPower =
       data.reduce(
-        (acc, item) =>
-          acc +
-          ((parseFloat(item.MAX_POWER) || 0) +
-            (parseFloat(item.MIN_POWER) || 0)) /
-            2,
+        (a, i) =>
+          a +
+          ((parseFloat(i.MAX_POWER) || 0) + (parseFloat(i.MIN_POWER) || 0)) / 2,
         0,
-      ) / data.length;
-    const passCount = data.filter((item) => item.PERFORMANCE === "PASS").length;
-    const passRate = (passCount / data.length) * 100;
-    const faultCount = data.filter(
-      (item) => item.PERFORMANCE === "FAIL",
-    ).length;
-
+      ) / n;
+    const passCount = data.filter((i) => i.PERFORMANCE === "PASS").length;
     setStats({
-      avgRuntime: avgRuntime.toFixed(2),
-      avgTemp: avgTemp.toFixed(2),
-      avgPower: avgPower.toFixed(2),
-      passRate: passRate.toFixed(1),
-      faultCount,
+      avgRuntime: avgRuntime.toFixed(1),
+      avgTemp: avgTemp.toFixed(1),
+      avgPower: avgPower.toFixed(1),
+      passRate: ((passCount / n) * 100).toFixed(1),
+      faultCount: n - passCount,
+      passCount,
     });
   };
 
+  // -- Fetch -----------------------------------------------------------------
   const fetchDataWithDates = async (
     start,
     end,
@@ -224,31 +246,25 @@ const CPTReport = () => {
     pageLimit = limit,
   ) => {
     if (!start || !end) {
-      toast.error("Please select Time Range.");
+      toast.error("Please select a date & time range.");
       return;
     }
     setLoading(true);
     try {
-      const formattedStartDate = new Date(start).toISOString().split("T")[0];
-      const formattedEndDate = new Date(end).toISOString().split("T")[0];
-
-      const params = {
-        startDate: formattedStartDate,
-        endDate: formattedEndDate,
-        page,
-        limit: pageLimit,
-      };
-
       const res = await axios.get(`${baseURL}quality/cpt-report`, {
-        params,
+        params: {
+          startDate: toAPIDateTime(start),
+          endDate: toAPIDateTime(end),
+          page,
+          limit: pageLimit,
+        },
       });
-
       if (res?.data?.success) {
-        setReportData(res?.data?.data);
-        setCurrentPage(res?.data?.pagination?.currentPage || 1);
-        setTotalPages(res?.data?.pagination?.totalPages || 0);
-        setTotalRecords(res?.data?.pagination?.totalRecords || 0);
-        calculateStats(res?.data?.data);
+        setReportData(res.data.data);
+        setCurrentPage(res.data.pagination?.currentPage || 1);
+        setTotalPages(res.data.pagination?.totalPages || 0);
+        setTotalRecords(res.data.pagination?.totalRecords || 0);
+        calculateStats(res.data.data);
       }
     } catch (error) {
       console.error("Failed to fetch CPT Report:", error);
@@ -258,25 +274,29 @@ const CPTReport = () => {
     }
   };
 
-  const fetchData = async (page = 1, pageLimit = limit) => {
-    fetchDataWithDates(startTime, endTime, page, pageLimit);
+  // -- Event handlers --------------------------------------------------------
+  const handleQuickFilter = (filterType) => {
+    const dates = getQuickFilterDates(filterType);
+    if (!dates) return;
+    setStartTime(dates.start);
+    setEndTime(dates.end);
+    setActiveFilter(filterType);
+    fetchDataWithDates(dates.start, dates.end, 1, limit);
   };
 
   const handleQuery = () => {
     setCurrentPage(1);
     setActiveFilter("custom");
-    fetchData(1, limit);
+    fetchDataWithDates(startTime, endTime, 1, limit);
   };
-
   const handlePageChange = (page) => {
     setCurrentPage(page);
-    fetchData(page, limit);
+    fetchDataWithDates(startTime, endTime, page, limit);
   };
-
   const handleLimitChange = (newLimit) => {
     setLimit(newLimit);
     setCurrentPage(1);
-    fetchData(1, newLimit);
+    fetchDataWithDates(startTime, endTime, 1, newLimit);
   };
 
   const handleClear = () => {
@@ -293,50 +313,29 @@ const CPTReport = () => {
       avgPower: 0,
       passRate: 0,
       faultCount: 0,
+      passCount: 0,
     });
   };
 
-  // Handle manual date change - clear active filter
-  const handleStartDateChange = (e) => {
-    setStartTime(e.target.value);
-    setActiveFilter("custom");
-  };
-
-  const handleEndDateChange = (e) => {
-    setEndTime(e.target.value);
-    setActiveFilter("custom");
-  };
-
-  // Export all data (without pagination)
   const handleExportAll = async () => {
     if (!startTime || !endTime) {
-      toast.error("Please select Time Range.");
-      return;
+      toast.error("Please select a date & time range.");
+      return [];
     }
     setExportLoading(true);
     try {
-      const formattedStartDate = new Date(startTime)
-        .toISOString()
-        .split("T")[0];
-      const formattedEndDate = new Date(endTime).toISOString().split("T")[0];
-
-      const params = {
-        startDate: formattedStartDate,
-        endDate: formattedEndDate,
-        page: 1,
-        limit: 100000,
-      };
-
       const res = await axios.get(`${baseURL}quality/cpt-report`, {
-        params,
+        params: {
+          startDate: toAPIDateTime(startTime),
+          endDate: toAPIDateTime(endTime),
+          page: 1,
+          limit: 100000,
+        },
       });
-
-      if (res?.data?.success && res?.data?.data?.length > 0) {
-        return res.data.data;
-      }
-      return [];
-    } catch (error) {
-      console.error("Failed to export CPT Report:", error);
+      return res?.data?.success && res?.data?.data?.length > 0
+        ? res.data.data
+        : [];
+    } catch {
       toast.error("Failed to export CPT Report.");
       return [];
     } finally {
@@ -344,483 +343,342 @@ const CPTReport = () => {
     }
   };
 
-  // Quick Filter Button Component
-  const QuickFilterButton = ({ filterType, label, icon: Icon, color }) => {
-    const isActive = activeFilter === filterType;
-    return (
-      <button
-        onClick={() => handleQuickFilter(filterType)}
-        disabled={loading}
-        className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center gap-2 border ${
-          isActive
-            ? `${color} text-white shadow-lg scale-105`
-            : `bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50`
-        } ${loading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-      >
-        <Icon className={isActive ? "text-white" : "text-gray-500"} />
-        {label}
-      </button>
-    );
+  // -- Static config ---------------------------------------------------------
+  const filterLabels = {
+    today: "Today",
+    yesterday: "Yesterday",
+    thisWeek: "This Week",
+    lastWeek: "Last Week",
+    thisMonth: "This Month",
+    lastMonth: "Last Month",
+    last7Days: "Last 7 Days",
+    last30Days: "Last 30 Days",
+    last90Days: "Last 90 Days",
+    custom: "Custom Range",
   };
 
-  // Status indicator component
-  const StatusBadge = ({ status }) => {
-    const isPass = status === "PASS";
-    return (
-      <span
-        className={`px-2 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1 ${
-          isPass ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-        }`}
-      >
-        {isPass ? (
-          <FaCheck className="w-3 h-3" />
-        ) : (
-          <FaTimes className="w-3 h-3" />
-        )}
-        {status}
-      </span>
-    );
-  };
+  const quickFilters = [
+    { filterType: "today", label: "Today", icon: MdToday },
+    { filterType: "yesterday", label: "Yesterday", icon: BsCalendar2Day },
+    { filterType: "thisMonth", label: "This Month", icon: MdCalendarMonth },
+  ];
 
-  // Get filter label for display
-  const getFilterLabel = () => {
-    const labels = {
-      today: "Today",
-      yesterday: "Yesterday",
-      thisWeek: "This Week",
-      lastWeek: "Last Week",
-      thisMonth: "This Month",
-      lastMonth: "Last Month",
-      last7Days: "Last 7 Days",
-      last30Days: "Last 30 Days",
-      last90Days: "Last 90 Days",
-      custom: "Custom Range",
-    };
-    return labels[activeFilter] || "";
-  };
+  const TABLE_HEADERS = [
+    { icon: <AiOutlineFieldNumber className="text-slate-400" />, label: "#" },
+    { icon: <FaDatabase className="text-indigo-400" />, label: "Result ID" },
+    { icon: <MdAccessTime className="text-blue-400" />, label: "Date / Time" },
+    { icon: <FaBarcode className="text-slate-400" />, label: "Barcode" },
+    { icon: <FaCog className="text-slate-400" />, label: "Model" },
+    { icon: <FaClock className="text-emerald-400" />, label: "Runtime" },
+    {
+      icon: <FaThermometerHalf className="text-orange-400" />,
+      label: "Temp (°C)",
+    },
+    {
+      icon: <MdElectricBolt className="text-blue-400" />,
+      label: "Current (A)",
+    },
+    {
+      icon: <FaBatteryFull className="text-yellow-500" />,
+      label: "Voltage (V)",
+    },
+    { icon: <FaLightbulb className="text-amber-400" />, label: "Power (W)" },
+    {
+      icon: <BsSpeedometer2 className="text-purple-400" />,
+      label: "Performance",
+    },
+    { icon: <HiStatusOnline className="text-emerald-400" />, label: "Status" },
+    {
+      icon: <FaExclamationTriangle className="text-red-400" />,
+      label: "Fault Info",
+    },
+    { icon: <FaMapMarkerAlt className="text-purple-400" />, label: "Area" },
+  ];
 
+  // -- Render ----------------------------------------------------------------
   return (
-    <div className="p-6 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
-      {/* Header Section */}
-      <div className="flex items-center justify-center gap-3 mb-6">
-        <div className="bg-blue-600 p-3 rounded-full">
-          <BsLightningChargeFill className="text-3xl text-white" />
+    <div className="min-h-screen bg-slate-50 p-4 md:p-6">
+      {/* Header */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="bg-slate-800 p-3 rounded-2xl shadow-lg">
+            <BsLightningChargeFill className="text-2xl text-amber-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight">
+              CPT Performance Report
+            </h1>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Cooling Performance Testing
+            </p>
+          </div>
         </div>
-        <Title title="CPT Performance Report" align="center" />
+        {totalRecords > 0 && (
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm">
+            <HiDatabase className="text-slate-400" />
+            <span className="text-sm font-semibold text-slate-700">
+              {totalRecords.toLocaleString()} Records
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Quick Filters Section */}
-      <div className="bg-white rounded-xl shadow-lg p-4 mb-6 border border-gray-100">
+      {/* Filter Panel */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-5">
+        {/* Quick Filters */}
         <div className="flex items-center gap-2 mb-3">
-          <span className="bg-purple-100 text-purple-600 p-2 rounded-lg">
-            <TbCalendarStats className="text-xl" />
+          <FaFilter className="text-slate-400 text-sm" />
+          <span className="text-sm font-bold text-slate-600 uppercase tracking-wider">
+            Quick Filters
           </span>
-          <h2 className="text-lg font-semibold text-gray-800">Quick Filters</h2>
           {activeFilter && activeFilter !== "custom" && (
-            <span className="ml-auto text-sm text-gray-500 flex items-center gap-1">
-              <FaCheckCircle className="text-green-500" />
-              Active: {getFilterLabel()}
+            <span className="ml-auto text-xs text-emerald-600 font-semibold flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-200">
+              <FaCheckCircle /> {filterLabels[activeFilter]}
             </span>
           )}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <QuickFilterButton
-            filterType="today"
-            label="Today"
-            icon={MdToday}
-            color="bg-gradient-to-r from-blue-500 to-blue-600"
-          />
-          <QuickFilterButton
-            filterType="yesterday"
-            label="Yesterday"
-            icon={BsCalendar2Day}
-            color="bg-gradient-to-r from-indigo-500 to-indigo-600"
-          />
-          <QuickFilterButton
-            filterType="thisWeek"
-            label="This Week"
-            icon={BsCalendar2Week}
-            color="bg-gradient-to-r from-purple-500 to-purple-600"
-          />
-          <QuickFilterButton
-            filterType="lastWeek"
-            label="Last Week"
-            icon={FaCalendarWeek}
-            color="bg-gradient-to-r from-violet-500 to-violet-600"
-          />
-          <QuickFilterButton
-            filterType="thisMonth"
-            label="This Month"
-            icon={MdCalendarMonth}
-            color="bg-gradient-to-r from-pink-500 to-pink-600"
-          />
-          <QuickFilterButton
-            filterType="lastMonth"
-            label="Last Month"
-            icon={BsCalendar2Month}
-            color="bg-gradient-to-r from-rose-500 to-rose-600"
-          />
-
-          <div className="w-px bg-gray-300 mx-2 hidden md:block" />
-
-          <QuickFilterButton
-            filterType="last7Days"
-            label="Last 7 Days"
-            icon={BsCalendar3}
-            color="bg-gradient-to-r from-teal-500 to-teal-600"
-          />
-          <QuickFilterButton
-            filterType="last30Days"
-            label="Last 30 Days"
-            icon={RiCalendarEventLine}
-            color="bg-gradient-to-r from-cyan-500 to-cyan-600"
-          />
-          <QuickFilterButton
-            filterType="last90Days"
-            label="Last 90 Days"
-            icon={FaHistory}
-            color="bg-gradient-to-r from-emerald-500 to-emerald-600"
-          />
+        <div className="flex flex-wrap gap-2 mb-5">
+          {quickFilters.map((f) => (
+            <QuickFilterBtn
+              key={f.filterType}
+              {...f}
+              activeFilter={activeFilter}
+              onClick={handleQuickFilter}
+              loading={loading}
+            />
+          ))}
         </div>
-      </div>
 
-      {/* Filters Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        {/* Date Range Card */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="bg-indigo-100 text-indigo-600 p-2 rounded-lg">
-              <FaCalendarAlt className="text-xl" />
+        {/* Custom Range */}
+        <div className="border-t border-slate-100 pt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <FaCalendarAlt className="text-slate-400 text-sm" />
+            <span className="text-sm font-bold text-slate-600 uppercase tracking-wider">
+              Custom Date & Time Range
             </span>
-            <h2 className="text-lg font-semibold text-gray-800">
-              Custom Date Range
-            </h2>
             {activeFilter === "custom" && (
-              <span className="ml-2 text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full">
+              <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
                 Custom
               </span>
             )}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <label className="font-medium text-gray-700 text-sm flex items-center gap-2">
-                <MdDateRange className="text-indigo-500" />
-                Start Date
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                <MdDateRange className="text-blue-400" /> Start Date & Time
               </label>
               <input
-                type="date"
-                name="startDate"
+                type="datetime-local"
                 value={startTime}
-                onChange={handleStartDateChange}
-                className="border-2 border-gray-200 px-4 py-3 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all outline-none"
+                onChange={(e) => {
+                  setStartTime(e.target.value);
+                  setActiveFilter("custom");
+                }}
+                className="w-full border-2 border-slate-200 px-3 py-2.5 rounded-xl text-sm focus:border-slate-500 focus:ring-2 focus:ring-slate-100 outline-none transition-all text-slate-700"
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <label className="font-medium text-gray-700 text-sm flex items-center gap-2">
-                <MdDateRange className="text-indigo-500" />
-                End Date
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                <MdDateRange className="text-rose-400" /> End Date & Time
               </label>
               <input
-                type="date"
-                name="endDate"
+                type="datetime-local"
                 value={endTime}
-                onChange={handleEndDateChange}
-                className="border-2 border-gray-200 px-4 py-3 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all outline-none"
+                onChange={(e) => {
+                  setEndTime(e.target.value);
+                  setActiveFilter("custom");
+                }}
+                className="w-full border-2 border-slate-200 px-3 py-2.5 rounded-xl text-sm focus:border-slate-500 focus:ring-2 focus:ring-slate-100 outline-none transition-all text-slate-700"
               />
+            </div>
+            <div className="md:col-span-2 flex items-end gap-3">
+              <button
+                onClick={handleQuery}
+                disabled={loading || !startTime || !endTime}
+                className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-sm text-white transition-all flex items-center justify-center gap-2
+                  ${
+                    loading || !startTime || !endTime
+                      ? "bg-slate-300 cursor-not-allowed"
+                      : "bg-slate-800 hover:bg-slate-700 shadow-md hover:shadow-lg active:scale-95"
+                  }`}
+              >
+                {loading ? (
+                  <>
+                    <svg
+                      className="animate-spin h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        className="opacity-25"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
+                    </svg>{" "}
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <FaSearch /> Query
+                  </>
+                )}
+              </button>
+              <button
+                onClick={handleClear}
+                className="py-2.5 px-4 rounded-xl font-bold text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all flex items-center gap-2 active:scale-95"
+              >
+                <FaSyncAlt /> Clear
+              </button>
+              {reportData?.length > 0 && (
+                <ExportButton
+                  data={reportData}
+                  filename="CPT_Report"
+                  fetchAllData={handleExportAll}
+                  totalRecords={totalRecords}
+                  isLoading={exportLoading}
+                />
+              )}
             </div>
           </div>
 
-          {/* Selected Date Range Display */}
           {startTime && endTime && (
-            <div className="mt-4 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
-              <p className="text-sm text-indigo-700 flex items-center gap-2">
-                <IoCalendarOutline className="text-lg" />
-                <span className="font-medium">Selected Range:</span>
-                {new Date(startTime).toLocaleDateString("en-US", {
-                  weekday: "short",
-                  year: "numeric",
+            <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+              <IoCalendarOutline className="text-slate-400 shrink-0" />
+              <span className="font-medium text-slate-600">
+                {new Date(startTime).toLocaleString("en-IN", {
+                  day: "2-digit",
                   month: "short",
-                  day: "numeric",
-                })}
-                <span className="mx-2">→</span>
-                {new Date(endTime).toLocaleDateString("en-US", {
-                  weekday: "short",
                   year: "numeric",
-                  month: "short",
-                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
                 })}
-              </p>
+              </span>
+              <span className="text-slate-400 mx-1">?</span>
+              <span className="font-medium text-slate-600">
+                {new Date(endTime).toLocaleString("en-IN", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
             </div>
           )}
         </div>
+      </div>
 
-        {/* Actions Card */}
-        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="bg-green-100 text-green-600 p-2 rounded-lg">
-              <BiTargetLock className="text-xl" />
-            </span>
-            <h2 className="text-lg font-semibold text-gray-800">Actions</h2>
+      {/* Data Table */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <TbReportAnalytics className="text-slate-500 text-xl" />
+            <h2 className="font-bold text-slate-700">Detailed Test Results</h2>
           </div>
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={handleQuery}
-              disabled={loading || !startTime || !endTime}
-              className={`w-full py-3 px-4 rounded-xl font-semibold text-white transition-all duration-300 flex items-center justify-center gap-2 ${
-                loading || !startTime || !endTime
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-lg hover:shadow-xl"
-              }`}
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Loading...
-                </>
-              ) : (
-                <>
-                  <FaSearch /> Query Data
-                </>
-              )}
-            </button>
-            <button
-              onClick={handleClear}
-              className="w-full py-3 px-4 rounded-xl font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-all duration-300 flex items-center justify-center gap-2"
-            >
-              <FaSyncAlt /> Clear All
-            </button>
-            {reportData && reportData.length > 0 && (
-              <ExportButton
-                data={reportData}
-                filename="CPT_Report"
-                fetchAllData={handleExportAll}
-                totalRecords={totalRecords}
-                isLoading={exportLoading}
-              />
+          <div className="flex items-center gap-2 flex-wrap">
+            {activeFilter && (
+              <span className="bg-slate-800 text-white px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
+                <TbCalendarStats className="text-amber-400" />{" "}
+                {filterLabels[activeFilter]}
+              </span>
+            )}
+            {totalRecords > 0 && (
+              <>
+                <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full text-xs font-semibold">
+                  {totalRecords.toLocaleString()} records
+                </span>
+                <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-semibold">
+                  Page {currentPage}/{totalPages}
+                </span>
+              </>
             )}
           </div>
         </div>
-      </div>
 
-      {/* Data Table Section */}
-      <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-        <div className="bg-gradient-to-r from-gray-800 to-gray-700 px-6 py-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-              <FaClipboardList />
-              Detailed Test Results
-            </h2>
-            <div className="flex items-center gap-3 flex-wrap">
-              {activeFilter && (
-                <span className="bg-purple-500 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1">
-                  <TbCalendarStats />
-                  {getFilterLabel()}
-                </span>
-              )}
-              <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1">
-                <HiDatabase />
-                {totalRecords} Total Records
-              </span>
-              {totalRecords > 0 && (
-                <span className="bg-indigo-500 text-white px-3 py-1 rounded-full text-sm">
-                  Page {currentPage} of {totalPages}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+        <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-gray-100 sticky top-0 z-10">
+            <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700 border-b">
-                  <div className="flex items-center gap-1">
-                    <AiOutlineFieldNumber className="text-gray-500" />#
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700 border-b">
-                  <div className="flex items-center gap-1">
-                    <FaDatabase className="text-indigo-500" />
-                    Result ID
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700 border-b">
-                  <div className="flex items-center gap-1">
-                    <MdAccessTime className="text-blue-500" />
-                    Date/Time
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700 border-b">
-                  <div className="flex items-center gap-1">
-                    <FaBarcode className="text-gray-500" />
-                    Barcode
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700 border-b">
-                  <div className="flex items-center gap-1">
-                    <FaCog className="text-gray-500" />
-                    Model
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-700 border-b">
-                  <div className="flex items-center justify-center gap-1">
-                    <FaClock className="text-green-500" />
-                    Runtime
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-700 border-b">
-                  <div className="flex items-center justify-center gap-1">
-                    <FaThermometerHalf className="text-orange-500" />
-                    Temp (°C)
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-700 border-b">
-                  <div className="flex items-center justify-center gap-1">
-                    <MdElectricBolt className="text-blue-500" />
-                    Current (A)
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-700 border-b">
-                  <div className="flex items-center justify-center gap-1">
-                    <FaBatteryFull className="text-yellow-500" />
-                    Voltage (V)
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-700 border-b">
-                  <div className="flex items-center justify-center gap-1">
-                    <FaLightbulb className="text-amber-500" />
-                    Power (W)
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-700 border-b">
-                  <div className="flex items-center justify-center gap-1">
-                    <BsSpeedometer2 className="text-purple-500" />
-                    Performance
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-700 border-b">
-                  <div className="flex items-center justify-center gap-1">
-                    <HiStatusOnline className="text-green-500" />
-                    Status
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700 border-b">
-                  <div className="flex items-center gap-1">
-                    <FaExclamationTriangle className="text-red-500" />
-                    Fault Info
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700 border-b">
-                  <div className="flex items-center gap-1">
-                    <FaMapMarkerAlt className="text-purple-500" />
-                    Area
-                  </div>
-                </th>
+                {TABLE_HEADERS.map(({ icon, label }, i) => (
+                  <th key={i} className="px-4 py-3 text-left">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+                      {icon} {label}
+                    </div>
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-slate-50">
               {reportData.map((item, index) => (
                 <tr
-                  key={item.Result_ID || index}
-                  className="hover:bg-indigo-50 transition-colors duration-150"
+                  key={item.Result_ID ?? index}
+                  className="hover:bg-blue-50/40 transition-colors duration-100"
                 >
-                  <td className="px-4 py-3 text-gray-600">
+                  <td className="px-4 py-3 text-xs text-slate-400 font-mono">
                     {(currentPage - 1) * limit + index + 1}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="font-mono text-indigo-600 font-medium">
-                      {item.Result_ID}
+                    <span className="font-mono text-indigo-600 font-bold text-xs bg-indigo-50 px-2 py-0.5 rounded">
+                      #{item.Result_ID}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="text-gray-800 flex items-center gap-1">
-                      <FaCalendarAlt className="text-gray-400 text-xs" />
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                      <FaCalendarAlt className="text-slate-300 text-[9px]" />
                       {item.DATE}
                     </div>
-                    <div className="text-gray-500 text-xs flex items-center gap-1">
-                      <MdAccessTime className="text-gray-400" />
+                    <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                      <MdAccessTime className="text-slate-300" />
                       {item.TIME}
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="bg-gray-100 px-2 py-1 rounded font-mono text-xs flex items-center gap-1 w-fit">
-                      <FaBarcode className="text-gray-400" />
+                    <span className="font-mono text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded-lg flex items-center gap-1 w-fit">
+                      <FaBarcode className="text-slate-400 text-[9px]" />
                       {item.BARCODE}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="font-medium text-gray-800">
+                    <div className="font-semibold text-slate-800 text-xs">
                       {item.MODEL}
                     </div>
-                    <div className="text-gray-500 text-xs">
+                    <div className="text-slate-400 text-xs">
                       {item.MODELNAME}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1">
-                      <FaClock className="text-blue-500" />
-                      {item.RUNTIME_MINUTES}
+                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1">
+                      <FaClock className="text-emerald-400 text-[9px]" />
+                      {item.RUNTIME_MINUTES}m
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <div className="text-xs space-y-1">
-                      <div className="flex items-center justify-center gap-1 text-red-500">
-                        <FaArrowUp /> {item.MAX_TEMPERATURE}
-                      </div>
-                      <div className="flex items-center justify-center gap-1 text-blue-500">
-                        <FaArrowDown /> {item.MIN_TEMPERATURE}
-                      </div>
-                    </div>
+                    <MinMaxCell
+                      max={item.MAX_TEMPERATURE}
+                      min={item.MIN_TEMPERATURE}
+                    />
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <div className="text-xs space-y-1">
-                      <div className="flex items-center justify-center gap-1 text-red-500">
-                        <FaArrowUp /> {item.MAX_CURRENT}
-                      </div>
-                      <div className="flex items-center justify-center gap-1 text-blue-500">
-                        <FaArrowDown /> {item.MIN_CURRENT}
-                      </div>
-                    </div>
+                    <MinMaxCell max={item.MAX_CURRENT} min={item.MIN_CURRENT} />
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <div className="text-xs space-y-1">
-                      <div className="flex items-center justify-center gap-1 text-red-500">
-                        <FaArrowUp /> {item.MAX_VOLTAGE}
-                      </div>
-                      <div className="flex items-center justify-center gap-1 text-blue-500">
-                        <FaArrowDown /> {item.MIN_VOLTAGE}
-                      </div>
-                    </div>
+                    <MinMaxCell max={item.MAX_VOLTAGE} min={item.MIN_VOLTAGE} />
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <div className="text-xs space-y-1">
-                      <div className="flex items-center justify-center gap-1 text-red-500">
-                        <FaArrowUp /> {item.MAX_POWER}
-                      </div>
-                      <div className="flex items-center justify-center gap-1 text-blue-500">
-                        <FaArrowDown /> {item.MIN_POWER}
-                      </div>
-                    </div>
+                    <MinMaxCell max={item.MAX_POWER} min={item.MIN_POWER} />
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className="font-semibold text-gray-800 flex items-center justify-center gap-1">
-                      <IoSpeedometer className="text-purple-500" />
+                    <span className="font-bold text-xs text-slate-600 flex items-center justify-center gap-1">
+                      <IoSpeedometer className="text-purple-400" />
                       {item.PERFORMANCE}
                     </span>
                   </td>
@@ -828,57 +686,38 @@ const CPTReport = () => {
                     <StatusBadge status={item.PERFORMANCE} />
                   </td>
                   <td className="px-4 py-3">
-                    {item.FaultCode &&
-                    item.FaultCode !== "0" &&
-                    item.FaultCode !== "" ? (
-                      <div>
-                        <span className="text-red-600 font-mono text-xs flex items-center gap-1">
-                          <FaExclamationTriangle />#{item.FaultCode}
-                        </span>
-                        <div className="text-gray-500 text-xs">
-                          {item.FaultName}
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400 flex items-center gap-1">
-                        <FaCheckCircle className="text-green-400" />-
-                      </span>
-                    )}
+                    <div className="text-slate-500 text-xs mt-0.5">
+                      {item.FaultName}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs inline-flex items-center gap-1">
-                      <FaMapMarkerAlt />
-                      {item.AREA_ID}
+                    <span className="bg-purple-50 text-purple-700 border border-purple-200 px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 w-fit">
+                      <FaMapMarkerAlt className="text-[9px]" />
+                      {AREA_LABELS[item.AREA_ID] ?? `Area ${item.AREA_ID}`}
                     </span>
                   </td>
                 </tr>
               ))}
+
               {!loading && reportData.length === 0 && (
                 <tr>
-                  <td colSpan={14} className="text-center py-12">
+                  <td colSpan={14} className="py-16 text-center">
                     <div className="flex flex-col items-center gap-3">
-                      <div className="bg-gray-100 p-6 rounded-full">
-                        <TbReportAnalytics className="text-6xl text-gray-400" />
+                      <div className="bg-slate-100 p-6 rounded-3xl">
+                        <TbReportAnalytics className="text-5xl text-slate-300" />
                       </div>
-                      <p className="text-gray-500 text-lg font-medium">
-                        No data found
+                      <p className="text-slate-500 font-semibold">
+                        No data available
                       </p>
-                      <p className="text-gray-400 text-sm flex items-center gap-2">
-                        <FaCalendarAlt />
-                        Use quick filters or select a date range to view results
+                      <p className="text-slate-400 text-sm">
+                        Use quick filters or set a custom date & time range
                       </p>
-                      <div className="flex gap-2 mt-2">
+                      <div className="flex gap-2 mt-1">
                         <button
                           onClick={() => handleQuickFilter("today")}
-                          className="px-4 py-2 bg-indigo-100 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-200 transition-colors flex items-center gap-2"
+                          className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-700 transition-colors flex items-center gap-2"
                         >
-                          <MdToday /> View Today's Data
-                        </button>
-                        <button
-                          onClick={() => handleQuickFilter("thisWeek")}
-                          className="px-4 py-2 bg-purple-100 text-purple-600 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors flex items-center gap-2"
-                        >
-                          <BsCalendar2Week /> View This Week
+                          <MdToday /> Today's Data
                         </button>
                       </div>
                     </div>
@@ -887,14 +726,14 @@ const CPTReport = () => {
               )}
             </tbody>
           </table>
+
           {loading && (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-16">
               <Loader />
             </div>
           )}
         </div>
 
-        {/* Pagination Component */}
         {totalRecords > 0 && (
           <Pagination
             currentPage={currentPage}

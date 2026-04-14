@@ -11,7 +11,6 @@ import {
   useGetEstReportSummaryQuery,
   useGetDistinctModelsQuery,
   useGetDistinctOperatorsQuery,
-  useLazyGetEstReportQuickFilterQuery,
   useLazyGetExportDataQuery,
 } from "../../redux/api/estReportApi";
 import {
@@ -31,6 +30,7 @@ import {
   formatDateTimeLocal,
 } from "../../utils/dateUtils";
 import { exportToXls } from "../../utils/exportToXls.js";
+
 import {
   FaShieldAlt,
   FaTint,
@@ -46,23 +46,53 @@ import {
   FaDownload,
   FaSync,
   FaRedo,
+  FaFilter,
+  FaChevronRight,
 } from "react-icons/fa";
-import { MdFilterAlt } from "react-icons/md";
+import { MdFilterAlt, MdElectricBolt } from "react-icons/md";
 import { HiLightningBolt, HiOutlineDocumentReport } from "react-icons/hi";
 import { BiSearchAlt, BiTime } from "react-icons/bi";
-import { BsLightningChargeFill } from "react-icons/bs";
-import { TbReportAnalytics } from "react-icons/tb";
+import { BsLightningChargeFill, BsGraphUp } from "react-icons/bs";
 import { IoMdStats } from "react-icons/io";
 import { GiElectric } from "react-icons/gi";
 import { VscCircuitBoard } from "react-icons/vsc";
+import { RiDashboardLine } from "react-icons/ri";
+import { AiOutlineClockCircle } from "react-icons/ai";
+import { PiWarningCircleBold } from "react-icons/pi";
 
-// Detail Modal Component
 import ESTDetailModal from "../../components/ESTDetailModal";
 
+// --- Status Badge --------------------------------------------------------------
+const StatusBadge = ({ status, size = "md" }) => {
+  const isPass = status === "Pass" || status === 1;
+  const base = "inline-flex items-center gap-1 rounded font-semibold";
+  const sizes = {
+    sm: "px-2 py-0.5 text-[11px]",
+    md: "px-2.5 py-1 text-xs",
+    lg: "px-4 py-1.5 text-sm",
+  };
+  const iconSize = size === "lg" ? 14 : 10;
+  return (
+    <span
+      className={`${base} ${sizes[size]} ${
+        isPass
+          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+          : "bg-rose-50 text-rose-700 border border-rose-200"
+      }`}
+    >
+      {isPass ? (
+        <FaCheckCircle size={iconSize} />
+      ) : (
+        <FaTimesCircle size={iconSize} />
+      )}
+      {isPass ? "PASS" : "FAIL"}
+    </span>
+  );
+};
+
+// --- Main Component ------------------------------------------------------------
 const ESTReport = () => {
   const dispatch = useDispatch();
-
-  // Redux state - ADD pagination HERE
   const {
     filters,
     selectedRecord,
@@ -71,11 +101,10 @@ const ESTReport = () => {
     pagination,
   } = useSelector((state) => state.estReport);
 
-  // Local state for date inputs
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
 
-  // RTK Query hooks - ADD pagination params
+  // -- API Hooks --------------------------------------------------------------
   const {
     data: reportData,
     isLoading: reportLoading,
@@ -95,27 +124,21 @@ const ESTReport = () => {
     { skip: !filters.startDate || !filters.endDate },
   );
 
-  const { data: summaryData, isLoading: summaryLoading } =
-    useGetEstReportSummaryQuery(
-      {
-        startDate: filters.startDate,
-        endDate: filters.endDate,
-        model: filters.model,
-      },
-      { skip: !filters.startDate || !filters.endDate },
-    );
+  const { data: summaryData } = useGetEstReportSummaryQuery(
+    {
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      model: filters.model,
+    },
+    { skip: !filters.startDate || !filters.endDate },
+  );
 
   const { data: modelsData } = useGetDistinctModelsQuery();
   const { data: operatorsData } = useGetDistinctOperatorsQuery();
-
-  // Lazy queries for quick filters
-  const [triggerQuickFilter, { isLoading: quickFilterLoading }] =
-    useLazyGetEstReportQuickFilterQuery();
-
   const [triggerExport, { isLoading: exportLoading }] =
     useLazyGetExportDataQuery();
 
-  // UPDATE PAGINATION WHEN API RESPONSE CHANGES - ADD THIS useEffect
+  // -- Sync pagination from API response -------------------------------------
   useEffect(() => {
     if (reportData?.pagination) {
       dispatch(
@@ -127,40 +150,38 @@ const ESTReport = () => {
     }
   }, [reportData, dispatch]);
 
-  // Test type options
+  // -- Options ----------------------------------------------------------------
   const testTypeOptions = [
     { label: "All Tests", value: "all" },
-    { label: "ECT Test", value: "ect" },
-    { label: "HV Test", value: "hv" },
-    { label: "IR Test", value: "ir" },
-    { label: "LCT Test", value: "lct" },
+    { label: "ECT", value: "ect" },
+    { label: "HV", value: "hv" },
+    { label: "IR", value: "ir" },
+    { label: "LCT", value: "lct" },
   ];
 
-  // Result options
   const resultOptions = [
     { label: "All Results", value: "" },
     { label: "Pass", value: "Pass" },
     { label: "Fail", value: "Fail" },
   ];
 
-  // Models options from API
   const modelOptions = [
     { label: "All Models", value: "" },
     ...(modelsData?.data || []),
   ];
 
-  // Operators options from API
   const operatorOptions = [
     { label: "All Operators", value: "" },
     ...(operatorsData?.data || []),
   ];
 
-  // Handle Query button click
+  // -- Handlers --------------------------------------------------------------
   const handleQuery = () => {
     if (!startTime || !endTime) {
-      alert("Please select both start and end date/time");
+      alert("Please select both start and end date/time.");
       return;
     }
+    dispatch(setPage(1)); // reset to page 1 on new query
     dispatch(
       setDateRange({
         startDate: new Date(startTime).toISOString(),
@@ -170,32 +191,22 @@ const ESTReport = () => {
     dispatch(setActiveQuickFilter(null));
   };
 
-  // Handle Quick Filter clicks
-  const handleQuickFilter = async (filterType) => {
-    let dateRange;
-    switch (filterType) {
-      case "today":
-        dateRange = getTodayRange();
-        break;
-      case "yesterday":
-        dateRange = getYesterdayRange();
-        break;
-      case "mtd":
-        dateRange = getMTDRange();
-        break;
-      default:
-        return;
-    }
+  const handleQuickFilter = (filterType) => {
+    const rangeMap = {
+      today: getTodayRange,
+      yesterday: getYesterdayRange,
+      mtd: getMTDRange,
+    };
+    const dateRange = rangeMap[filterType]?.();
+    if (!dateRange) return;
 
+    dispatch(setPage(1));
     dispatch(setDateRange(dateRange));
     dispatch(setActiveQuickFilter(filterType));
-
-    // Update local date inputs
     setStartTime(formatDateTimeLocal(dateRange.startDate));
     setEndTime(formatDateTimeLocal(dateRange.endDate));
   };
 
-  // Handle Export
   const handleExport = async () => {
     try {
       const result = await triggerExport({
@@ -205,313 +216,264 @@ const ESTReport = () => {
         operator: filters.operator,
         result: filters.result,
       }).unwrap();
-
-      if (result?.data) {
-        exportToXls(result.data, "EST_Report.xlsx");
-      }
-    } catch (error) {
-      console.error("Export failed:", error);
-      alert("Failed to export data");
+      if (result?.data) exportToXls(result.data, "EST_Report.xlsx");
+    } catch {
+      alert("Export failed. Please try again.");
     }
   };
 
-  // Handle row click
-  const handleRowClick = (record) => {
-    dispatch(setSelectedRecord(record));
-  };
-
-  // Handle page change - ADD THIS FUNCTION
-  const handlePageChange = (newPage) => {
-    dispatch(setPage(newPage));
-  };
-
-  // Handle limit change - ADD THIS FUNCTION
-  const handleLimitChange = (newLimit) => {
-    dispatch(setLimit(newLimit));
-  };
-
-  // Handle Reset Filters - ADD THIS FUNCTION
   const handleResetFilters = () => {
     dispatch(resetFilters());
     setStartTime("");
     setEndTime("");
   };
 
-  // Status Badge Component
-  const StatusBadge = ({ status, size = "md" }) => {
-    const isPass = status === "Pass" || status === 1;
-    const sizeClasses =
-      size === "lg" ? "px-4 py-2 text-lg gap-2" : "px-2 py-1 text-xs gap-1";
-    const iconSize = size === "lg" ? 20 : 12;
+  const handlePageChange = (p) => dispatch(setPage(p));
+  const handleLimitChange = (l) => dispatch(setLimit(l));
 
-    return (
-      <span
-        className={`${sizeClasses} rounded-full font-bold flex items-center ${
-          isPass
-            ? "bg-green-100 text-green-700 border border-green-400"
-            : "bg-red-100 text-red-700 border border-red-400"
-        }`}
-      >
-        {isPass ? (
-          <FaCheckCircle size={iconSize} />
-        ) : (
-          <FaTimesCircle size={iconSize} />
-        )}
-        {isPass ? "PASS" : "FAIL"}
-      </span>
-    );
-  };
-
+  // -- Derived state ----------------------------------------------------------
   const estData = reportData?.data || [];
-  // USE pagination.totalRecords instead of estData.length for total count
-  const totalCount = pagination.totalRecords;
-
+  const summary = summaryData?.data;
   const isLoading = reportLoading || reportFetching;
+  const hasData = estData.length > 0;
+  const hasFilters = filters.startDate && filters.endDate;
+
+  const passRate = summary ? parseFloat(summary.total.passRate) : null;
 
   return (
-    <div className="p-6 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-center gap-3 mb-6">
-        <GiElectric className="text-4xl text-purple-600" />
-        <Title title="EST Report Dashboard" align="center" />
-      </div>
-
-      {/* Filters Section */}
-      <div className="flex flex-wrap gap-4 items-start mb-6">
-        {/* Box 1: Main Filters */}
-        <div className="bg-white border border-purple-200 p-6 rounded-xl shadow-md flex-1 min-w-[400px]">
-          <h2 className="text-lg font-semibold text-purple-700 mb-4 flex items-center gap-2">
-            <BiSearchAlt className="text-xl" />
-            Search Filters
-          </h2>
-          <div className="flex flex-wrap gap-4">
-            {/* Test Type */}
-            <div className="flex items-center gap-2">
-              <MdFilterAlt className="text-purple-500" />
-              <SelectField
-                label="Test Type"
-                options={testTypeOptions}
-                value={filters.testType}
-                onChange={(e) =>
-                  dispatch(setFilters({ testType: e.target.value }))
-                }
-                className="w-40"
-              />
-            </div>
-
-            {/* Model */}
-            <SelectField
-              label="Model"
-              options={modelOptions}
-              value={filters.model}
-              onChange={(e) => dispatch(setFilters({ model: e.target.value }))}
-              className="w-48"
-            />
-
-            {/* Operator */}
-            <SelectField
-              label="Operator"
-              options={operatorOptions}
-              value={filters.operator}
-              onChange={(e) =>
-                dispatch(setFilters({ operator: e.target.value }))
-              }
-              className="w-40"
-            />
-
-            {/* Result */}
-            <SelectField
-              label="Result"
-              options={resultOptions}
-              value={filters.result}
-              onChange={(e) => dispatch(setFilters({ result: e.target.value }))}
-              className="w-32"
-            />
-          </div>
-
-          {/* Date Pickers */}
-          <div className="flex flex-wrap gap-4 mt-4">
-            <div className="flex items-center gap-2">
-              <FaCalendarAlt className="text-purple-500" />
-              <DateTimePicker
-                label="Start Time"
-                name="startTime"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="w-52"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <FaCalendarAlt className="text-purple-500" />
-              <DateTimePicker
-                label="End Time"
-                name="endTime"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="w-52"
-              />
-            </div>
-          </div>
+    <div className="min-h-screen bg-slate-50 font-sans">
+      {/* -- Top Header -- */}
+      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-4 shadow-sm">
+        <div className="w-9 h-9 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-lg flex items-center justify-center shadow">
+          <GiElectric className="text-white text-lg" />
         </div>
-
-        {/* Box 2: Actions - UPDATED WITH RESET BUTTON */}
-        <div className="bg-white border border-purple-200 p-4 rounded-xl shadow-md">
-          <div className="flex flex-col items-center gap-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                onClick={handleQuery}
-                bgColor={
-                  isLoading
-                    ? "bg-gray-400"
-                    : "bg-gradient-to-r from-blue-500 to-purple-500"
-                }
-                textColor="text-white"
-                className="font-semibold px-6 flex items-center gap-2"
-                disabled={isLoading}
-              >
-                <BiSearchAlt />
-                {isLoading ? "Loading..." : "Query"}
-              </Button>
-
-              <Button
-                onClick={() => refetchReport()}
-                bgColor="bg-gray-200"
-                textColor="text-gray-700"
-                className="p-2"
-                disabled={isLoading}
-                title="Refresh"
-              >
-                <FaSync className={isLoading ? "animate-spin" : ""} />
-              </Button>
-
-              {/* Reset Button - NEW */}
-              <Button
-                onClick={handleResetFilters}
-                bgColor="bg-orange-100"
-                textColor="text-orange-700"
-                className="p-2"
-                title="Reset Filters"
-              >
-                <FaRedo />
-              </Button>
-
-              {estData.length > 0 && (
-                <Button
-                  onClick={handleExport}
-                  bgColor="bg-green-500"
-                  textColor="text-white"
-                  className="font-semibold flex items-center gap-2"
-                  disabled={exportLoading}
-                >
-                  <FaDownload />
-                  {exportLoading ? "Exporting..." : "Export All"}
-                </Button>
-              )}
-            </div>
-
-            <div className="bg-purple-100 px-4 py-2 rounded-lg flex items-center gap-2">
-              <IoMdStats className="text-purple-600" />
-              <span className="font-bold text-purple-800">
-                Total: <span className="text-2xl">{totalCount}</span> records
-              </span>
-            </div>
-          </div>
+        <div>
+          <h1 className="text-lg font-bold text-slate-800 leading-tight">
+            EST Report Dashboard
+          </h1>
+          <p className="text-xs text-slate-400">
+            Electrical Safety Testing — Quality Analytics
+          </p>
         </div>
-
-        {/* Box 3: Quick Filters */}
-        <div className="bg-white border border-purple-200 p-4 rounded-xl shadow-md">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3 text-center flex items-center justify-center gap-2">
-            <BsLightningChargeFill className="text-yellow-500" />
-            Quick Filters
-          </h2>
-          <div className="flex gap-2">
-            <Button
-              onClick={() => handleQuickFilter("yesterday")}
-              bgColor={
-                activeQuickFilter === "yesterday"
-                  ? "bg-yellow-600"
-                  : "bg-yellow-400 hover:bg-yellow-500"
-              }
-              textColor="text-gray-800"
-              className="font-semibold text-sm flex items-center gap-1"
-              disabled={quickFilterLoading || isLoading}
-            >
-              <BiTime />
-              YDAY
-            </Button>
-            <Button
-              onClick={() => handleQuickFilter("today")}
-              bgColor={
-                activeQuickFilter === "today"
-                  ? "bg-blue-600"
-                  : "bg-blue-400 hover:bg-blue-500"
-              }
-              textColor="text-white"
-              className="font-semibold text-sm flex items-center gap-1"
-              disabled={quickFilterLoading || isLoading}
-            >
-              <FaCalendarAlt />
-              TODAY
-            </Button>
-            <Button
-              onClick={() => handleQuickFilter("mtd")}
-              bgColor={
-                activeQuickFilter === "mtd"
-                  ? "bg-green-600"
-                  : "bg-green-400 hover:bg-green-500"
-              }
-              textColor="text-white"
-              className="font-semibold text-sm flex items-center gap-1"
-              disabled={quickFilterLoading || isLoading}
-            >
-              <TbReportAnalytics />
-              MTD
-            </Button>
-          </div>
+        <div className="ml-auto flex items-center gap-2 text-xs text-slate-400">
+          <AiOutlineClockCircle />
+          <span>Live Data</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse" />
         </div>
       </div>
 
-      {isLoading && <Loader />}
+      <div className="px-6 py-5 space-y-5 max-w-[1600px] mx-auto">
+        {/* -- Filter Panel -- */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-slate-700 px-5 py-3 flex items-center gap-2">
+            <FaFilter className="text-slate-300 text-sm" />
+            <span className="text-sm font-semibold text-white">
+              Filters & Date Range
+            </span>
+          </div>
 
-      {!isLoading && estData.length > 0 && (
-        <>
-          {/* Data Table*/}
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-            {/* Table Header */}
-            <div className="p-5 border-b flex flex-wrap items-center justify-between gap-4">
-              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <FaTable className="text-purple-500" />
-                Test Records
-              </h2>
-              <div className="flex items-center gap-4 text-sm text-gray-600">
-                <span>
-                  Page{" "}
-                  <span className="font-bold text-purple-600">
-                    {pagination.page}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-bold text-purple-600">
-                    {pagination.totalPages}
-                  </span>
-                </span>
-                <span className="text-gray-300">|</span>
-                <span>
-                  Showing{" "}
-                  <span className="font-bold text-purple-600">
-                    {estData.length}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-bold text-purple-600">
-                    {pagination.totalRecords}
-                  </span>{" "}
-                  records
-                </span>
+          <div className="p-5 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-5">
+            {/* Left: filter controls */}
+            <div className="space-y-4">
+              {/* Row 1: dropdowns */}
+              <div className="flex flex-wrap gap-3">
+                <div className="min-w-[140px]">
+                  <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                    Test Type
+                  </label>
+                  <SelectField
+                    options={testTypeOptions}
+                    value={filters.testType}
+                    onChange={(e) =>
+                      dispatch(setFilters({ testType: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="min-w-[160px]">
+                  <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                    Model
+                  </label>
+                  <SelectField
+                    options={modelOptions}
+                    value={filters.model}
+                    onChange={(e) =>
+                      dispatch(setFilters({ model: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="min-w-[140px]">
+                  <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                    Operator
+                  </label>
+                  <SelectField
+                    options={operatorOptions}
+                    value={filters.operator}
+                    onChange={(e) =>
+                      dispatch(setFilters({ operator: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="min-w-[120px]">
+                  <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                    Result
+                  </label>
+                  <SelectField
+                    options={resultOptions}
+                    value={filters.result}
+                    onChange={(e) =>
+                      dispatch(setFilters({ result: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: date pickers */}
+              <div className="flex flex-wrap gap-3 items-end">
+                <div className="min-w-[200px]">
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <FaCalendarAlt size={9} /> Start Time
+                  </label>
+                  <DateTimePicker
+                    name="startTime"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
+                </div>
+                <div className="min-w-[200px]">
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <FaCalendarAlt size={9} /> End Time
+                  </label>
+                  <DateTimePicker
+                    name="endTime"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 items-end pb-0.5">
+                  <button
+                    onClick={handleQuery}
+                    disabled={isLoading}
+                    className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm"
+                  >
+                    <BiSearchAlt />
+                    {isLoading ? "Loading…" : "Query"}
+                  </button>
+                  <button
+                    onClick={() => refetchReport()}
+                    disabled={isLoading}
+                    title="Refresh"
+                    className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors"
+                  >
+                    <FaSync
+                      className={isLoading ? "animate-spin" : ""}
+                      size={14}
+                    />
+                  </button>
+                  <button
+                    onClick={handleResetFilters}
+                    title="Reset Filters"
+                    className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200 rounded-lg transition-colors"
+                  >
+                    <FaRedo size={14} />
+                  </button>
+                  {hasData && (
+                    <button
+                      onClick={handleExport}
+                      disabled={exportLoading}
+                      className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm"
+                    >
+                      <FaDownload size={12} />
+                      {exportLoading ? "Exporting…" : "Export"}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* PAGINATION COMPONENT - ADD THIS */}
+            {/* Right: Quick Filters */}
+            <div className="border-l border-slate-100 pl-5 flex flex-col justify-center gap-3">
+              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                <BsLightningChargeFill className="text-amber-400" /> Quick
+                Select
+              </p>
+              <div className="flex flex-col gap-2">
+                {[
+                  { key: "yesterday", label: "Yesterday", color: "amber" },
+                  { key: "today", label: "Today", color: "indigo" },
+                  { key: "mtd", label: "Month to Date", color: "emerald" },
+                ].map(({ key, label, color }) => {
+                  const active = activeQuickFilter === key;
+                  const styles = {
+                    amber: active
+                      ? "bg-amber-500 text-white"
+                      : "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100",
+                    indigo: active
+                      ? "bg-indigo-600 text-white"
+                      : "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100",
+                    emerald: active
+                      ? "bg-emerald-600 text-white"
+                      : "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100",
+                  };
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => handleQuickFilter(key)}
+                      disabled={isLoading}
+                      className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${styles[color]}`}
+                    >
+                      {label}
+                      <FaChevronRight size={9} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* -- Loader -- */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-16">
+            <Loader />
+          </div>
+        )}
+
+        {/* -- Data Table -- */}
+        {!isLoading && hasData && (
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            {/* Table header bar */}
+            <div className="border-b border-slate-200 px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <FaTable className="text-indigo-500" />
+                <span className="font-semibold text-slate-700 text-sm">
+                  Test Records
+                </span>
+                <span className="ml-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full border border-indigo-100">
+                  {pagination.totalRecords.toLocaleString()} total
+                </span>
+              </div>
+              <div className="text-xs text-slate-500">
+                Page{" "}
+                <span className="font-semibold text-slate-700">
+                  {pagination.page}
+                </span>{" "}
+                of{" "}
+                <span className="font-semibold text-slate-700">
+                  {pagination.totalPages}
+                </span>
+                {" · "}Showing{" "}
+                <span className="font-semibold text-slate-700">
+                  {estData.length}
+                </span>{" "}
+                records
+              </div>
+            </div>
+
+            {/* Pagination */}
             {pagination.totalRecords > 0 && (
-              <div className="px-5 py-3 bg-gray-50 border-b">
+              <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-200">
                 <Pagination
                   currentPage={pagination.page}
                   totalPages={pagination.totalPages}
@@ -524,164 +486,135 @@ const ESTReport = () => {
               </div>
             )}
 
+            {/* Table */}
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      <div className="flex items-center gap-1">
-                        <HiOutlineDocumentReport />
-                        Ref No
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      <div className="flex items-center gap-1">
-                        <FaCubes />
-                        Model
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      <div className="flex items-center gap-1">
-                        <FaBarcode />
-                        Serial
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      <div className="flex items-center gap-1">
-                        <FaCalendarAlt />
-                        Date/Time
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      <div className="flex items-center gap-1">
-                        <FaUser />
-                        Operator
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      <div className="flex items-center gap-1">
-                        <FaPlug />
-                        ECT
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      <div className="flex items-center gap-1">
-                        <HiLightningBolt />
-                        HV
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      <div className="flex items-center gap-1">
-                        <FaShieldAlt />
-                        IR
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      <div className="flex items-center gap-1">
-                        <FaTint />
-                        LCT
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      <div className="flex items-center gap-1">
-                        <FaBatteryFull />
-                        Wattage
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      <div className="flex items-center gap-1">
-                        <VscCircuitBoard />
-                        Result
-                      </div>
-                    </th>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-700 text-slate-200 text-xs uppercase tracking-wide">
+                    {[
+                      { icon: HiOutlineDocumentReport, label: "Ref No" },
+                      { icon: FaCubes, label: "Model" },
+                      { icon: FaBarcode, label: "Serial" },
+                      { icon: FaCalendarAlt, label: "Date / Time" },
+                      { icon: FaUser, label: "Operator" },
+                      { icon: FaPlug, label: "ECT" },
+                      { icon: HiLightningBolt, label: "HV" },
+                      { icon: FaShieldAlt, label: "IR" },
+                      { icon: FaTint, label: "LCT" },
+                      { icon: FaBatteryFull, label: "Wattage" },
+                      { icon: VscCircuitBoard, label: "Result" },
+                    ].map(({ icon: Icon, label }) => (
+                      <th
+                        key={label}
+                        className="px-4 py-3 text-left font-semibold whitespace-nowrap"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Icon className="opacity-70" /> {label}
+                        </span>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100">
                   {estData.map((item, index) => (
                     <tr
                       key={item.RefNo || index}
-                      className="hover:bg-purple-50 border-b border-gray-100 cursor-pointer transition-colors"
-                      onClick={() => handleRowClick(item)}
+                      onClick={() => dispatch(setSelectedRecord(item))}
+                      className="hover:bg-indigo-50 cursor-pointer transition-colors group"
                     >
-                      <td className="px-3 py-3 font-mono font-semibold">
-                        {item.RefNo}
+                      <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-600 group-hover:text-indigo-700">
+                        #{item.RefNo}
                       </td>
-                      <td className="px-3 py-3 font-semibold text-blue-600">
+                      <td className="px-4 py-3 font-semibold text-indigo-600 text-xs">
                         {item.model_no}
                       </td>
-                      <td className="px-3 py-3 font-mono text-gray-600">
+                      <td className="px-4 py-3 font-mono text-xs text-slate-500">
                         {item.serial_no}
                       </td>
-                      <td className="px-3 py-3">
-                        {item.date_time &&
-                          item.date_time.replace("T", " ").replace("Z", "")}
+                      <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
+                        {item.date_time?.replace("T", " ").slice(0, 19)}
                       </td>
-                      <td className="px-3 py-3">
-                        <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-semibold">
-                          {item.operator}
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-50 text-violet-700 border border-violet-100 rounded text-xs font-medium">
+                          <FaUser size={8} /> {item.operator}
                         </span>
                       </td>
-                      <td className="px-3 py-3">
-                        <StatusBadge status={item.ect_result} />
+                      <td className="px-4 py-3">
+                        <StatusBadge
+                          status={
+                            item.ect_result == null ? "PASS" : item.ect_result
+                          }
+                        />
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-4 py-3">
                         <StatusBadge status={item.hv_result} />
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-4 py-3">
                         <StatusBadge status={item.ir_result} />
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-4 py-3">
                         <StatusBadge status={item.lct_ln_result} />
                       </td>
-                      <td className="px-3 py-3">
-                        <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-                          {item.set_wattage_lower} - {item.set_wattage_upper}
+                      <td className="px-4 py-3">
+                        <span className="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
+                          {item.set_wattage_lower}–{item.set_wattage_upper}
                         </span>
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-4 py-3">
                         <StatusBadge status={item.result} />
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-
-              {estData.length === 0 && !isLoading && (
-                <div className="text-center py-8 text-gray-500">
-                  No data found. Please adjust your filters and try again.
-                </div>
-              )}
             </div>
           </div>
-        </>
-      )}
+        )}
 
-      {!isLoading && estData.length === 0 && filters.startDate && (
-        <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-          <GiElectric className="text-6xl text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-600 mb-2">
-            No Records Found
-          </h3>
-          <p className="text-gray-500">
-            No EST records found for the selected date range and filters.
-          </p>
-        </div>
-      )}
+        {/* -- Empty States -- */}
+        {!isLoading && hasFilters && !hasData && (
+          <div className="bg-white border border-slate-200 rounded-xl p-14 text-center shadow-sm">
+            <PiWarningCircleBold className="text-5xl text-slate-300 mx-auto mb-3" />
+            <h3 className="text-base font-semibold text-slate-600 mb-1">
+              No Records Found
+            </h3>
+            <p className="text-sm text-slate-400">
+              No EST records matched the selected filters. Try adjusting the
+              date range or filters.
+            </p>
+          </div>
+        )}
 
-      {!filters.startDate && !filters.endDate && (
-        <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-          <BiSearchAlt className="text-6xl text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-600 mb-2">
-            Select Date Range
-          </h3>
-          <p className="text-gray-500">
-            Please select a date range or use quick filters to view EST report
-            data.
-          </p>
-        </div>
-      )}
+        {!hasFilters && (
+          <div className="bg-white border border-dashed border-slate-300 rounded-xl p-14 text-center">
+            <div className="w-14 h-14 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <BiSearchAlt className="text-2xl text-indigo-400" />
+            </div>
+            <h3 className="text-base font-semibold text-slate-600 mb-1">
+              Select a Date Range
+            </h3>
+            <p className="text-sm text-slate-400 max-w-sm mx-auto">
+              Use the filters above or click a Quick Select option to load EST
+              report data.
+            </p>
+            <div className="flex justify-center gap-2 mt-5">
+              {["Yesterday", "Today", "MTD"].map((q, i) => (
+                <button
+                  key={q}
+                  onClick={() =>
+                    handleQuickFilter(["yesterday", "today", "mtd"][i])
+                  }
+                  className="px-4 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
-      {/* Detail Modal */}
+      {/* -- Detail Modal -- */}
       {isDetailModalOpen && selectedRecord && <ESTDetailModal />}
     </div>
   );

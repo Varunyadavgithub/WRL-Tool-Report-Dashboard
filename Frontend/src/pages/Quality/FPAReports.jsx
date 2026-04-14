@@ -76,8 +76,8 @@ ChartJS.register(
   Filler,
 );
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const FPQI_TARGET = 1.4;
+// --- Constants ----------------------------------------------------------------
+const FPQI_TARGET = 2.2;
 
 const REPORT_TYPES = [
   {
@@ -121,7 +121,7 @@ const CHART_COLORS = {
   sample: "#6366f1",
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// --- Helpers ------------------------------------------------------------------
 const normalizeArray = (data) => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
@@ -141,7 +141,7 @@ const getFpqiStatus = (value) => {
 const calcFpqi = (critical, major, minor, samples) =>
   samples > 0 ? (critical * 9 + major * 6 + minor * 1) / samples : null;
 
-// ─── Mini Components ─────────────────────────────────────────────────────────
+// --- Mini Components ---------------------------------------------------------
 const FpqiBadge = ({ value }) => {
   if (value === null || value === undefined)
     return <span style={{ color: "#9ca3af" }}>—</span>;
@@ -228,7 +228,7 @@ const StatusPill = ({ fpqi }) => {
   );
 };
 
-// ─── KPI Cards Row ─────────────────────────────────────────────────────────────
+// --- KPI Cards Row -------------------------------------------------------------
 const KpiCard = ({ icon, label, value, color, sub, trend }) => (
   <div
     style={{
@@ -391,15 +391,15 @@ const DefectBar = ({ critical, major, minor }) => {
         }}
       >
         <span>
-          <span style={{ color: "#ef4444", fontWeight: 700 }}>●</span> Critical{" "}
+          <span style={{ color: "#ef4444", fontWeight: 700 }}>?</span> Critical{" "}
           {critical}
         </span>
         <span>
-          <span style={{ color: "#f59e0b", fontWeight: 700 }}>●</span> Major{" "}
+          <span style={{ color: "#f59e0b", fontWeight: 700 }}>?</span> Major{" "}
           {major}
         </span>
         <span>
-          <span style={{ color: "#eab308", fontWeight: 700 }}>●</span> Minor{" "}
+          <span style={{ color: "#eab308", fontWeight: 700 }}>?</span> Minor{" "}
           {minor}
         </span>
       </div>
@@ -407,7 +407,7 @@ const DefectBar = ({ critical, major, minor }) => {
   );
 };
 
-// ─── FPA Detail Summary ───────────────────────────────────────────────────────
+// --- FPA Detail Summary -------------------------------------------------------
 const FpaDetailSummary = ({ data }) => {
   if (!data || data.length === 0) return null;
   const critical = data.filter((r) => r.Category === "Critical").length;
@@ -460,7 +460,7 @@ const FpaDetailSummary = ({ data }) => {
           label="FPQI Score"
           value={fpqi !== null ? Number(fpqi).toFixed(3) : "—"}
           color={fpqi !== null && fpqi <= FPQI_TARGET ? "#10b981" : "#ef4444"}
-          sub={`Target ≤ ${FPQI_TARGET}`}
+          sub={`Target = ${FPQI_TARGET}`}
         />
         {defectRate && (
           <KpiCard
@@ -476,7 +476,7 @@ const FpaDetailSummary = ({ data }) => {
   );
 };
 
-// ─── Aggregate Summary ────────────────────────────────────────────────────────
+// --- Aggregate Summary --------------------------------------------------------
 const AggregateSummary = ({ data, reportType }) => {
   if (!data || data.length === 0) return null;
   const totalCritical = data.reduce((s, r) => s + (r.NoOfCritical || 0), 0);
@@ -541,7 +541,7 @@ const AggregateSummary = ({ data, reportType }) => {
           color={
             avgFpqi !== null && avgFpqi <= FPQI_TARGET ? "#10b981" : "#ef4444"
           }
-          sub={`Target ≤ ${FPQI_TARGET}`}
+          sub={`Target = ${FPQI_TARGET}`}
         />
         <KpiCard
           icon={<FaTrophy />}
@@ -578,7 +578,7 @@ const AggregateSummary = ({ data, reportType }) => {
                   marginBottom: 4,
                 }}
               >
-                🏆 Best Period
+                ?? Best Period
               </div>
               <div style={{ fontWeight: 700, color: "#111827" }}>
                 {getPeriodLabel(best)}
@@ -608,7 +608,7 @@ const AggregateSummary = ({ data, reportType }) => {
                   marginBottom: 4,
                 }}
               >
-                ⚠ Worst Period
+                ? Worst Period
               </div>
               <div style={{ fontWeight: 700, color: "#111827" }}>
                 {getPeriodLabel(worst)}
@@ -624,7 +624,7 @@ const AggregateSummary = ({ data, reportType }) => {
   );
 };
 
-// ─── Top Defects Analysis ─────────────────────────────────────────────────────
+// --- Top Defects Analysis -----------------------------------------------------
 const TopDefectsPanel = ({ data }) => {
   if (!data || data.length === 0) return null;
   const freq = {};
@@ -745,7 +745,7 @@ const TopDefectsPanel = ({ data }) => {
   );
 };
 
-// ─── Model Performance Panel ──────────────────────────────────────────────────
+// --- Model Performance Panel --------------------------------------------------
 const ModelPerformancePanel = ({ data }) => {
   if (!data || data.length === 0) return null;
   const models = {};
@@ -897,7 +897,7 @@ const ModelPerformancePanel = ({ data }) => {
   );
 };
 
-// ─── Country Analysis Panel ───────────────────────────────────────────────────
+// --- Country Analysis Panel ---------------------------------------------------
 const CountryPanel = ({ data }) => {
   if (!data || data.length === 0) return null;
   const countries = {};
@@ -1008,7 +1008,7 @@ const CountryPanel = ({ data }) => {
   );
 };
 
-// ─── Charts ───────────────────────────────────────────────────────────────────
+// --- Charts -------------------------------------------------------------------
 const FpqiTrendChart = ({ data, reportType }) => {
   if (!data || data.length === 0) return null;
 
@@ -1233,10 +1233,10 @@ const FpqiTrendChart = ({ data, reportType }) => {
   );
 };
 
-// ─── Empty State ───────────────────────────────────────────────────────────────
+// --- Empty State ---------------------------------------------------------------
 const EmptyState = ({ message = "No data found." }) => (
   <div style={{ textAlign: "center", padding: "56px 0", color: "#9ca3af" }}>
-    <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.3 }}>📊</div>
+    <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.3 }}>??</div>
     <div style={{ fontSize: 15, fontWeight: 700, color: "#374151" }}>
       {message}
     </div>
@@ -1246,7 +1246,7 @@ const EmptyState = ({ message = "No data found." }) => (
   </div>
 );
 
-// ─── Shared table styles ──────────────────────────────────────────────────────
+// --- Shared table styles ------------------------------------------------------
 const thS = {
   padding: "10px 12px",
   background: "#1e1b4b",
@@ -1276,14 +1276,14 @@ const tableWrapper = {
   border: "1px solid #e5e7eb",
 };
 
-// ─── FPA Detail Table ─────────────────────────────────────────────────────────
+// --- FPA Detail Table ---------------------------------------------------------
 const FpaReportTable = ({ data }) => {
   const [sort, setSort] = useState({ key: null, dir: "asc" });
   const [catFilter, setCatFilter] = useState("All");
 
   const handleDownloadImage = async (fgSrNo, fileName) => {
     if (!fgSrNo || !fileName) {
-      toast("No image available.", { icon: "ℹ️" });
+      toast("No image available.", { icon: "??" });
       return;
     }
     try {
@@ -1522,7 +1522,7 @@ const FpaReportTable = ({ data }) => {
   );
 };
 
-// ─── Daily Table ──────────────────────────────────────────────────────────────
+// --- Daily Table --------------------------------------------------------------
 const DailyFpaReportTable = ({ data }) => {
   if (!data || data.length === 0) return <EmptyState />;
   const sorted = [...data].sort(
@@ -1610,7 +1610,7 @@ const DailyFpaReportTable = ({ data }) => {
   );
 };
 
-// ─── Monthly Table ────────────────────────────────────────────────────────────
+// --- Monthly Table ------------------------------------------------------------
 const MonthlyFpaReportTable = ({ data }) => {
   if (!data || data.length === 0) return <EmptyState />;
   const sorted = [...data].sort((a, b) =>
@@ -1698,7 +1698,7 @@ const MonthlyFpaReportTable = ({ data }) => {
   );
 };
 
-// ─── Yearly Table ─────────────────────────────────────────────────────────────
+// --- Yearly Table -------------------------------------------------------------
 const YearlyFpaReportTable = ({ data }) => {
   if (!data || data.length === 0) return <EmptyState />;
   const sorted = [...data].sort((a, b) => a.Year - b.Year);
@@ -1847,7 +1847,7 @@ const YearlyFpaReportTable = ({ data }) => {
   );
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// --- Main Component -----------------------------------------------------------
 const FPAReports = () => {
   const [loading, setLoading] = useState(false);
   const [startTime, setStartTime] = useState("");
@@ -1902,7 +1902,7 @@ const FPAReports = () => {
         const data = await fetchReport(type, params);
         setReportData(data);
         setLastFetched(new Date());
-        if (data.length === 0) toast("No records found.", { icon: "ℹ️" });
+        if (data.length === 0) toast("No records found.", { icon: "??" });
         else toast.success(`Loaded ${data.length} records`);
       } catch (err) {
         console.error(err);
@@ -2010,7 +2010,7 @@ const FPAReports = () => {
         fontFamily: "system-ui, -apple-system, sans-serif",
       }}
     >
-      {/* ── Header ── */}
+      {/* -- Header -- */}
       <div
         style={{
           background:
@@ -2073,12 +2073,12 @@ const FPAReports = () => {
           >
             <MdOutlineQueryStats style={{ fontSize: 18 }} />
             FPQI Target:{" "}
-            <strong style={{ color: "#fff" }}>&nbsp;≤ {FPQI_TARGET}</strong>
+            <strong style={{ color: "#fff" }}>&nbsp;= {FPQI_TARGET}</strong>
           </div>
         </div>
       </div>
 
-      {/* ── Filter Panel ── */}
+      {/* -- Filter Panel -- */}
       <div
         style={{
           background: "#fff",
@@ -2418,7 +2418,7 @@ const FPAReports = () => {
         </div>
       </div>
 
-      {/* ── Loading ── */}
+      {/* -- Loading -- */}
       {loading && (
         <div
           style={{
@@ -2436,7 +2436,7 @@ const FPAReports = () => {
         </div>
       )}
 
-      {/* ── Data Panel ── */}
+      {/* -- Data Panel -- */}
       {!loading && reportData.length > 0 && (
         <>
           {/* Summary */}
@@ -2535,7 +2535,7 @@ const FPAReports = () => {
         </>
       )}
 
-      {/* ── Empty ── */}
+      {/* -- Empty -- */}
       {!loading && reportData.length === 0 && (
         <div
           style={{

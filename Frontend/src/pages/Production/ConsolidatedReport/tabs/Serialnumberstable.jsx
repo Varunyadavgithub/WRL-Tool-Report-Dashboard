@@ -21,8 +21,8 @@ function classifySerial(barcode) {
   if (b.startsWith("F"))
     return {
       type: "FG",
-      label: "FG Serial",
-      short: "FG",
+      label: "Foaming Serial",
+      short: "FOAM",
       order: 3,
       bg: "bg-emerald-50",
       border: "border-emerald-300",
@@ -36,8 +36,8 @@ function classifySerial(barcode) {
   if (b.startsWith("4"))
     return {
       type: "FOAMING",
-      label: "Foaming Serial",
-      short: "FOAM",
+      label: "FG Serial",
+      short: "FG",
       order: 2,
       bg: "bg-blue-50",
       border: "border-blue-300",
