@@ -7,54 +7,27 @@ import ExportButton from "../../components/ui/ExportButton";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets";
 import { useGetModelVariantsQuery } from "../../redux/api/commonApi.js";
+import {
+  RefreshCw,
+  Filter,
+  X,
+  BarChart2,
+  List,
+  Target,
+  AlertTriangle,
+  CheckCircle,
+  ChevronUp,
+  ChevronDown,
+  Loader2,
+  PackageOpen,
+} from "lucide-react";
 
-/* ═══════════════════════════════════════════
-   THEME
-═══════════════════════════════════════════ */
-const T = {
-  bg: "#f4f6fb",
-  bgDeep: "#eef1f8",
-  surface: "#ffffff",
-  surfaceHover: "#f8faff",
-  border: "#e2e8f0",
-  borderMed: "#cbd5e1",
+// ── Spinner ────────────────────────────────────────────────────────────────────
+const Spinner = ({ cls = "w-4 h-4" }) => (
+  <Loader2 className={`animate-spin ${cls}`} />
+);
 
-  primary: "#3b5bdb",
-  primaryDim: "#3b5bdb14",
-  primaryBorder: "#3b5bdb44",
-
-  amber: "#d97706",
-  amberBg: "#fffbeb",
-  amberBorder: "#fde68a",
-  amberDim: "#d9770618",
-
-  red: "#dc2626",
-  redBg: "#fef2f2",
-  redBorder: "#fecaca",
-
-  green: "#16a34a",
-  greenBg: "#f0fdf4",
-  greenBorder: "#bbf7d0",
-
-  sky: "#0284c7",
-  skyBg: "#f0f9ff",
-  skyBorder: "#bae6fd",
-
-  orange: "#ea580c",
-  orangeBg: "#fff7ed",
-  orangeBorder: "#fed7aa",
-  orangeDim: "#ea580c18",
-
-  text: "#0f172a",
-  textSub: "#334155",
-  textMuted: "#64748b",
-  textFaint: "#94a3b8",
-
-  mono: "'JetBrains Mono','Fira Code',monospace",
-  sans: "'Outfit',sans-serif",
-};
-
-/* ─── status classifier — SINGLE SOURCE OF TRUTH ─── */
+// ── Status classifier ──────────────────────────────────────────────────────────
 const classifyStatus = (status) => {
   const s = (status || "").toLowerCase().trim();
   if (!s || s === "not logged in") return "unknown";
@@ -77,305 +50,129 @@ const classifyStatus = (status) => {
   return "unknown";
 };
 
-const STATUS_CFG = {
-  open: { bg: T.redBg, color: T.red, border: T.redBorder, dot: "#ef4444" },
-  closed: {
-    bg: T.greenBg,
-    color: T.green,
-    border: T.greenBorder,
-    dot: "#22c55e",
-  },
-  unknown: {
-    bg: "#f8fafc",
-    color: T.textMuted,
-    border: T.border,
-    dot: "#94a3b8",
-  },
-};
-
-/* defect severity */
+// ── Defect severity ────────────────────────────────────────────────────────────
 const ratioLevel = (pct) => {
   if (pct === null || pct === undefined)
-    return { color: T.textFaint, label: "—", bg: T.bg, border: T.border };
+    return {
+      color: "text-slate-400",
+      bg: "bg-slate-50",
+      border: "border-slate-200",
+      label: "—",
+      hex: "#94a3b8",
+    };
   if (pct >= 35)
     return {
-      color: T.red,
+      color: "text-red-600",
+      bg: "bg-red-50",
+      border: "border-red-200",
       label: "Critical",
-      bg: T.redBg,
-      border: T.redBorder,
+      hex: "#dc2626",
     };
   if (pct >= 25)
     return {
-      color: T.amber,
+      color: "text-amber-600",
+      bg: "bg-amber-50",
+      border: "border-amber-200",
       label: "High",
-      bg: T.amberBg,
-      border: T.amberBorder,
+      hex: "#d97706",
     };
   if (pct >= 15)
     return {
-      color: T.orange,
+      color: "text-orange-600",
+      bg: "bg-orange-50",
+      border: "border-orange-200",
       label: "Moderate",
-      bg: T.orangeBg,
-      border: T.orangeBorder,
+      hex: "#ea580c",
     };
   return {
-    color: T.green,
+    color: "text-emerald-600",
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
     label: "Good",
-    bg: T.greenBg,
-    border: T.greenBorder,
+    hex: "#16a34a",
   };
 };
 
-/* ═══════════════════════════════════════════
-   ICONS
-═══════════════════════════════════════════ */
-const Ico = ({ path, size = 16, color = "currentColor", sw = 1.8 }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke={color}
-    strokeWidth={sw}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d={path} />
-  </svg>
-);
-const IC = {
-  refresh:
-    "M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15",
-  filter: "M22 3H2l8 9.46V19l4 2v-8.54L22 3",
-  x: "M18 6L6 18M6 6l12 12",
-  chart: "M18 20V10M12 20V4M6 20v-6",
-  list: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01",
-  layers: "M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5",
-  check: "M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3",
-  alert:
-    "M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01",
-  clock:
-    "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 6v6l4 2",
-  target:
-    "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 18a6 6 0 100-12 6 6 0 000 12zM12 14a2 2 0 100-4 2 2 0 000 4z",
-  factory: "M2 20h20M4 20V10l6-6 6 6v10M10 20v-5h4v5M14 7h2v3h-2z",
-  info: "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 16v-4M12 8h.01",
-  bar: "M12 20V10M18 20V4M6 20v-6",
-  sort: "M3 6h18M7 12h10M11 18h2",
-};
-
-/* ═══════════════════════════════════════════
-   STATUS BADGE
-═══════════════════════════════════════════ */
+// ── Status Badge ───────────────────────────────────────────────────────────────
 const StatusBadge = ({ status }) => {
   const type = classifyStatus(status);
-  const cfg = STATUS_CFG[type];
+  const cfg = {
+    open: "bg-red-50 text-red-700 border-red-200",
+    closed: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    unknown: "bg-slate-100 text-slate-500 border-slate-200",
+  };
+  const dot = {
+    open: "bg-red-400 animate-pulse",
+    closed: "bg-emerald-400",
+    unknown: "bg-slate-400",
+  };
   return (
     <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "3px 10px",
-        borderRadius: 20,
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: ".07em",
-        textTransform: "uppercase",
-        background: cfg.bg,
-        color: cfg.color,
-        border: `1px solid ${cfg.border}`,
-        fontFamily: T.mono,
-      }}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-bold rounded-full border uppercase tracking-wider font-mono ${cfg[type]}`}
     >
-      <span
-        style={{
-          width: 5,
-          height: 5,
-          borderRadius: "50%",
-          background: cfg.dot,
-          boxShadow: `0 0 5px ${cfg.dot}88`,
-          animation: type === "open" ? "rr-pulse 2s ease infinite" : "none",
-        }}
-      />
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot[type]}`} />
       {status || "—"}
     </span>
   );
 };
 
-/* ═══════════════════════════════════════════
-   KPI CARD
-═══════════════════════════════════════════ */
-const KpiCard = ({
-  label,
-  value,
-  sub,
-  accent,
-  iconPath,
-  onClick,
-  active,
-  badge,
-}) => {
-  const [hover, setHover] = useState(false);
-  const ac = accent || T.primary;
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        flex: "1 1 155px",
-        minWidth: 145,
-        background: active ? ac + "0f" : hover ? T.surfaceHover : T.surface,
-        border: `1.5px solid ${active ? ac : hover ? T.borderMed : T.border}`,
-        borderRadius: 14,
-        padding: "18px 20px",
-        cursor: onClick ? "pointer" : "default",
-        textAlign: "left",
-        transition: "all .18s ease",
-        boxShadow: active
-          ? `0 0 0 3px ${ac}1a,0 4px 18px ${ac}18`
-          : hover
-            ? "0 4px 16px rgba(0,0,0,.07)"
-            : "0 1px 4px rgba(0,0,0,.04)",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 3,
-          background: active ? ac : "transparent",
-          borderRadius: "14px 14px 0 0",
-          transition: "background .2s",
-        }}
-      />
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: ".1em",
-              textTransform: "uppercase",
-              color: active ? ac : T.textMuted,
-              marginBottom: 8,
-              fontFamily: T.mono,
-            }}
-          >
-            {label}
-          </div>
-          <div
-            style={{
-              fontSize: 32,
-              fontWeight: 900,
-              color: active ? ac : T.text,
-              lineHeight: 1,
-              fontFamily: T.sans,
-              letterSpacing: "-0.03em",
-            }}
-          >
-            {typeof value === "number" ? value.toLocaleString() : value}
-          </div>
-          {sub && (
-            <div
-              style={{
-                fontSize: 11,
-                color: T.textMuted,
-                marginTop: 6,
-                fontFamily: T.mono,
-                lineHeight: 1.5,
-              }}
-            >
-              {sub}
-            </div>
-          )}
-          {badge && (
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 5,
-                marginTop: 8,
-                padding: "2px 8px",
-                borderRadius: 6,
-                background: badge.bg,
-                color: badge.color,
-                border: `1px solid ${badge.border}`,
-                fontSize: 10,
-                fontWeight: 700,
-                fontFamily: T.mono,
-                letterSpacing: ".06em",
-                textTransform: "uppercase",
-              }}
-            >
-              {badge.label}
-            </div>
-          )}
-        </div>
-        {iconPath && (
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              flexShrink: 0,
-              background: active ? ac + "18" : T.bgDeep,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              border: `1px solid ${active ? ac + "44" : T.border}`,
-            }}
-          >
-            <Ico path={iconPath} size={16} color={active ? ac : T.textMuted} />
-          </div>
+// ── QuickBtn ───────────────────────────────────────────────────────────────────
+const QuickBtn = ({ label, sublabel, loading, onClick, colorClass }) => (
+  <button
+    disabled={loading}
+    onClick={onClick}
+    className={`w-full flex flex-col items-center justify-center gap-0.5 px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-150 ${
+      loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : colorClass
+    }`}
+  >
+    {loading ? (
+      <span className="flex items-center gap-2">
+        <Spinner /> Loading…
+      </span>
+    ) : (
+      <>
+        <span className="text-[15px] font-bold tracking-widest">{label}</span>
+        {sublabel && (
+          <span className="text-[10px] opacity-75 font-normal">{sublabel}</span>
         )}
-      </div>
-    </button>
-  );
-};
+      </>
+    )}
+  </button>
+);
 
-/* ═══════════════════════════════════════════
-   DONUT CHART
-═══════════════════════════════════════════ */
-const DonutChart = ({ open, closed, unknown }) => {
-  const safeOpen = Number(open) || 0;
-  const safeClosed = Number(closed) || 0;
-  const safeUnknown = Number(unknown) || 0;
+// ── SortIcon ───────────────────────────────────────────────────────────────────
+const SortIcon = ({ active, dir }) => (
+  <span className="inline-flex flex-col ml-1">
+    <ChevronUp
+      className={`w-2.5 h-2.5 -mb-0.5 ${active && dir === "asc" ? "text-blue-500" : "text-slate-400"}`}
+    />
+    <ChevronDown
+      className={`w-2.5 h-2.5          ${active && dir === "desc" ? "text-blue-500" : "text-slate-400"}`}
+    />
+  </span>
+);
 
-  const total = safeOpen + safeClosed + safeUnknown;
-
+// ── Donut Chart ────────────────────────────────────────────────────────────────
+const DonutChart = ({ open, closed }) => {
+  const total = (Number(open) || 0) + (Number(closed) || 0);
   const r = 44,
     cx = 58,
     cy = 58,
     circ = 2 * Math.PI * r;
-
-  const cArc = total ? (safeClosed / total) * circ : 0;
-  const oArc = total ? (safeOpen / total) * circ : 0;
-  const uArc = total ? (safeUnknown / total) * circ : 0;
-
+  const cArc = total ? (closed / total) * circ : 0;
+  const oArc = total ? (open / total) * circ : 0;
+  const pct = total > 0 ? Math.round((closed / total) * 100) : 0;
   return (
-    <div style={{ position: "relative", width: 116, height: 116 }}>
+    <div className="relative w-[116px] h-[116px]">
       <svg viewBox="0 0 116 116">
         <circle
           cx={cx}
           cy={cy}
           r={r}
           fill="none"
-          stroke="#eee"
+          stroke="#e2e8f0"
           strokeWidth={13}
         />
-
         <circle
           cx={cx}
           cy={cy}
@@ -385,11 +182,10 @@ const DonutChart = ({ open, closed, unknown }) => {
           strokeWidth={13}
           strokeDasharray={`${cArc} ${circ}`}
           style={{
-            transform: "rotate(-90deg)",
+            transform: `rotate(-90deg)`,
             transformOrigin: `${cx}px ${cy}px`,
           }}
         />
-
         <circle
           cx={cx}
           cy={cy}
@@ -400,146 +196,64 @@ const DonutChart = ({ open, closed, unknown }) => {
           strokeDasharray={`${oArc} ${circ}`}
           strokeDashoffset={-cArc}
           style={{
-            transform: "rotate(-90deg)",
+            transform: `rotate(-90deg)`,
             transformOrigin: `${cx}px ${cy}px`,
           }}
         />
       </svg>
-
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div>{total > 0 ? Math.round((safeClosed / total) * 100) : 0}%</div>
+      <div className="absolute inset-0 flex items-center justify-center text-sm font-black text-slate-800 font-mono">
+        {pct}%
       </div>
     </div>
   );
 };
 
-/* ═══════════════════════════════════════════
-   REWORK STACKED BAR CHART
-═══════════════════════════════════════════ */
+// ── Rework Bar Chart ───────────────────────────────────────────────────────────
 const ReworkBarChart = ({ data }) => {
   const max = Math.max(...data.map((d) => d.total), 1);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <div className="flex flex-col gap-3">
       {data.map((row, i) => (
         <div key={i}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 5,
-            }}
-          >
-            <span
-              style={{
-                fontSize: 12,
-                color: T.textSub,
-                fontFamily: T.mono,
-                fontWeight: 600,
-                maxWidth: 220,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
+          <div className="flex justify-between items-center mb-1.5">
+            <span className="text-xs font-mono font-semibold text-slate-600 truncate max-w-[220px]">
               {row.Model_Name}
             </span>
-            <div style={{ display: "flex", gap: 14, flexShrink: 0 }}>
-              <span
-                style={{
-                  fontSize: 11,
-                  color: T.red,
-                  fontFamily: T.mono,
-                  fontWeight: 700,
-                }}
-              >
+            <div className="flex gap-3 shrink-0">
+              <span className="text-[11px] font-bold font-mono text-red-600">
                 ↑ {row.open}
               </span>
-              <span
-                style={{
-                  fontSize: 11,
-                  color: T.green,
-                  fontFamily: T.mono,
-                  fontWeight: 700,
-                }}
-              >
+              <span className="text-[11px] font-bold font-mono text-emerald-600">
                 ✓ {row.closed}
               </span>
-              <span
-                style={{
-                  fontSize: 12,
-                  color: T.primary,
-                  fontFamily: T.mono,
-                  fontWeight: 800,
-                }}
-              >
+              <span className="text-[11px] font-bold font-mono text-blue-600">
                 {row.total}
               </span>
             </div>
           </div>
-          <div
-            style={{
-              height: 9,
-              borderRadius: 5,
-              background: T.bgDeep,
-              overflow: "hidden",
-              display: "flex",
-              border: `1px solid ${T.border}`,
-            }}
-          >
+          <div className="h-2 rounded-full bg-slate-100 overflow-hidden flex border border-slate-200">
             <div
+              className="h-full bg-emerald-400 transition-all duration-700"
               style={{
                 width: `${(row.closed / max) * 100}%`,
-                background: "#22c55e",
-                transition: `width .9s cubic-bezier(.4,0,.2,1) ${i * 0.05}s`,
-                borderRadius:
-                  row.open === 0 && row.unknown === 0 ? "5px" : "5px 0 0 5px",
+                borderRadius: row.open === 0 ? "9999px" : "9999px 0 0 9999px",
               }}
             />
             <div
-              style={{
-                width: `${(row.open / max) * 100}%`,
-                background: "#ef4444",
-                transition: `width .9s cubic-bezier(.4,0,.2,1) ${i * 0.05 + 0.1}s`,
-              }}
+              className="h-full bg-red-400 transition-all duration-700"
+              style={{ width: `${(row.open / max) * 100}%` }}
             />
-            {row.unknown > 0 && (
-              <div
-                style={{
-                  width: `${(row.unknown / max) * 100}%`,
-                  background: "#94a3b8",
-                  transition: `width .9s cubic-bezier(.4,0,.2,1) ${i * 0.05 + 0.2}s`,
-                }}
-              />
-            )}
           </div>
         </div>
       ))}
-      <div style={{ display: "flex", gap: 18, marginTop: 4 }}>
+      <div className="flex gap-4 mt-1">
         {[
-          { c: "#22c55e", l: "Closed" },
-          { c: "#ef4444", l: "Open" },
+          { c: "bg-emerald-400", l: "Closed" },
+          { c: "bg-red-400", l: "Open" },
         ].map((x) => (
-          <div
-            key={x.l}
-            style={{ display: "flex", alignItems: "center", gap: 6 }}
-          >
-            <div
-              style={{ width: 9, height: 9, borderRadius: 2, background: x.c }}
-            />
-            <span
-              style={{ fontSize: 11, color: T.textMuted, fontFamily: T.mono }}
-            >
-              {x.l}
-            </span>
+          <div key={x.l} className="flex items-center gap-1.5">
+            <div className={`w-2.5 h-2.5 rounded-sm ${x.c}`} />
+            <span className="text-[11px] text-slate-500 font-mono">{x.l}</span>
           </div>
         ))}
       </div>
@@ -547,14 +261,11 @@ const ReworkBarChart = ({ data }) => {
   );
 };
 
-/* ═══════════════════════════════════════════
-   PER-MODEL DEFECT RATIO BARS
-   Now accurate: each model has its own production count
-═══════════════════════════════════════════ */
+// ── Defect Ratio Bars ──────────────────────────────────────────────────────────
 const DefectRatioBars = ({ data }) => {
   const maxRatio = Math.max(...data.map((d) => d.defectRatio ?? 0), 0.01);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div className="flex flex-col gap-3">
       {data.map((row, i) => {
         const rl = ratioLevel(row.defectRatio);
         const barPct =
@@ -563,70 +274,22 @@ const DefectRatioBars = ({ data }) => {
             : 0;
         return (
           <div key={i}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 5,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 12,
-                  color: T.textSub,
-                  fontFamily: T.mono,
-                  fontWeight: 600,
-                  maxWidth: 210,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-xs font-mono font-semibold text-slate-600 truncate max-w-[210px]">
                 {row.Model_Name}
               </span>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  flexShrink: 0,
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: T.textMuted,
-                    fontFamily: T.mono,
-                  }}
-                >
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="text-[11px] font-mono text-slate-500">
                   Prod:{" "}
-                  <b style={{ color: T.primary }}>
+                  <b className="text-blue-600">
                     {(row.production || 0).toLocaleString()}
                   </b>
                 </span>
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: T.textMuted,
-                    fontFamily: T.mono,
-                  }}
-                >
-                  RW: <b style={{ color: T.red }}>{row.reworkTotal}</b>
+                <span className="text-[11px] font-mono text-slate-500">
+                  RW: <b className="text-red-600">{row.reworkTotal}</b>
                 </span>
                 <span
-                  style={{
-                    padding: "2px 10px",
-                    borderRadius: 6,
-                    fontSize: 11,
-                    fontWeight: 800,
-                    fontFamily: T.mono,
-                    background: rl.bg,
-                    color: rl.color,
-                    border: `1px solid ${rl.border}`,
-                    minWidth: 62,
-                    textAlign: "center",
-                  }}
+                  className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold font-mono border ${rl.bg} ${rl.color} ${rl.border}`}
                 >
                   {row.defectRatio !== null
                     ? `${row.defectRatio.toFixed(2)}%`
@@ -634,54 +297,28 @@ const DefectRatioBars = ({ data }) => {
                 </span>
               </div>
             </div>
-            {/* ratio bar */}
-            <div
-              style={{
-                height: 9,
-                borderRadius: 5,
-                background: T.bgDeep,
-                overflow: "hidden",
-                border: `1px solid ${T.border}`,
-              }}
-            >
+            <div className="h-2 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
               <div
-                style={{
-                  width: `${barPct}%`,
-                  height: "100%",
-                  background: rl.color,
-                  borderRadius: 5,
-                  transition: `width .9s cubic-bezier(.4,0,.2,1) ${i * 0.06}s`,
-                }}
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${barPct}%`, backgroundColor: rl.hex }}
               />
             </div>
           </div>
         );
       })}
-      {/* severity legend */}
-      <div style={{ display: "flex", gap: 18, marginTop: 6, flexWrap: "wrap" }}>
+      <div className="flex gap-4 mt-1 flex-wrap">
         {[
-          { color: T.green, label: "Good (<15%)" },
-          { color: T.orange, label: "Moderate (15-20%)" },
-          { color: T.amber, label: "High (20-35%)" },
-          { color: T.red, label: "Critical (≥35%)" },
+          { hex: "#16a34a", l: "Good (<15%)" },
+          { hex: "#ea580c", l: "Moderate (15-25%)" },
+          { hex: "#d97706", l: "High (25-35%)" },
+          { hex: "#dc2626", l: "Critical (≥35%)" },
         ].map((l) => (
-          <div
-            key={l.label}
-            style={{ display: "flex", alignItems: "center", gap: 6 }}
-          >
+          <div key={l.l} className="flex items-center gap-1.5">
             <div
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 2,
-                background: l.color,
-              }}
+              className="w-2.5 h-2.5 rounded-sm"
+              style={{ background: l.hex }}
             />
-            <span
-              style={{ fontSize: 11, color: T.textMuted, fontFamily: T.mono }}
-            >
-              {l.label}
-            </span>
+            <span className="text-[11px] text-slate-500 font-mono">{l.l}</span>
           </div>
         ))}
       </div>
@@ -689,10 +326,7 @@ const DefectRatioBars = ({ data }) => {
   );
 };
 
-/* ═══════════════════════════════════════════
-   DEFECT RATIO TABLE — per-model production
-   Model_Name matched between rework & production
-═══════════════════════════════════════════ */
+// ── Defect Ratio Table ─────────────────────────────────────────────────────────
 const DefectRatioTable = ({ data }) => {
   const [sortCol, setSortCol] = useState("defectRatio");
   const [sortDir, setSortDir] = useState("desc");
@@ -706,346 +340,140 @@ const DefectRatioTable = ({ data }) => {
   };
 
   const sorted = [...data].sort((a, b) => {
-    const av = a[sortCol] ?? -1;
-    const bv = b[sortCol] ?? -1;
+    const av = a[sortCol] ?? -1,
+      bv = b[sortCol] ?? -1;
     return sortDir === "asc" ? av - bv : bv - av;
   });
 
-  const SortTh = ({ col, label, align = "center" }) => (
-    <th
-      onClick={() => handleSort(col)}
-      style={{
-        padding: "9px 14px",
-        textAlign: align === "left" ? "left" : "center",
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: ".1em",
-        textTransform: "uppercase",
-        color: sortCol === col ? T.primary : T.textMuted,
-        fontFamily: T.mono,
-        borderBottom: `2px solid ${T.border}`,
-        whiteSpace: "nowrap",
-        cursor: "pointer",
-        userSelect: "none",
-        background: sortCol === col ? T.primaryDim : T.bgDeep,
-      }}
-    >
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-        {label}
-        {sortCol === col && (
-          <Ico
-            path={sortDir === "asc" ? "M18 15l-6-6-6 6" : "M6 9l6 6 6-6"}
-            size={10}
-            color={T.primary}
-          />
-        )}
-      </span>
-    </th>
-  );
-
   const hasProd = data.some((r) => r.production !== null);
 
+  const totProd = sorted.reduce((s, r) => s + (r.production ?? 0), 0);
+  const totRW = sorted.reduce((s, r) => s + r.reworkTotal, 0);
+  const totRatio = totProd > 0 ? (totRW / totProd) * 100 : null;
+  const totRl = ratioLevel(totRatio);
+
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div className="overflow-auto">
       {!hasProd && (
-        <div
-          style={{
-            margin: "0 0 14px",
-            padding: "10px 14px",
-            borderRadius: 10,
-            background: T.amberBg,
-            border: `1px solid ${T.amberBorder}`,
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 10,
-          }}
-        >
-          <Ico path={IC.info} size={14} color={T.amber} />
-          <p
-            style={{
-              margin: 0,
-              fontSize: 11,
-              color: T.amber,
-              fontFamily: T.mono,
-              lineHeight: 1.5,
-            }}
-          >
-            Production data unavailable for this period. Ensure the
-            <b> quality/production-report</b> endpoint is active and returning
-            data from Station 1220010 (ActivityType = 5).
+        <div className="mb-3 p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+          <p className="text-[11px] text-amber-700 font-mono leading-relaxed">
+            Production data unavailable. Ensure the{" "}
+            <b>quality/production-report</b> endpoint is active and returning
+            data from Station 1220010.
           </p>
         </div>
       )}
-
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th
-              style={{
-                padding: "9px 14px",
-                textAlign: "left",
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: ".1em",
-                textTransform: "uppercase",
-                color: T.textMuted,
-                fontFamily: T.mono,
-                borderBottom: `2px solid ${T.border}`,
-                whiteSpace: "nowrap",
-                background: T.bgDeep,
-              }}
-            >
-              #
-            </th>
-            <SortTh col="Model_Name" label="Model" align="left" />
-            <SortTh col="production" label="Production" />
-            <SortTh col="reworkTotal" label="Rework" />
-            <SortTh col="defectRatio" label="Defect Ratio" />
-            <th
-              style={{
-                padding: "9px 14px",
-                textAlign: "center",
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: ".1em",
-                textTransform: "uppercase",
-                color: T.textMuted,
-                fontFamily: T.mono,
-                borderBottom: `2px solid ${T.border}`,
-                whiteSpace: "nowrap",
-                background: T.bgDeep,
-              }}
-            >
-              Severity
-            </th>
-            <th
-              style={{
-                padding: "9px 14px",
-                textAlign: "center",
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: ".1em",
-                textTransform: "uppercase",
-                color: T.textMuted,
-                fontFamily: T.mono,
-                borderBottom: `2px solid ${T.border}`,
-                whiteSpace: "nowrap",
-                background: T.bgDeep,
-              }}
-            >
-              Visual
-            </th>
+      <table className="min-w-full text-xs border-separate border-spacing-0">
+        <thead className="sticky top-0 z-10">
+          <tr className="bg-slate-100">
+            {[
+              "Sr. No.",
+              "Model",
+              "Production",
+              "Rework",
+              "Defect Ratio",
+              "Severity",
+              "Visual",
+            ].map((h, i) => (
+              <th
+                key={h}
+                onClick={() =>
+                  ["Production", "Rework", "Defect Ratio"].includes(h)
+                    ? handleSort(
+                        ["production", "reworkTotal", "defectRatio"][
+                          ["Production", "Rework", "Defect Ratio"].indexOf(h)
+                        ],
+                      )
+                    : null
+                }
+                className={`px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap text-center ${i === 1 ? "text-left" : ""} ${["Production", "Rework", "Defect Ratio"].includes(h) ? "cursor-pointer hover:bg-slate-200" : ""}`}
+              >
+                <span className="flex items-center justify-center gap-1">
+                  {h}
+                  {["Production", "Rework", "Defect Ratio"].includes(h) && (
+                    <SortIcon
+                      active={
+                        sortCol ===
+                        ["production", "reworkTotal", "defectRatio"][
+                          ["Production", "Rework", "Defect Ratio"].indexOf(h)
+                        ]
+                      }
+                      dir={sortDir}
+                    />
+                  )}
+                </span>
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
           {sorted.map((row, i) => {
             const rl = ratioLevel(row.defectRatio);
-            const bg = i % 2 === 0 ? T.surface : T.bg;
             return (
               <tr
                 key={i}
-                style={{ background: bg, transition: "background .1s" }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "#f8faff")
-                }
-                onMouseLeave={(e) => (e.currentTarget.style.background = bg)}
+                className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
               >
-                <td
-                  style={{
-                    padding: "11px 14px",
-                    fontFamily: T.mono,
-                    fontSize: 11,
-                    color: T.textFaint,
-                    borderBottom: `1px solid ${T.border}`,
-                  }}
-                >
+                <td className="px-3 py-2 border-b border-slate-100 text-slate-400 font-mono text-center">
                   {i + 1}
                 </td>
-                {/* Model */}
-                <td
-                  style={{
-                    padding: "11px 14px",
-                    fontFamily: T.mono,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: T.text,
-                    borderBottom: `1px solid ${T.border}`,
-                    maxWidth: 200,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
+                <td className="px-3 py-2 border-b border-slate-100 font-semibold text-slate-800 font-mono max-w-[200px] truncate">
                   {row.Model_Name}
                 </td>
-                {/* Production — exact per-model count from DB */}
-                <td
-                  style={{
-                    padding: "11px 14px",
-                    textAlign: "center",
-                    borderBottom: `1px solid ${T.border}`,
-                  }}
-                >
+                <td className="px-3 py-2 border-b border-slate-100 text-center font-bold font-mono text-blue-700">
                   {row.production !== null ? (
-                    <span
-                      style={{
-                        fontFamily: T.mono,
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: T.primary,
-                      }}
-                    >
-                      {row.production.toLocaleString()}
-                    </span>
+                    row.production.toLocaleString()
                   ) : (
-                    <span
-                      style={{
-                        color: T.textFaint,
-                        fontFamily: T.mono,
-                        fontSize: 11,
-                      }}
-                    >
-                      —
-                    </span>
+                    <span className="text-slate-300">—</span>
                   )}
                 </td>
-                {/* Rework */}
-                <td
-                  style={{
-                    padding: "11px 14px",
-                    textAlign: "center",
-                    borderBottom: `1px solid ${T.border}`,
-                  }}
-                >
-                  <span
-                    style={{
-                      background: T.redBg,
-                      color: T.red,
-                      border: `1px solid ${T.redBorder}`,
-                      borderRadius: 6,
-                      padding: "2px 10px",
-                      fontFamily: T.mono,
-                      fontSize: 13,
-                      fontWeight: 700,
-                      display: "inline-block",
-                    }}
-                  >
+                <td className="px-3 py-2 border-b border-slate-100 text-center">
+                  <span className="bg-red-50 text-red-700 border border-red-200 rounded-md px-2 py-0.5 font-bold font-mono">
                     {row.reworkTotal}
                   </span>
                 </td>
-                {/* Defect Ratio */}
-                <td
-                  style={{
-                    padding: "11px 14px",
-                    textAlign: "center",
-                    borderBottom: `1px solid ${T.border}`,
-                  }}
-                >
+                <td className="px-3 py-2 border-b border-slate-100 text-center">
                   {row.defectRatio !== null ? (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 10,
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 72,
-                          height: 7,
-                          background: T.bgDeep,
-                          borderRadius: 4,
-                          overflow: "hidden",
-                          border: `1px solid ${T.border}`,
-                        }}
-                      >
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                         <div
+                          className="h-full rounded-full transition-all duration-700"
                           style={{
                             width: `${Math.min(row.defectRatio, 100)}%`,
-                            height: "100%",
-                            background: rl.color,
-                            borderRadius: 4,
-                            transition: "width .9s cubic-bezier(.4,0,.2,1)",
+                            backgroundColor: rl.hex,
                           }}
                         />
                       </div>
                       <span
-                        style={{
-                          fontFamily: T.mono,
-                          fontSize: 13,
-                          fontWeight: 800,
-                          color: rl.color,
-                          minWidth: 58,
-                        }}
+                        className={`font-bold font-mono text-sm ${rl.color}`}
                       >
                         {row.defectRatio.toFixed(2)}%
                       </span>
                     </div>
                   ) : (
-                    <span
-                      style={{
-                        color: T.textFaint,
-                        fontFamily: T.mono,
-                        fontSize: 11,
-                      }}
-                    >
-                      N/A
-                    </span>
+                    <span className="text-slate-300 font-mono">N/A</span>
                   )}
                 </td>
-                {/* Severity */}
-                <td
-                  style={{
-                    padding: "11px 14px",
-                    textAlign: "center",
-                    borderBottom: `1px solid ${T.border}`,
-                  }}
-                >
+                <td className="px-3 py-2 border-b border-slate-100 text-center">
                   <span
-                    style={{
-                      padding: "2px 10px",
-                      borderRadius: 20,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      fontFamily: T.mono,
-                      letterSpacing: ".06em",
-                      textTransform: "uppercase",
-                      background: rl.bg,
-                      color: rl.color,
-                      border: `1px solid ${rl.border}`,
-                    }}
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border font-mono ${rl.bg} ${rl.color} ${rl.border}`}
                   >
                     {row.defectRatio !== null ? rl.label : "No Data"}
                   </span>
                 </td>
-                {/* Visual blocks */}
-                <td
-                  style={{
-                    padding: "11px 14px",
-                    textAlign: "center",
-                    borderBottom: `1px solid ${T.border}`,
-                  }}
-                >
+                <td className="px-3 py-2 border-b border-slate-100 text-center">
                   {row.defectRatio !== null && (
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "center",
-                        gap: 3,
-                      }}
-                    >
-                      {[2, 5, 10].map((thresh, idx) => (
+                    <div className="flex justify-center gap-1">
+                      {[2, 5, 10].map((thresh, ti) => (
                         <div
-                          key={idx}
+                          key={ti}
+                          className="w-2.5 h-2.5 rounded-sm border transition-colors"
                           style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: 2,
                             background:
-                              row.defectRatio > thresh ? rl.color : T.bgDeep,
-                            border: `1px solid ${row.defectRatio > thresh ? rl.color : T.border}`,
-                            transition: "background .3s",
+                              row.defectRatio > thresh ? rl.hex : "#f1f5f9",
+                            borderColor:
+                              row.defectRatio > thresh ? rl.hex : "#e2e8f0",
                           }}
                         />
                       ))}
@@ -1055,550 +483,223 @@ const DefectRatioTable = ({ data }) => {
               </tr>
             );
           })}
-
           {/* Totals row */}
-          {sorted.length > 0 &&
-            (() => {
-              const totProd = sorted.reduce(
-                (s, r) => s + (r.production ?? 0),
-                0,
-              );
-              const totRW = sorted.reduce((s, r) => s + r.reworkTotal, 0);
-              const totRatio = totProd > 0 ? (totRW / totProd) * 100 : null;
-              const rl = ratioLevel(totRatio);
-              return (
-                <tr
-                  style={{
-                    background: T.bgDeep,
-                    borderTop: `2px solid ${T.borderMed}`,
-                  }}
-                >
-                  <td style={{ padding: "11px 14px" }} />
-                  <td
-                    style={{
-                      padding: "11px 14px",
-                      fontFamily: T.mono,
-                      fontSize: 12,
-                      fontWeight: 800,
-                      color: T.text,
-                    }}
+          {sorted.length > 0 && (
+            <tr className="bg-slate-800 text-white">
+              <td className="px-3 py-3" />
+              <td className="px-3 py-3 font-bold font-mono text-[11px] uppercase tracking-wider">
+                TOTAL
+              </td>
+              <td className="px-3 py-3 text-center font-bold font-mono text-blue-300">
+                {totProd.toLocaleString()}
+              </td>
+              <td className="px-3 py-3 text-center font-bold font-mono text-red-300">
+                {totRW.toLocaleString()}
+              </td>
+              <td className="px-3 py-3 text-center">
+                {totRatio !== null && (
+                  <span
+                    className="font-bold font-mono text-sm"
+                    style={{ color: totRl.hex }}
                   >
-                    TOTAL
-                  </td>
-                  <td
-                    style={{
-                      padding: "11px 14px",
-                      textAlign: "center",
-                      fontFamily: T.mono,
-                      fontSize: 14,
-                      color: T.primary,
-                      fontWeight: 900,
-                    }}
+                    {totRatio.toFixed(2)}%
+                  </span>
+                )}
+              </td>
+              <td className="px-3 py-3 text-center">
+                {totRatio !== null && (
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border font-mono ${totRl.bg} ${totRl.color} ${totRl.border}`}
                   >
-                    {totProd.toLocaleString()}
-                  </td>
-                  <td
-                    style={{
-                      padding: "11px 14px",
-                      textAlign: "center",
-                      fontFamily: T.mono,
-                      fontSize: 14,
-                      color: T.red,
-                      fontWeight: 900,
-                    }}
-                  >
-                    {totRW.toLocaleString()}
-                  </td>
-                  <td style={{ padding: "11px 14px", textAlign: "center" }}>
-                    {totRatio !== null && (
-                      <span
-                        style={{
-                          fontFamily: T.mono,
-                          fontSize: 15,
-                          fontWeight: 900,
-                          color: rl.color,
-                        }}
-                      >
-                        {totRatio.toFixed(2)}%
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ padding: "11px 14px", textAlign: "center" }}>
-                    {totRatio !== null && (
-                      <span
-                        style={{
-                          padding: "2px 10px",
-                          borderRadius: 20,
-                          fontSize: 10,
-                          fontWeight: 700,
-                          fontFamily: T.mono,
-                          letterSpacing: ".06em",
-                          textTransform: "uppercase",
-                          background: rl.bg,
-                          color: rl.color,
-                          border: `1px solid ${rl.border}`,
-                        }}
-                      >
-                        {rl.label}
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ padding: "11px 14px" }} />
-                </tr>
-              );
-            })()}
+                    {totRl.label}
+                  </span>
+                )}
+              </td>
+              <td className="px-3 py-3" />
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
   );
 };
 
-/* ═══════════════════════════════════════════
-   REWORK BREAKDOWN TABLE
-═══════════════════════════════════════════ */
-const BreakdownTable = ({ data, selectedModel, onModelClick }) => (
-  <div style={{ overflowX: "auto" }}>
-    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-      <thead>
-        <tr style={{ background: T.bgDeep }}>
-          {["#", "Model", "Total", "Open", "Closed", "Close Rate", ""].map(
-            (h, i) => (
-              <th
-                key={i}
-                style={{
-                  padding: "9px 14px",
-                  textAlign: i >= 2 && i <= 6 ? "center" : "left",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: ".1em",
-                  textTransform: "uppercase",
-                  color: T.textMuted,
-                  fontFamily: T.mono,
-                  borderBottom: `2px solid ${T.border}`,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {h}
-              </th>
-            ),
-          )}
-        </tr>
-      </thead>
-      <tbody>
-        {data.map((row, i) => {
-          const rate =
-            row.total > 0 ? Math.round((row.closed / row.total) * 100) : 0;
-          const isAct = selectedModel === row.Model_Name;
-          const rc = rate >= 70 ? T.green : rate >= 40 ? T.amber : T.red;
-          const bg = i % 2 === 0 ? T.surface : T.bg;
-          return (
-            <tr
-              key={i}
-              onClick={() => onModelClick(row.Model_Name)}
-              style={{
-                background: isAct ? T.primary + "0a" : bg,
-                borderLeft: `3px solid ${isAct ? T.primary : "transparent"}`,
-                cursor: "pointer",
-                transition: "background .12s",
-              }}
-              onMouseEnter={(e) => {
-                if (!isAct) e.currentTarget.style.background = "#f8faff";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = isAct
-                  ? T.primary + "0a"
-                  : bg;
-              }}
-            >
-              <td
-                style={{
-                  padding: "10px 14px",
-                  fontFamily: T.mono,
-                  fontSize: 11,
-                  color: T.textFaint,
-                  borderBottom: `1px solid ${T.border}`,
-                }}
-              >
-                {i + 1}
-              </td>
-              <td
-                style={{
-                  padding: "10px 14px",
-                  fontFamily: T.mono,
-                  fontSize: 12,
-                  color: isAct ? T.primary : T.text,
-                  fontWeight: isAct ? 700 : 500,
-                  borderBottom: `1px solid ${T.border}`,
-                }}
-              >
-                {row.Model_Name}
-              </td>
-              <td
-                style={{
-                  padding: "10px 14px",
-                  textAlign: "center",
-                  fontFamily: T.mono,
-                  fontSize: 14,
-                  color: T.primary,
-                  fontWeight: 800,
-                  borderBottom: `1px solid ${T.border}`,
-                }}
-              >
-                {row.total}
-              </td>
-              <td
-                style={{
-                  padding: "10px 14px",
-                  textAlign: "center",
-                  borderBottom: `1px solid ${T.border}`,
-                }}
-              >
-                <span
-                  style={{
-                    background: T.redBg,
-                    color: T.red,
-                    border: `1px solid ${T.redBorder}`,
-                    borderRadius: 6,
-                    padding: "2px 9px",
-                    fontFamily: T.mono,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    display: "inline-block",
-                  }}
+// ── Breakdown Table ────────────────────────────────────────────────────────────
+const BreakdownTable = ({ data, selectedModel, onModelClick }) => {
+  const totals = data.reduce(
+    (a, r) => ({
+      total: a.total + r.total,
+      open: a.open + r.open,
+      closed: a.closed + r.closed,
+    }),
+    { total: 0, open: 0, closed: 0 },
+  );
+  const totRate =
+    totals.total > 0 ? Math.round((totals.closed / totals.total) * 100) : 0;
+
+  return (
+    <div className="overflow-auto">
+      <table className="min-w-full text-xs border-separate border-spacing-0">
+        <thead className="sticky top-0 z-10">
+          <tr className="bg-slate-100">
+            {["Sr. No.", "Model", "Total", "Open", "Closed", "Close Rate", ""].map(
+              (h, i) => (
+                <th
+                  key={h}
+                  className={`px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap ${i <= 1 ? "text-left" : "text-center"}`}
                 >
-                  {row.open}
-                </span>
-              </td>
-              <td
-                style={{
-                  padding: "10px 14px",
-                  textAlign: "center",
-                  borderBottom: `1px solid ${T.border}`,
-                }}
-              >
-                <span
-                  style={{
-                    background: T.greenBg,
-                    color: T.green,
-                    border: `1px solid ${T.greenBorder}`,
-                    borderRadius: 6,
-                    padding: "2px 9px",
-                    fontFamily: T.mono,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    display: "inline-block",
-                  }}
-                >
-                  {row.closed}
-                </span>
-              </td>
-              <td
-                style={{
-                  padding: "10px 14px",
-                  borderBottom: `1px solid ${T.border}`,
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    minWidth: 130,
-                  }}
-                >
-                  <div
-                    style={{
-                      flex: 1,
-                      height: 7,
-                      background: T.bgDeep,
-                      borderRadius: 4,
-                      overflow: "hidden",
-                      border: `1px solid ${T.border}`,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: `${rate}%`,
-                        height: "100%",
-                        background: rc,
-                        borderRadius: 4,
-                        transition: "width .9s",
-                      }}
-                    />
-                  </div>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontFamily: T.mono,
-                      color: rc,
-                      fontWeight: 700,
-                      minWidth: 34,
-                    }}
-                  >
-                    {rate}%
-                  </span>
-                </div>
-              </td>
-              <td
-                style={{
-                  padding: "10px 14px",
-                  borderBottom: `1px solid ${T.border}`,
-                }}
-              >
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onModelClick(row.Model_Name);
-                  }}
-                  style={{
-                    padding: "4px 12px",
-                    borderRadius: 6,
-                    border: `1px solid ${isAct ? T.primary : T.border}`,
-                    background: isAct ? T.primaryDim : "transparent",
-                    color: isAct ? T.primary : T.textMuted,
-                    fontFamily: T.mono,
-                    fontSize: 10,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    transition: "all .15s",
-                    letterSpacing: ".05em",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {isAct ? "Clear" : "Filter"}
-                </button>
-              </td>
-            </tr>
-          );
-        })}
-        {data.length > 0 &&
-          (() => {
-            const tot = data.reduce(
-              (a, r) => ({
-                total: a.total + r.total,
-                open: a.open + r.open,
-                closed: a.closed + r.closed,
-                unknown: a.unknown + r.unknown,
-              }),
-              { total: 0, open: 0, closed: 0, unknown: 0 },
-            );
-            const tr =
-              tot.total > 0 ? Math.round((tot.closed / tot.total) * 100) : 0;
-            const rc = tr >= 70 ? T.green : tr >= 40 ? T.amber : T.red;
+                  {h}
+                </th>
+              ),
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, i) => {
+            const rate =
+              row.total > 0 ? Math.round((row.closed / row.total) * 100) : 0;
+            const isAct = selectedModel === row.Model_Name;
+            const rc =
+              rate >= 70
+                ? "text-emerald-600"
+                : rate >= 40
+                  ? "text-amber-600"
+                  : "text-red-600";
+            const rcHex =
+              rate >= 70 ? "#16a34a" : rate >= 40 ? "#d97706" : "#dc2626";
             return (
               <tr
-                style={{
-                  background: T.bgDeep,
-                  borderTop: `2px solid ${T.borderMed}`,
-                }}
+                key={i}
+                onClick={() => onModelClick(row.Model_Name)}
+                className={`cursor-pointer transition-colors ${isAct ? "bg-blue-50 border-l-2 border-blue-500" : "hover:bg-blue-50/60 even:bg-slate-50/40"}`}
               >
-                <td style={{ padding: "10px 14px" }} />
-                <td
-                  style={{
-                    padding: "10px 14px",
-                    fontFamily: T.mono,
-                    fontSize: 12,
-                    fontWeight: 800,
-                    color: T.text,
-                  }}
-                >
-                  TOTAL
+                <td className="px-3 py-2.5 border-b border-slate-100 text-slate-400 font-mono">
+                  {i + 1}
                 </td>
                 <td
-                  style={{
-                    padding: "10px 14px",
-                    textAlign: "center",
-                    fontFamily: T.mono,
-                    fontSize: 14,
-                    color: T.primary,
-                    fontWeight: 900,
-                  }}
+                  className={`px-3 py-2.5 border-b border-slate-100 font-semibold font-mono ${isAct ? "text-blue-700" : "text-slate-800"}`}
                 >
-                  {tot.total}
+                  {row.Model_Name}
                 </td>
-                <td
-                  style={{
-                    padding: "10px 14px",
-                    textAlign: "center",
-                    fontFamily: T.mono,
-                    fontSize: 13,
-                    color: T.red,
-                    fontWeight: 800,
-                  }}
-                >
-                  {tot.open}
+                <td className="px-3 py-2.5 border-b border-slate-100 text-center font-bold font-mono text-blue-700 text-sm">
+                  {row.total}
                 </td>
-                <td
-                  style={{
-                    padding: "10px 14px",
-                    textAlign: "center",
-                    fontFamily: T.mono,
-                    fontSize: 13,
-                    color: T.green,
-                    fontWeight: 800,
-                  }}
-                >
-                  {tot.closed}
+                <td className="px-3 py-2.5 border-b border-slate-100 text-center">
+                  <span className="bg-red-50 text-red-700 border border-red-200 rounded-md px-2 py-0.5 font-bold font-mono">
+                    {row.open}
+                  </span>
                 </td>
-                <td
-                  style={{
-                    padding: "10px 14px",
-                    textAlign: "center",
-                    fontFamily: T.mono,
-                    fontSize: 13,
-                    color: T.textMuted,
-                    fontWeight: 700,
-                  }}
-                >
-                  {tot.unknown > 0 ? tot.unknown : "—"}
+                <td className="px-3 py-2.5 border-b border-slate-100 text-center">
+                  <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md px-2 py-0.5 font-bold font-mono">
+                    {row.closed}
+                  </span>
                 </td>
-                <td style={{ padding: "10px 14px" }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      minWidth: 130,
-                    }}
-                  >
-                    <div
-                      style={{
-                        flex: 1,
-                        height: 7,
-                        background: T.border,
-                        borderRadius: 4,
-                        overflow: "hidden",
-                      }}
-                    >
+                <td className="px-3 py-2.5 border-b border-slate-100">
+                  <div className="flex items-center gap-2 min-w-[130px]">
+                    <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                       <div
-                        style={{
-                          width: `${tr}%`,
-                          height: "100%",
-                          background: rc,
-                          borderRadius: 4,
-                        }}
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${rate}%`, backgroundColor: rcHex }}
                       />
                     </div>
                     <span
-                      style={{
-                        fontSize: 12,
-                        fontFamily: T.mono,
-                        color: T.text,
-                        fontWeight: 800,
-                        minWidth: 34,
-                      }}
+                      className={`text-[11px] font-mono font-bold min-w-[34px] ${rc}`}
                     >
-                      {tr}%
+                      {rate}%
                     </span>
                   </div>
                 </td>
-                <td style={{ padding: "10px 14px" }} />
+                <td className="px-3 py-2.5 border-b border-slate-100 text-center">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onModelClick(row.Model_Name);
+                    }}
+                    className={`px-3 py-1 rounded-md border text-[10px] font-bold font-mono uppercase tracking-wider transition-all ${
+                      isAct
+                        ? "bg-blue-50 border-blue-300 text-blue-700"
+                        : "bg-white border-slate-200 text-slate-500 hover:border-blue-300 hover:text-blue-600"
+                    }`}
+                  >
+                    {isAct ? "Clear" : "Filter"}
+                  </button>
+                </td>
               </tr>
             );
-          })()}
-      </tbody>
-    </table>
-  </div>
-);
-
-/* ═══════════════════════════════════════════
-   SECTION WRAPPER
-═══════════════════════════════════════════ */
-const Section = ({ title, iconPath, children, right, delay = 0, accent }) => (
-  <div
-    style={{
-      background: T.surface,
-      borderRadius: 16,
-      border: `1px solid ${accent || T.border}`,
-      overflow: "hidden",
-      boxShadow: "0 1px 6px rgba(0,0,0,.05)",
-      animation: `rr-fadeup .45s ease ${delay}s both`,
-    }}
-  >
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "12px 20px",
-        borderBottom: `1px solid ${accent || T.border}`,
-        background: accent ? accent + "08" : T.bg,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-        {iconPath && (
-          <Ico path={iconPath} size={14} color={accent || T.primary} />
-        )}
-        <span
-          style={{
-            fontFamily: T.mono,
-            fontWeight: 700,
-            fontSize: 11,
-            letterSpacing: ".1em",
-            textTransform: "uppercase",
-            color: accent || T.textSub,
-          }}
-        >
-          {title}
-        </span>
-      </div>
-      {right}
+          })}
+          {/* Totals */}
+          {data.length > 0 && (
+            <tr className="bg-slate-800 text-white">
+              <td className="px-3 py-3" />
+              <td className="px-3 py-3 font-bold font-mono text-[11px] uppercase tracking-wider">
+                TOTAL
+              </td>
+              <td className="px-3 py-3 text-center font-bold font-mono text-blue-300 text-sm">
+                {totals.total}
+              </td>
+              <td className="px-3 py-3 text-center font-bold font-mono text-red-300">
+                {totals.open}
+              </td>
+              <td className="px-3 py-3 text-center font-bold font-mono text-emerald-300">
+                {totals.closed}
+              </td>
+              <td className="px-3 py-3">
+                <div className="flex items-center gap-2 min-w-[130px]">
+                  <div className="flex-1 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-white/60 rounded-full"
+                      style={{ width: `${totRate}%` }}
+                    />
+                  </div>
+                  <span className="text-[11px] font-mono font-bold text-white">
+                    {totRate}%
+                  </span>
+                </div>
+              </td>
+              <td className="px-3 py-3" />
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
-    <div style={{ padding: 20 }}>{children}</div>
-  </div>
-);
-
-/* ═══════════════════════════════════════════
-   QUICK BUTTON
-═══════════════════════════════════════════ */
-const QuickBtn = ({ label, onClick, loading }) => {
-  const [hover, setHover] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      disabled={loading}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        padding: "7px 16px",
-        borderRadius: 8,
-        border: `1.5px solid ${hover ? T.primary : T.border}`,
-        background: hover ? T.primaryDim : T.surface,
-        fontFamily: T.mono,
-        fontWeight: 700,
-        fontSize: 10,
-        letterSpacing: ".09em",
-        textTransform: "uppercase",
-        color: hover ? T.primary : T.textMuted,
-        cursor: "pointer",
-        transition: "all .15s",
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        opacity: loading ? 0.55 : 1,
-      }}
-    >
-      {loading && (
-        <span
-          style={{
-            width: 10,
-            height: 10,
-            border: `2px solid ${T.border}`,
-            borderTopColor: T.primary,
-            borderRadius: "50%",
-            animation: "rr-spin .7s linear infinite",
-            display: "inline-block",
-          }}
-        />
-      )}
-      {label}
-    </button>
   );
 };
 
-/* ═══════════════════════════════════════════
-   MAIN COMPONENT
-═══════════════════════════════════════════ */
+// ── KPI Card ───────────────────────────────────────────────────────────────────
+const KpiCard = ({
+  label,
+  value,
+  sub,
+  badge,
+  colorClass = "bg-blue-50 border-blue-100",
+  textClass = "text-blue-700",
+  subClass = "text-blue-500",
+}) => (
+  <div
+    className={`flex flex-col items-center px-4 py-2 rounded-lg border min-w-[100px] ${colorClass}`}
+  >
+    <span className={`text-xl font-bold font-mono ${textClass}`}>{value}</span>
+    <span
+      className={`text-[10px] font-medium uppercase tracking-wide ${subClass}`}
+    >
+      {label}
+    </span>
+    {sub && (
+      <span className="text-[10px] text-slate-400 mt-0.5 text-center">
+        {sub}
+      </span>
+    )}
+    {badge && (
+      <span
+        className={`mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border font-mono ${badge.bg} ${badge.color} ${badge.border}`}
+      >
+        {badge.label}
+      </span>
+    )}
+  </div>
+);
+
+// ── Main Component ─────────────────────────────────────────────────────────────
 const ReworkReport = () => {
   const [loading, setLoading] = useState(false);
   const [ydayLoading, setYdayLoading] = useState(false);
@@ -1616,8 +717,6 @@ const ReworkReport = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [selectedModel, setSelectedModel] = useState(null);
 
-  /* ── Production state ── */
-  // productionMap: { Model_Name → production_count }
   const [productionMap, setProductionMap] = useState({});
   const [totalProduction, setTotalProduction] = useState(0);
   const [prodLoading, setProdLoading] = useState(false);
@@ -1641,7 +740,6 @@ const ReworkReport = () => {
     ...extra,
   });
 
-  /* infinite scroll */
   const lastRowRef = useCallback(
     (node) => {
       if (loading) return;
@@ -1654,12 +752,6 @@ const ReworkReport = () => {
     [loading, hasMore],
   );
 
-  /* ── Fetch production (calls getProductionReport controller)
-     Response: { success, totalProduction, data: [{ Model_Name, MatCode, production_count }] }
-     Model_Name here = m.Name from the production SQL (same join as rework's m.Alias).
-     ⚠ NOTE: rework uses m.Alias, production uses m.Name — if they differ on your DB,
-       change the production SQL's `m.Name AS Model_Name` to `m.Alias AS Model_Name`.
-  ── */
   const fetchProductionData = async (st, et) => {
     try {
       setProdLoading(true);
@@ -1679,8 +771,7 @@ const ReworkReport = () => {
         setProductionMap(map);
         setTotalProduction(res.data.totalProduction || 0);
       }
-    } catch (err) {
-      console.warn("Production data unavailable:", err.message);
+    } catch {
       setProductionMap({});
       setTotalProduction(0);
     } finally {
@@ -1688,7 +779,6 @@ const ReworkReport = () => {
     }
   };
 
-  /* paginated rework fetch */
   const fetchReworkData = async (pageNumber = 1) => {
     if (!startTime || !endTime) {
       toast.error("Please select a Time Range.");
@@ -1708,15 +798,13 @@ const ReworkReport = () => {
         }
         setHasMore(nd.length === limit);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       toast.error("Failed to fetch rework data.");
     } finally {
       setLoading(false);
     }
   };
 
-  /* quick fetch */
   const fetchQuickData = async (start, end, setLoader) => {
     try {
       setLoader(true);
@@ -1742,17 +830,19 @@ const ReworkReport = () => {
   };
 
   const fetchYesterdayData = () => {
-    const now = new Date();
-    const t8 = new Date(now.setHours(8, 0, 0, 0));
-    const y8 = new Date(t8);
+    const now = new Date(),
+      t8 = new Date(now.setHours(8, 0, 0, 0)),
+      y8 = new Date(t8);
     y8.setDate(t8.getDate() - 1);
     fetchQuickData(fmt(y8), fmt(t8), setYdayLoading);
   };
+
   const fetchTodayData = () => {
-    const now = new Date();
-    const t8 = new Date(now.setHours(8, 0, 0, 0));
+    const now = new Date(),
+      t8 = new Date(now.setHours(8, 0, 0, 0));
     fetchQuickData(fmt(t8), fmt(new Date()), setTodayLoading);
   };
+
   const fetchMTDData = () => {
     const now = new Date();
     fetchQuickData(
@@ -1778,48 +868,21 @@ const ReworkReport = () => {
     }
   };
 
-  const normalizeModel = (name) => {
-    if (!name) return "Not Logged In";
+  const normalizeModel = (name) =>
+    name ? name.trim().replace(/\s*S$/i, "").trim() : "Not Logged In";
 
-    return name
-      .trim()
-      .replace(/\s*S$/i, "") // removes " S" at end
-      .trim();
-  };
-
-  /* aggregation — uses classifyStatus (same as StatusBadge) */
   const aggregateReworkData = () => {
     const map = {};
-
     reworkData.forEach((item) => {
       const model = normalizeModel(item.Model_Name);
-
-      if (!map[model]) {
-        map[model] = {
-          total: 0,
-          open: 0,
-          closed: 0,
-        };
-      }
-
+      if (!map[model]) map[model] = { total: 0, open: 0, closed: 0 };
       map[model].total++;
-
-      const type = classifyStatus(item.Rework_Status);
-
-      if (type === "closed") {
-        map[model].closed++;
-      } else {
-        // ✅ unknown + open → treated as OPEN
-        map[model].open++;
-      }
+      classifyStatus(item.Rework_Status) === "closed"
+        ? map[model].closed++
+        : map[model].open++;
     });
-
     return Object.entries(map)
-      .map(([k, v]) => ({
-        Model_Name: k,
-        ...v,
-        reworkTotal: v.total,
-      }))
+      .map(([k, v]) => ({ Model_Name: k, ...v, reworkTotal: v.total }))
       .sort((a, b) => b.total - a.total);
   };
 
@@ -1835,6 +898,7 @@ const ReworkReport = () => {
     setTotalProduction(0);
     fetchReworkData(1);
   };
+
   const handleModelClick = (model) => {
     setSelectedModel((prev) => (prev === model ? null : model));
     setActiveTab("detail");
@@ -1847,11 +911,12 @@ const ReworkReport = () => {
   const aggregated = aggregateReworkData();
   const totalOpen = aggregated.reduce((s, r) => s + r.open, 0);
   const totalClosed = aggregated.reduce((s, r) => s + r.closed, 0);
-  const totalUnknown = 0;
-  const closeRate =
-    totalCount > 0 ? Math.round((totalClosed / totalCount) * 100) : 0;
 
-  /* merge rework aggregation with per-model production counts */
+  
+  const hasProd = totalProduction > 0;
+  const overallRatio = hasProd ? (totalCount / totalProduction) * 100 : null;
+  const overallRl = ratioLevel(overallRatio);
+
   const ratioData = aggregated
     .map((row) => {
       const prod = productionMap[row.Model_Name] ?? null;
@@ -1860,1041 +925,490 @@ const ReworkReport = () => {
     })
     .sort((a, b) => (b.defectRatio ?? -1) - (a.defectRatio ?? -1));
 
-  const hasProd = totalProduction > 0;
-  const overallRatio = hasProd ? (totalCount / totalProduction) * 100 : null;
-  const columns = Object.keys(filteredData[0] || {});
   const hasData = reworkData.length > 0;
+  const columns = Object.keys(filteredData[0] || {});
 
   const TABS = [
-    { id: "summary", icon: IC.chart, label: "Summary" },
-    { id: "defect", icon: IC.target, label: "Defect Ratio" },
-    { id: "detail", icon: IC.list, label: "Detail View" },
+    { id: "summary", icon: BarChart2, label: "Summary" },
+    { id: "defect", icon: Target, label: "Defect Ratio" },
+    { id: "detail", icon: List, label: "Detail View" },
   ];
 
   if (variantsLoading) return <Loader />;
 
+  /* ══════════════════════════════════════════════════════════
+     RENDER — lives inside Layout <Outlet />, use h-full
+  ══════════════════════════════════════════════════════════ */
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap');
-        @keyframes rr-spin   { to { transform:rotate(360deg); } }
-        @keyframes rr-fadeup { from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);} }
-        @keyframes rr-pulse  { 0%,100%{opacity:1;}50%{opacity:.3;} }
-        .rr-tr:hover td { background:#f8faff !important; }
-        .rr-th {
-          position:sticky; top:0; z-index:2;
-          background:${T.bgDeep}; color:${T.textMuted};
-          font-family:${T.mono}; font-size:10px; font-weight:700;
-          letter-spacing:.1em; text-transform:uppercase;
-          padding:10px 14px; white-space:nowrap;
-          border-bottom:2px solid ${T.border};
-        }
-        .rr-td {
-          padding:10px 14px; border-bottom:1px solid ${T.border};
-          font-family:${T.mono}; font-size:12px;
-          color:${T.textSub}; white-space:nowrap; transition:background .12s;
-        }
-        .tab-btn {
-          padding:8px 18px; border-radius:9px; font-family:${T.mono};
-          font-weight:700; font-size:10px; letter-spacing:.09em;
-          text-transform:uppercase; cursor:pointer; transition:all .15s;
-          display:flex; align-items:center; gap:7px; border:1.5px solid;
-        }
-        .tab-active        { background:${T.primaryDim};  border-color:${T.primaryBorder}; color:${T.primary}; }
-        .tab-defect-active { background:${T.orangeDim};   border-color:${T.orangeBorder};  color:${T.orange};  }
-        .tab-inactive      { background:${T.surface};     border-color:${T.border};        color:${T.textMuted}; }
-        .tab-inactive:hover{ border-color:${T.borderMed}; color:${T.textSub}; background:${T.bg}; }
-        ::-webkit-scrollbar       { width:5px; height:5px; }
-        ::-webkit-scrollbar-track { background:${T.bg}; }
-        ::-webkit-scrollbar-thumb { background:${T.borderMed}; border-radius:3px; }
-      `}</style>
-
-      <div
-        style={{
-          minHeight: "100vh",
-          background: T.bg,
-          fontFamily: T.sans,
-          padding: "24px 28px",
-          color: T.text,
-        }}
-      >
-        {/* ══ HEADER ══ */}
-        <div style={{ marginBottom: 22, animation: "rr-fadeup .4s ease" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: 14,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <div
-                style={{
-                  width: 46,
-                  height: 46,
-                  borderRadius: 13,
-                  background: T.primaryDim,
-                  border: `1.5px solid ${T.primaryBorder}`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: `0 4px 14px ${T.primary}22`,
-                }}
-              >
-                <Ico path={IC.layers} size={22} color={T.primary} />
-              </div>
-              <div>
-                <h1
-                  style={{
-                    margin: 0,
-                    fontSize: 26,
-                    fontWeight: 900,
-                    fontFamily: T.sans,
-                    letterSpacing: "-0.03em",
-                    color: T.text,
-                  }}
-                >
-                  Rework Report
-                </h1>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 11,
-                    color: T.textMuted,
-                    fontFamily: T.mono,
-                    letterSpacing: ".06em",
-                  }}
-                >
-                  Quality Control · Rework & Defect Ratio Dashboard
-                </p>
-              </div>
-            </div>
-
-            {hasData && (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {TABS.map((tab) => {
-                  const isActive = activeTab === tab.id;
-                  const isDef = tab.id === "defect";
-                  return (
-                    <button
-                      key={tab.id}
-                      className={`tab-btn ${isActive ? (isDef ? "tab-defect-active" : "tab-active") : "tab-inactive"}`}
-                      onClick={() => setActiveTab(tab.id)}
-                    >
-                      <Ico path={tab.icon} size={12} color="currentColor" />
-                      {tab.label}
-                      {tab.id === "detail" && (
-                        <span
-                          style={{
-                            background: isActive ? T.primary + "22" : T.bgDeep,
-                            color: isActive ? T.primary : T.textFaint,
-                            padding: "1px 7px",
-                            borderRadius: 10,
-                            fontSize: 10,
-                            fontFamily: T.mono,
-                            fontWeight: 700,
-                          }}
-                        >
-                          {filteredData.length.toLocaleString()}
-                        </span>
-                      )}
-                      {tab.id === "defect" && overallRatio !== null && (
-                        <span
-                          style={{
-                            background: isActive ? T.orange + "22" : T.bgDeep,
-                            color: isActive ? T.orange : T.textFaint,
-                            padding: "1px 7px",
-                            borderRadius: 10,
-                            fontSize: 10,
-                            fontFamily: T.mono,
-                            fontWeight: 700,
-                          }}
-                        >
-                          {overallRatio.toFixed(2)}%
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+    <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
+      {/* ── PAGE HEADER — sticky ── */}
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
+        <div>
+          <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
+            Rework Report
+          </h1>
+          <p className="text-[11px] text-slate-400">
+            Quality Control · Rework & Defect Ratio Dashboard
+          </p>
         </div>
-
-        {/* ══ FILTER PANEL ══ */}
-        <div
-          style={{
-            background: T.surface,
-            borderRadius: 16,
-            border: `1px solid ${T.border}`,
-            padding: "18px 22px",
-            marginBottom: 20,
-            boxShadow: "0 1px 6px rgba(0,0,0,.05)",
-            animation: "rr-fadeup .4s ease .05s both",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "flex-end",
-              gap: 16,
-              marginBottom: 16,
-            }}
-          >
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: ".1em",
-                  textTransform: "uppercase",
-                  color: T.textMuted,
-                  fontFamily: T.mono,
-                }}
-              >
-                Model Variant
-              </label>
-              <SelectField
-                options={variants}
-                value={selectedModelVariant?.value || ""}
-                onChange={(e) =>
-                  setSelectedModelVariant(
-                    variants.find((v) => v.value === e.target.value) || null,
-                  )
-                }
-              />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: ".1em",
-                  textTransform: "uppercase",
-                  color: T.textMuted,
-                  fontFamily: T.mono,
-                }}
-              >
-                Start Time
-              </label>
-              <DateTimePicker
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: ".1em",
-                  textTransform: "uppercase",
-                  color: T.textMuted,
-                  fontFamily: T.mono,
-                }}
-              >
-                End Time
-              </label>
-              <DateTimePicker
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
-            </div>
-            <button
-              onClick={handleQuery}
-              disabled={loading}
-              style={{
-                padding: "10px 26px",
-                borderRadius: 10,
-                border: "none",
-                background: loading ? T.bgDeep : T.primary,
-                color: loading ? T.textMuted : "#fff",
-                fontFamily: T.mono,
-                fontWeight: 800,
-                fontSize: 11,
-                letterSpacing: ".09em",
-                textTransform: "uppercase",
-                cursor: loading ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                transition: "all .15s",
-                boxShadow: loading ? "none" : `0 4px 16px ${T.primary}44`,
-              }}
-            >
-              {loading ? (
-                <span
-                  style={{
-                    width: 13,
-                    height: 13,
-                    border: `2px solid ${T.border}`,
-                    borderTopColor: T.primary,
-                    borderRadius: "50%",
-                    animation: "rr-spin .7s linear infinite",
-                  }}
-                />
-              ) : (
-                <Ico path={IC.refresh} size={13} color="#fff" />
-              )}
-              {loading ? "Loading…" : "Run Query"}
-            </button>
-            {hasData && (
-              <div style={{ marginLeft: "auto" }}>
-                <ExportButton
-                  fetchData={fetchExportData}
-                  filename="Rework_Report"
-                />
-              </div>
-            )}
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              flexWrap: "wrap",
-              paddingTop: 14,
-              borderTop: `1px dashed ${T.border}`,
-            }}
-          >
-            <span
-              style={{
-                fontSize: 10,
-                fontFamily: T.mono,
-                fontWeight: 700,
-                letterSpacing: ".09em",
-                textTransform: "uppercase",
-                color: T.textFaint,
-              }}
-            >
-              Quick →
-            </span>
-            <QuickBtn
-              label="Yesterday"
-              onClick={fetchYesterdayData}
-              loading={ydayLoading}
-            />
-            <QuickBtn
-              label="Today"
-              onClick={fetchTodayData}
-              loading={todayLoading}
-            />
-            <QuickBtn
-              label="Month to Date"
-              onClick={fetchMTDData}
-              loading={monthLoading}
-            />
-            {selectedModel && (
-              <button
-                onClick={() => setSelectedModel(null)}
-                style={{
-                  marginLeft: "auto",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 7,
-                  padding: "6px 13px",
-                  borderRadius: 8,
-                  border: `1px solid ${T.primaryBorder}`,
-                  background: T.primaryDim,
-                  color: T.primary,
-                  fontFamily: T.mono,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  letterSpacing: ".05em",
-                }}
-              >
-                <Ico path={IC.filter} size={11} color={T.primary} />
-                {selectedModel}
-                <Ico path={IC.x} size={11} color={T.primary} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* ══ EMPTY ══ */}
-        {!hasData && !loading && (
-          <div
-            style={{
-              background: T.surface,
-              borderRadius: 16,
-              border: `1px solid ${T.border}`,
-              padding: "72px 24px",
-              textAlign: "center",
-              animation: "rr-fadeup .4s ease .1s both",
-            }}
-          >
-            <div style={{ fontSize: 52, marginBottom: 18, opacity: 0.5 }}>
-              ⚙️
-            </div>
-            <div
-              style={{
-                fontFamily: T.sans,
-                fontSize: 18,
-                fontWeight: 700,
-                color: T.textMuted,
-                marginBottom: 8,
-              }}
-            >
-              No data loaded
-            </div>
-            <div
-              style={{ fontFamily: T.mono, fontSize: 11, color: T.textFaint }}
-            >
-              Run a query or select a quick filter to load rework records
-            </div>
-          </div>
-        )}
-        {loading && !hasData && (
-          <div
-            style={{ display: "flex", justifyContent: "center", padding: 72 }}
-          >
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                border: `3px solid ${T.border}`,
-                borderTopColor: T.primary,
-                borderRadius: "50%",
-                animation: "rr-spin .7s linear infinite",
-              }}
-            />
-          </div>
-        )}
-
-        {/* ══ SUMMARY TAB ══ */}
-        {hasData && activeTab === "summary" && (
-          <>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 14,
-                marginBottom: 20,
-                animation: "rr-fadeup .4s ease .08s both",
-              }}
-            >
+        <div className="flex items-center gap-2">
+          {hasData && (
+            <>
               <KpiCard
                 label="Total Records"
-                value={totalCount}
-                accent={T.primary}
-                iconPath={IC.layers}
-                sub={`${aggregated.length} model${aggregated.length !== 1 ? "s" : ""} tracked`}
-                onClick={() => setSelectedModel(null)}
-                active={!selectedModel}
+                value={totalCount.toLocaleString()}
+                colorClass="bg-blue-50 border-blue-100"
+                textClass="text-blue-700"
+                subClass="text-blue-500"
               />
               <KpiCard
                 label="Open / Pending"
                 value={totalOpen}
-                accent={T.red}
-                iconPath={IC.alert}
-                sub={`${totalCount > 0 ? 100 - closeRate : 0}% unresolved`}
+                colorClass="bg-red-50 border-red-100"
+                textClass="text-red-700"
+                subClass="text-red-500"
               />
               <KpiCard
                 label="Closed"
                 value={totalClosed}
-                accent={T.green}
-                iconPath={IC.check}
-                sub={`${closeRate}% resolution rate`}
+                colorClass="bg-emerald-50 border-emerald-100"
+                textClass="text-emerald-700"
+                subClass="text-emerald-500"
               />
               {overallRatio !== null && (
                 <KpiCard
-                  label="Overall Defect Ratio"
+                  label="Defect Ratio"
                   value={`${overallRatio.toFixed(2)}%`}
-                  accent={ratioLevel(overallRatio).color}
-                  iconPath={IC.target}
-                  sub={`${totalCount} reworks / ${totalProduction.toLocaleString()} produced`}
-                  badge={ratioLevel(overallRatio)}
+                  colorClass={`${overallRl.bg} ${overallRl.border}`}
+                  textClass={overallRl.color}
+                  subClass={overallRl.color}
+                  badge={overallRl}
                 />
               )}
-              {totalUnknown > 0 && (
-                <KpiCard
-                  label="Unknown Status"
-                  value={totalUnknown}
-                  accent={T.textMuted}
-                  iconPath={IC.clock}
-                  sub="Unclassified status"
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── BODY ── */}
+      <div className="flex-1 overflow-auto p-4 flex flex-col gap-3 min-h-0">
+        {/* ── FILTERS + QUICK FILTERS ── */}
+        <div className="flex gap-3 shrink-0">
+          {/* Filters card */}
+          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div className="flex items-center gap-1.5 mb-3">
+              <Filter className="w-3 h-3 text-slate-400" />
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                Filters
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="min-w-[190px] flex-1">
+                <SelectField
+                  label="Model Variant"
+                  options={variants}
+                  value={selectedModelVariant?.value || ""}
+                  onChange={(e) =>
+                    setSelectedModelVariant(
+                      variants.find((v) => v.value === e.target.value) || null,
+                    )
+                  }
                 />
-              )}
-              <KpiCard
-                label="Models Affected"
-                value={aggregated.length}
-                accent={T.sky}
-                iconPath={IC.bar}
+              </div>
+              <div className="min-w-[185px] flex-1">
+                <DateTimePicker
+                  label="Start Time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                />
+              </div>
+              <div className="min-w-[185px] flex-1">
+                <DateTimePicker
+                  label="End Time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2 pb-0.5 shrink-0">
+                <button
+                  onClick={handleQuery}
+                  disabled={loading}
+                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    loading
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                  }`}
+                >
+                  {loading ? <Spinner /> : <RefreshCw className="w-4 h-4" />}
+                  {loading ? "Loading…" : "Run Query"}
+                </button>
+                {hasData && (
+                  <ExportButton
+                    fetchData={fetchExportData}
+                    filename="Rework_Report"
+                  />
+                )}
+                {selectedModel && (
+                  <button
+                    onClick={() => setSelectedModel(null)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition-all"
+                  >
+                    <Filter className="w-3 h-3" /> {selectedModel}{" "}
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick filters */}
+          <div className="w-60 shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">
+              Quick Filters
+            </p>
+            <p className="text-[10px] text-slate-400 mb-3">
+              Select a preset time range.
+            </p>
+            <div className="flex flex-col gap-2">
+              <QuickBtn
+                label="YESTERDAY"
+                sublabel="Prev day 08:00 → today 08:00"
+                loading={ydayLoading}
+                onClick={fetchYesterdayData}
+                colorClass="bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+              />
+              <QuickBtn
+                label="TODAY"
+                sublabel="08:00 → now"
+                loading={todayLoading}
+                onClick={fetchTodayData}
+                colorClass="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+              />
+              <QuickBtn
+                label="MTD"
+                sublabel="Month to date"
+                loading={monthLoading}
+                onClick={fetchMTDData}
+                colorClass="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
               />
             </div>
+          </div>
+        </div>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 300px",
-                gap: 18,
-                marginBottom: 18,
-                animation: "rr-fadeup .4s ease .12s both",
-              }}
-            >
-              <Section
-                title="Rework Volume by Model"
-                iconPath={IC.chart}
-                delay={0.12}
-              >
-                {aggregated.length > 0 ? (
-                  <ReworkBarChart data={aggregated} />
-                ) : (
-                  <p
-                    style={{
-                      color: T.textMuted,
-                      fontFamily: T.mono,
-                      fontSize: 12,
-                      margin: 0,
-                    }}
-                  >
-                    No model data
-                  </p>
-                )}
-              </Section>
-              <Section title="Resolution Rate" iconPath={IC.check} delay={0.16}>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 20,
-                  }}
-                >
-                  <DonutChart
-                    open={totalOpen}
-                    closed={totalClosed}
-                    //unknown={totalUnknown}
-                  />
-                  <div
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 10,
-                    }}
-                  >
-                    {[
-                      {
-                        label: "Closed",
-                        val: totalClosed,
-                        color: T.green,
-                        bg: T.greenBg,
-                        border: T.greenBorder,
-                      },
-                      {
-                        label: "Open / Pending",
-                        val: totalOpen,
-                        color: T.red,
-                        bg: T.redBg,
-                        border: T.redBorder,
-                      },
-                      ...(totalUnknown > 0
-                        ? [
-                            {
-                              label: "Unknown",
-                              val: totalUnknown,
-                              color: T.textMuted,
-                              bg: T.bg,
-                              border: T.border,
-                            },
-                          ]
-                        : []),
-                    ].map((s) => (
-                      <div
-                        key={s.label}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          padding: "9px 13px",
-                          borderRadius: 9,
-                          background: s.bg,
-                          border: `1px solid ${s.border}`,
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 7,
-                              height: 7,
-                              borderRadius: "50%",
-                              background: s.color,
-                            }}
-                          />
-                          <span
-                            style={{
-                              fontSize: 11,
-                              fontFamily: T.mono,
-                              color: T.textMuted,
-                            }}
-                          >
-                            {s.label}
-                          </span>
-                        </div>
-                        <span
-                          style={{
-                            fontSize: 18,
-                            fontWeight: 900,
-                            fontFamily: T.sans,
-                            color: s.color,
-                          }}
-                        >
-                          {s.val.toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </Section>
-            </div>
-
-            <div style={{ animation: "rr-fadeup .4s ease .2s both" }}>
-              <Section
-                title="Model Breakdown"
-                iconPath={IC.list}
-                right={
-                  <span
-                    style={{
-                      fontFamily: T.mono,
-                      fontSize: 11,
-                      color: T.textMuted,
-                    }}
-                  >
-                    {aggregated.length} model
-                    {aggregated.length !== 1 ? "s" : ""} · Click row to filter
-                    detail
-                  </span>
-                }
-              >
-                <BreakdownTable
-                  data={aggregated}
-                  selectedModel={selectedModel}
-                  onModelClick={handleModelClick}
-                />
-              </Section>
-            </div>
-          </>
+        {/* ── EMPTY / LOADING STATE ── */}
+        {!hasData && !loading && (
+          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center gap-3 text-slate-400 py-24">
+            <PackageOpen className="w-14 h-14 opacity-20" strokeWidth={1.2} />
+            <p className="text-base font-bold text-slate-500">No data loaded</p>
+            <p className="text-sm text-slate-400">
+              Run a query or select a quick filter to load rework records
+            </p>
+          </div>
+        )}
+        {loading && !hasData && (
+          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-center gap-3">
+            <Spinner cls="w-6 h-6 text-blue-600" />
+            <span className="text-sm text-slate-400">
+              Fetching rework data…
+            </span>
+          </div>
         )}
 
-        {/* ══ DEFECT RATIO TAB ══ */}
-        {hasData && activeTab === "defect" && (
-          <>
-            {/* KPI row */}
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 14,
-                marginBottom: 20,
-                animation: "rr-fadeup .4s ease .08s both",
-              }}
-            >
-              <KpiCard
-                label="Total Production"
-                iconPath={IC.factory}
-                value={
-                  prodLoading
-                    ? "…"
-                    : hasProd
-                      ? totalProduction.toLocaleString()
-                      : "N/A"
-                }
-                accent={T.primary}
-                sub={
-                  prodLoading
-                    ? "Fetching Station 1220010…"
-                    : hasProd
-                      ? `Across ${Object.keys(productionMap).length} models`
-                      : "No data from production-report"
-                }
-              />
-              <KpiCard
-                label="Total Rework"
-                value={totalCount}
-                accent={T.red}
-                iconPath={IC.alert}
-                sub="Rework entries in period"
-              />
-              <KpiCard
-                label="Overall Defect Ratio"
-                value={
-                  overallRatio !== null ? `${overallRatio.toFixed(2)}%` : "N/A"
-                }
-                accent={
-                  overallRatio !== null
-                    ? ratioLevel(overallRatio).color
-                    : T.textFaint
-                }
-                iconPath={IC.target}
-                sub={
-                  hasProd
-                    ? `${totalCount.toLocaleString()} reworks ÷ ${totalProduction.toLocaleString()} produced`
-                    : prodLoading
-                      ? "Calculating…"
-                      : "Awaiting production data"
-                }
-                badge={overallRatio !== null ? ratioLevel(overallRatio) : null}
-              />
-              <KpiCard
-                label="Models Tracked"
-                value={aggregated.length}
-                accent={T.sky}
-                iconPath={IC.bar}
-                sub={
-                  hasProd
-                    ? `${ratioData.filter((r) => r.defectRatio !== null).length} with production data`
-                    : "Production data pending"
-                }
-              />
-            </div>
-
-            {/* Severity legend */}
-            <div
-              style={{
-                background: T.surface,
-                borderRadius: 12,
-                border: `1px solid ${T.border}`,
-                padding: "12px 20px",
-                marginBottom: 18,
-                display: "flex",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: 18,
-                boxShadow: "0 1px 4px rgba(0,0,0,.04)",
-                animation: "rr-fadeup .4s ease .1s both",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: T.mono,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: ".1em",
-                  textTransform: "uppercase",
-                  color: T.textMuted,
-                }}
-              >
-                Severity Thresholds:
-              </span>
-              {[
-                { label: "Good", pct: 0.5 },
-                { label: "Moderate", pct: 3 },
-                { label: "High", pct: 7 },
-                { label: "Critical", pct: 12 },
-              ].map((t) => {
-                const rl = ratioLevel(t.pct);
+        {/* ── TAB BAR ── */}
+        {hasData && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col shrink-0">
+            <div className="flex items-center gap-1 px-2 pt-1.5 border-b border-slate-100 bg-slate-50/50">
+              {TABS.map((tab) => {
+                const isActive = activeTab === tab.id;
+                const Icon = tab.icon;
                 return (
-                  <div
-                    key={t.label}
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold whitespace-nowrap rounded-t-lg transition-all cursor-pointer ${
+                      isActive
+                        ? "bg-white text-blue-700 border-t-2 border-x border-t-blue-500 border-x-slate-200 -mb-px shadow-sm"
+                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-100/70"
+                    }`}
                   >
-                    <span
-                      style={{
-                        padding: "2px 10px",
-                        borderRadius: 20,
-                        fontSize: 10,
-                        fontWeight: 700,
-                        fontFamily: T.mono,
-                        background: rl.bg,
-                        color: rl.color,
-                        border: `1px solid ${rl.border}`,
-                      }}
-                    >
-                      {t.label}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        color: T.textMuted,
-                        fontFamily: T.mono,
-                      }}
-                    >
-                      {t.label === "Good"
-                        ? "< 15%"
-                        : t.label === "Moderate"
-                          ? "15–25%"
-                          : t.label === "High"
-                            ? "25–35%"
-                            : "≥ 35%"}
-                    </span>
-                  </div>
+                    <Icon
+                      className={`w-3.5 h-3.5 ${isActive ? "text-blue-500" : "text-slate-400"}`}
+                    />
+                    {tab.label}
+                    {tab.id === "detail" && (
+                      <span
+                        className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isActive ? "bg-blue-100 text-blue-700" : "bg-slate-200 text-slate-500"}`}
+                      >
+                        {filteredData.length.toLocaleString()}
+                      </span>
+                    )}
+                    {tab.id === "defect" && overallRatio !== null && (
+                      <span
+                        className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isActive ? `${overallRl.bg} ${overallRl.color}` : "bg-slate-200 text-slate-500"}`}
+                      >
+                        {overallRatio.toFixed(2)}%
+                      </span>
+                    )}
+                  </button>
                 );
               })}
             </div>
 
-            {/* Per-model ratio bars */}
-            {hasProd && (
-              <div
-                style={{
-                  marginBottom: 18,
-                  animation: "rr-fadeup .4s ease .12s both",
-                }}
-              >
-                <Section
-                  title="Defect Ratio by Model — Rework ÷ Per-Model Production"
-                  iconPath={IC.bar}
-                  delay={0.12}
-                  accent={T.orange}
-                >
-                  <DefectRatioBars data={ratioData} />
-                </Section>
+            {/* ── SUMMARY TAB ── */}
+            {activeTab === "summary" && (
+              <div className="p-4 flex flex-col gap-4">
+                {/* Bar chart + donut */}
+                <div className="grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-4">
+                  <div className="bg-white rounded-xl border border-slate-200 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <BarChart2 className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                        Rework Volume by Model
+                      </span>
+                    </div>
+                    {aggregated.length > 0 ? (
+                      <ReworkBarChart data={aggregated} />
+                    ) : (
+                      <p className="text-xs text-slate-400 font-mono">
+                        No model data
+                      </p>
+                    )}
+                  </div>
+                  <div className="bg-white rounded-xl border border-slate-200 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                        Resolution Rate
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-center gap-4">
+                      <DonutChart open={totalOpen} closed={totalClosed} />
+                      <div className="w-full flex flex-col gap-2">
+                        {[
+                          {
+                            label: "Closed",
+                            val: totalClosed,
+                            cls: "bg-emerald-50 border-emerald-200 text-emerald-700",
+                          },
+                          {
+                            label: "Open/Pending",
+                            val: totalOpen,
+                            cls: "bg-red-50 border-red-200 text-red-700",
+                          },
+                        ].map((s) => (
+                          <div
+                            key={s.label}
+                            className={`flex justify-between items-center px-3 py-2 rounded-lg border ${s.cls}`}
+                          >
+                            <span className="text-[11px] font-mono">
+                              {s.label}
+                            </span>
+                            <span className="text-lg font-black font-mono">
+                              {s.val.toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Model breakdown */}
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <List className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                        Model Breakdown
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-400">
+                      {aggregated.length} model
+                      {aggregated.length !== 1 ? "s" : ""} · Click row to filter
+                      detail
+                    </span>
+                  </div>
+                  <BreakdownTable
+                    data={aggregated}
+                    selectedModel={selectedModel}
+                    onModelClick={handleModelClick}
+                  />
+                </div>
               </div>
             )}
 
-            {/* Defect ratio table */}
-            <div style={{ animation: "rr-fadeup .4s ease .16s both" }}>
-              <Section
-                title="Per-Model Defect Ratio Table"
-                iconPath={IC.target}
-                delay={0.16}
-                accent={T.orange}
-                right={
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 10 }}
-                  >
-                    {prodLoading && (
-                      <span
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          fontSize: 11,
-                          color: T.textMuted,
-                          fontFamily: T.mono,
-                        }}
-                      >
+            {/* ── DEFECT RATIO TAB ── */}
+            {activeTab === "defect" && (
+              <div className="p-4 flex flex-col gap-4">
+                {/* Severity legend */}
+                <div className="flex items-center flex-wrap gap-4 px-4 py-2.5 bg-slate-50 rounded-lg border border-slate-200">
+                  <span className="text-[10px] font-bold font-mono uppercase tracking-wider text-slate-400">
+                    Severity:
+                  </span>
+                  {[
+                    { label: "Good", pct: 0.5 },
+                    { label: "Moderate", pct: 20 },
+                    { label: "High", pct: 30 },
+                    { label: "Critical", pct: 40 },
+                  ].map((t) => {
+                    const rl = ratioLevel(t.pct);
+                    return (
+                      <div key={t.label} className="flex items-center gap-2">
                         <span
-                          style={{
-                            width: 10,
-                            height: 10,
-                            border: `2px solid ${T.border}`,
-                            borderTopColor: T.primary,
-                            borderRadius: "50%",
-                            animation: "rr-spin .7s linear infinite",
-                            display: "inline-block",
-                          }}
-                        />
-                        Loading production…
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border font-mono ${rl.bg} ${rl.color} ${rl.border}`}
+                        >
+                          {t.label}
+                        </span>
+                        <span className="text-[11px] text-slate-500 font-mono">
+                          {t.label === "Good"
+                            ? "< 15%"
+                            : t.label === "Moderate"
+                              ? "15–25%"
+                              : t.label === "High"
+                                ? "25–35%"
+                                : "≥ 35%"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {prodLoading && (
+                    <span className="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono ml-auto">
+                      <Spinner cls="w-3 h-3" /> Loading production…
+                    </span>
+                  )}
+                  {!hasProd && !prodLoading && (
+                    <span className="text-[11px] text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 font-mono ml-auto">
+                      ⚠ Production data unavailable
+                    </span>
+                  )}
+                  {hasProd && (
+                    <span className="text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 font-mono ml-auto">
+                      ✓ Per-model production matched
+                    </span>
+                  )}
+                </div>
+
+                {/* Ratio bars */}
+                {hasProd && (
+                  <div className="bg-white rounded-xl border border-orange-200 overflow-hidden">
+                    <div className="flex items-center gap-2 px-4 py-2.5 border-b border-orange-100 bg-orange-50/30">
+                      <BarChart2 className="w-3.5 h-3.5 text-orange-500" />
+                      <span className="text-[11px] font-semibold text-orange-600 uppercase tracking-widest">
+                        Defect Ratio by Model — Rework ÷ Per-Model Production
                       </span>
-                    )}
-                    {!hasProd && !prodLoading && (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          color: T.amber,
-                          fontFamily: T.mono,
-                          background: T.amberBg,
-                          padding: "3px 10px",
-                          borderRadius: 6,
-                          border: `1px solid ${T.amberBorder}`,
-                        }}
+                    </div>
+                    <div className="p-4">
+                      <DefectRatioBars data={ratioData} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Ratio table */}
+                <div className="bg-white rounded-xl border border-orange-200 overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-2.5 border-b border-orange-100 bg-orange-50/30">
+                    <Target className="w-3.5 h-3.5 text-orange-500" />
+                    <span className="text-[11px] font-semibold text-orange-600 uppercase tracking-widest">
+                      Per-Model Defect Ratio Table
+                    </span>
+                  </div>
+                  <DefectRatioTable data={ratioData} />
+                </div>
+              </div>
+            )}
+
+            {/* ── DETAIL TAB ── */}
+            {activeTab === "detail" && (
+              <div className="flex flex-col min-h-0">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 shrink-0">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                      {selectedModel
+                        ? `Filtered: ${selectedModel}`
+                        : "All Records"}
+                    </span>
+                    <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono">
+                      {filteredData.length.toLocaleString()} rows
+                    </span>
+                    {selectedModel && (
+                      <button
+                        onClick={() => setSelectedModel(null)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-md border border-blue-200 bg-blue-50 text-blue-700 text-[10px] font-bold hover:bg-blue-100 transition-all"
                       >
-                        ⚠ Production data unavailable
-                      </span>
-                    )}
-                    {hasProd && (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          color: T.green,
-                          fontFamily: T.mono,
-                          background: T.greenBg,
-                          padding: "3px 10px",
-                          borderRadius: 6,
-                          border: `1px solid ${T.greenBorder}`,
-                        }}
-                      >
-                        ✓ Per-model production matched
-                      </span>
+                        Clear filter <X className="w-2.5 h-2.5" />
+                      </button>
                     )}
                   </div>
-                }
-              >
-                <DefectRatioTable data={ratioData} />
-              </Section>
-            </div>
-          </>
-        )}
-
-        {/* ══ DETAIL TAB ══ */}
-        {hasData && activeTab === "detail" && (
-          <div
-            style={{
-              background: T.surface,
-              borderRadius: 16,
-              border: `1px solid ${T.border}`,
-              overflow: "hidden",
-              boxShadow: "0 1px 6px rgba(0,0,0,.05)",
-              animation: "rr-fadeup .4s ease .08s both",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "13px 20px",
-                borderBottom: `1px solid ${T.border}`,
-                background: T.bg,
-                flexWrap: "wrap",
-                gap: 10,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <Ico path={IC.list} size={14} color={T.primary} />
-                <span
-                  style={{
-                    fontFamily: T.mono,
-                    fontWeight: 700,
-                    fontSize: 11,
-                    letterSpacing: ".09em",
-                    textTransform: "uppercase",
-                    color: T.textSub,
-                  }}
-                >
-                  {selectedModel ? `Filtered: ${selectedModel}` : "All Records"}
-                </span>
-                <span
-                  style={{
-                    background: T.primaryDim,
-                    color: T.primary,
-                    padding: "2px 10px",
-                    borderRadius: 20,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    fontFamily: T.mono,
-                    border: `1px solid ${T.primaryBorder}`,
-                  }}
-                >
-                  {filteredData.length.toLocaleString()} rows
-                </span>
-                {selectedModel && (
-                  <button
-                    onClick={() => setSelectedModel(null)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 5,
-                      padding: "3px 10px",
-                      borderRadius: 6,
-                      border: `1px solid ${T.primaryBorder}`,
-                      background: T.primaryDim,
-                      color: T.primary,
-                      fontFamily: T.mono,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Clear filter <Ico path={IC.x} size={10} color={T.primary} />
-                  </button>
-                )}
-              </div>
-              {hasMore && (
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: T.textMuted,
-                    fontFamily: T.mono,
-                  }}
-                >
-                  Scroll to load more ↓
-                </span>
-              )}
-            </div>
-            <div
-              style={{ overflowX: "auto", overflowY: "auto", maxHeight: 560 }}
-            >
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th
-                      className="rr-th"
-                      style={{ width: 44, textAlign: "center" }}
-                    >
-                      #
-                    </th>
-                    {columns.map((k) => (
-                      <th key={k} className="rr-th">
-                        {k.replace(/_/g, " ")}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredData.map((row, i) => (
-                    <tr
-                      key={i}
-                      className="rr-tr"
-                      ref={i === filteredData.length - 1 ? lastRowRef : null}
-                      style={{ background: i % 2 === 0 ? T.surface : T.bg }}
-                    >
-                      <td
-                        className="rr-td"
-                        style={{
-                          textAlign: "center",
-                          color: T.textFaint,
-                          fontSize: 10,
-                        }}
-                      >
-                        {i + 1}
-                      </td>
-                      {columns.map((k) => (
-                        <td key={k} className="rr-td">
-                          {k === "Rework_Status" ? (
-                            <StatusBadge status={row[k]} />
-                          ) : (
-                            <span
-                              style={{
-                                color: k === "Model_Name" ? T.text : T.textSub,
-                              }}
-                            >
-                              {row[k] ?? "—"}
-                            </span>
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {loading && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    padding: 28,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 26,
-                      height: 26,
-                      border: `3px solid ${T.border}`,
-                      borderTopColor: T.primary,
-                      borderRadius: "50%",
-                      animation: "rr-spin .7s linear infinite",
-                    }}
-                  />
+                  {hasMore && (
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      Scroll to load more ↓
+                    </span>
+                  )}
                 </div>
-              )}
-            </div>
+                <div className="overflow-auto max-h-[520px]">
+                  <table className="min-w-full text-xs text-left border-separate border-spacing-0">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="bg-slate-100">
+                        <th className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap w-10">
+                          Sr. No.
+                        </th>
+                        {columns.map((k) => (
+                          <th
+                            key={k}
+                            className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap"
+                          >
+                            {k.replace(/_/g, " ")}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredData.map((row, i) => (
+                        <tr
+                          key={i}
+                          ref={
+                            i === filteredData.length - 1 ? lastRowRef : null
+                          }
+                          className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
+                        >
+                          <td className="px-3 py-2 border-b border-slate-100 text-slate-400 font-mono text-center">
+                            {i + 1}
+                          </td>
+                          {columns.map((k) => (
+                            <td
+                              key={k}
+                              className="px-3 py-2 border-b border-slate-100 whitespace-nowrap"
+                            >
+                              {k === "Rework_Status" ? (
+                                <StatusBadge status={row[k]} />
+                              ) : (
+                                <span
+                                  className={
+                                    k === "Model_Name"
+                                      ? "font-semibold text-slate-800"
+                                      : "text-slate-600"
+                                  }
+                                >
+                                  {row[k] ?? "—"}
+                                </span>
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {loading && (
+                    <div className="flex items-center justify-center py-4 gap-2 text-blue-600 text-xs border-t border-slate-100">
+                      <Spinner /> Loading more records…
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 };
 

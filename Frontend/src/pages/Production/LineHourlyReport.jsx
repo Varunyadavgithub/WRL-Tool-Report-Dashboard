@@ -67,9 +67,9 @@ const mapCategory = (data, mappings = CATEGORY_MAPPINGS) => {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const LINE_TABS = [
-  { value: "final_line", label: "Final Line", icon: Factory },
+  { value: "final_line", label: "Final", icon: Factory },
   { value: "final_loading", label: "Loading", icon: Truck },
-  { value: "post_Foaming", label: "Post Foam", icon: Wind },
+  { value: "post_Foaming", label: "Post Foaming", icon: Wind },
   { value: "Foaming", label: "Foaming", icon: Settings },
 ];
 

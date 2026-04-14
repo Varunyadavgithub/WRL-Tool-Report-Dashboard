@@ -4,11 +4,10 @@ import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { convertToIST } from "../../utils/convertToIST.js";
 
-// ─── Shared CTE (reused across all three rework handlers) ───────────────────
+// ─── Shared CTE ─────────────────────────────────────────────────────────────
 const REWORK_BASE_CTE = `
   WITH ReworkBase AS (
     SELECT
-        ROW_NUMBER() OVER (ORDER BY pr.StartedOn) AS SrNo,
         m.Alias               AS Model_Name,
         mc.Name               AS Category,
         w.Name                AS Station,
@@ -60,26 +59,17 @@ const REWORK_BASE_CTE = `
   )
 `;
 
-// ─── GET /rework-report  (paginated main table) ──────────────────────────────
+// ─── GET /rework-report (Paginated) ─────────────────────────────────────────
 export const getReworkReport = tryCatch(async (req, res) => {
-  const {
-    startTime,
-    endTime,
-    model,
-    page  = 1,
-    limit = 1000,
-  } = req.query;
+  const { startTime, endTime, model, page = 1, limit = 1000 } = req.query;
 
   if (!startTime || !endTime) {
-    throw new AppError(
-      "Missing required query parameters: startTime and endTime",
-      400
-    );
+    throw new AppError("Missing required query parameters", 400);
   }
 
   const istStart = convertToIST(startTime);
-  const istEnd   = convertToIST(endTime);
-  const offset   = (parseInt(page) - 1) * parseInt(limit);
+  const istEnd = convertToIST(endTime);
+  const offset = (parseInt(page) - 1) * parseInt(limit);
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
@@ -87,10 +77,10 @@ export const getReworkReport = tryCatch(async (req, res) => {
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
-      .input("endTime",   sql.DateTime, istEnd)
-      .input("offset",    sql.Int,      offset)
-      .input("limit",     sql.Int,      parseInt(limit))
-      .input("model",     sql.VarChar,  model && model !== "0" ? model : null);
+      .input("endTime", sql.DateTime, istEnd)
+      .input("offset", sql.Int, offset)
+      .input("limit", sql.Int, parseInt(limit))
+      .input("model", sql.VarChar, model && model !== "0" ? model : null);
 
     const query = `
       ${REWORK_BASE_CTE}
@@ -102,83 +92,36 @@ export const getReworkReport = tryCatch(async (req, res) => {
         (SELECT COUNT(*) FROM Filtered) AS totalCount,
         *
       FROM Filtered
-      WHERE SrNo >  @offset
-        AND SrNo <= (@offset + @limit);
-    `;
-
-    const result = await request.query(query);
-
-    res.status(200).json({
-      success:    true,
-      message:    "Rework report data retrieved successfully",
-      data:       result.recordset,
-      totalCount: result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
-    });
-  } catch (error) {
-    throw new AppError(`Failed to fetch rework report: ${error.message}`, 500);
-  } finally {
-    await pool.close();
-  }
-});
-
-// ─── GET /rework-report-export  (full dump, no pagination) ──────────────────
-export const getReworkReportExport = tryCatch(async (req, res) => {
-  const { startTime, endTime, model } = req.query;
-
-  if (!startTime || !endTime) {
-    throw new AppError(
-      "Missing required query parameters: startTime and endTime",
-      400
-    );
-  }
-
-  const istStart = convertToIST(startTime);
-  const istEnd   = convertToIST(endTime);
-
-  const pool = await new sql.ConnectionPool(dbConfig1).connect();
-
-  try {
-    const request = pool
-      .request()
-      .input("startTime", sql.DateTime, istStart)
-      .input("endTime",   sql.DateTime, istEnd)
-      .input("model",     sql.VarChar,  model && model !== "0" ? model : null);
-
-    const query = `
-      ${REWORK_BASE_CTE}
-      SELECT *
-      FROM ReworkBase
-      WHERE (@model IS NULL OR MatCode = @model)
-      ORDER BY SrNo;
+      ORDER BY Rework_IN
+      OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY;
     `;
 
     const result = await request.query(query);
 
     res.status(200).json({
       success: true,
-      message: "Rework report export data retrieved successfully",
-      data:    result.recordset,
+      message: "Rework report fetched",
+      data: result.recordset,
+      totalCount:
+        result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
     });
   } catch (error) {
-    throw new AppError(`Failed to export rework report: ${error.message}`, 500);
+    throw new AppError(error.message, 500);
   } finally {
     await pool.close();
   }
 });
 
-// ─── GET /rework-report-quick  (YDAY / TDAY / MTD — no pagination) ──────────
-export const getReworkReportQuick = tryCatch(async (req, res) => {
+// ─── GET /rework-report-export ──────────────────────────────────────────────
+export const getReworkReportExport = tryCatch(async (req, res) => {
   const { startTime, endTime, model } = req.query;
 
   if (!startTime || !endTime) {
-    throw new AppError(
-      "Missing required query parameters: startTime and endTime",
-      400
-    );
+    throw new AppError("Missing required query parameters", 400);
   }
 
   const istStart = convertToIST(startTime);
-  const istEnd   = convertToIST(endTime);
+  const istEnd = convertToIST(endTime);
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
@@ -186,30 +129,69 @@ export const getReworkReportQuick = tryCatch(async (req, res) => {
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
-      .input("endTime",   sql.DateTime, istEnd)
-      .input("model",     sql.VarChar,  model && model !== "0" ? model : null);
+      .input("endTime", sql.DateTime, istEnd)
+      .input("model", sql.VarChar, model && model !== "0" ? model : null);
 
     const query = `
       ${REWORK_BASE_CTE}
       SELECT *
       FROM ReworkBase
       WHERE (@model IS NULL OR MatCode = @model)
-      ORDER BY SrNo;
+      ORDER BY Rework_IN;
     `;
 
     const result = await request.query(query);
 
     res.status(200).json({
-      success:    true,
-      message:    "Rework quick filter data retrieved successfully",
-      data:       result.recordset,
+      success: true,
+      message: "Export data fetched",
+      data: result.recordset,
+    });
+  } catch (error) {
+    throw new AppError(error.message, 500);
+  } finally {
+    await pool.close();
+  }
+});
+
+// ─── GET /rework-report-quick ───────────────────────────────────────────────
+export const getReworkReportQuick = tryCatch(async (req, res) => {
+  const { startTime, endTime, model } = req.query;
+
+  if (!startTime || !endTime) {
+    throw new AppError("Missing required query parameters", 400);
+  }
+
+  const istStart = convertToIST(startTime);
+  const istEnd = convertToIST(endTime);
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
+    const request = pool
+      .request()
+      .input("startTime", sql.DateTime, istStart)
+      .input("endTime", sql.DateTime, istEnd)
+      .input("model", sql.VarChar, model && model !== "0" ? model : null);
+
+    const query = `
+      ${REWORK_BASE_CTE}
+      SELECT *
+      FROM ReworkBase
+      WHERE (@model IS NULL OR MatCode = @model)
+      ORDER BY Rework_IN;
+    `;
+
+    const result = await request.query(query);
+
+    res.status(200).json({
+      success: true,
+      message: "Quick data fetched",
+      data: result.recordset,
       totalCount: result.recordset.length,
     });
   } catch (error) {
-    throw new AppError(
-      `Failed to fetch rework quick data: ${error.message}`,
-      500
-    );
+    throw new AppError(error.message, 500);
   } finally {
     await pool.close();
   }
@@ -231,14 +213,11 @@ export const getProductionReport = tryCatch(async (req, res) => {
   const { startTime, endTime, model } = req.query;
 
   if (!startTime || !endTime) {
-    throw new AppError(
-      "Missing required query parameters: startTime and endTime",
-      400
-    );
+    throw new AppError("Missing required query parameters", 400);
   }
 
   const istStart = convertToIST(startTime);
-  const istEnd   = convertToIST(endTime);
+  const istEnd = convertToIST(endTime);
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
 
@@ -246,79 +225,49 @@ export const getProductionReport = tryCatch(async (req, res) => {
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
-      .input("endTime",   sql.DateTime, istEnd)
-      .input("model",     sql.VarChar,  model && model !== "0" ? model : null);
+      .input("endTime", sql.DateTime, istEnd)
+      .input("model", sql.VarChar, model && model !== "0" ? model : null);
 
-    // Wraps the provided production query and aggregates COUNT per model.
-    // Inner query is the exact SQL provided — no changes to logic.
     const query = `
       WITH FilteredData AS (
           SELECT
               mb.Material,
-              CASE WHEN mb.VSerial IS NULL THEN mb.Serial ELSE mb.Alias END AS Assembly_Sr_No,
-              pa.ActivityOn,
-              pa.StationCode,
-              pa.Operator,
-              mb.Serial,
-              mb.VSerial,
-              mb.Serial2
+              CASE WHEN mb.VSerial IS NULL THEN mb.Serial ELSE mb.Alias END AS Assembly_Sr_No
           FROM MaterialBarcode mb
           JOIN ProcessActivity pa ON pa.PSNo = mb.DocNo
-          JOIN WorkCenter wc      ON pa.StationCode = wc.StationCode
+          JOIN WorkCenter wc ON pa.StationCode = wc.StationCode
           WHERE mb.PrintStatus = 1
             AND mb.Status <> 99
             AND pa.ActivityType = 5
             AND pa.ActivityOn BETWEEN @startTime AND @endTime
             AND wc.StationCode = 1220010
-      ),
-      ModelStats AS (
-          SELECT
-              MIN(Assembly_Sr_No) AS StartSerial,
-              MAX(Assembly_Sr_No) AS EndSerial,
-              Material
-          FROM FilteredData
-          GROUP BY Material
-      ),
-      Production AS (
-          SELECT
-              m.Name      AS Model_Name,
-              fd.Material AS MatCode,
-              fd.Assembly_Sr_No,
-              ms.StartSerial,
-              ms.EndSerial
-          FROM FilteredData fd
-          JOIN ModelStats ms  ON ms.Material = fd.Material
-          JOIN Material m     ON m.MatCode   = fd.Material
-          WHERE (@model IS NULL OR fd.Material = @model)
       )
-      -- Aggregate: one row per model with total production count
       SELECT
-          Model_Name,
-          MatCode,
-          COUNT(*)       AS production_count,
-          MIN(StartSerial) AS StartSerial,
-          MAX(EndSerial)   AS EndSerial
-      FROM Production
-      GROUP BY Model_Name, MatCode
+          m.Name AS Model_Name,
+          fd.Material AS MatCode,
+          COUNT(*) AS production_count
+      FROM FilteredData fd
+      JOIN Material m ON m.MatCode = fd.Material
+      WHERE (@model IS NULL OR fd.Material = @model)
+      GROUP BY m.Name, fd.Material
       ORDER BY production_count DESC;
     `;
 
     const result = await request.query(query);
-    const rows   = result.recordset;
 
-    const totalProduction = rows.reduce(
-      (sum, r) => sum + (Number(r.production_count) || 0),
-      0
+    const totalProduction = result.recordset.reduce(
+      (sum, r) => sum + Number(r.production_count || 0),
+      0,
     );
 
     res.status(200).json({
-      success:         true,
-      message:         "Production report data retrieved successfully",
+      success: true,
+      message: "Production data fetched",
       totalProduction,
-      data:            rows,
+      data: result.recordset,
     });
   } catch (error) {
-    throw new AppError(`Failed to fetch production report: ${error.message}`, 500);
+    throw new AppError(error.message, 500);
   } finally {
     await pool.close();
   }
