@@ -570,9 +570,6 @@ const TotalProduction = () => {
                 <table className="min-w-[700px] w-full text-xs text-left border-separate border-spacing-0">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-100">
-                      <th className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap">
-                        Sr. No.
-                      </th>
                       {COLUMNS.map((col) => (
                         <th
                           key={col.key}
@@ -602,9 +599,6 @@ const TotalProduction = () => {
                             }
                             className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
                           >
-                            <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-400 whitespace-nowrap">
-                              {idx + 1}
-                            </td>
                             <td className="px-3 py-2 border-b border-slate-100 font-medium text-slate-800 whitespace-nowrap">
                               {item.Model_Name}
                             </td>
@@ -612,13 +606,13 @@ const TotalProduction = () => {
                               {item.FG_SR}
                             </td>
                             <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap">
-                              {item.Asset_tag || "—"}
+                              {item.Asset_tag || ""}
                             </td>
                             <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap break-all">
-                              {item.CustomerQR || "—"}
+                              {item.CustomerQR || ""}
                             </td>
                             <td className="px-3 py-2 border-b border-slate-100 font-mono text-blue-600 whitespace-nowrap">
-                              {item.NFC_UID || "—"}
+                              {item.NFC_UID || ""}
                             </td>
                           </tr>
                         );
