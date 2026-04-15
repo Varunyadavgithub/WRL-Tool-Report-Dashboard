@@ -336,7 +336,7 @@ const Overview = () => {
       </div>
 
       {/* ── Body ── */}
-      <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3 min-h-0">
+      <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3">
         {/* ── Filters + Quick filters row ── */}
         <div className="flex gap-3 shrink-0">
           {/* Filters card */}

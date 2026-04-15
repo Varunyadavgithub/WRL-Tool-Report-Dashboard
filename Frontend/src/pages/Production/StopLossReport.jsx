@@ -607,7 +607,7 @@ function StopLossReport() {
       </div>
 
       {/* ── BODY ── */}
-      <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3 min-h-0">
+      <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3">
         {/* ── FILTERS CARD ── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
           <div className="flex items-center gap-1.5 mb-3">

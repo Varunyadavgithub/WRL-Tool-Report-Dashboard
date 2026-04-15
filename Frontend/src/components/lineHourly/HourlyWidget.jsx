@@ -203,7 +203,7 @@ const CategoryWidget = ({ title, data = [], icon: Icon }) => {
   const exportCSV = () => {
     if (!data.length) return;
     const csv = [
-      ["#", "Category", "Count", "%"],
+      ["Sr. No.", "Category", "Count", "%"],
       ...data.map((r, i) => [
         i + 1,
         r.category,
@@ -321,7 +321,7 @@ const CategoryWidget = ({ title, data = [], icon: Icon }) => {
                     zIndex: 1,
                   }}
                 >
-                  {["#", "Category", "Count", "Share"].map((h, i) => (
+                  {["Sr. No.", "Category", "Count", "Share"].map((h, i) => (
                     <th
                       key={i}
                       style={{
@@ -828,7 +828,7 @@ const TotalModelPanel = ({ modelData, onClose }) => {
 
   const exportCSV = () => {
     const csv = [
-      ["#", "MatCode", "Name", "Category", "Count", "%"],
+      ["Sr. No.", "MatCode", "Name", "Category", "Count", "%"],
       ...modelTotals.map((m, i) => [
         i + 1,
         m.MatCode,
@@ -929,7 +929,7 @@ const TotalModelPanel = ({ modelData, onClose }) => {
                     zIndex: 1,
                   }}
                 >
-                  {["#", "Model Name", "Count", "Share"].map((h, i) => (
+                  {["Sr. No.", "Model Name", "Count", "Share"].map((h, i) => (
                     <th
                       key={i}
                       style={{

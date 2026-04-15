@@ -153,7 +153,7 @@ const ModelNameUpdate = () => {
       </div>
 
       {/* ── BODY ── */}
-      <div className="flex-1 overflow-auto p-4 flex flex-col gap-3 min-h-0">
+      <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
         {/* ── INPUT CARDS ROW ── */}
         <div className="flex gap-3 shrink-0 flex-wrap">
           {/* Manual entry card */}

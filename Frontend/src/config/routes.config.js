@@ -191,30 +191,21 @@ export const ROUTE_CONFIG = [
         path: "/quality/rework-report",
         label: "Rework Report",
         component: ReworkReport,
-        roles: [ROLES.ADMIN],
       },
       {
         path: "/quality/gas-charging-report",
         label: "Gas Charging Report",
         component: GasChargingReport,
-        roles: [ROLES.ADMIN],
       },
       {
         path: "/quality/est-report",
         label: "EST Report",
         component: ESTReport,
-        roles: [ROLES.ADMIN],
       },
       {
         path: "/quality/cpt-report",
         label: "CPT Report",
         component: CPTReport,
-        roles: [
-          ROLES.ADMIN,
-          ROLES.LINE_QUALITY_ENGINEER,
-          ROLES.FPA,
-          ROLES.QUALITY_MANAGER,
-        ],
       },
       {
         path: "/quality/fpa",

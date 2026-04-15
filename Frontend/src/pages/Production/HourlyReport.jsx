@@ -467,7 +467,7 @@ const HourlyReport = () => {
       </div>
 
       {/* ── BODY ── */}
-      <div className="flex-1 overflow-auto p-4 flex flex-col gap-3 min-h-0">
+      <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
         {/* ── FILTERS CARD ── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
           <div className="flex items-center gap-1.5 mb-3">
@@ -684,7 +684,7 @@ const HourlyReport = () => {
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
             {/* ── LEFT COLUMN ── */}
             <div className="flex flex-col gap-3">
-              {/* Hourly Summary Table */}
+              {/* Hourly Summary Table — always shows all rows (H1–H13) */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                 <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 shrink-0">
                   <List className="w-3.5 h-3.5 text-blue-500" />
@@ -692,10 +692,11 @@ const HourlyReport = () => {
                     Hourly Production Summary
                   </span>
                   <span className="text-[11px] text-slate-400 hidden sm:block">
-                    · Units produced & distinct models per hour
+                    · Units produced &amp; distinct models per hour
                   </span>
                 </div>
-                <div className="overflow-auto max-h-64">
+                {/* ✅ No max-h — 13 rows always visible, outer body scrolls */}
+                <div className="overflow-auto">
                   <table className="min-w-full text-xs text-left border-separate border-spacing-0">
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-slate-100">
@@ -743,7 +744,7 @@ const HourlyReport = () => {
                 </div>
               </div>
 
-              {/* Bar Chart */}
+              {/* Bar Chart — scales with viewport */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                 <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 shrink-0">
                   <BarChart2 className="w-3.5 h-3.5 text-blue-500" />
@@ -754,7 +755,8 @@ const HourlyReport = () => {
                     · Output count per hour
                   </span>
                 </div>
-                <div className="p-4 h-64">
+                {/* ✅ Responsive: 35% of viewport, minimum 250px */}
+                <div className="p-4 h-[35vh] min-h-[250px]">
                   {chartData ? (
                     <Bar data={chartData} options={chartOptions} />
                   ) : (
@@ -772,7 +774,7 @@ const HourlyReport = () => {
 
             {/* ── RIGHT COLUMN ── */}
             <div className="flex flex-col gap-3">
-              {/* Model-wise Table */}
+              {/* Model-wise Table — viewport-relative scroll */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                 <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 shrink-0">
                   <Cpu className="w-3.5 h-3.5 text-blue-500" />
@@ -783,7 +785,8 @@ const HourlyReport = () => {
                     · Units per model variant
                   </span>
                 </div>
-                <div className="overflow-auto max-h-64">
+                {/* ✅ 50vh — adapts to any screen, scrolls only if overflow */}
+                <div className="overflow-auto max-h-[50vh]">
                   <table className="min-w-full text-xs text-left border-separate border-spacing-0">
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-slate-100">
@@ -823,7 +826,7 @@ const HourlyReport = () => {
                 </div>
               </div>
 
-              {/* Category-wise Table */}
+              {/* Category-wise Table — viewport-relative scroll */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                 <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 shrink-0">
                   <Tag className="w-3.5 h-3.5 text-blue-500" />
@@ -834,7 +837,8 @@ const HourlyReport = () => {
                     · Units per product category
                   </span>
                 </div>
-                <div className="overflow-auto max-h-64">
+                {/* ✅ 50vh — adapts to any screen, scrolls only if overflow */}
+                <div className="overflow-auto max-h-[50vh]">
                   <table className="min-w-full text-xs text-left border-separate border-spacing-0">
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-slate-100">

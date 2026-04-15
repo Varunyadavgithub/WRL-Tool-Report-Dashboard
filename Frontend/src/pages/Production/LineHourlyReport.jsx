@@ -18,13 +18,10 @@ import {
   Factory,
   Truck,
   Settings,
-  BarChart2,
   Search,
   Download,
   Calendar,
   History,
-  TrendingUp,
-  Clock,
   Moon,
   Sun,
   Gauge,
@@ -32,7 +29,6 @@ import {
   RefreshCw,
   Zap,
   Wind,
-  LayoutDashboard,
 } from "lucide-react";
 
 ChartJS.register(
@@ -114,6 +110,12 @@ const CHART = {
   slate: "rgba(100,116,139,0.65)",
   teal: "rgba(20,184,166,0.70)",
 };
+
+// ── How tall one data-row is (px) — tune once to match HourlyWidget ──
+const ROW_H = 34;
+const WIDGET_CHROME = 120;
+const MAX_VISIBLE_ROWS = 13;
+const WIDGET_MIN_H = WIDGET_CHROME + ROW_H * MAX_VISIBLE_ROWS;
 
 // ── Spinner ────────────────────────────────────────────────────────────────────
 const Spinner = ({ cls = "w-4 h-4" }) => (
@@ -274,6 +276,7 @@ const LineHourlyReport = () => {
     paramsRef.current = p;
     runFetch(p, lineType);
   };
+
   const handleToday = () => {
     const now = new Date(),
       s = new Date(now);
@@ -282,6 +285,7 @@ const LineHourlyReport = () => {
     paramsRef.current = p;
     runFetch(p, lineType);
   };
+  
   const handleYesterday = () => {
     const e = new Date();
     e.setHours(8, 0, 0, 0);
@@ -367,7 +371,11 @@ const LineHourlyReport = () => {
         { label: "Manual", value: mp, color: "amber" },
         { label: "Post SUS", value: sus, color: "violet" },
         { label: "VISI", value: visi, color: "emerald" },
-        { label: "Grand Total", value: pf + mp + sus + visi, highlight: true },
+        {
+          label: "Grand Total",
+          value: pf + mp + sus + visi,
+          highlight: true,
+        },
       ];
     } else if (lineType === "Foaming") {
       const a = d.foamA.reduce((s, r) => s + (r.COUNT || 0), 0);
@@ -428,7 +436,12 @@ const LineHourlyReport = () => {
       else night += v;
     }
     const dayPct = grandTotal > 0 ? Math.round((day / grandTotal) * 100) : 0;
-    return { avg, peakHour: peakEntry[0], peakCount: peakEntry[1], dayPct };
+    return {
+      avg,
+      peakHour: peakEntry[0],
+      peakCount: peakEntry[1],
+      dayPct,
+    };
   }, [apiData, lineType, grandTotal]);
 
   // ── Export ─────────────────────────────────────────────────────────────────
@@ -650,12 +663,12 @@ const LineHourlyReport = () => {
   };
 
   /* ══════════════════════════════════════════════════════════
-     RENDER — lives inside Layout <Outlet />, use h-full
+     RENDER
   ══════════════════════════════════════════════════════════ */
   return (
     <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
-      {/* ── PAGE HEADER — sticky, Overview pattern ── */}
-      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
+      {/* ── PAGE HEADER — always pinned at top, never scrolls ── */}
+      <div className="shrink-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm">
         <div>
           <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
             Line Hourly Report
@@ -665,7 +678,6 @@ const LineHourlyReport = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Insights badges */}
           {insights && (
             <>
               <span className="flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-full font-medium">
@@ -688,7 +700,6 @@ const LineHourlyReport = () => {
               <RefreshCw className="w-3 h-3" /> {countdown}s
             </span>
           )}
-          {/* Grand total badge */}
           <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-blue-50 border border-blue-100 min-w-[90px]">
             <span className="text-xl font-bold font-mono text-blue-700">
               {grandTotal.toLocaleString()}
@@ -710,8 +721,8 @@ const LineHourlyReport = () => {
         </div>
       </div>
 
-      {/* ── BODY ── */}
-      <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3 min-h-0">
+      {/* ── SCROLLABLE BODY — everything below the header scrolls ── */}
+      <div className="flex-1 overflow-y-auto flex flex-col p-4 gap-3">
         {/* ── TOOLBAR CARD ── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
           <div className="flex flex-wrap items-end gap-3">
@@ -829,10 +840,14 @@ const LineHourlyReport = () => {
               </span>
               <div
                 onClick={() => setAutoRefresh((p) => !p)}
-                className={`relative w-9 h-5 rounded-full cursor-pointer transition-colors ${autoRefresh ? "bg-blue-500" : "bg-slate-300"}`}
+                className={`relative w-9 h-5 rounded-full cursor-pointer transition-colors ${
+                  autoRefresh ? "bg-blue-500" : "bg-slate-300"
+                }`}
               >
                 <div
-                  className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${autoRefresh ? "translate-x-4" : "translate-x-0"}`}
+                  className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                    autoRefresh ? "translate-x-4" : "translate-x-0"
+                  }`}
                 />
               </div>
             </div>
@@ -858,7 +873,10 @@ const LineHourlyReport = () => {
               ) : (
                 <div
                   key={i}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl border flex-1 min-w-0 ${cardColorMap[card.color] || "bg-white border-slate-200 text-slate-700"}`}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl border flex-1 min-w-0 ${
+                    cardColorMap[card.color] ||
+                    "bg-white border-slate-200 text-slate-700"
+                  }`}
                 >
                   <span className="text-xs font-medium truncate opacity-80">
                     {card.label}
@@ -872,15 +890,20 @@ const LineHourlyReport = () => {
           </div>
         )}
 
-        {/* ── WIDGET GRID ── */}
-        <div className="flex-1 min-h-0">
+        {/* ── WIDGET GRID ──
+            • Each widget has minHeight so H1–H13 show without scroll
+            • If data > 13 rows, the widget's internal table scrolls
+            • The whole body panel scrolls if grid is taller than viewport
+        ── */}
+        <div className="shrink-0">
           {loading ? (
             <div
-              className="h-full"
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(3, 1fr)",
-                gridTemplateRows: is5 ? "1fr 1fr" : "1fr",
+                gridTemplateRows: is5
+                  ? `repeat(2, minmax(${WIDGET_MIN_H}px, auto))`
+                  : `minmax(${WIDGET_MIN_H}px, auto)`,
                 gap: 10,
               }}
             >
@@ -888,7 +911,10 @@ const LineHourlyReport = () => {
                 <div
                   key={i}
                   className="bg-white rounded-xl border border-slate-200 animate-pulse overflow-hidden"
-                  style={{ gridColumn: is5 && i === 4 ? "span 2" : undefined }}
+                  style={{
+                    gridColumn: is5 && i === 4 ? "span 2" : undefined,
+                    minHeight: WIDGET_MIN_H,
+                  }}
                 >
                   <div className="h-9 bg-slate-50 border-b border-slate-100" />
                   <div className="p-3 space-y-2">
@@ -905,11 +931,12 @@ const LineHourlyReport = () => {
             </div>
           ) : (
             <div
-              className="h-full"
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(3, 1fr)",
-                gridTemplateRows: is5 ? "1fr 1fr" : "1fr",
+                gridTemplateRows: is5
+                  ? `repeat(2, minmax(${WIDGET_MIN_H}px, auto))`
+                  : `minmax(${WIDGET_MIN_H}px, auto)`,
                 gap: 10,
               }}
             >
@@ -918,7 +945,13 @@ const LineHourlyReport = () => {
                 if (is5 && i === 3) gridColumn = "1";
                 if (is5 && i === 4) gridColumn = "2 / span 2";
                 return (
-                  <div key={i} style={{ gridColumn, minHeight: 0 }}>
+                  <div
+                    key={i}
+                    style={{
+                      gridColumn,
+                      minHeight: WIDGET_MIN_H,
+                    }}
+                  >
                     <HourlyWidget
                       title={wc.title}
                       data={wc.data}
@@ -926,6 +959,7 @@ const LineHourlyReport = () => {
                       datasets={wc.datasets}
                       isCategoryChart={!!wc.isCategoryChart}
                       icon={wc.icon}
+                      maxVisibleRows={MAX_VISIBLE_ROWS}
                     />
                   </div>
                 );

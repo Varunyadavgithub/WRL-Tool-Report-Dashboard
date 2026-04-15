@@ -417,7 +417,7 @@ const TotalProduction = () => {
       </div>
 
       {/* ── BODY ── */}
-      <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3 min-h-0">
+      <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3">
         {/* ── FILTERS + QUICK FILTERS ROW ── */}
         <div className="flex gap-3 shrink-0">
           {/* Filters card */}
