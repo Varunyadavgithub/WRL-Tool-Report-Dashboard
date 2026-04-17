@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import Loader from "../../components/ui/Loader";
 import DateTimePicker from "../../components/ui/DateTimePicker";
-import Button from "../../components/ui/Button";
 import FpaModelDetailModal from "../../components/FpaModelDetailModal";
 import FpaDefectDetailModal from "../../components/FpaDefectDetailModal";
 import toast from "react-hot-toast";
@@ -35,66 +34,60 @@ import {
 } from "../../utils/dateUtils";
 
 import {
-  HiOutlineClipboardList,
-  HiOutlineSearch,
-  HiOutlineDocumentReport,
-  HiOutlineBadgeCheck,
-  HiOutlineExclamationCircle,
-  HiOutlineFilter,
-  HiOutlineLightningBolt,
-  HiOutlineChartBar,
-  HiOutlinePrinter,
-} from "react-icons/hi";
-import {
-  FiRefreshCw,
-  FiDownload,
-  FiTrendingUp,
-  FiTrendingDown,
-  FiMinus,
-  FiChevronLeft,
-  FiChevronRight,
-} from "react-icons/fi";
-import {
-  FaSearch,
-  FaRedo,
-  FaCalendarAlt,
-  FaArrowRight,
-  FaCheckCircle,
-  FaTimesCircle,
-  FaExclamationTriangle,
-  FaShieldAlt,
-} from "react-icons/fa";
-import { MdOutlineFactory, MdOutlineSpeed, MdWarning } from "react-icons/md";
-import { BiBarChartAlt2 } from "react-icons/bi";
-import { RiAlarmWarningLine } from "react-icons/ri";
-import { IoMdTrendingUp } from "react-icons/io";
+  Factory,
+  Filter,
+  Search,
+  RefreshCw,
+  RotateCcw,
+  Download,
+  Printer,
+  Zap,
+  ChevronRight,
+  ChevronLeft,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Shield,
+  Gauge,
+  BarChart3,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  ArrowRight,
+  ClipboardList,
+  BadgeCheck,
+  FileText,
+  PackageOpen,
+  Loader2,
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  Siren,
+} from "lucide-react";
 
-/* ----------------------------------------------
-   CONSTANTS
----------------------------------------------- */
+// ─── Constants ─────────────────────────────────────────────────────────────────
+
 const PALETTE = {
   critical: "#dc2626",
   major: "#ea580c",
   minor: "#ca8a04",
   done: "#16a34a",
   pending: "#e11d48",
-  navy: "#1e3a5f",
-  slate: "#64748b",
 };
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
-/* ----------------------------------------------
-   HELPERS
----------------------------------------------- */
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
 const fpqiStatus = (val) => {
   if (val === null || val === undefined) return null;
   if (val > 5)
     return {
       label: "Poor",
-      bg: "bg-red-100",
-      text: "text-red-700",
-      border: "border-red-200",
+      bg: "bg-rose-100",
+      text: "text-rose-700",
+      border: "border-rose-200",
     };
   if (val > 2)
     return {
@@ -113,8 +106,6 @@ const fpqiStatus = (val) => {
 
 const exportToCSV = (data, label = "fpa_report") => {
   if (!data || !data.length) return;
-
-  // BUG FIX #5: Column order now matches the table display order
   const headers = [
     "Model Name",
     "Production",
@@ -128,23 +119,19 @@ const exportToCSV = (data, label = "fpa_report") => {
     "FPQI",
     "Rating",
   ];
-
   const rows = data.map((r) => {
     const pct =
       r.FPA > 0
         ? Math.min(100, Math.round((r.SampleInspected / r.FPA) * 100))
         : 0;
-
     const fpqi =
       r.FPQI !== null && r.FPQI !== undefined
         ? parseFloat(r.FPQI).toFixed(3)
         : "N/A";
-
     const st =
       r.FPQI !== null && r.FPQI !== undefined
         ? fpqiStatus(parseFloat(r.FPQI))?.label || "N/A"
         : "N/A";
-
     return [
       `"${r.ModelName}"`,
       r.ModelCount || 0,
@@ -159,56 +146,52 @@ const exportToCSV = (data, label = "fpa_report") => {
       st,
     ];
   });
-
   const csvContent = [
     headers.join(","),
     ...rows.map((row) => row.join(",")),
   ].join("\n");
-
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
-
   const link = document.createElement("a");
   link.href = url;
   link.download = `${label}_${new Date().toISOString().slice(0, 10)}.csv`;
-
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-
   URL.revokeObjectURL(url);
 };
 
-/* ----------------------------------------------
-   SUB-COMPONENTS
----------------------------------------------- */
+// ─── Spinner ───────────────────────────────────────────────────────────────────
+const Spinner = ({ cls = "w-4 h-4" }) => (
+  <Loader2 className={`animate-spin ${cls}`} />
+);
 
-/* KPI Card */
+// ─── KPI Card ──────────────────────────────────────────────────────────────────
 const KpiCard = ({ icon: Icon, label, value, sub, colorClass, iconBg }) => (
-  <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 flex flex-col gap-1.5">
+  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3.5 flex flex-col gap-1.5 hover:shadow-md transition-all">
     <div className="flex items-center justify-between">
-      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
+      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
         {label}
       </span>
       <span className={`p-1.5 rounded-lg ${iconBg}`}>
-        <Icon size={14} />
+        <Icon className="w-3.5 h-3.5" />
       </span>
     </div>
-    <div className={`text-2xl font-black tracking-tight ${colorClass}`}>
+    <div className={`text-2xl font-extrabold tracking-tight ${colorClass}`}>
       {value}
     </div>
-    {sub && <div className="text-[11px] text-gray-400">{sub}</div>}
+    {sub && <div className="text-[11px] text-slate-400">{sub}</div>}
   </div>
 );
 
-/* Section Panel */
+// ─── Panel ─────────────────────────────────────────────────────────────────────
 const Panel = ({ title, icon: Icon, right, children, className = "" }) => (
   <div
-    className={`bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden ${className}`}
+    className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden ${className}`}
   >
-    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/60">
-      <h3 className="text-xs font-bold text-gray-600 uppercase tracking-widest flex items-center gap-2">
-        {Icon && <Icon size={14} className="text-blue-600" />}
+    <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 shrink-0">
+      <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+        {Icon && <Icon className="w-3.5 h-3.5 text-blue-500" />}
         {title}
       </h3>
       {right && <div className="flex items-center gap-2">{right}</div>}
@@ -217,12 +200,12 @@ const Panel = ({ title, icon: Icon, right, children, className = "" }) => (
   </div>
 );
 
-/* Custom Chart Tooltip */
+// ─── Chart Tooltip ─────────────────────────────────────────────────────────────
 const ChartTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-xl p-3 text-xs min-w-[150px]">
-      <p className="font-bold text-gray-700 mb-2 truncate max-w-[200px]">
+    <div className="bg-white border border-slate-200 rounded-lg shadow-xl p-3 text-xs min-w-[150px]">
+      <p className="font-bold text-slate-700 mb-2 truncate max-w-[200px]">
         {label}
       </p>
       {payload.map((p) => (
@@ -232,50 +215,49 @@ const ChartTooltip = ({ active, payload, label }) => {
         >
           <span className="flex items-center gap-1.5">
             <span
-              className="w-2 h-2 rounded-full flex-shrink-0"
+              className="w-2 h-2 rounded-full shrink-0"
               style={{ background: p.fill || p.color }}
             />
-            <span className="text-gray-500 capitalize">{p.name}</span>
+            <span className="text-slate-500 capitalize">{p.name}</span>
           </span>
-          <span className="font-bold text-gray-800">{p.value}</span>
+          <span className="font-bold text-slate-800">{p.value}</span>
         </div>
       ))}
     </div>
   );
 };
 
-/* Inline Sort Icon */
-// BUG FIX #4: SortIcon alignment now follows the column, not forced to center
+// ─── Sort Icon ─────────────────────────────────────────────────────────────────
 const SortIcon = ({ field, sortField, sortDir }) => {
   if (sortField !== field)
-    return <FiMinus size={9} className="opacity-25 ml-0.5" />;
+    return <Minus className="w-2 h-2 opacity-25 ml-0.5" />;
   return sortDir === "asc" ? (
-    <FiTrendingUp size={9} className="text-blue-500 ml-0.5" />
+    <TrendingUp className="w-2.5 h-2.5 text-blue-500 ml-0.5" />
   ) : (
-    <FiTrendingDown size={9} className="text-blue-500 ml-0.5" />
+    <TrendingDown className="w-2.5 h-2.5 text-blue-500 ml-0.5" />
   );
 };
 
-/* Worst-Model Mini Card */
-const ModelAlertCard = ({ model, index, onView }) => {
+// ─── Model Alert Card ──────────────────────────────────────────────────────────
+const ModelAlertCard = ({ model, index }) => {
   const fpqi = parseFloat(model.FPQI);
   const st = fpqiStatus(fpqi);
   const totalDefects =
     (model.Critical || 0) + (model.Major || 0) + (model.Minor || 0);
   return (
-    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-orange-200 hover:bg-orange-50/30 transition-all">
-      <div className="w-7 h-7 rounded-full bg-orange-100 text-orange-700 font-black text-xs flex items-center justify-center flex-shrink-0">
+    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100 hover:border-amber-200 hover:bg-amber-50/30 transition-all">
+      <div className="w-7 h-7 rounded-full bg-amber-100 text-amber-700 font-extrabold text-[10px] flex items-center justify-center shrink-0">
         {index + 1}
       </div>
       <div className="flex-1 min-w-0">
         <p
-          className="text-xs font-semibold text-gray-800 truncate"
+          className="text-xs font-semibold text-slate-800 truncate"
           title={model.ModelName}
         >
           {model.ModelName}
         </p>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] text-red-500 font-bold">
+          <span className="text-[10px] text-rose-500 font-bold">
             C:{model.Critical || 0}
           </span>
           <span className="text-[10px] text-orange-500 font-bold">
@@ -284,13 +266,13 @@ const ModelAlertCard = ({ model, index, onView }) => {
           <span className="text-[10px] text-yellow-500 font-bold">
             m:{model.Minor || 0}
           </span>
-          <span className="text-[10px] text-gray-400">
+          <span className="text-[10px] text-slate-400">
             | {totalDefects} defects
           </span>
         </div>
       </div>
       <span
-        className={`text-[10px] font-bold px-2 py-0.5 rounded border ${st?.bg} ${st?.text} ${st?.border} flex-shrink-0`}
+        className={`text-[10px] font-bold px-2 py-0.5 rounded border shrink-0 ${st?.bg} ${st?.text} ${st?.border}`}
       >
         {fpqi.toFixed(2)}
       </span>
@@ -298,13 +280,12 @@ const ModelAlertCard = ({ model, index, onView }) => {
   );
 };
 
-/* ----------------------------------------------
-   MAIN COMPONENT
----------------------------------------------- */
+// ─── Main Component ────────────────────────────────────────────────────────────
+
 const FpaHistory = () => {
   const dispatch = useDispatch();
 
-  /* -- Redux state -- */
+  // ── Redux state ────────────────────────────────────────────────────────────
   const fpaState = useSelector((s) => s.fpaReport);
   const filters = fpaState?.filters || { startDate: "", endDate: "" };
   const activeQuickFilter = fpaState?.activeQuickFilter || null;
@@ -313,7 +294,7 @@ const FpaHistory = () => {
   const isDefectModalOpen = fpaState?.isDefectModalOpen || false;
   const selectedFGSRNo = fpaState?.selectedFGSRNo || null;
 
-  /* -- Local state -- */
+  // ── Local state ────────────────────────────────────────────────────────────
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -325,7 +306,7 @@ const FpaHistory = () => {
 
   const hasFilters = !!(filters.startDate && filters.endDate);
 
-  /* -- API -- */
+  // ── API ────────────────────────────────────────────────────────────────────
   const {
     data: historyData,
     isLoading: historyLoading,
@@ -338,7 +319,7 @@ const FpaHistory = () => {
 
   const rawData = historyData?.data || [];
 
-  /* -- Derived / filtered / sorted data -- */
+  // ── Derived / filtered / sorted data ───────────────────────────────────────
   const fpaData = useMemo(() => {
     let d = [...rawData];
     if (searchTerm.trim()) {
@@ -358,11 +339,10 @@ const FpaHistory = () => {
     return d;
   }, [rawData, searchTerm, sortField, sortDir]);
 
-  /* Paginated slice */
   const totalPages = Math.max(1, Math.ceil(fpaData.length / pageSize));
   const pagedData = fpaData.slice((page - 1) * pageSize, page * pageSize);
 
-  /* -- KPIs -- */
+  // ── KPIs ───────────────────────────────────────────────────────────────────
   const kpis = useMemo(() => {
     const total = rawData.length;
     const done = rawData.filter((r) => r.SampleInspected >= r.FPA).length;
@@ -393,8 +373,7 @@ const FpaHistory = () => {
     };
   }, [rawData]);
 
-  /* -- Chart data -- */
-  /* Top-10 defect bar chart */
+  // ── Chart data ─────────────────────────────────────────────────────────────
   const defectBarData = useMemo(
     () =>
       [...rawData]
@@ -419,7 +398,6 @@ const FpaHistory = () => {
     [rawData],
   );
 
-  /* Production vs Inspected (top 10 by production) */
   const prodVsInspData = useMemo(
     () =>
       [...rawData]
@@ -437,13 +415,6 @@ const FpaHistory = () => {
     [rawData],
   );
 
-  /*
-   * BUG FIX #2: FPQI ranking — "worst first" means highest FPQI at top.
-   * Previously `.reverse()` was called after slicing which flipped the order
-   * to best-first, contradicting the panel title "Worst First".
-   * FIX: Sort descending (worst first) and do NOT reverse, so the horizontal
-   * bar chart renders worst model at the top (first entry = top Y-axis item).
-   */
   const fpqiRankData = useMemo(
     () =>
       rawData
@@ -469,7 +440,6 @@ const FpaHistory = () => {
     [rawData],
   );
 
-  /* Pie charts */
   const statusPie = useMemo(
     () => [
       { name: "Done", value: kpis.done, color: PALETTE.done },
@@ -492,7 +462,6 @@ const FpaHistory = () => {
     [kpis],
   );
 
-  /* Worst-FPQI models for alert cards */
   const worstModels = useMemo(
     () =>
       rawData
@@ -505,7 +474,6 @@ const FpaHistory = () => {
     [rawData],
   );
 
-  // BUG FIX #6: Memoize the FPQI watchlist data instead of computing inline twice
   const watchlistData = useMemo(
     () =>
       rawData
@@ -517,7 +485,7 @@ const FpaHistory = () => {
     [rawData],
   );
 
-  /* -- Handlers -- */
+  // ── Handlers ───────────────────────────────────────────────────────────────
   const handleQuery = () => {
     if (!startTime || !endTime) {
       toast.error("Please select both start and end date/time");
@@ -574,50 +542,12 @@ const FpaHistory = () => {
     setPage(1);
   };
 
-  /*
-   * BUG FIX #1 — Critical/Major/Minor not showing in detail modal.
-   *
-   * Root cause: `openModelModal(item.ModelName)` passes only the model name
-   * string. The `FpaModelDetailModal` has no way to access defect counts
-   * (Critical, Major, Minor) unless it re-fetches them separately.
-   *
-   * If your Redux slice + modal are designed to re-fetch data by model name,
-   * the defect counts must come from that API response — make sure the API
-   * returns Critical/Major/Minor fields and the modal reads them.
-   *
-   * If the modal is NOT doing a separate fetch (just reading from Redux store),
-   * you MUST dispatch the full row object instead of just the model name.
-   * Two possible fixes depending on your slice design:
-   *
-   * Option A — slice stores the full selected model object:
-   *   dispatch(openModelModal(item))  // pass whole row object
-   *
-   * Option B — slice stores only name (current), but modal fetches by name:
-   *   Ensure the API endpoint called by the modal returns Critical/Major/Minor.
-   *   No change needed here; fix is in FpaModelDetailModal or the API.
-   *
-   * We implement Option A below (safest, works without API changes).
-   * Update your fpaReportSlice `openModelModal` reducer to accept an object:
-   *   openModelModal: (state, action) => {
-   *     state.isModelModalOpen = true;
-   *     state.selectedModel = action.payload; // full object, not just string
-   *   }
-   * And read selectedModel.ModelName wherever you need the name in the modal.
-   */
   const handleOpenModelModal = (item) => {
-    dispatch(openModelModal(item)); // FIX: pass full item object, not just ModelName
+    dispatch(openModelModal(item));
   };
-
-  const handlePrint = () => window.print();
 
   const isLoading = historyLoading || historyFetching;
 
-  /*
-   * BUG FIX #3 — Pagination page number generation.
-   * Original formula: `Math.max(1, Math.min(totalPages - 4, page - 2)) + i`
-   * could produce page numbers > totalPages when totalPages < 5.
-   * Fixed with a proper window calculation that clamps to valid range.
-   */
   const pageNumbers = useMemo(() => {
     const windowSize = Math.min(5, totalPages);
     let start = Math.max(1, page - Math.floor(windowSize / 2));
@@ -629,162 +559,237 @@ const FpaHistory = () => {
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   }, [page, totalPages]);
 
-  /* ----------------------------------------------
+  // ── Table columns config ───────────────────────────────────────────────────
+  const TABLE_COLS = [
+    { field: "ModelName", label: "Model Name", align: "left" },
+    { field: "ModelCount", label: "Production", align: "center" },
+    { field: "FPA", label: "FPA Req.", align: "center" },
+    { field: "SampleInspected", label: "Inspected", align: "center" },
+    { field: null, label: "Progress", align: "center" },
+    { field: null, label: "Status", align: "center" },
+    { field: "Critical", label: "C", align: "center" },
+    { field: "Major", label: "M", align: "center" },
+    { field: "Minor", label: "m", align: "center" },
+    { field: "FPQI", label: "FPQI", align: "center" },
+    { field: null, label: "Action", align: "center" },
+  ];
+
+  /* ══════════════════════════════════════════════════════════
      RENDER
-  ---------------------------------------------- */
+  ══════════════════════════════════════════════════════════ */
   return (
-    <div className="min-h-screen bg-slate-50/80 font-sans">
-      {/* -- PAGE HEADER -- */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 px-6 py-4 shadow-xl print:hidden">
-        <div className="max-w-screen-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="bg-blue-500/20 border border-blue-400/30 p-2.5 rounded-xl">
-              <MdOutlineFactory size={22} className="text-blue-300" />
-            </span>
-            <div>
-              <h1 className="text-lg font-black text-white tracking-tight">
-                FPA Report Dashboard
-              </h1>
-              <p className="text-blue-300/70 text-[11px] mt-0.5 font-medium">
-                Final Product Audit · Quality Inspection Centre
-              </p>
-            </div>
-          </div>
+    <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
+      {/* ── PAGE HEADER — sticky ── */}
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
+        <div>
+          <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
+            FPA Report Dashboard
+          </h1>
+          <p className="text-[11px] text-slate-400">
+            Final Product Audit · Quality Inspection Centre
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
           {rawData.length > 0 && (
-            <div className="flex items-center gap-2">
+            <>
               <button
-                onClick={handlePrint}
-                className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors border border-white/15"
+                onClick={() => window.print()}
+                className="flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg font-medium hover:bg-slate-100 transition-colors"
               >
-                <HiOutlinePrinter size={13} /> Print
+                <Printer className="w-3 h-3" /> Print
               </button>
               <button
                 onClick={() => exportToCSV(rawData)}
-                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 text-[11px] text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1 rounded-lg font-semibold transition-colors shadow-sm shadow-blue-200"
               >
-                <FiDownload size={13} /> Export CSV
+                <Download className="w-3 h-3" /> Export CSV
               </button>
+            </>
+          )}
+
+          <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-blue-50 border border-blue-100 min-w-[90px]">
+            <span className="text-xl font-bold font-mono text-blue-700">
+              {rawData.length}
+            </span>
+            <span className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">
+              Models
+            </span>
+          </div>
+
+          {kpis.avgFPQI && (
+            <div
+              className={`flex flex-col items-center px-4 py-1.5 rounded-lg border min-w-[90px] ${
+                parseFloat(kpis.avgFPQI) > 5
+                  ? "bg-rose-50 border-rose-100"
+                  : parseFloat(kpis.avgFPQI) > 2
+                    ? "bg-amber-50 border-amber-100"
+                    : "bg-emerald-50 border-emerald-100"
+              }`}
+            >
+              <span
+                className={`text-xl font-bold font-mono ${
+                  parseFloat(kpis.avgFPQI) > 5
+                    ? "text-rose-700"
+                    : parseFloat(kpis.avgFPQI) > 2
+                      ? "text-amber-700"
+                      : "text-emerald-700"
+                }`}
+              >
+                {kpis.avgFPQI}
+              </span>
+              <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">
+                Avg FPQI
+              </span>
             </div>
           )}
         </div>
       </div>
 
-      <div className="max-w-screen-2xl mx-auto px-4 md:px-5 py-4 space-y-4">
-        {/* -- FILTERS -- */}
-        <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm print:hidden">
-          <div className="flex items-center gap-2 mb-3">
-            <HiOutlineFilter size={13} className="text-blue-600" />
-            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+      {/* ── BODY ── */}
+      <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
+        {/* ── FILTERS CARD ── */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
+          <div className="flex items-center gap-1.5 mb-3">
+            <Filter className="w-3 h-3 text-slate-400" />
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
               Filters
-            </span>
+            </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-            <div className="md:col-span-3">
-              <DateTimePicker
-                label="Start Date / Time"
-                name="startTime"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
-            </div>
-            <div className="md:col-span-3">
-              <DateTimePicker
-                label="End Date / Time"
-                name="endTime"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
-            </div>
 
-            <div className="md:col-span-3 flex items-end gap-2">
-              <Button
-                onClick={handleQuery}
-                bgColor={
-                  isLoading ? "bg-gray-300" : "bg-blue-700 hover:bg-blue-800"
-                }
-                textColor="text-white"
-                className="px-4 py-[9px] text-sm flex items-center gap-1.5 font-bold rounded-lg flex-1"
-                disabled={isLoading}
-              >
-                <FaSearch size={10} />
-                {isLoading ? "Loading…" : "Search"}
-              </Button>
-              <button
-                onClick={() => hasFilters && refetchHistory()}
-                disabled={isLoading || !hasFilters}
-                title="Refresh"
-                className="p-[9px] rounded-lg bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-gray-500 disabled:opacity-40 transition-colors border border-gray-200"
-              >
-                <FiRefreshCw
-                  size={14}
-                  className={isLoading ? "animate-spin" : ""}
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto] gap-4">
+            {/* Left: controls */}
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="min-w-[170px] flex-1">
+                <DateTimePicker
+                  label="Start Date / Time"
+                  name="startTime"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
                 />
-              </button>
-              <Button
-                onClick={handleReset}
-                bgColor="bg-gray-100 hover:bg-red-50"
-                textColor="text-gray-500 hover:text-red-600"
-                className="px-3 py-[9px] text-sm flex items-center gap-1.5 rounded-lg border border-gray-200"
-              >
-                <FaRedo size={10} /> Reset
-              </Button>
-            </div>
+              </div>
+              <div className="min-w-[170px] flex-1">
+                <DateTimePicker
+                  label="End Date / Time"
+                  name="endTime"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                />
+              </div>
 
-            <div className="md:col-span-3 flex items-end gap-2">
-              <span className="text-[10px] text-gray-400 font-semibold whitespace-nowrap mb-[10px]">
-                Quick:
-              </span>
-              {[
-                { key: "today", label: "Today" },
-                { key: "yesterday", label: "YDAY" },
-                { key: "mtd", label: "MTD" },
-              ].map(({ key, label }) => (
+              {/* Action buttons */}
+              <div className="flex items-center gap-2 pb-0.5 shrink-0">
                 <button
-                  key={key}
-                  onClick={() => !isLoading && handleQuickFilter(key)}
+                  onClick={handleQuery}
                   disabled={isLoading}
-                  className={`px-3 py-[9px] text-xs font-bold rounded-lg transition-all disabled:opacity-50 flex-1 ${
-                    activeQuickFilter === key
-                      ? "bg-blue-700 text-white shadow-sm ring-2 ring-blue-300 ring-offset-1"
-                      : "bg-gray-100 hover:bg-blue-50 hover:text-blue-700 text-gray-600 border border-gray-200"
+                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    isLoading
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
                   }`}
                 >
-                  {label}
+                  {isLoading ? (
+                    <Spinner cls="w-4 h-4" />
+                  ) : (
+                    <Search className="w-4 h-4" />
+                  )}
+                  {isLoading ? "Loading…" : "Search"}
                 </button>
-              ))}
+
+                <button
+                  onClick={() => hasFilters && refetchHistory()}
+                  disabled={isLoading || !hasFilters}
+                  title="Refresh"
+                  className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors disabled:opacity-40"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
+                  />
+                </button>
+
+                <button
+                  onClick={handleReset}
+                  title="Reset Filters"
+                  className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200 rounded-lg transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Right: Quick Filters */}
+            <div className="border-l border-slate-100 pl-5 flex flex-col justify-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <Zap className="w-3 h-3 text-amber-400" />
+                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                  Quick Select
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                {[
+                  { key: "yesterday", label: "Yesterday", color: "amber" },
+                  { key: "today", label: "Today", color: "blue" },
+                  { key: "mtd", label: "Month to Date", color: "emerald" },
+                ].map(({ key, label, color }) => {
+                  const active = activeQuickFilter === key;
+                  const colorMap = {
+                    amber: active
+                      ? "bg-amber-500 text-white border-amber-500 shadow-sm shadow-amber-200"
+                      : "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100",
+                    blue: active
+                      ? "bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-200"
+                      : "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100",
+                    emerald: active
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-200"
+                      : "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100",
+                  };
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => !isLoading && handleQuickFilter(key)}
+                      disabled={isLoading}
+                      className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${colorMap[color]} ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      {label}
+                      <ChevronRight className="w-3 h-3" />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* -- LOADING -- */}
+        {/* ── LOADING ── */}
         {isLoading && (
-          <div className="flex items-center justify-center py-16">
-            <Loader />
+          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-center gap-3">
+            <Spinner cls="w-5 h-5 text-blue-600" />
+            <p className="text-sm text-slate-400">Fetching FPA data…</p>
           </div>
         )}
 
-        {/* -------------- DATA CONTENT -------------- */}
+        {/* ── DATA CONTENT ── */}
         {!isLoading && rawData.length > 0 && (
           <>
-            {/* -- KPI STRIP -- */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+            {/* ── KPI STRIP ── */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
               <KpiCard
-                icon={MdOutlineFactory}
+                icon={Factory}
                 label="Total Models"
                 value={kpis.total}
                 colorClass="text-blue-900"
                 iconBg="bg-blue-100 text-blue-600"
               />
               <KpiCard
-                icon={FaCheckCircle}
+                icon={CheckCircle2}
                 label="Completed"
                 value={kpis.done}
-                sub={`${kpis.total ? Math.round((kpis.done / kpis.total) * 100) : 0}% completion rate`}
+                sub={`${kpis.total ? Math.round((kpis.done / kpis.total) * 100) : 0}% completion`}
                 colorClass="text-emerald-700"
                 iconBg="bg-emerald-100 text-emerald-600"
               />
               <KpiCard
-                icon={FaTimesCircle}
+                icon={XCircle}
                 label="Pending"
                 value={kpis.pending}
                 sub={`${kpis.total ? Math.round((kpis.pending / kpis.total) * 100) : 0}% remaining`}
@@ -792,121 +797,116 @@ const FpaHistory = () => {
                 iconBg="bg-rose-100 text-rose-600"
               />
               <KpiCard
-                icon={RiAlarmWarningLine}
-                label="Critical Defects"
+                icon={Siren}
+                label="Critical"
                 value={kpis.totalCritical}
                 colorClass="text-red-700"
                 iconBg="bg-red-100 text-red-600"
               />
               <KpiCard
-                icon={FaExclamationTriangle}
-                label="Major Defects"
+                icon={AlertTriangle}
+                label="Major"
                 value={kpis.totalMajor}
                 colorClass="text-orange-700"
                 iconBg="bg-orange-100 text-orange-600"
               />
               <KpiCard
-                icon={HiOutlineLightningBolt}
-                label="Minor Defects"
+                icon={Zap}
+                label="Minor"
                 value={kpis.totalMinor}
                 colorClass="text-yellow-700"
                 iconBg="bg-yellow-100 text-yellow-600"
               />
               <KpiCard
-                icon={MdOutlineSpeed}
+                icon={Gauge}
                 label="Avg FPQI"
                 value={kpis.avgFPQI ?? "—"}
                 sub={
                   kpis.avgFPQI
                     ? parseFloat(kpis.avgFPQI) > 5
-                      ? "? Poor quality range"
+                      ? "Poor range"
                       : parseFloat(kpis.avgFPQI) > 2
-                        ? "? Fair quality range"
-                        : "? Good quality range"
-                    : "No inspections yet"
+                        ? "Fair range"
+                        : "Good range"
+                    : "No inspections"
                 }
                 colorClass={
-                  kpis.avgFPQI === null
-                    ? "text-gray-400"
+                  !kpis.avgFPQI
+                    ? "text-slate-400"
                     : parseFloat(kpis.avgFPQI) > 5
                       ? "text-red-700"
                       : parseFloat(kpis.avgFPQI) > 2
                         ? "text-amber-700"
                         : "text-emerald-700"
                 }
-                iconBg="bg-purple-100 text-purple-600"
+                iconBg="bg-violet-100 text-violet-600"
               />
             </div>
 
-            {/* -- SECONDARY STATS BAR -- */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 flex items-center gap-3">
-                <span className="bg-blue-50 p-2 rounded-lg">
-                  <MdOutlineFactory size={18} className="text-blue-600" />
-                </span>
-                <div>
-                  <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
-                    Total Production
-                  </p>
-                  <p className="text-lg font-black text-gray-800">
-                    {kpis.totalProd.toLocaleString()}
-                  </p>
+            {/* ── SECONDARY STATS ── */}
+            <div className="grid grid-cols-3 gap-2.5">
+              {[
+                {
+                  icon: Factory,
+                  label: "Total Production",
+                  value: kpis.totalProd.toLocaleString(),
+                  iconBg: "bg-blue-50 text-blue-600",
+                },
+                {
+                  icon: BadgeCheck,
+                  label: "FPA Required",
+                  value: kpis.totalFPAReq.toLocaleString(),
+                  iconBg: "bg-teal-50 text-teal-600",
+                },
+                {
+                  icon: FileText,
+                  label: "Total Inspected",
+                  value: kpis.totalInsp.toLocaleString(),
+                  iconBg: "bg-indigo-50 text-indigo-600",
+                },
+              ].map(({ icon: Icon, label, value, iconBg }) => (
+                <div
+                  key={label}
+                  className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex items-center gap-3"
+                >
+                  <span className={`p-2 rounded-lg ${iconBg}`}>
+                    <Icon className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                      {label}
+                    </p>
+                    <p className="text-lg font-extrabold text-slate-800">
+                      {value}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 flex items-center gap-3">
-                <span className="bg-teal-50 p-2 rounded-lg">
-                  <HiOutlineBadgeCheck size={18} className="text-teal-600" />
-                </span>
-                <div>
-                  <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
-                    FPA Required
-                  </p>
-                  <p className="text-lg font-black text-gray-800">
-                    {kpis.totalFPAReq.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 flex items-center gap-3">
-                <span className="bg-indigo-50 p-2 rounded-lg">
-                  <HiOutlineDocumentReport
-                    size={18}
-                    className="text-indigo-600"
-                  />
-                </span>
-                <div>
-                  <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
-                    Total Inspected
-                  </p>
-                  <p className="text-lg font-black text-gray-800">
-                    {kpis.totalInsp.toLocaleString()}
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
 
-            {/* ---------- CHARTS SECTION ---------- */}
+            {/* ── CHARTS SECTION ── */}
             <div>
               <button
                 onClick={() => setChartsExpanded((v) => !v)}
-                className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-blue-600 mb-3 transition-colors print:hidden"
+                className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-blue-600 mb-2 transition-colors print:hidden"
               >
-                <BiBarChartAlt2 size={15} className="text-blue-600" />
+                <BarChart3 className="w-3.5 h-3.5 text-blue-500" />
                 Charts & Analytics
-                <span
-                  className={`ml-1 transition-transform ${chartsExpanded ? "rotate-180" : ""}`}
-                >
-                  ?
-                </span>
+                {chartsExpanded ? (
+                  <ChevronUp className="w-3 h-3" />
+                ) : (
+                  <ChevronDown className="w-3 h-3" />
+                )}
               </button>
 
               {chartsExpanded && (
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-                  {/* Defect Bar Chart — spans 2 cols */}
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+                  {/* Defect Bar Chart */}
                   <Panel
                     title="Top 10 Models by Defect Count"
-                    icon={BiBarChartAlt2}
+                    icon={BarChart3}
                     right={
-                      <span className="text-[10px] text-gray-400">
+                      <span className="text-[10px] text-slate-400">
                         Critical · Major · Minor
                       </span>
                     }
@@ -965,21 +965,18 @@ const FpaHistory = () => {
                         </ResponsiveContainer>
                       ) : (
                         <div className="h-[240px] flex flex-col items-center justify-center gap-2 text-emerald-600">
-                          <HiOutlineBadgeCheck
-                            size={32}
-                            className="opacity-60"
-                          />
+                          <BadgeCheck className="w-8 h-8 opacity-60" />
                           <span className="text-sm font-semibold">
-                            No defects recorded in this period
+                            No defects recorded
                           </span>
                         </div>
                       )}
                     </div>
                   </Panel>
 
-                  {/* Right column — 2 pie charts stacked */}
-                  <div className="flex flex-col gap-4">
-                    <Panel title="Inspection Status" icon={FaShieldAlt}>
+                  {/* Right column — pies */}
+                  <div className="flex flex-col gap-3">
+                    <Panel title="Inspection Status" icon={Shield}>
                       <div className="p-3">
                         <ResponsiveContainer width="100%" height={140}>
                           <PieChart>
@@ -1015,10 +1012,7 @@ const FpaHistory = () => {
                       </div>
                     </Panel>
 
-                    <Panel
-                      title="Defect Distribution"
-                      icon={HiOutlineExclamationCircle}
-                    >
+                    <Panel title="Defect Distribution" icon={AlertTriangle}>
                       <div className="p-3">
                         {defectPie.length > 0 ? (
                           <>
@@ -1059,20 +1053,20 @@ const FpaHistory = () => {
                           </>
                         ) : (
                           <div className="h-[140px] flex items-center justify-center text-emerald-600 text-xs font-semibold">
-                            ? No defects recorded
+                            No defects recorded
                           </div>
                         )}
                       </div>
                     </Panel>
                   </div>
 
-                  {/* Production vs FPA vs Inspected — full width */}
+                  {/* Production vs Inspected */}
                   <Panel
                     title="Production vs FPA Required vs Inspected (Top 10)"
-                    icon={IoMdTrendingUp}
+                    icon={TrendingUp}
                     right={
-                      <span className="text-[10px] text-gray-400">
-                        Top 10 by production volume
+                      <span className="text-[10px] text-slate-400">
+                        by production volume
                       </span>
                     }
                     className="xl:col-span-2"
@@ -1125,12 +1119,12 @@ const FpaHistory = () => {
                     </div>
                   </Panel>
 
-                  {/* FPQI Ranking — right col */}
+                  {/* FPQI Ranking */}
                   <Panel
                     title="FPQI Ranking (Worst First)"
-                    icon={MdOutlineSpeed}
+                    icon={Gauge}
                     right={
-                      <span className="text-[10px] text-gray-400">
+                      <span className="text-[10px] text-slate-400">
                         Inspected models only
                       </span>
                     }
@@ -1172,7 +1166,7 @@ const FpaHistory = () => {
                           </BarChart>
                         </ResponsiveContainer>
                       ) : (
-                        <div className="h-[220px] flex items-center justify-center text-gray-400 text-xs">
+                        <div className="h-[220px] flex items-center justify-center text-slate-400 text-xs">
                           No inspected models yet
                         </div>
                       )}
@@ -1182,24 +1176,23 @@ const FpaHistory = () => {
               )}
             </div>
 
-            {/* ---------- MAIN LAYOUT: Alert Cards + Data Table ---------- */}
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 items-start">
-              {/* -- Left: Alert/Insight cards -- */}
-              <div className="xl:col-span-1 flex flex-col gap-4">
-                {/* Quality Alert Panel */}
+            {/* ── MAIN LAYOUT: Alerts + Table ── */}
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-3 items-start">
+              {/* Left: Alert cards */}
+              <div className="xl:col-span-1 flex flex-col gap-3">
                 {worstModels.length > 0 ? (
                   <Panel
-                    title="? Quality Alerts"
-                    icon={MdWarning}
+                    title="Quality Alerts"
+                    icon={AlertTriangle}
                     right={
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">
                         {worstModels.length}
                       </span>
                     }
                   >
                     <div className="p-3 space-y-2">
-                      <p className="text-[10px] text-gray-400 mb-2">
-                        Models with FPQI &gt; 2.000 — needs attention
+                      <p className="text-[10px] text-slate-400 mb-2">
+                        Models with FPQI &gt; 2.000
                       </p>
                       {worstModels.map((m, i) => (
                         <ModelAlertCard key={i} model={m} index={i} />
@@ -1207,16 +1200,13 @@ const FpaHistory = () => {
                     </div>
                   </Panel>
                 ) : (
-                  <Panel title="Quality Status" icon={HiOutlineBadgeCheck}>
+                  <Panel title="Quality Status" icon={BadgeCheck}>
                     <div className="p-6 text-center text-emerald-600">
-                      <HiOutlineBadgeCheck
-                        size={32}
-                        className="mx-auto mb-2 opacity-70"
-                      />
+                      <BadgeCheck className="w-8 h-8 mx-auto mb-2 opacity-70" />
                       <p className="text-xs font-bold">
                         All models within acceptable FPQI
                       </p>
-                      <p className="text-[10px] text-gray-400 mt-1">
+                      <p className="text-[10px] text-slate-400 mt-1">
                         Quality is in good shape!
                       </p>
                     </div>
@@ -1224,7 +1214,7 @@ const FpaHistory = () => {
                 )}
 
                 {/* Quick Stats */}
-                <Panel title="Quick Stats" icon={HiOutlineChartBar}>
+                <Panel title="Quick Stats" icon={BarChart3}>
                   <div className="p-3 space-y-3">
                     {[
                       {
@@ -1273,14 +1263,14 @@ const FpaHistory = () => {
                     ].map(({ label, value, pct, barColor }) => (
                       <div key={label}>
                         <div className="flex justify-between text-[11px] mb-1">
-                          <span className="text-gray-500 font-medium">
+                          <span className="text-slate-500 font-medium">
                             {label}
                           </span>
-                          <span className="font-bold text-gray-700">
+                          <span className="font-bold text-slate-700">
                             {value}
                           </span>
                         </div>
-                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full ${barColor} transition-all`}
                             style={{ width: `${pct}%` }}
@@ -1292,18 +1282,15 @@ const FpaHistory = () => {
                 </Panel>
               </div>
 
-              {/* -- Right: Data Table -- */}
+              {/* Right: Data Table */}
               <div className="xl:col-span-3">
                 <Panel
                   title="FPA Inspection Summary"
-                  icon={HiOutlineDocumentReport}
+                  icon={FileText}
                   right={
                     <div className="flex items-center gap-2">
                       <div className="relative">
-                        <FaSearch
-                          size={10}
-                          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
-                        />
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                         <input
                           type="text"
                           placeholder="Search model…"
@@ -1312,67 +1299,43 @@ const FpaHistory = () => {
                             setSearchTerm(e.target.value);
                             setPage(1);
                           }}
-                          className="pl-7 pr-3 py-1.5 text-[11px] border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 w-36 bg-gray-50"
+                          className="pl-7 pr-3 py-1.5 text-[11px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 w-36 bg-slate-50"
                         />
                       </div>
                       <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-gray-400">Show:</span>
+                        <span className="text-[10px] text-slate-400">
+                          Show:
+                        </span>
                         <select
                           value={pageSize}
                           onChange={(e) => {
                             setPageSize(Number(e.target.value));
                             setPage(1);
                           }}
-                          className="text-[11px] border border-gray-200 rounded-md px-1.5 py-1 bg-gray-50 focus:outline-none"
+                          className="text-[11px] border border-slate-200 rounded-md px-1.5 py-1 bg-slate-50 focus:outline-none"
                         >
                           {PAGE_SIZE_OPTIONS.map((n) => (
                             <option key={n}>{n}</option>
                           ))}
                         </select>
                       </div>
-                      <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                      <span className="text-[10px] text-slate-400 whitespace-nowrap">
                         {fpaData.length}/{rawData.length}
                       </span>
                     </div>
                   }
                 >
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-gray-100 text-gray-400 uppercase tracking-widest text-[9px]">
-                          <th className="px-3 py-2.5 text-left">#</th>
-                          {[
-                            {
-                              field: "ModelName",
-                              label: "Model Name",
-                              align: "left",
-                            },
-                            {
-                              field: "ModelCount",
-                              label: "Production",
-                              align: "center",
-                            },
-                            {
-                              field: "FPA",
-                              label: "FPA Req.",
-                              align: "center",
-                            },
-                            {
-                              field: "SampleInspected",
-                              label: "Inspected",
-                              align: "center",
-                            },
-                            { field: null, label: "Progress", align: "center" },
-                            { field: null, label: "Status", align: "center" },
-                            { field: "Critical", label: "C", align: "center" },
-                            { field: "Major", label: "M", align: "center" },
-                            { field: "Minor", label: "m", align: "center" },
-                            { field: "FPQI", label: "FPQI", align: "center" },
-                            { field: null, label: "Action", align: "center" },
-                          ].map(({ field, label, align }) => (
+                  <div className="overflow-auto">
+                    <table className="min-w-full text-xs text-left border-separate border-spacing-0">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="bg-slate-100">
+                          <th className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-left whitespace-nowrap">
+                            Sr. No.
+                          </th>
+                          {TABLE_COLS.map(({ field, label, align }) => (
                             <th
                               key={label}
-                              className={`px-3 py-2.5 text-${align} font-bold ${field ? "cursor-pointer hover:text-blue-600 select-none" : ""}`}
+                              className={`px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap text-${align} ${field ? "cursor-pointer hover:text-blue-600 select-none" : ""}`}
                               onClick={() => handleSort(field)}
                             >
                               <span
@@ -1391,7 +1354,7 @@ const FpaHistory = () => {
                           ))}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-50">
+                      <tbody>
                         {pagedData.map((item, idx) => {
                           const done = item.SampleInspected >= item.FPA;
                           const fpqi =
@@ -1414,116 +1377,89 @@ const FpaHistory = () => {
                           return (
                             <tr
                               key={item.ModelName + idx}
-                              className="hover:bg-blue-50/40 transition-colors group"
+                              className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
                             >
-                              <td className="px-3 py-2.5 text-gray-300 text-[10px]">
+                              <td className="px-3 py-2 border-b border-slate-100 text-slate-400 font-mono text-[10px]">
                                 {globalIdx}
                               </td>
-
-                              {/* Model Name */}
-                              <td className="px-3 py-2.5 max-w-[220px]">
+                              <td className="px-3 py-2 border-b border-slate-100 max-w-[220px]">
                                 <span
-                                  className="font-semibold text-gray-800 truncate block text-[11px]"
+                                  className="font-semibold text-slate-800 truncate block text-[11px]"
                                   title={item.ModelName}
                                 >
                                   {item.ModelName}
                                 </span>
                               </td>
-
-                              <td className="px-3 py-2.5 text-center font-semibold text-gray-700">
+                              <td className="px-3 py-2 border-b border-slate-100 text-center font-semibold text-slate-700">
                                 {item.ModelCount || 0}
                               </td>
-                              <td className="px-3 py-2.5 text-center font-semibold text-gray-700">
+                              <td className="px-3 py-2 border-b border-slate-100 text-center font-semibold text-slate-700">
                                 {item.FPA || 0}
                               </td>
-                              <td className="px-3 py-2.5 text-center font-semibold text-gray-700">
+                              <td className="px-3 py-2 border-b border-slate-100 text-center font-semibold text-slate-700">
                                 {item.SampleInspected || 0}
                               </td>
-
-                              {/* Progress Bar */}
-                              <td className="px-3 py-2.5 text-center">
+                              <td className="px-3 py-2 border-b border-slate-100 text-center">
                                 <div className="flex flex-col items-center gap-0.5">
-                                  <div className="w-14 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                                  <div className="w-14 h-1.5 rounded-full bg-slate-100 overflow-hidden">
                                     <div
                                       className={`h-full rounded-full transition-all ${done ? "bg-emerald-400" : pct > 50 ? "bg-amber-400" : "bg-rose-400"}`}
                                       style={{ width: `${pct}%` }}
                                     />
                                   </div>
-                                  <span className="text-[9px] text-gray-400">
+                                  <span className="text-[9px] text-slate-400">
                                     {pct}%
                                   </span>
                                 </div>
                               </td>
-
-                              {/* Status Badge */}
-                              <td className="px-3 py-2.5 text-center">
+                              <td className="px-3 py-2 border-b border-slate-100 text-center">
                                 <span
-                                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                    done
-                                      ? "bg-emerald-100 text-emerald-700"
-                                      : "bg-rose-100 text-rose-700"
-                                  }`}
+                                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${done ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}
                                 >
                                   {done ? (
-                                    <FaCheckCircle size={8} />
+                                    <CheckCircle2 className="w-2 h-2" />
                                   ) : (
-                                    <FaTimesCircle size={8} />
+                                    <XCircle className="w-2 h-2" />
                                   )}
                                   {done ? "Done" : "Pending"}
                                 </span>
                               </td>
-
-                              {/* Defects — BUG FIX: guard against undefined with || 0 */}
-                              <td className="px-3 py-2.5 text-center">
-                                <span
-                                  className={`font-black text-sm ${(item.Critical || 0) > 0 ? "text-red-600" : "text-gray-200"}`}
-                                >
-                                  {item.Critical || 0}
-                                </span>
+                              <td
+                                className={`px-3 py-2 border-b border-slate-100 text-center font-extrabold text-sm ${(item.Critical || 0) > 0 ? "text-red-600" : "text-slate-200"}`}
+                              >
+                                {item.Critical || 0}
                               </td>
-                              <td className="px-3 py-2.5 text-center">
-                                <span
-                                  className={`font-black text-sm ${(item.Major || 0) > 0 ? "text-orange-500" : "text-gray-200"}`}
-                                >
-                                  {item.Major || 0}
-                                </span>
+                              <td
+                                className={`px-3 py-2 border-b border-slate-100 text-center font-extrabold text-sm ${(item.Major || 0) > 0 ? "text-orange-500" : "text-slate-200"}`}
+                              >
+                                {item.Major || 0}
                               </td>
-                              <td className="px-3 py-2.5 text-center">
-                                <span
-                                  className={`font-black text-sm ${(item.Minor || 0) > 0 ? "text-yellow-500" : "text-gray-200"}`}
-                                >
-                                  {item.Minor || 0}
-                                </span>
+                              <td
+                                className={`px-3 py-2 border-b border-slate-100 text-center font-extrabold text-sm ${(item.Minor || 0) > 0 ? "text-yellow-500" : "text-slate-200"}`}
+                              >
+                                {item.Minor || 0}
                               </td>
-
-                              {/* FPQI */}
-                              <td className="px-3 py-2.5 text-center">
+                              <td className="px-3 py-2 border-b border-slate-100 text-center">
                                 {fpqi !== null ? (
                                   <span
-                                    className={`inline-block px-1.5 py-0.5 rounded border text-[10px] font-black ${st?.bg} ${st?.text} ${st?.border}`}
+                                    className={`inline-block px-1.5 py-0.5 rounded border text-[10px] font-extrabold ${st?.bg} ${st?.text} ${st?.border}`}
                                   >
                                     {fpqi.toFixed(3)}
                                   </span>
                                 ) : (
-                                  <span className="text-gray-200 text-xs">
-                                    —
-                                  </span>
+                                  <span className="text-slate-200">—</span>
                                 )}
                               </td>
-
-                              {/* Action — BUG FIX #1: pass full item object */}
-                              <td className="px-3 py-2.5 text-center">
+                              <td className="px-3 py-2 border-b border-slate-100 text-center">
                                 {hasInsp ? (
                                   <button
                                     onClick={() => handleOpenModelModal(item)}
                                     className="text-blue-600 hover:text-white hover:bg-blue-600 border border-blue-200 hover:border-blue-600 px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 transition-all"
                                   >
-                                    View <FaArrowRight size={8} />
+                                    View <ArrowRight className="w-2.5 h-2.5" />
                                   </button>
                                 ) : (
-                                  <span className="text-gray-200 text-xs">
-                                    —
-                                  </span>
+                                  <span className="text-slate-200">—</span>
                                 )}
                               </td>
                             </tr>
@@ -1533,72 +1469,64 @@ const FpaHistory = () => {
                     </table>
 
                     {fpaData.length === 0 && (
-                      <div className="p-10 text-center text-gray-400 text-xs">
+                      <div className="p-10 text-center text-slate-400 text-xs">
                         No models match <strong>"{searchTerm}"</strong>
                       </div>
                     )}
                   </div>
 
-                  {/* Table Footer + Pagination — BUG FIX #3: correct page numbers */}
-                  <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-[11px] text-gray-500">
+                  {/* Pagination Footer */}
+                  <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-500">
                     <span>
                       Showing{" "}
-                      <strong className="text-gray-700">
+                      <strong className="text-slate-700">
                         {fpaData.length === 0 ? 0 : (page - 1) * pageSize + 1}–
                         {Math.min(page * pageSize, fpaData.length)}
                       </strong>{" "}
                       of{" "}
-                      <strong className="text-gray-700">
+                      <strong className="text-slate-700">
                         {fpaData.length}
                       </strong>{" "}
                       models
                     </span>
 
-                    {/* Pagination Controls */}
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => setPage(1)}
                         disabled={page === 1}
-                        className="px-2 py-1 rounded border border-gray-200 bg-white hover:bg-blue-50 disabled:opacity-30 text-[10px] font-bold text-gray-600"
+                        className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-blue-50 disabled:opacity-30 text-[10px] font-bold text-slate-600"
                       >
                         «
                       </button>
                       <button
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                         disabled={page === 1}
-                        className="px-2 py-1 rounded border border-gray-200 bg-white hover:bg-blue-50 disabled:opacity-30 text-gray-600"
+                        className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-blue-50 disabled:opacity-30 text-slate-600"
                       >
-                        <FiChevronLeft size={12} />
+                        <ChevronLeft className="w-3 h-3" />
                       </button>
-
-                      {/* FIX #3: use memoized pageNumbers array */}
                       {pageNumbers.map((p) => (
                         <button
                           key={p}
                           onClick={() => setPage(p)}
-                          className={`w-7 h-7 rounded border text-[10px] font-bold transition-all ${
-                            p === page
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-white border-gray-200 hover:bg-blue-50 text-gray-600"
-                          }`}
+                          className={`w-7 h-7 rounded border text-[10px] font-bold transition-all ${p === page ? "bg-blue-600 text-white border-blue-600" : "bg-white border-slate-200 hover:bg-blue-50 text-slate-600"}`}
                         >
                           {p}
                         </button>
                       ))}
-
                       <button
                         onClick={() =>
                           setPage((p) => Math.min(totalPages, p + 1))
                         }
                         disabled={page === totalPages}
-                        className="px-2 py-1 rounded border border-gray-200 bg-white hover:bg-blue-50 disabled:opacity-30 text-gray-600"
+                        className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-blue-50 disabled:opacity-30 text-slate-600"
                       >
-                        <FiChevronRight size={12} />
+                        <ChevronRight className="w-3 h-3" />
                       </button>
                       <button
                         onClick={() => setPage(totalPages)}
                         disabled={page === totalPages}
-                        className="px-2 py-1 rounded border border-gray-200 bg-white hover:bg-blue-50 disabled:opacity-30 text-[10px] font-bold text-gray-600"
+                        className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-blue-50 disabled:opacity-30 text-[10px] font-bold text-slate-600"
                       >
                         »
                       </button>
@@ -1607,13 +1535,13 @@ const FpaHistory = () => {
                     <span className="flex items-center gap-4">
                       <span>
                         Production:{" "}
-                        <strong className="text-gray-700">
+                        <strong className="text-slate-700">
                           {kpis.totalProd.toLocaleString()}
                         </strong>
                       </span>
                       <span>
                         Inspected:{" "}
-                        <strong className="text-gray-700">
+                        <strong className="text-slate-700">
                           {kpis.totalInsp.toLocaleString()}
                         </strong>
                       </span>
@@ -1623,18 +1551,17 @@ const FpaHistory = () => {
               </div>
             </div>
 
-            {/* ---------- FPQI WATCHLIST — Full Width ---------- */}
-            {/* BUG FIX #6: use memoized watchlistData */}
+            {/* ── FPQI WATCHLIST ── */}
             <Panel
               title="FPQI Watchlist — Models Needing Attention"
-              icon={MdOutlineSpeed}
+              icon={Gauge}
               right={
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-gray-400">
+                  <span className="text-[10px] text-slate-400">
                     FPQI &gt; 2.000
                   </span>
                   {watchlistData.length > 0 && (
-                    <span className="bg-red-100 text-red-700 text-[10px] font-black px-1.5 py-0.5 rounded">
+                    <span className="bg-rose-100 text-rose-700 text-[10px] font-bold px-1.5 py-0.5 rounded">
                       {watchlistData.length} models
                     </span>
                   )}
@@ -1642,89 +1569,80 @@ const FpaHistory = () => {
               }
             >
               {watchlistData.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-red-50/60 text-red-700 text-left border-b border-red-100 text-[9px] uppercase tracking-widest">
-                        <th className="px-4 py-2.5 font-bold">#</th>
-                        <th className="px-4 py-2.5 font-bold">Model</th>
-                        <th className="px-4 py-2.5 font-bold text-center">
-                          Production
-                        </th>
-                        <th className="px-4 py-2.5 font-bold text-center">
-                          Inspected
-                        </th>
-                        <th className="px-4 py-2.5 font-bold text-center">
-                          Critical
-                        </th>
-                        <th className="px-4 py-2.5 font-bold text-center">
-                          Major
-                        </th>
-                        <th className="px-4 py-2.5 font-bold text-center">
-                          Minor
-                        </th>
-                        <th className="px-4 py-2.5 font-bold text-center">
-                          FPQI
-                        </th>
-                        <th className="px-4 py-2.5 font-bold text-center">
-                          Rating
-                        </th>
-                        <th className="px-4 py-2.5 font-bold text-center">
-                          Action
-                        </th>
+                <div className="overflow-auto">
+                  <table className="min-w-full text-xs text-left border-separate border-spacing-0">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="bg-rose-50/60">
+                        {[
+                          "Sr. No.",
+                          "Model",
+                          "Production",
+                          "Inspected",
+                          "Critical",
+                          "Major",
+                          "Minor",
+                          "FPQI",
+                          "Rating",
+                          "Action",
+                        ].map((h) => (
+                          <th
+                            key={h}
+                            className="px-4 py-2.5 font-semibold text-rose-700 border-b border-rose-100 text-center whitespace-nowrap text-[10px] uppercase tracking-widest"
+                          >
+                            {h}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody>
                       {watchlistData.map((r, i) => {
                         const st = fpqiStatus(parseFloat(r.FPQI));
                         return (
                           <tr
                             key={r.ModelName + i}
-                            className="hover:bg-red-50/40 transition-colors"
+                            className="hover:bg-rose-50/40 transition-colors even:bg-slate-50/40"
                           >
-                            <td className="px-4 py-2.5 text-gray-400 text-[10px]">
+                            <td className="px-4 py-2 border-b border-slate-100 text-slate-400 text-[10px] text-center">
                               {i + 1}
                             </td>
-                            <td className="px-4 py-2.5 font-semibold text-gray-800 max-w-[280px] truncate">
+                            <td className="px-4 py-2 border-b border-slate-100 font-semibold text-slate-800 max-w-[280px] truncate">
                               {r.ModelName}
                             </td>
-                            <td className="px-4 py-2.5 text-center text-gray-700">
+                            <td className="px-4 py-2 border-b border-slate-100 text-center text-slate-700">
                               {r.ModelCount || 0}
                             </td>
-                            <td className="px-4 py-2.5 text-center text-gray-700">
+                            <td className="px-4 py-2 border-b border-slate-100 text-center text-slate-700">
                               {r.SampleInspected || 0}
                             </td>
-                            {/* BUG FIX #7: guard defect values with || 0 */}
-                            <td className="px-4 py-2.5 text-center text-red-600 font-black">
+                            <td className="px-4 py-2 border-b border-slate-100 text-center text-red-600 font-extrabold">
                               {r.Critical || 0}
                             </td>
-                            <td className="px-4 py-2.5 text-center text-orange-600 font-black">
+                            <td className="px-4 py-2 border-b border-slate-100 text-center text-orange-600 font-extrabold">
                               {r.Major || 0}
                             </td>
-                            <td className="px-4 py-2.5 text-center text-yellow-600 font-black">
+                            <td className="px-4 py-2 border-b border-slate-100 text-center text-yellow-600 font-extrabold">
                               {r.Minor || 0}
                             </td>
-                            <td className="px-4 py-2.5 text-center font-black text-gray-800">
+                            <td className="px-4 py-2 border-b border-slate-100 text-center font-extrabold text-slate-800">
                               {parseFloat(r.FPQI).toFixed(3)}
                             </td>
-                            <td className="px-4 py-2.5 text-center">
+                            <td className="px-4 py-2 border-b border-slate-100 text-center">
                               <span
-                                className={`px-2 py-0.5 rounded border text-[10px] font-black ${st?.bg} ${st?.text} ${st?.border}`}
+                                className={`px-2 py-0.5 rounded border text-[10px] font-bold ${st?.bg} ${st?.text} ${st?.border}`}
                               >
                                 {st?.label}
                               </span>
                             </td>
-                            {/* BUG FIX #1 + #7: consistent hasInsp guard + pass full object */}
-                            <td className="px-4 py-2.5 text-center">
+                            <td className="px-4 py-2 border-b border-slate-100 text-center">
                               {r.SampleInspected > 0 ? (
                                 <button
                                   onClick={() => handleOpenModelModal(r)}
                                   className="text-blue-600 hover:text-white hover:bg-blue-600 border border-blue-200 hover:border-blue-600 px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 transition-all"
                                 >
-                                  View <FaArrowRight size={8} />
+                                  View <ArrowRight className="w-2.5 h-2.5" />
                                 </button>
                               ) : (
-                                <span className="text-gray-200 text-xs">—</span>
+                                <span className="text-slate-200">—</span>
                               )}
                             </td>
                           </tr>
@@ -1735,11 +1653,11 @@ const FpaHistory = () => {
                 </div>
               ) : (
                 <div className="p-10 text-center text-emerald-600 flex flex-col items-center gap-2">
-                  <HiOutlineBadgeCheck size={32} className="opacity-60" />
+                  <BadgeCheck className="w-8 h-8 opacity-60" />
                   <p className="text-sm font-bold">
-                    All models have FPQI = 2.000
+                    All models have FPQI ≤ 2.000
                   </p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-slate-400">
                     Quality is in good shape!
                   </p>
                 </div>
@@ -1748,41 +1666,46 @@ const FpaHistory = () => {
           </>
         )}
 
-        {/* -- EMPTY: No data for range -- */}
+        {/* ── Empty: no data for range ── */}
         {!isLoading && rawData.length === 0 && hasFilters && (
-          <div className="bg-white border border-gray-100 rounded-xl p-14 text-center shadow-sm">
-            <HiOutlineClipboardList className="text-gray-200 text-6xl mx-auto mb-4" />
-            <h3 className="text-base font-bold text-gray-500 mb-1">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center py-16 gap-3">
+            <ClipboardList
+              className="w-10 h-10 text-slate-300"
+              strokeWidth={1.2}
+            />
+            <h3 className="text-sm font-semibold text-slate-600">
               No Records Found
             </h3>
-            <p className="text-sm text-gray-400">
+            <p className="text-xs text-slate-400 max-w-sm text-center">
               No FPA records found for the selected date range.
             </p>
           </div>
         )}
 
-        {/* -- EMPTY: No filters applied -- */}
+        {/* ── Empty: no filters applied ── */}
         {!hasFilters && !isLoading && (
-          <div className="bg-white border border-gray-100 rounded-xl p-14 text-center shadow-sm">
-            <HiOutlineSearch className="text-gray-200 text-6xl mx-auto mb-4" />
-            <h3 className="text-base font-bold text-gray-600 mb-2">
+          <div className="bg-white rounded-xl border border-dashed border-slate-300 shadow-sm flex flex-col items-center justify-center py-16 gap-4">
+            <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center">
+              <Search className="w-6 h-6 text-blue-400" />
+            </div>
+            <h3 className="text-sm font-semibold text-slate-600">
               Select a Date Range to Begin
             </h3>
-            <p className="text-sm text-gray-400 mb-6">
+            <p className="text-xs text-slate-400 max-w-sm text-center">
               Use the date pickers above or click a quick shortcut below.
             </p>
-            <div className="flex justify-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 mt-1">
               {[
-                { key: "today", label: "Today", icon: FaCalendarAlt },
-                { key: "yesterday", label: "Yesterday", icon: FaCalendarAlt },
-                { key: "mtd", label: "Month to Date", icon: FaCalendarAlt },
-              ].map(({ key, label, icon: Icon }) => (
+                { key: "today", label: "Today" },
+                { key: "yesterday", label: "Yesterday" },
+                { key: "mtd", label: "Month to Date" },
+              ].map(({ key, label }) => (
                 <button
                   key={key}
                   onClick={() => handleQuickFilter(key)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-50 hover:bg-blue-700 hover:text-white text-blue-700 rounded-xl text-sm font-bold transition-all border border-blue-100"
+                  className="px-4 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all shadow-sm shadow-blue-200"
                 >
-                  <Icon size={12} /> {label}
+                  {label}
                 </button>
               ))}
             </div>
@@ -1790,7 +1713,7 @@ const FpaHistory = () => {
         )}
       </div>
 
-      {/* -- MODALS -- */}
+      {/* ── MODALS ── */}
       {isModelModalOpen && selectedModel && (
         <FpaModelDetailModal
           modelName={

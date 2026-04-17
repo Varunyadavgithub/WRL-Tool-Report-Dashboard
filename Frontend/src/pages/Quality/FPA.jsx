@@ -969,7 +969,7 @@ const FPA = () => {
                 <thead>
                   <tr className="bg-gray-50 text-left text-gray-500 uppercase tracking-wider">
                     {[
-                      "#",
+                      "Sr. No.",
                       "Date & Time",
                       "Model",
                       "Shift",
