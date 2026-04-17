@@ -1,45 +1,6 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import {
-  FaDownload,
-  FaSearch,
-  FaCalendarAlt,
-  FaFilter,
-  FaChartBar,
-  FaChartLine,
-  FaExclamationTriangle,
-  FaCheckCircle,
-  FaTimesCircle,
-  FaInfoCircle,
-  FaIndustry,
-  FaClipboardList,
-  FaBolt,
-  FaStar,
-  FaArrowUp,
-  FaArrowDown,
-  FaMinus,
-  FaTable,
-  FaTimes,
-  FaArrowRight,
-  FaEye,
-  FaSync,
-  FaShieldAlt,
-  FaTrophy,
-  FaFireAlt,
-  FaPercentage,
-} from "react-icons/fa";
-import {
-  MdOutlineQueryStats,
-  MdSpeed,
-  MdWarningAmber,
-  MdCheckCircleOutline,
-  MdErrorOutline,
-  MdDashboard,
-  MdTrendingUp,
-  MdTrendingDown,
-  MdTrendingFlat,
-} from "react-icons/md";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -61,6 +22,45 @@ import ExportButton from "../../components/ui/ExportButton";
 import { baseURL } from "../../assets/assets";
 import { useGetModelVariantsQuery } from "../../redux/api/commonApi.js";
 import Loader from "../../components/ui/Loader";
+import {
+  Factory,
+  Filter,
+  Calendar,
+  ChevronRight,
+  Search,
+  X,
+  Download,
+  RefreshCw,
+  Zap,
+  Clock,
+  Star,
+  ArrowRight,
+  ArrowUp,
+  ArrowDown,
+  Minus,
+  Table2,
+  BarChart3,
+  TrendingUp,
+  TrendingDown,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Info,
+  Shield,
+  Trophy,
+  Flame,
+  Percent,
+  Gauge,
+  ClipboardList,
+  Globe,
+  PackageOpen,
+  Loader2,
+  ChartLine,
+  CalendarDays,
+  Target,
+  FileText,
+  Boxes,
+} from "lucide-react";
 
 ChartJS.register(
   CategoryScale,
@@ -76,39 +76,36 @@ ChartJS.register(
   Filler,
 );
 
-// --- Constants ----------------------------------------------------------------
+// ─── Constants ─────────────────────────────────────────────────────────────────
+
 const FPQI_TARGET = 2.2;
 
 const REPORT_TYPES = [
-  {
-    value: "dailyFpaReport",
-    label: "Daily",
-    icon: <FaCalendarAlt />,
-    desc: "Day-wise summary",
-  },
-  {
-    value: "monthlyFpaReport",
-    label: "Monthly",
-    icon: <FaChartBar />,
-    desc: "Month aggregation",
-  },
-  {
-    value: "yearlyFpaReport",
-    label: "Yearly",
-    icon: <FaChartLine />,
-    desc: "Year-over-year",
-  },
+  { value: "fpaReport", label: "Detail", desc: "Full records" },
+  { value: "dailyFpaReport", label: "Daily", desc: "Day-wise summary" },
+  { value: "monthlyFpaReport", label: "Monthly", desc: "Month aggregation" },
+  { value: "yearlyFpaReport", label: "Yearly", desc: "Year-over-year" },
 ];
 
 const CATEGORY_CONFIG = {
   Critical: {
-    color: "#dc2626",
-    bg: "#fef2f2",
-    border: "#fecaca",
-    dot: "#ef4444",
+    text: "text-rose-700",
+    bg: "bg-rose-50",
+    border: "border-rose-200",
+    dot: "bg-rose-500",
   },
-  Major: { color: "#d97706", bg: "#fffbeb", border: "#fde68a", dot: "#f59e0b" },
-  Minor: { color: "#ca8a04", bg: "#fefce8", border: "#fef08a", dot: "#eab308" },
+  Major: {
+    text: "text-amber-700",
+    bg: "bg-amber-50",
+    border: "border-amber-200",
+    dot: "bg-amber-500",
+  },
+  Minor: {
+    text: "text-yellow-700",
+    bg: "bg-yellow-50",
+    border: "border-yellow-200",
+    dot: "bg-yellow-500",
+  },
 };
 
 const CHART_COLORS = {
@@ -118,10 +115,10 @@ const CHART_COLORS = {
   critical: "#ef4444",
   major: "#f59e0b",
   minor: "#eab308",
-  sample: "#6366f1",
 };
 
-// --- Helpers ------------------------------------------------------------------
+// ─── Utilities ─────────────────────────────────────────────────────────────────
+
 const normalizeArray = (data) => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
@@ -141,273 +138,167 @@ const getFpqiStatus = (value) => {
 const calcFpqi = (critical, major, minor, samples) =>
   samples > 0 ? (critical * 9 + major * 6 + minor * 1) / samples : null;
 
-// --- Mini Components ---------------------------------------------------------
+// ─── Spinner ───────────────────────────────────────────────────────────────────
+const Spinner = ({ cls = "w-4 h-4" }) => (
+  <Loader2 className={`animate-spin ${cls}`} />
+);
+
+// ─── FpqiBadge ─────────────────────────────────────────────────────────────────
 const FpqiBadge = ({ value }) => {
   if (value === null || value === undefined)
-    return <span style={{ color: "#9ca3af" }}>—</span>;
+    return <span className="text-slate-400">—</span>;
   const ok = getFpqiStatus(value) === "good";
   return (
     <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        padding: "3px 10px",
-        borderRadius: 20,
-        fontWeight: 700,
-        fontSize: 12,
-        background: ok ? "#dcfce7" : "#fee2e2",
-        color: ok ? "#166534" : "#991b1b",
-        border: `1px solid ${ok ? "#86efac" : "#fca5a5"}`,
-      }}
+      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+        ok
+          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+          : "bg-rose-50 text-rose-800 border-rose-200"
+      }`}
     >
-      {ok ? <FaCheckCircle size={10} /> : <FaTimesCircle size={10} />}
+      {ok ? (
+        <CheckCircle2 className="w-2.5 h-2.5" />
+      ) : (
+        <XCircle className="w-2.5 h-2.5" />
+      )}
       {Number(value).toFixed(3)}
     </span>
   );
 };
 
+// ─── CategoryBadge ─────────────────────────────────────────────────────────────
 const CategoryBadge = ({ category }) => {
   const cfg = CATEGORY_CONFIG[category] || {};
   return (
     <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 5,
-        padding: "3px 10px",
-        borderRadius: 20,
-        fontWeight: 600,
-        fontSize: 11,
-        background: cfg.bg || "#f3f4f6",
-        color: cfg.color || "#374151",
-        border: `1px solid ${cfg.border || "#e5e7eb"}`,
-      }}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${cfg.bg || "bg-slate-50"} ${cfg.text || "text-slate-700"} ${cfg.border || "border-slate-200"}`}
     >
       <span
-        style={{
-          width: 6,
-          height: 6,
-          borderRadius: "50%",
-          background: cfg.dot || "#9ca3af",
-        }}
+        className={`w-1.5 h-1.5 rounded-full ${cfg.dot || "bg-slate-400"}`}
       />
       {category}
     </span>
   );
 };
 
+// ─── StatusPill ────────────────────────────────────────────────────────────────
 const StatusPill = ({ fpqi }) => {
   const ok = getFpqiStatus(fpqi) === "good";
-  return ok ? (
+  return (
     <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        color: "#166534",
-        fontWeight: 600,
-        fontSize: 11,
-      }}
+      className={`inline-flex items-center gap-1 text-[11px] font-semibold ${
+        ok ? "text-emerald-700" : "text-rose-700"
+      }`}
     >
-      <MdCheckCircleOutline size={13} /> Pass
-    </span>
-  ) : (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        color: "#991b1b",
-        fontWeight: 600,
-        fontSize: 11,
-      }}
-    >
-      <MdErrorOutline size={13} /> Fail
+      {ok ? (
+        <CheckCircle2 className="w-3 h-3" />
+      ) : (
+        <XCircle className="w-3 h-3" />
+      )}
+      {ok ? "Pass" : "Fail"}
     </span>
   );
 };
 
-// --- KPI Cards Row -------------------------------------------------------------
-const KpiCard = ({ icon, label, value, color, sub, trend }) => (
+// ─── KPI Card ──────────────────────────────────────────────────────────────────
+const KpiCard = ({
+  icon: Icon,
+  label,
+  value,
+  colorClass,
+  borderColor,
+  sub,
+  trend,
+}) => (
   <div
-    style={{
-      background: "#fff",
-      border: "1px solid #e5e7eb",
-      borderRadius: 12,
-      padding: "16px 20px",
-      display: "flex",
-      alignItems: "center",
-      gap: 14,
-      boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-      borderTop: `3px solid ${color}`,
-      minWidth: 0,
-      flex: "1 1 140px",
-    }}
+    className={`bg-white border rounded-xl px-4 py-3 flex items-center gap-3 shadow-sm flex-1 min-w-[140px]`}
+    style={{ borderTopWidth: 3, borderTopColor: borderColor }}
   >
     <div
-      style={{
-        width: 44,
-        height: 44,
-        borderRadius: 10,
-        background: `${color}18`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color,
-        fontSize: 20,
-        flexShrink: 0,
-      }}
+      className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+      style={{ backgroundColor: `${borderColor}18`, color: borderColor }}
     >
-      {icon}
+      <Icon className="w-5 h-5" />
     </div>
-    <div style={{ minWidth: 0 }}>
-      <div
-        style={{
-          fontSize: 24,
-          fontWeight: 800,
-          color: "#111827",
-          lineHeight: 1.1,
-          letterSpacing: -0.5,
-        }}
-      >
+    <div className="min-w-0">
+      <div className="text-xl font-extrabold text-slate-900 leading-tight tracking-tight">
         {value}
       </div>
-      <div
-        style={{
-          fontSize: 11,
-          color: "#6b7280",
-          fontWeight: 600,
-          marginTop: 3,
-          textTransform: "uppercase",
-          letterSpacing: 0.4,
-        }}
-      >
+      <div className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide mt-0.5">
         {label}
       </div>
-      {sub && (
-        <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>
-          {sub}
-        </div>
-      )}
+      {sub && <div className="text-[10px] text-slate-400 mt-0.5">{sub}</div>}
     </div>
     {trend && (
-      <div style={{ marginLeft: "auto", flexShrink: 0 }}>
-        {trend === "up" && (
-          <FaArrowUp style={{ color: "#ef4444", fontSize: 14 }} />
-        )}
+      <div className="ml-auto shrink-0">
+        {trend === "up" && <ArrowUp className="w-3.5 h-3.5 text-rose-500" />}
         {trend === "down" && (
-          <FaArrowDown style={{ color: "#10b981", fontSize: 14 }} />
+          <ArrowDown className="w-3.5 h-3.5 text-emerald-500" />
         )}
-        {trend === "flat" && (
-          <FaMinus style={{ color: "#9ca3af", fontSize: 14 }} />
-        )}
+        {trend === "flat" && <Minus className="w-3.5 h-3.5 text-slate-400" />}
       </div>
     )}
   </div>
 );
 
-// Defect distribution bar (visual breakdown)
+// ─── DefectBar ─────────────────────────────────────────────────────────────────
 const DefectBar = ({ critical, major, minor }) => {
   const total = critical + major + minor;
   if (total === 0) return null;
   const pct = (n) => ((n / total) * 100).toFixed(1);
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 600,
-          color: "#6b7280",
-          textTransform: "uppercase",
-          letterSpacing: 0.5,
-          marginBottom: 8,
-        }}
-      >
+    <div className="mb-4">
+      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-2">
         Defect Breakdown — {total} total
       </div>
-      <div
-        style={{
-          display: "flex",
-          height: 20,
-          borderRadius: 10,
-          overflow: "hidden",
-          gap: 2,
-        }}
-      >
+      <div className="flex h-5 rounded-lg overflow-hidden gap-0.5">
         {critical > 0 && (
           <div
-            style={{
-              flex: critical,
-              background: "#ef4444",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+            className="bg-rose-500 flex items-center justify-center"
+            style={{ flex: critical }}
           >
-            <span style={{ fontSize: 9, color: "#fff", fontWeight: 700 }}>
+            <span className="text-[9px] text-white font-bold">
               {pct(critical)}%
             </span>
           </div>
         )}
         {major > 0 && (
           <div
-            style={{
-              flex: major,
-              background: "#f59e0b",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+            className="bg-amber-500 flex items-center justify-center"
+            style={{ flex: major }}
           >
-            <span style={{ fontSize: 9, color: "#fff", fontWeight: 700 }}>
+            <span className="text-[9px] text-white font-bold">
               {pct(major)}%
             </span>
           </div>
         )}
         {minor > 0 && (
           <div
-            style={{
-              flex: minor,
-              background: "#eab308",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+            className="bg-yellow-500 flex items-center justify-center"
+            style={{ flex: minor }}
           >
-            <span style={{ fontSize: 9, color: "#fff", fontWeight: 700 }}>
+            <span className="text-[9px] text-white font-bold">
               {pct(minor)}%
             </span>
           </div>
         )}
       </div>
-      <div
-        style={{
-          display: "flex",
-          gap: 16,
-          marginTop: 6,
-          fontSize: 11,
-          color: "#6b7280",
-        }}
-      >
+      <div className="flex gap-4 mt-1.5 text-[11px] text-slate-500">
         <span>
-          <span style={{ color: "#ef4444", fontWeight: 700 }}>?</span> Critical{" "}
-          {critical}
+          <span className="text-rose-500 font-bold">●</span> Critical {critical}
         </span>
         <span>
-          <span style={{ color: "#f59e0b", fontWeight: 700 }}>?</span> Major{" "}
-          {major}
+          <span className="text-amber-500 font-bold">●</span> Major {major}
         </span>
         <span>
-          <span style={{ color: "#eab308", fontWeight: 700 }}>?</span> Minor{" "}
-          {minor}
+          <span className="text-yellow-500 font-bold">●</span> Minor {minor}
         </span>
       </div>
     </div>
   );
 };
 
-// --- FPA Detail Summary -------------------------------------------------------
+// ─── FPA Detail Summary ───────────────────────────────────────────────────────
 const FpaDetailSummary = ({ data }) => {
   if (!data || data.length === 0) return null;
   const critical = data.filter((r) => r.Category === "Critical").length;
@@ -421,53 +312,53 @@ const FpaDetailSummary = ({ data }) => {
       : null;
 
   return (
-    <div style={{ marginBottom: 20 }}>
-      <div
-        style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14 }}
-      >
+    <div>
+      <div className="flex flex-wrap gap-2.5 mb-3">
         <KpiCard
-          icon={<FaClipboardList />}
+          icon={ClipboardList}
           label="Total Records"
           value={data.length}
-          color="#6366f1"
+          borderColor="#6366f1"
         />
         <KpiCard
-          icon={<FaIndustry />}
+          icon={Factory}
           label="Unique FGSRNos"
           value={samples}
-          color="#8b5cf6"
+          borderColor="#8b5cf6"
         />
         <KpiCard
-          icon={<FaExclamationTriangle />}
+          icon={AlertTriangle}
           label="Critical"
           value={critical}
-          color="#ef4444"
+          borderColor="#ef4444"
         />
         <KpiCard
-          icon={<MdWarningAmber />}
+          icon={AlertTriangle}
           label="Major"
           value={major}
-          color="#f59e0b"
+          borderColor="#f59e0b"
         />
         <KpiCard
-          icon={<FaInfoCircle />}
+          icon={Info}
           label="Minor"
           value={minor}
-          color="#eab308"
+          borderColor="#eab308"
         />
         <KpiCard
-          icon={<MdSpeed />}
+          icon={Gauge}
           label="FPQI Score"
           value={fpqi !== null ? Number(fpqi).toFixed(3) : "—"}
-          color={fpqi !== null && fpqi <= FPQI_TARGET ? "#10b981" : "#ef4444"}
-          sub={`Target = ${FPQI_TARGET}`}
+          borderColor={
+            fpqi !== null && fpqi <= FPQI_TARGET ? "#10b981" : "#ef4444"
+          }
+          sub={`Target ≤ ${FPQI_TARGET}`}
         />
         {defectRate && (
           <KpiCard
-            icon={<FaPercentage />}
+            icon={Percent}
             label="Defect Rate"
             value={`${defectRate}%`}
-            color="#6366f1"
+            borderColor="#6366f1"
           />
         )}
       </div>
@@ -476,7 +367,7 @@ const FpaDetailSummary = ({ data }) => {
   );
 };
 
-// --- Aggregate Summary --------------------------------------------------------
+// ─── Aggregate Summary ────────────────────────────────────────────────────────
 const AggregateSummary = ({ data, reportType }) => {
   if (!data || data.length === 0) return null;
   const totalCritical = data.reduce((s, r) => s + (r.NoOfCritical || 0), 0);
@@ -489,7 +380,6 @@ const AggregateSummary = ({ data, reportType }) => {
   const passRate =
     data.length > 0 ? ((passCount / data.length) * 100).toFixed(0) : 0;
 
-  // Best and worst periods
   const sorted = [...data]
     .filter((r) => r.FPQI !== null)
     .sort((a, b) => a.FPQI - b.FPQI);
@@ -506,48 +396,46 @@ const AggregateSummary = ({ data, reportType }) => {
   };
 
   return (
-    <div style={{ marginBottom: 20 }}>
-      <div
-        style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14 }}
-      >
+    <div>
+      <div className="flex flex-wrap gap-2.5 mb-3">
         <KpiCard
-          icon={<FaExclamationTriangle />}
+          icon={AlertTriangle}
           label="Total Critical"
           value={totalCritical}
-          color="#ef4444"
+          borderColor="#ef4444"
         />
         <KpiCard
-          icon={<MdWarningAmber />}
+          icon={AlertTriangle}
           label="Total Major"
           value={totalMajor}
-          color="#f59e0b"
+          borderColor="#f59e0b"
         />
         <KpiCard
-          icon={<FaInfoCircle />}
+          icon={Info}
           label="Total Minor"
           value={totalMinor}
-          color="#eab308"
+          borderColor="#eab308"
         />
         <KpiCard
-          icon={<FaIndustry />}
+          icon={Factory}
           label="Total Samples"
           value={totalSamples}
-          color="#6366f1"
+          borderColor="#6366f1"
         />
         <KpiCard
-          icon={<MdSpeed />}
+          icon={Gauge}
           label="Avg FPQI"
           value={avgFpqi !== null ? Number(avgFpqi).toFixed(3) : "—"}
-          color={
+          borderColor={
             avgFpqi !== null && avgFpqi <= FPQI_TARGET ? "#10b981" : "#ef4444"
           }
-          sub={`Target = ${FPQI_TARGET}`}
+          sub={`Target ≤ ${FPQI_TARGET}`}
         />
         <KpiCard
-          icon={<FaTrophy />}
+          icon={Trophy}
           label="Pass Rate"
           value={`${passRate}%`}
-          color="#10b981"
+          borderColor="#10b981"
           sub={`${passCount} pass / ${failCount} fail`}
         />
       </div>
@@ -556,64 +444,31 @@ const AggregateSummary = ({ data, reportType }) => {
         major={totalMajor}
         minor={totalMinor}
       />
+
       {(best || worst) && (
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div className="flex gap-2.5 flex-wrap">
           {best && (
-            <div
-              style={{
-                flex: "1 1 200px",
-                background: "#f0fdf4",
-                border: "1px solid #bbf7d0",
-                borderRadius: 10,
-                padding: "10px 14px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#166534",
-                  textTransform: "uppercase",
-                  letterSpacing: 0.5,
-                  marginBottom: 4,
-                }}
-              >
-                ?? Best Period
+            <div className="flex-1 min-w-[200px] bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+              <div className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide mb-1">
+                ✅ Best Period
               </div>
-              <div style={{ fontWeight: 700, color: "#111827" }}>
+              <div className="font-bold text-slate-900">
                 {getPeriodLabel(best)}
               </div>
-              <div style={{ fontSize: 12, color: "#166534" }}>
+              <div className="text-xs text-emerald-700">
                 FPQI: {Number(best.FPQI).toFixed(3)}
               </div>
             </div>
           )}
           {worst && worst !== best && (
-            <div
-              style={{
-                flex: "1 1 200px",
-                background: "#fef2f2",
-                border: "1px solid #fecaca",
-                borderRadius: 10,
-                padding: "10px 14px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#991b1b",
-                  textTransform: "uppercase",
-                  letterSpacing: 0.5,
-                  marginBottom: 4,
-                }}
-              >
-                ? Worst Period
+            <div className="flex-1 min-w-[200px] bg-rose-50 border border-rose-200 rounded-xl px-4 py-3">
+              <div className="text-[10px] font-bold text-rose-700 uppercase tracking-wide mb-1">
+                ❌ Worst Period
               </div>
-              <div style={{ fontWeight: 700, color: "#111827" }}>
+              <div className="font-bold text-slate-900">
                 {getPeriodLabel(worst)}
               </div>
-              <div style={{ fontSize: 12, color: "#991b1b" }}>
+              <div className="text-xs text-rose-700">
                 FPQI: {Number(worst.FPQI).toFixed(3)}
               </div>
             </div>
@@ -624,7 +479,7 @@ const AggregateSummary = ({ data, reportType }) => {
   );
 };
 
-// --- Top Defects Analysis -----------------------------------------------------
+// ─── Top Defects Panel ────────────────────────────────────────────────────────
 const TopDefectsPanel = ({ data }) => {
   if (!data || data.length === 0) return null;
   const freq = {};
@@ -637,104 +492,47 @@ const TopDefectsPanel = ({ data }) => {
   const max = top[0]?.[1] || 1;
 
   return (
-    <div
-      style={{
-        background: "#fff",
-        border: "1px solid #e5e7eb",
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 16,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 14,
-        }}
-      >
-        <FaFireAlt style={{ color: "#ef4444" }} />
-        <span style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Flame className="w-3.5 h-3.5 text-rose-500" />
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
           Top Defect Types
         </span>
-        <span style={{ marginLeft: "auto", fontSize: 11, color: "#9ca3af" }}>
-          by frequency
-        </span>
+        <span className="ml-auto text-[11px] text-slate-400">by frequency</span>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="flex flex-col gap-2">
         {top.map(([defect, count], i) => (
-          <div
-            key={i}
-            style={{ display: "flex", alignItems: "center", gap: 10 }}
-          >
+          <div key={i} className="flex items-center gap-2.5">
             <span
-              style={{
-                width: 20,
-                height: 20,
-                borderRadius: 6,
-                background:
-                  i === 0 ? "#ef444422" : i === 1 ? "#f59e0b22" : "#6366f122",
-                color: i === 0 ? "#ef4444" : i === 1 ? "#f59e0b" : "#6366f1",
-                fontSize: 10,
-                fontWeight: 800,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
+              className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-extrabold shrink-0 ${
+                i === 0
+                  ? "bg-rose-100 text-rose-600"
+                  : i === 1
+                    ? "bg-amber-100 text-amber-600"
+                    : "bg-blue-100 text-blue-600"
+              }`}
             >
               {i + 1}
             </span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: 3,
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 12,
-                    color: "#374151",
-                    fontWeight: 500,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between mb-0.5">
+                <span className="text-xs text-slate-700 font-medium truncate">
                   {defect}
                 </span>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#374151",
-                    marginLeft: 8,
-                    flexShrink: 0,
-                  }}
-                >
+                <span className="text-[11px] font-bold text-slate-700 ml-2 shrink-0">
                   {count}
                 </span>
               </div>
-              <div
-                style={{
-                  height: 6,
-                  background: "#f3f4f6",
-                  borderRadius: 3,
-                  overflow: "hidden",
-                }}
-              >
+              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <div
-                  style={{
-                    width: `${(count / max) * 100}%`,
-                    height: "100%",
-                    background:
-                      i === 0 ? "#ef4444" : i === 1 ? "#f59e0b" : "#6366f1",
-                    borderRadius: 3,
-                    transition: "width 0.5s ease",
-                  }}
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    i === 0
+                      ? "bg-rose-500"
+                      : i === 1
+                        ? "bg-amber-500"
+                        : "bg-blue-500"
+                  }`}
+                  style={{ width: `${(count / max) * 100}%` }}
                 />
               </div>
             </div>
@@ -745,7 +543,7 @@ const TopDefectsPanel = ({ data }) => {
   );
 };
 
-// --- Model Performance Panel --------------------------------------------------
+// ─── Model Performance Panel ──────────────────────────────────────────────────
 const ModelPerformancePanel = ({ data }) => {
   if (!data || data.length === 0) return null;
   const models = {};
@@ -753,52 +551,38 @@ const ModelPerformancePanel = ({ data }) => {
     if (!r.Model) return;
     if (!models[r.Model])
       models[r.Model] = { critical: 0, major: 0, minor: 0, fgsrNos: new Set() };
-    const cat = r.Category;
-    if (cat === "Critical") models[r.Model].critical++;
-    else if (cat === "Major") models[r.Model].major++;
-    else if (cat === "Minor") models[r.Model].minor++;
+    if (r.Category === "Critical") models[r.Model].critical++;
+    else if (r.Category === "Major") models[r.Model].major++;
+    else if (r.Category === "Minor") models[r.Model].minor++;
     if (r.FGSRNo) models[r.Model].fgsrNos.add(r.FGSRNo);
   });
 
   const rows = Object.entries(models)
     .map(([model, d]) => {
       const samples = d.fgsrNos.size;
-      const fpqi = calcFpqi(d.critical, d.major, d.minor, samples);
-      return { model, ...d, samples, fpqi };
+      return {
+        model,
+        ...d,
+        samples,
+        fpqi: calcFpqi(d.critical, d.major, d.minor, samples),
+      };
     })
     .sort((a, b) => (a.fpqi ?? 999) - (b.fpqi ?? 999));
 
   if (rows.length < 2) return null;
 
   return (
-    <div
-      style={{
-        background: "#fff",
-        border: "1px solid #e5e7eb",
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 16,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 14,
-        }}
-      >
-        <FaShieldAlt style={{ color: "#6366f1" }} />
-        <span style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Shield className="w-3.5 h-3.5 text-blue-500" />
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
           Model Performance
         </span>
       </div>
-      <div style={{ overflowX: "auto" }}>
-        <table
-          style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}
-        >
-          <thead>
-            <tr style={{ background: "#f8fafc" }}>
+      <div className="overflow-auto">
+        <table className="min-w-full text-xs text-left border-separate border-spacing-0">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-slate-100">
               {[
                 "Model",
                 "Samples",
@@ -810,16 +594,7 @@ const ModelPerformancePanel = ({ data }) => {
               ].map((h) => (
                 <th
                   key={h}
-                  style={{
-                    padding: "8px 12px",
-                    textAlign: "center",
-                    fontWeight: 700,
-                    color: "#374151",
-                    fontSize: 11,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.4,
-                    borderBottom: "2px solid #e5e7eb",
-                  }}
+                  className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-center whitespace-nowrap"
                 >
                   {h}
                 </th>
@@ -830,62 +605,33 @@ const ModelPerformancePanel = ({ data }) => {
             {rows.map((row, i) => (
               <tr
                 key={i}
-                style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}
+                className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40 text-center"
               >
-                <td
-                  style={{
-                    padding: "8px 12px",
-                    fontWeight: 700,
-                    color: "#1e1b4b",
-                    textAlign: "center",
-                  }}
-                >
+                <td className="px-3 py-2 border-b border-slate-100 font-bold text-slate-800">
                   {row.model}
                 </td>
-                <td
-                  style={{
-                    padding: "8px 12px",
-                    textAlign: "center",
-                    color: "#6366f1",
-                    fontWeight: 600,
-                  }}
-                >
+                <td className="px-3 py-2 border-b border-slate-100 font-semibold text-blue-600">
                   {row.samples}
                 </td>
                 <td
-                  style={{
-                    padding: "8px 12px",
-                    textAlign: "center",
-                    color: row.critical > 0 ? "#ef4444" : "#9ca3af",
-                    fontWeight: row.critical > 0 ? 700 : 400,
-                  }}
+                  className={`px-3 py-2 border-b border-slate-100 ${row.critical > 0 ? "font-bold text-rose-600" : "text-slate-400"}`}
                 >
                   {row.critical}
                 </td>
                 <td
-                  style={{
-                    padding: "8px 12px",
-                    textAlign: "center",
-                    color: row.major > 0 ? "#f59e0b" : "#9ca3af",
-                    fontWeight: row.major > 0 ? 700 : 400,
-                  }}
+                  className={`px-3 py-2 border-b border-slate-100 ${row.major > 0 ? "font-bold text-amber-600" : "text-slate-400"}`}
                 >
                   {row.major}
                 </td>
                 <td
-                  style={{
-                    padding: "8px 12px",
-                    textAlign: "center",
-                    color: row.minor > 0 ? "#eab308" : "#9ca3af",
-                    fontWeight: row.minor > 0 ? 700 : 400,
-                  }}
+                  className={`px-3 py-2 border-b border-slate-100 ${row.minor > 0 ? "font-bold text-yellow-600" : "text-slate-400"}`}
                 >
                   {row.minor}
                 </td>
-                <td style={{ padding: "8px 12px", textAlign: "center" }}>
+                <td className="px-3 py-2 border-b border-slate-100">
                   <FpqiBadge value={row.fpqi} />
                 </td>
-                <td style={{ padding: "8px 12px", textAlign: "center" }}>
+                <td className="px-3 py-2 border-b border-slate-100">
                   <StatusPill fpqi={row.fpqi} />
                 </td>
               </tr>
@@ -897,7 +643,7 @@ const ModelPerformancePanel = ({ data }) => {
   );
 };
 
-// --- Country Analysis Panel ---------------------------------------------------
+// ─── Country Analysis Panel ───────────────────────────────────────────────────
 const CountryPanel = ({ data }) => {
   if (!data || data.length === 0) return null;
   const countries = {};
@@ -937,68 +683,36 @@ const CountryPanel = ({ data }) => {
   if (rows.length < 2) return null;
 
   return (
-    <div
-      style={{
-        background: "#fff",
-        border: "1px solid #e5e7eb",
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 16,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 14,
-        }}
-      >
-        <FaIndustry style={{ color: "#8b5cf6" }} />
-        <span style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Globe className="w-3.5 h-3.5 text-violet-500" />
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
           Destination Country Analysis
         </span>
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      <div className="flex flex-wrap gap-2.5">
         {rows.map((row, i) => {
           const ok = getFpqiStatus(row.fpqi) === "good";
           return (
             <div
               key={i}
-              style={{
-                flex: "1 1 160px",
-                background: ok ? "#f0fdf4" : "#fef2f2",
-                border: `1px solid ${ok ? "#bbf7d0" : "#fecaca"}`,
-                borderRadius: 10,
-                padding: "10px 14px",
-              }}
+              className={`flex-1 min-w-[160px] rounded-xl px-4 py-3 border ${
+                ok
+                  ? "bg-emerald-50 border-emerald-200"
+                  : "bg-rose-50 border-rose-200"
+              }`}
             >
-              <div
-                style={{
-                  fontWeight: 700,
-                  fontSize: 13,
-                  color: "#111827",
-                  marginBottom: 4,
-                }}
-              >
+              <div className="font-bold text-slate-900 text-sm mb-1">
                 {row.country}
               </div>
-              <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>
+              <div className="text-[11px] text-slate-500 mb-1.5">
                 {row.samples} inspected
               </div>
               <FpqiBadge value={row.fpqi} />
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  marginTop: 6,
-                  fontSize: 10,
-                  color: "#6b7280",
-                }}
-              >
-                <span style={{ color: "#ef4444" }}>C:{row.critical}</span>
-                <span style={{ color: "#f59e0b" }}>M:{row.major}</span>
-                <span style={{ color: "#eab308" }}>m:{row.minor}</span>
+              <div className="flex gap-2 mt-1.5 text-[10px] text-slate-500">
+                <span className="text-rose-500">C:{row.critical}</span>
+                <span className="text-amber-500">M:{row.major}</span>
+                <span className="text-yellow-500">m:{row.minor}</span>
               </div>
             </div>
           );
@@ -1008,7 +722,7 @@ const CountryPanel = ({ data }) => {
   );
 };
 
-// --- Charts -------------------------------------------------------------------
+// ─── FPQI Trend Chart ─────────────────────────────────────────────────────────
 const FpqiTrendChart = ({ data, reportType }) => {
   if (!data || data.length === 0) return null;
 
@@ -1026,9 +740,7 @@ const FpqiTrendChart = ({ data, reportType }) => {
         ? sorted.map(
             (i) => `${i.Month?.slice(0, 3)} ${i.MonthKey?.slice(0, 4)}`,
           )
-        : reportType === "yearlyFpaReport"
-          ? sorted.map((i) => String(i.Year))
-          : [];
+        : sorted.map((i) => String(i.Year));
 
   const isLine = reportType === "dailyFpaReport";
   const fpqiData = sorted.map((i) => i.FPQI);
@@ -1048,11 +760,7 @@ const FpqiTrendChart = ({ data, reportType }) => {
         borderWidth: isLine ? 2.5 : 1.5,
         tension: 0.4,
         fill: isLine,
-        pointBackgroundColor: sorted.map((i) =>
-          getFpqiStatus(i.FPQI) === "good"
-            ? CHART_COLORS.good
-            : CHART_COLORS.bad,
-        ),
+        pointBackgroundColor: goodColors,
         pointRadius: isLine ? 5 : 0,
         pointHoverRadius: 8,
         borderRadius: isLine ? 0 : 6,
@@ -1109,9 +817,11 @@ const FpqiTrendChart = ({ data, reportType }) => {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: "#1e1b4b",
-        titleColor: "#e0e7ff",
-        bodyColor: "#c7d2fe",
+        backgroundColor: "#fff",
+        titleColor: "#475569",
+        bodyColor: "#1e293b",
+        borderColor: "#e2e8f0",
+        borderWidth: 1,
         padding: 12,
         cornerRadius: 8,
         callbacks: {
@@ -1119,9 +829,8 @@ const FpqiTrendChart = ({ data, reportType }) => {
             if (
               ctx.dataset.label === "FPQI" ||
               ctx.dataset.label === `Target (${FPQI_TARGET})`
-            ) {
+            )
               return ` ${ctx.dataset.label}: ${Number(ctx.raw).toFixed(3)}`;
-            }
             return ` ${ctx.dataset.label}: ${ctx.raw}`;
           },
         },
@@ -1131,8 +840,8 @@ const FpqiTrendChart = ({ data, reportType }) => {
       x: {
         grid: { display: false },
         ticks: {
-          color: "#6b7280",
-          fontSize: 11,
+          color: "#94a3b8",
+          font: { size: 11 },
           maxRotation: 45,
           autoSkip: true,
           maxTicksLimit: 15,
@@ -1144,21 +853,21 @@ const FpqiTrendChart = ({ data, reportType }) => {
           display: true,
           text: "FPQI",
           color: "#6366f1",
-          font: { weight: "700", size: 11 },
+          font: { weight: "bold", size: 11 },
         },
-        grid: { color: "#f3f4f6" },
-        ticks: { color: "#6b7280", callback: (v) => v.toFixed(2) },
+        grid: { color: "rgba(148,163,184,0.15)" },
+        ticks: { color: "#94a3b8", callback: (v) => v.toFixed(2) },
       },
       y2: {
         position: "right",
         title: {
           display: true,
           text: "Defect Count",
-          color: "#9ca3af",
-          font: { weight: "700", size: 11 },
+          color: "#94a3b8",
+          font: { weight: "bold", size: 11 },
         },
         grid: { display: false },
-        ticks: { color: "#9ca3af" },
+        ticks: { color: "#94a3b8" },
       },
     },
   };
@@ -1172,118 +881,78 @@ const FpqiTrendChart = ({ data, reportType }) => {
   ];
 
   return (
-    <div
-      style={{
-        background: "#fff",
-        border: "1px solid #e5e7eb",
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 16,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 12,
-        }}
-      >
-        <FaChartLine style={{ color: "#6366f1" }} />
-        <span style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 shrink-0">
+        <ChartLine className="w-3.5 h-3.5 text-blue-500" />
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
           {reportType === "dailyFpaReport"
-            ? "Daily FPQI Trend"
+            ? "Daily"
             : reportType === "monthlyFpaReport"
-              ? "Monthly FPQI Trend"
-              : "Yearly FPQI Trend"}
+              ? "Monthly"
+              : "Yearly"}{" "}
+          FPQI Trend
         </span>
       </div>
-      <div
-        style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 12 }}
-      >
+      <div className="px-4 pt-2 pb-1 flex flex-wrap gap-3">
         {legendItems.map((item, i) => (
           <span
             key={i}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              fontSize: 11,
-              color: "#6b7280",
-            }}
+            className="flex items-center gap-1.5 text-[11px] text-slate-500"
           >
             <span
+              className="inline-block rounded"
               style={{
                 width: 14,
                 height: item.dashed ? 3 : 10,
-                borderRadius: item.dashed ? 0 : 3,
-                background: item.color,
+                background: item.dashed ? "transparent" : item.color,
                 borderTop: item.dashed ? `2px dashed ${item.color}` : "none",
-                display: "inline-block",
               }}
             />
             {item.label}
           </span>
         ))}
       </div>
-      <div style={{ position: "relative", height: 320 }}>
+      <div className="p-4 h-[35vh] min-h-[250px]">
         <Chart type="bar" data={chartData} options={options} />
       </div>
     </div>
   );
 };
 
-// --- Empty State ---------------------------------------------------------------
-const EmptyState = ({ message = "No data found." }) => (
-  <div style={{ textAlign: "center", padding: "56px 0", color: "#9ca3af" }}>
-    <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.3 }}>??</div>
-    <div style={{ fontSize: 15, fontWeight: 700, color: "#374151" }}>
-      {message}
+// ─── EmptyState ────────────────────────────────────────────────────────────────
+const EmptyState = () => (
+  <div className="bg-white rounded-xl border border-dashed border-slate-300 shadow-sm flex flex-col items-center justify-center py-16 gap-4">
+    <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center">
+      <Search className="w-6 h-6 text-blue-400" />
     </div>
-    <div style={{ fontSize: 12, marginTop: 6, color: "#9ca3af" }}>
-      Adjust your filters and click Query
-    </div>
+    <h3 className="text-sm font-semibold text-slate-600">No Data Found</h3>
+    <p className="text-xs text-slate-400 max-w-sm text-center">
+      Adjust your filters and click Query to load FPA report data.
+    </p>
   </div>
 );
 
-// --- Shared table styles ------------------------------------------------------
-const thS = {
-  padding: "10px 12px",
-  background: "#1e1b4b",
-  color: "#e0e7ff",
-  fontWeight: 700,
-  fontSize: 11,
-  textTransform: "uppercase",
-  letterSpacing: 0.5,
-  whiteSpace: "nowrap",
-  border: "1px solid #312e81",
-  textAlign: "center",
-};
-const tdS = {
-  padding: "8px 12px",
-  border: "1px solid #f3f4f6",
-  fontSize: 12,
-  color: "#374151",
-  textAlign: "center",
-  whiteSpace: "nowrap",
-};
+// ─── Shared Table Components ──────────────────────────────────────────────────
 
-const tableWrapper = {
-  maxHeight: 520,
-  overflowX: "auto",
-  overflowY: "auto",
-  borderRadius: 8,
-  border: "1px solid #e5e7eb",
-};
+const TableEmpty = () => (
+  <tr>
+    <td colSpan={20} className="py-10 text-center">
+      <div className="flex flex-col items-center gap-2 text-slate-400">
+        <PackageOpen className="w-8 h-8 opacity-20" strokeWidth={1.2} />
+        <p className="text-xs">No data available.</p>
+      </div>
+    </td>
+  </tr>
+);
 
-// --- FPA Detail Table ---------------------------------------------------------
+// ─── FPA Detail Table ─────────────────────────────────────────────────────────
 const FpaReportTable = ({ data }) => {
   const [sort, setSort] = useState({ key: null, dir: "asc" });
   const [catFilter, setCatFilter] = useState("All");
 
   const handleDownloadImage = async (fgSrNo, fileName) => {
     if (!fgSrNo || !fileName) {
-      toast("No image available.", { icon: "??" });
+      toast("No image available.", { icon: "📎" });
       return;
     }
     try {
@@ -1294,7 +963,7 @@ const FpaReportTable = ({ data }) => {
         params: { filename: fileName },
       });
       if (!response.data || response.data.size === 0) {
-        toast.info("File is empty or unavailable.");
+        toast.error("File is empty or unavailable.");
         return;
       }
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -1321,8 +990,8 @@ const FpaReportTable = ({ data }) => {
   const sorted = useMemo(() => {
     if (!sort.key) return filtered;
     return [...filtered].sort((a, b) => {
-      const av = a[sort.key];
-      const bv = b[sort.key];
+      const av = a[sort.key],
+        bv = b[sort.key];
       if (av < bv) return sort.dir === "asc" ? -1 : 1;
       if (av > bv) return sort.dir === "asc" ? 1 : -1;
       return 0;
@@ -1334,73 +1003,50 @@ const FpaReportTable = ({ data }) => {
       key,
       dir: s.key === key && s.dir === "asc" ? "desc" : "asc",
     }));
-  const SortIcon = ({ k }) =>
-    sort.key === k ? (
-      sort.dir === "asc" ? (
-        <FaArrowUp size={8} />
-      ) : (
-        <FaArrowDown size={8} />
-      )
-    ) : null;
 
-  if (!data || data.length === 0) return <EmptyState />;
+  if (!data || data.length === 0) return <TableEmpty />;
+
+  const CATS = [
+    { key: "All", color: "blue" },
+    { key: "Critical", color: "rose" },
+    { key: "Major", color: "amber" },
+    { key: "Minor", color: "yellow" },
+  ];
 
   return (
     <>
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          marginBottom: 10,
-          alignItems: "center",
-        }}
-      >
-        <span style={{ fontSize: 11, fontWeight: 600, color: "#6b7280" }}>
-          Filter by Category:
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <span className="text-[11px] font-semibold text-slate-500">
+          Filter:
         </span>
-        {["All", "Critical", "Major", "Minor"].map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setCatFilter(cat)}
-            style={{
-              padding: "4px 12px",
-              borderRadius: 20,
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: "pointer",
-              background:
-                catFilter === cat
-                  ? cat === "Critical"
-                    ? "#ef4444"
-                    : cat === "Major"
-                      ? "#f59e0b"
-                      : cat === "Minor"
-                        ? "#eab308"
-                        : "#6366f1"
-                  : "#f3f4f6",
-              color: catFilter === cat ? "#fff" : "#374151",
-              border: "none",
-            }}
-          >
-            {cat}{" "}
-            {cat !== "All" &&
-              `(${data.filter((r) => r.Category === cat).length})`}
-          </button>
-        ))}
-        <span style={{ marginLeft: "auto", fontSize: 11, color: "#9ca3af" }}>
-          Showing {sorted.length} of {data.length} records
+        {CATS.map(({ key, color }) => {
+          const active = catFilter === key;
+          const count =
+            key === "All"
+              ? data.length
+              : data.filter((r) => r.Category === key).length;
+          return (
+            <button
+              key={key}
+              onClick={() => setCatFilter(key)}
+              className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all border ${
+                active
+                  ? `bg-${color}-600 text-white border-${color}-600 shadow-sm`
+                  : `bg-${color}-50 text-${color}-700 border-${color}-200 hover:bg-${color}-100`
+              }`}
+            >
+              {key} {key !== "All" && `(${count})`}
+            </button>
+          );
+        })}
+        <span className="ml-auto text-[11px] text-slate-400">
+          Showing {sorted.length} of {data.length}
         </span>
       </div>
-      <div style={tableWrapper}>
-        <table
-          style={{
-            minWidth: "100%",
-            borderCollapse: "collapse",
-            tableLayout: "auto",
-          }}
-        >
-          <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
-            <tr>
+      <div className="overflow-auto max-h-[50vh]">
+        <table className="min-w-full text-xs text-left border-separate border-spacing-0">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-slate-100">
               {[
                 { label: "SR No", key: "SRNo" },
                 { label: "Date & Time", key: "Date" },
@@ -1415,17 +1061,17 @@ const FpaReportTable = ({ data }) => {
               ].map(({ label, key }) => (
                 <th
                   key={label}
-                  style={{ ...thS, cursor: key ? "pointer" : "default" }}
                   onClick={() => key && toggleSort(key)}
+                  className={`px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap text-center ${key ? "cursor-pointer hover:text-blue-600" : ""}`}
                 >
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                    }}
-                  >
-                    {label} {key && <SortIcon k={key} />}
+                  <span className="inline-flex items-center gap-1">
+                    {label}
+                    {sort.key === key &&
+                      (sort.dir === "asc" ? (
+                        <ArrowUp className="w-2.5 h-2.5" />
+                      ) : (
+                        <ArrowDown className="w-2.5 h-2.5" />
+                      ))}
                   </span>
                 </th>
               ))}
@@ -1435,82 +1081,55 @@ const FpaReportTable = ({ data }) => {
             {sorted.map((row, i) => (
               <tr
                 key={i}
-                style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "#eef2ff")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background =
-                    i % 2 === 0 ? "#fff" : "#fafafa")
-                }
+                className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40 text-center"
               >
-                <td style={{ ...tdS, fontWeight: 700, color: "#6366f1" }}>
+                <td className="px-3 py-2 border-b border-slate-100 font-bold text-blue-600">
                   {row.SRNo}
                 </td>
-                <td style={tdS}>
-                  {row.Date ? (
-                    <span style={{ fontFamily: "monospace", fontSize: 11 }}>
-                      {row.Date.replace("T", " ").replace("Z", "").slice(0, 19)}
-                    </span>
-                  ) : (
-                    "—"
-                  )}
+                <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap">
+                  {row.Date
+                    ? row.Date.replace("T", " ").replace("Z", "").slice(0, 19)
+                    : "—"}
                 </td>
-                <td style={{ ...tdS, fontWeight: 700 }}>{row.Model}</td>
-                <td style={tdS}>{row.Shift}</td>
-                <td style={{ ...tdS, fontWeight: 700 }}>{row.FGSRNo}</td>
-                <td style={tdS}>{row.Country}</td>
-                <td style={tdS}>
+                <td className="px-3 py-2 border-b border-slate-100 font-bold text-slate-800">
+                  {row.Model}
+                </td>
+                <td className="px-3 py-2 border-b border-slate-100 text-slate-600">
+                  {row.Shift}
+                </td>
+                <td className="px-3 py-2 border-b border-slate-100 font-bold text-slate-700">
+                  {row.FGSRNo}
+                </td>
+                <td className="px-3 py-2 border-b border-slate-100 text-slate-600">
+                  {row.Country}
+                </td>
+                <td className="px-3 py-2 border-b border-slate-100">
                   <CategoryBadge category={row.Category} />
                 </td>
                 <td
-                  style={{
-                    ...tdS,
-                    textAlign: "left",
-                    maxWidth: 200,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
+                  className="px-3 py-2 border-b border-slate-100 text-left max-w-[200px] truncate text-slate-600"
                   title={row.AddDefect}
                 >
                   {row.AddDefect}
                 </td>
                 <td
-                  style={{
-                    ...tdS,
-                    textAlign: "left",
-                    maxWidth: 160,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
+                  className="px-3 py-2 border-b border-slate-100 text-left max-w-[160px] truncate text-slate-500"
                   title={row.Remark}
                 >
                   {row.Remark}
                 </td>
-                <td style={tdS}>
+                <td className="px-3 py-2 border-b border-slate-100">
                   {row.DefectImage ? (
                     <button
                       onClick={() =>
                         handleDownloadImage(row.FGSRNo, row.DefectImage)
                       }
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        background: "#eef2ff",
-                        color: "#4338ca",
-                        border: "1px solid #c7d2fe",
-                        borderRadius: 6,
-                        padding: "4px 10px",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-semibold hover:bg-blue-100 transition-colors"
                     >
-                      <FaDownload size={10} /> Download
+                      <Download className="w-2.5 h-2.5" /> Download
                     </button>
                   ) : (
-                    <span style={{ color: "#d1d5db", fontSize: 11 }}>—</span>
+                    <span className="text-slate-300 text-[11px]">—</span>
                   )}
                 </td>
               </tr>
@@ -1522,185 +1141,146 @@ const FpaReportTable = ({ data }) => {
   );
 };
 
-// --- Daily Table --------------------------------------------------------------
-const DailyFpaReportTable = ({ data }) => {
-  if (!data || data.length === 0) return <EmptyState />;
-  const sorted = [...data].sort(
-    (a, b) => new Date(a.ShiftDate) - new Date(b.ShiftDate),
-  );
+// ─── Aggregate Table Component ────────────────────────────────────────────────
+const AggregateTable = ({ data, headers, renderRow, sortFn }) => {
+  if (!data || data.length === 0) return <TableEmpty />;
+  const sorted = sortFn ? sortFn([...data]) : data;
   return (
-    <div style={tableWrapper}>
-      <table style={{ minWidth: "100%", borderCollapse: "collapse" }}>
-        <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
-          <tr>
-            {[
-              "Date",
-              "Month",
-              "Critical",
-              "Major",
-              "Minor",
-              "Sample Inspected",
-              "FPQI",
-              "Status",
-            ].map((h) => (
-              <th key={h} style={thS}>
+    <div className="overflow-auto max-h-[50vh]">
+      <table className="min-w-full text-xs text-left border-separate border-spacing-0">
+        <thead className="sticky top-0 z-10">
+          <tr className="bg-slate-100">
+            {headers.map((h) => (
+              <th
+                key={h}
+                className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-center whitespace-nowrap"
+              >
                 {h}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody>
-          {sorted.map((row, i) => (
-            <tr
-              key={i}
-              style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "#eef2ff")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background =
-                  i % 2 === 0 ? "#fff" : "#fafafa")
-              }
-            >
-              <td style={{ ...tdS, fontFamily: "monospace", fontWeight: 600 }}>
-                {row.ShiftDate?.slice(0, 10) || "—"}
-              </td>
-              <td style={tdS}>{row.Month}</td>
-              <td
-                style={{
-                  ...tdS,
-                  color: row.NoOfCritical > 0 ? "#ef4444" : "#9ca3af",
-                  fontWeight: row.NoOfCritical > 0 ? 700 : 400,
-                }}
-              >
-                {row.NoOfCritical}
-              </td>
-              <td
-                style={{
-                  ...tdS,
-                  color: row.NoOfMajor > 0 ? "#f59e0b" : "#9ca3af",
-                  fontWeight: row.NoOfMajor > 0 ? 700 : 400,
-                }}
-              >
-                {row.NoOfMajor}
-              </td>
-              <td
-                style={{
-                  ...tdS,
-                  color: row.NoOfMinor > 0 ? "#eab308" : "#9ca3af",
-                  fontWeight: row.NoOfMinor > 0 ? 700 : 400,
-                }}
-              >
-                {row.NoOfMinor}
-              </td>
-              <td style={{ ...tdS, fontWeight: 600, color: "#6366f1" }}>
-                {row.SampleInspected}
-              </td>
-              <td style={tdS}>
-                <FpqiBadge value={row.FPQI} />
-              </td>
-              <td style={tdS}>
-                <StatusPill fpqi={row.FPQI} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
+        <tbody>{sorted.map((row, i) => renderRow(row, i))}</tbody>
       </table>
     </div>
   );
 };
 
-// --- Monthly Table ------------------------------------------------------------
-const MonthlyFpaReportTable = ({ data }) => {
-  if (!data || data.length === 0) return <EmptyState />;
-  const sorted = [...data].sort((a, b) =>
-    a.MonthKey?.localeCompare(b.MonthKey),
-  );
-  return (
-    <div style={tableWrapper}>
-      <table style={{ minWidth: "100%", borderCollapse: "collapse" }}>
-        <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
-          <tr>
-            {[
-              "Month",
-              "Period (YYYY-MM)",
-              "Critical",
-              "Major",
-              "Minor",
-              "Sample Inspected",
-              "FPQI",
-              "Status",
-            ].map((h) => (
-              <th key={h} style={thS}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((row, i) => (
-            <tr
-              key={i}
-              style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "#eef2ff")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background =
-                  i % 2 === 0 ? "#fff" : "#fafafa")
-              }
-            >
-              <td style={{ ...tdS, fontWeight: 700 }}>{row.Month}</td>
-              <td style={{ ...tdS, fontFamily: "monospace" }}>
-                {row.MonthKey}
-              </td>
-              <td
-                style={{
-                  ...tdS,
-                  color: row.NoOfCritical > 0 ? "#ef4444" : "#9ca3af",
-                  fontWeight: row.NoOfCritical > 0 ? 700 : 400,
-                }}
-              >
-                {row.NoOfCritical}
-              </td>
-              <td
-                style={{
-                  ...tdS,
-                  color: row.NoOfMajor > 0 ? "#f59e0b" : "#9ca3af",
-                  fontWeight: row.NoOfMajor > 0 ? 700 : 400,
-                }}
-              >
-                {row.NoOfMajor}
-              </td>
-              <td
-                style={{
-                  ...tdS,
-                  color: row.NoOfMinor > 0 ? "#eab308" : "#9ca3af",
-                  fontWeight: row.NoOfMinor > 0 ? 700 : 400,
-                }}
-              >
-                {row.NoOfMinor}
-              </td>
-              <td style={{ ...tdS, fontWeight: 600, color: "#6366f1" }}>
-                {row.SampleInspected}
-              </td>
-              <td style={tdS}>
-                <FpqiBadge value={row.FPQI} />
-              </td>
-              <td style={tdS}>
-                <StatusPill fpqi={row.FPQI} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-};
+// ─── Daily Table ──────────────────────────────────────────────────────────────
+const DailyFpaReportTable = ({ data }) => (
+  <AggregateTable
+    data={data}
+    headers={[
+      "Date",
+      "Month",
+      "Critical",
+      "Major",
+      "Minor",
+      "Sample Inspected",
+      "FPQI",
+      "Status",
+    ]}
+    sortFn={(d) =>
+      d.sort((a, b) => new Date(a.ShiftDate) - new Date(b.ShiftDate))
+    }
+    renderRow={(row, i) => (
+      <tr
+        key={i}
+        className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40 text-center"
+      >
+        <td className="px-3 py-2 border-b border-slate-100 font-mono font-semibold text-slate-700">
+          {row.ShiftDate?.slice(0, 10) || "—"}
+        </td>
+        <td className="px-3 py-2 border-b border-slate-100 text-slate-600">
+          {row.Month}
+        </td>
+        <td
+          className={`px-3 py-2 border-b border-slate-100 ${row.NoOfCritical > 0 ? "font-bold text-rose-600" : "text-slate-400"}`}
+        >
+          {row.NoOfCritical}
+        </td>
+        <td
+          className={`px-3 py-2 border-b border-slate-100 ${row.NoOfMajor > 0 ? "font-bold text-amber-600" : "text-slate-400"}`}
+        >
+          {row.NoOfMajor}
+        </td>
+        <td
+          className={`px-3 py-2 border-b border-slate-100 ${row.NoOfMinor > 0 ? "font-bold text-yellow-600" : "text-slate-400"}`}
+        >
+          {row.NoOfMinor}
+        </td>
+        <td className="px-3 py-2 border-b border-slate-100 font-semibold text-blue-600">
+          {row.SampleInspected}
+        </td>
+        <td className="px-3 py-2 border-b border-slate-100">
+          <FpqiBadge value={row.FPQI} />
+        </td>
+        <td className="px-3 py-2 border-b border-slate-100">
+          <StatusPill fpqi={row.FPQI} />
+        </td>
+      </tr>
+    )}
+  />
+);
 
-// --- Yearly Table -------------------------------------------------------------
+// ─── Monthly Table ────────────────────────────────────────────────────────────
+const MonthlyFpaReportTable = ({ data }) => (
+  <AggregateTable
+    data={data}
+    headers={[
+      "Month",
+      "Period",
+      "Critical",
+      "Major",
+      "Minor",
+      "Sample Inspected",
+      "FPQI",
+      "Status",
+    ]}
+    sortFn={(d) => d.sort((a, b) => a.MonthKey?.localeCompare(b.MonthKey))}
+    renderRow={(row, i) => (
+      <tr
+        key={i}
+        className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40 text-center"
+      >
+        <td className="px-3 py-2 border-b border-slate-100 font-bold text-slate-700">
+          {row.Month}
+        </td>
+        <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-600">
+          {row.MonthKey}
+        </td>
+        <td
+          className={`px-3 py-2 border-b border-slate-100 ${row.NoOfCritical > 0 ? "font-bold text-rose-600" : "text-slate-400"}`}
+        >
+          {row.NoOfCritical}
+        </td>
+        <td
+          className={`px-3 py-2 border-b border-slate-100 ${row.NoOfMajor > 0 ? "font-bold text-amber-600" : "text-slate-400"}`}
+        >
+          {row.NoOfMajor}
+        </td>
+        <td
+          className={`px-3 py-2 border-b border-slate-100 ${row.NoOfMinor > 0 ? "font-bold text-yellow-600" : "text-slate-400"}`}
+        >
+          {row.NoOfMinor}
+        </td>
+        <td className="px-3 py-2 border-b border-slate-100 font-semibold text-blue-600">
+          {row.SampleInspected}
+        </td>
+        <td className="px-3 py-2 border-b border-slate-100">
+          <FpqiBadge value={row.FPQI} />
+        </td>
+        <td className="px-3 py-2 border-b border-slate-100">
+          <StatusPill fpqi={row.FPQI} />
+        </td>
+      </tr>
+    )}
+  />
+);
+
+// ─── Yearly Table ─────────────────────────────────────────────────────────────
 const YearlyFpaReportTable = ({ data }) => {
-  if (!data || data.length === 0) return <EmptyState />;
+  if (!data || data.length === 0) return <TableEmpty />;
   const sorted = [...data].sort((a, b) => a.Year - b.Year);
   const withTrend = sorted.map((row, i) => {
     const prev = sorted[i - 1];
@@ -1713,10 +1293,10 @@ const YearlyFpaReportTable = ({ data }) => {
   });
 
   return (
-    <div style={tableWrapper}>
-      <table style={{ minWidth: "100%", borderCollapse: "collapse" }}>
-        <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
-          <tr>
+    <div className="overflow-auto max-h-[50vh]">
+      <table className="min-w-full text-xs text-left border-separate border-spacing-0">
+        <thead className="sticky top-0 z-10">
+          <tr className="bg-slate-100">
             {[
               "Year",
               "Critical",
@@ -1727,7 +1307,10 @@ const YearlyFpaReportTable = ({ data }) => {
               "YoY Trend",
               "Status",
             ].map((h) => (
-              <th key={h} style={thS}>
+              <th
+                key={h}
+                className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-center whitespace-nowrap"
+              >
                 {h}
               </th>
             ))}
@@ -1737,106 +1320,51 @@ const YearlyFpaReportTable = ({ data }) => {
           {withTrend.map((row, i) => (
             <tr
               key={i}
-              style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "#eef2ff")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background =
-                  i % 2 === 0 ? "#fff" : "#fafafa")
-              }
+              className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40 text-center"
             >
-              <td
-                style={{
-                  ...tdS,
-                  fontWeight: 800,
-                  fontSize: 15,
-                  color: "#1e1b4b",
-                }}
-              >
+              <td className="px-3 py-2 border-b border-slate-100 font-extrabold text-slate-800 text-sm">
                 {row.Year}
               </td>
               <td
-                style={{
-                  ...tdS,
-                  color: row.NoOfCritical > 0 ? "#ef4444" : "#9ca3af",
-                  fontWeight: row.NoOfCritical > 0 ? 700 : 400,
-                }}
+                className={`px-3 py-2 border-b border-slate-100 ${row.NoOfCritical > 0 ? "font-bold text-rose-600" : "text-slate-400"}`}
               >
                 {row.NoOfCritical}
               </td>
               <td
-                style={{
-                  ...tdS,
-                  color: row.NoOfMajor > 0 ? "#f59e0b" : "#9ca3af",
-                  fontWeight: row.NoOfMajor > 0 ? 700 : 400,
-                }}
+                className={`px-3 py-2 border-b border-slate-100 ${row.NoOfMajor > 0 ? "font-bold text-amber-600" : "text-slate-400"}`}
               >
                 {row.NoOfMajor}
               </td>
               <td
-                style={{
-                  ...tdS,
-                  color: row.NoOfMinor > 0 ? "#eab308" : "#9ca3af",
-                  fontWeight: row.NoOfMinor > 0 ? 700 : 400,
-                }}
+                className={`px-3 py-2 border-b border-slate-100 ${row.NoOfMinor > 0 ? "font-bold text-yellow-600" : "text-slate-400"}`}
               >
                 {row.NoOfMinor}
               </td>
-              <td style={{ ...tdS, fontWeight: 600, color: "#6366f1" }}>
+              <td className="px-3 py-2 border-b border-slate-100 font-semibold text-blue-600">
                 {row.SampleInspected}
               </td>
-              <td style={tdS}>
+              <td className="px-3 py-2 border-b border-slate-100">
                 <FpqiBadge value={row.FPQI} />
               </td>
-              <td style={tdS}>
+              <td className="px-3 py-2 border-b border-slate-100">
                 {row.trend === "down" && (
-                  <span
-                    style={{
-                      color: "#22c55e",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 3,
-                      fontSize: 11,
-                      fontWeight: 600,
-                    }}
-                  >
-                    <MdTrendingDown size={13} /> Improved
+                  <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">
+                    <TrendingDown className="w-3 h-3" /> Improved
                   </span>
                 )}
                 {row.trend === "up" && (
-                  <span
-                    style={{
-                      color: "#ef4444",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 3,
-                      fontSize: 11,
-                      fontWeight: 600,
-                    }}
-                  >
-                    <MdTrendingUp size={13} /> Declined
+                  <span className="inline-flex items-center gap-1 text-rose-600 font-semibold">
+                    <TrendingUp className="w-3 h-3" /> Declined
                   </span>
                 )}
                 {row.trend === "flat" && (
-                  <span
-                    style={{
-                      color: "#9ca3af",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 3,
-                      fontSize: 11,
-                      fontWeight: 600,
-                    }}
-                  >
-                    <MdTrendingFlat size={13} /> Stable
+                  <span className="inline-flex items-center gap-1 text-slate-400 font-semibold">
+                    <Minus className="w-3 h-3" /> Stable
                   </span>
                 )}
-                {!row.trend && (
-                  <span style={{ color: "#d1d5db", fontSize: 11 }}>—</span>
-                )}
+                {!row.trend && <span className="text-slate-300">—</span>}
               </td>
-              <td style={tdS}>
+              <td className="px-3 py-2 border-b border-slate-100">
                 <StatusPill fpqi={row.FPQI} />
               </td>
             </tr>
@@ -1847,7 +1375,8 @@ const YearlyFpaReportTable = ({ data }) => {
   );
 };
 
-// --- Main Component -----------------------------------------------------------
+// ─── Main Component ────────────────────────────────────────────────────────────
+
 const FPAReports = () => {
   const [loading, setLoading] = useState(false);
   const [startTime, setStartTime] = useState("");
@@ -1868,14 +1397,10 @@ const FPAReports = () => {
   useEffect(() => {
     if (variantsError) toast.error("Failed to load model variants");
   }, [variantsError]);
-
-  // Debounced search
   useEffect(() => {
     const t = setTimeout(() => setDetails(searchTerm), 300);
     return () => clearTimeout(t);
   }, [searchTerm]);
-
-  // Clear on type change
   useEffect(() => {
     setReportData([]);
     setSearchTerm("");
@@ -1902,7 +1427,7 @@ const FPAReports = () => {
         const data = await fetchReport(type, params);
         setReportData(data);
         setLastFetched(new Date());
-        if (data.length === 0) toast("No records found.", { icon: "??" });
+        if (data.length === 0) toast.success("No records found.");
         else toast.success(`Loaded ${data.length} records`);
       } catch (err) {
         console.error(err);
@@ -1931,12 +1456,11 @@ const FPAReports = () => {
     today8AM.setHours(8, 0, 0, 0);
     const yesterday8AM = new Date(today8AM);
     yesterday8AM.setDate(today8AM.getDate() - 1);
-    const modelLabel = selectedModelVariant?.label;
     const params = {
       startDate: formatDate(yesterday8AM),
       endDate: formatDate(today8AM),
     };
-    if (modelLabel) params.model = modelLabel;
+    if (selectedModelVariant?.label) params.model = selectedModelVariant.label;
     runQuery("fpaReport", params);
   };
 
@@ -1944,12 +1468,11 @@ const FPAReports = () => {
     const now = new Date();
     const today8AM = new Date(now);
     today8AM.setHours(8, 0, 0, 0);
-    const modelLabel = selectedModelVariant?.label;
     const params = {
       startDate: formatDate(today8AM),
       endDate: formatDate(now),
     };
-    if (modelLabel) params.model = modelLabel;
+    if (selectedModelVariant?.label) params.model = selectedModelVariant.label;
     runQuery("fpaReport", params);
   };
 
@@ -1976,7 +1499,6 @@ const FPAReports = () => {
     runQuery(reportType, params);
   };
 
-  // Filtered detail data
   const filteredData = useMemo(() => {
     if (reportType !== "fpaReport" || !Array.isArray(reportData))
       return reportData;
@@ -2002,554 +1524,316 @@ const FPAReports = () => {
   if (variantsLoading) return <Loader />;
 
   return (
-    <div
-      style={{
-        padding: 24,
-        background: "#f1f5f9",
-        minHeight: "100vh",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-      }}
-    >
-      {/* -- Header -- */}
-      <div
-        style={{
-          background:
-            "linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #4f46e5 100%)",
-          borderRadius: 14,
-          padding: "22px 28px",
-          marginBottom: 20,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          boxShadow: "0 4px 20px rgba(79,70,229,0.3)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div
-            style={{
-              background: "rgba(255,255,255,0.15)",
-              borderRadius: 10,
-              padding: 10,
-              fontSize: 24,
-              color: "#fff",
-            }}
-          >
-            <FaIndustry />
-          </div>
-          <div>
-            <h1
-              style={{
-                margin: 0,
-                color: "#fff",
-                fontSize: 22,
-                fontWeight: 800,
-                letterSpacing: -0.5,
-              }}
-            >
-              FPA Reports
-            </h1>
-            <p style={{ margin: 0, color: "#c7d2fe", fontSize: 13 }}>
-              Final Product Audit · Quality Intelligence Dashboard
-            </p>
-          </div>
+    <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
+      {/* ── PAGE HEADER — sticky ── */}
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
+        <div>
+          <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
+            FPA Reports
+          </h1>
+          <p className="text-[11px] text-slate-400">
+            Final Product Audit · Quality Intelligence Dashboard
+          </p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+
+        <div className="flex items-center gap-2">
           {lastFetched && (
-            <div style={{ color: "#a5b4fc", fontSize: 11, textAlign: "right" }}>
-              <div>Last refreshed</div>
-              <div style={{ fontWeight: 600, color: "#c7d2fe" }}>
-                {lastFetched.toLocaleTimeString()}
-              </div>
-            </div>
+            <span className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-full font-medium">
+              <Clock className="w-3 h-3" />
+              {lastFetched.toLocaleTimeString()}
+            </span>
           )}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              color: "#a5b4fc",
-              fontSize: 13,
-            }}
-          >
-            <MdOutlineQueryStats style={{ fontSize: 18 }} />
-            FPQI Target:{" "}
-            <strong style={{ color: "#fff" }}>&nbsp;= {FPQI_TARGET}</strong>
+
+          <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-blue-50 border border-blue-100 min-w-[90px]">
+            <span className="text-xl font-bold font-mono text-blue-700">
+              {reportType === "fpaReport"
+                ? filteredData.length
+                : reportData.length}
+            </span>
+            <span className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">
+              Records
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 border border-violet-100">
+            <Target className="w-3.5 h-3.5 text-violet-500" />
+            <span className="text-xs font-bold text-violet-700">
+              FPQI ≤ {FPQI_TARGET}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* -- Filter Panel -- */}
-      <div
-        style={{
-          background: "#fff",
-          border: "1px solid #e5e7eb",
-          borderRadius: 12,
-          padding: 20,
-          marginBottom: 16,
-          boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 16,
-            color: "#374151",
-          }}
-        >
-          <FaFilter style={{ color: "#6366f1" }} />
-          <span style={{ fontWeight: 700, fontSize: 14 }}>
-            Filters &amp; Report Type
-          </span>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 20,
-            alignItems: "flex-start",
-          }}
-        >
-          {/* Report Type Tabs */}
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: "#6b7280",
-                marginBottom: 8,
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
-              }}
-            >
-              Report Type
-            </div>
-            <div
-              style={{
-                display: "flex",
-                background: "#f9fafb",
-                border: "1px solid #e5e7eb",
-                borderRadius: 10,
-                overflow: "hidden",
-              }}
-            >
-              {REPORT_TYPES.map((rt) => (
-                <button
-                  key={rt.value}
-                  onClick={() => setReportType(rt.value)}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 4,
-                    padding: "10px 20px",
-                    background:
-                      reportType === rt.value ? "#4f46e5" : "transparent",
-                    color: reportType === rt.value ? "#fff" : "#6b7280",
-                    border: "none",
-                    cursor: "pointer",
-                    borderRight: "1px solid #e5e7eb",
-                    transition: "all 0.15s",
-                    minWidth: 80,
-                  }}
-                >
-                  <span style={{ fontSize: 16 }}>{rt.icon}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700 }}>
-                    {rt.label}
-                  </span>
-                  <span style={{ fontSize: 9, opacity: 0.8 }}>{rt.desc}</span>
-                </button>
-              ))}
-            </div>
+      {/* ── BODY ── */}
+      <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
+        {/* ── FILTERS CARD ── */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
+          <div className="flex items-center gap-1.5 mb-3">
+            <Filter className="w-3 h-3 text-slate-400" />
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+              Filters & Report Type
+            </p>
           </div>
 
-          {/* Date Range */}
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <div>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: "#6b7280",
-                  marginBottom: 8,
-                  textTransform: "uppercase",
-                  letterSpacing: 0.5,
-                }}
-              >
-                Start Time
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto] gap-4">
+            {/* Left: controls */}
+            <div className="space-y-3">
+              {/* Report Type Tabs */}
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <FileText className="w-3 h-3 text-slate-400" />
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                    Report Type
+                  </p>
+                </div>
+                <div className="flex bg-slate-50 border border-slate-200 rounded-lg overflow-hidden w-fit">
+                  {REPORT_TYPES.map((rt) => (
+                    <button
+                      key={rt.value}
+                      onClick={() => setReportType(rt.value)}
+                      className={`flex flex-col items-center gap-0.5 px-5 py-2.5 text-xs font-semibold transition-all border-r border-slate-200 last:border-r-0 min-w-[80px] ${
+                        reportType === rt.value
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "text-slate-500 hover:bg-slate-100"
+                      }`}
+                    >
+                      <span className="font-bold">{rt.label}</span>
+                      <span
+                        className={`text-[9px] ${reportType === rt.value ? "text-blue-100" : "text-slate-400"}`}
+                      >
+                        {rt.desc}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <DateTimePicker
-                label=""
-                name="startTime"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: "#6b7280",
-                  marginBottom: 8,
-                  textTransform: "uppercase",
-                  letterSpacing: 0.5,
-                }}
-              >
-                End Time
-              </div>
-              <DateTimePicker
-                label=""
-                name="endTime"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
-            </div>
-          </div>
 
-          {/* FPA-only filters */}
-          {reportType === "fpaReport" && (
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
-                flexWrap: "wrap",
-                alignItems: "flex-end",
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: "#6b7280",
-                    marginBottom: 8,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  Model Variant
-                </div>
-                <SelectField
-                  label=""
-                  options={variants}
-                  value={selectedModelVariant?.value || ""}
-                  onChange={(e) =>
-                    setSelectedModelVariant(
-                      variants.find((o) => o.value === e.target.value) || null,
-                    )
-                  }
-                  className="max-w-56"
-                />
-              </div>
-              <div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: "#6b7280",
-                    marginBottom: 8,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  Search
-                </div>
-                <div style={{ position: "relative" }}>
-                  <FaSearch
-                    style={{
-                      position: "absolute",
-                      left: 10,
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      color: "#9ca3af",
-                      fontSize: 12,
-                    }}
+              {/* Date pickers + FPA-only filters */}
+              <div className="flex flex-wrap gap-3 items-end">
+                <div className="min-w-[170px] flex-1">
+                  <DateTimePicker
+                    label="Start Time"
+                    name="startTime"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
                   />
-                  <input
-                    type="text"
-                    placeholder="Model, FGSRNO, defect…"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    style={{
-                      paddingLeft: 30,
-                      paddingRight: searchTerm ? 28 : 12,
-                      paddingTop: 7,
-                      paddingBottom: 7,
-                      border: "1px solid #d1d5db",
-                      borderRadius: 7,
-                      fontSize: 13,
-                      outline: "none",
-                      width: 200,
-                    }}
+                </div>
+                <div className="min-w-[170px] flex-1">
+                  <DateTimePicker
+                    label="End Time"
+                    name="endTime"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
                   />
-                  {searchTerm && (
-                    <FaTimes
-                      onClick={() => setSearchTerm("")}
-                      style={{
-                        position: "absolute",
-                        right: 8,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        color: "#9ca3af",
-                        cursor: "pointer",
-                        fontSize: 11,
-                      }}
+                </div>
+
+                {/* FPA-only: Model Variant */}
+                {reportType === "fpaReport" && (
+                  <div className="min-w-[170px] flex-1">
+                    <SelectField
+                      label="Model Variant"
+                      options={[
+                        { value: "", label: "All Models" },
+                        ...variants,
+                      ]}
+                      value={selectedModelVariant?.value || ""}
+                      onChange={(e) =>
+                        setSelectedModelVariant(
+                          variants.find((o) => o.value === e.target.value) ||
+                            null,
+                        )
+                      }
                     />
+                  </div>
+                )}
+
+                {/* FPA-only: Search */}
+                {reportType === "fpaReport" && (
+                  <div className="min-w-[170px] flex-1">
+                    <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                      Search
+                    </label>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Model, FGSRNO, defect…"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-8 pr-8 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+                      />
+                      {searchTerm && (
+                        <button
+                          onClick={() => setSearchTerm("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2"
+                        >
+                          <X className="w-3 h-3 text-slate-400 hover:text-slate-600" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div className="flex items-center gap-2 pb-0.5 shrink-0">
+                  <button
+                    onClick={handleQuery}
+                    disabled={loading}
+                    className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                      loading
+                        ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                        : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                    }`}
+                  >
+                    {loading ? (
+                      <Spinner cls="w-4 h-4" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    {loading ? "Loading…" : "Query"}
+                  </button>
+
+                  {reportData.length > 0 && (
+                    <ExportButton data={reportData} filename="FPA_Report" />
                   )}
                 </div>
               </div>
             </div>
-          )}
 
-          {/* Actions */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              justifyContent: "flex-end",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                flexWrap: "wrap",
-                alignItems: "center",
-              }}
-            >
-              <button
-                onClick={handleQuery}
-                disabled={loading}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "9px 20px",
-                  background: loading ? "#9ca3af" : "#4f46e5",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 8,
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: loading ? "not-allowed" : "pointer",
-                  boxShadow: loading ? "none" : "0 2px 8px rgba(79,70,229,0.3)",
-                }}
-              >
-                {loading ? (
-                  <FaSync style={{ animation: "spin 1s linear infinite" }} />
-                ) : (
-                  <MdOutlineQueryStats />
+            {/* Right: Quick Filters */}
+            <div className="border-l border-slate-100 pl-5 flex flex-col justify-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <Zap className="w-3 h-3 text-amber-400" />
+                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                  Quick Select
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                {showQuickYesterday && (
+                  <button
+                    onClick={handleYesterdayQuery}
+                    disabled={loading}
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all border ${
+                      loading
+                        ? "opacity-50 cursor-not-allowed bg-slate-50 text-slate-400 border-slate-200"
+                        : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                    }`}
+                  >
+                    Yesterday
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
                 )}
-                {loading ? "Loading…" : "Query"}
-              </button>
-
-              {showQuickYesterday && (
-                <button
-                  onClick={handleYesterdayQuery}
-                  disabled={loading}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    padding: "9px 14px",
-                    background: "#fef3c7",
-                    color: "#92400e",
-                    border: "1px solid #fde68a",
-                    borderRadius: 8,
-                    fontWeight: 700,
-                    fontSize: 12,
-                    cursor: loading ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <FaBolt size={10} /> YDAY
-                </button>
-              )}
-              {showQuickToday && (
-                <button
-                  onClick={handleTodayQuery}
-                  disabled={loading}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    padding: "9px 14px",
-                    background: "#dbeafe",
-                    color: "#1e40af",
-                    border: "1px solid #bfdbfe",
-                    borderRadius: 8,
-                    fontWeight: 700,
-                    fontSize: 12,
-                    cursor: loading ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <FaStar size={10} /> TODAY
-                </button>
-              )}
-              {showQuickMTD && (
-                <button
-                  onClick={handleMTDQuery}
-                  disabled={loading}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    padding: "9px 14px",
-                    background: "#dcfce7",
-                    color: "#166534",
-                    border: "1px solid #86efac",
-                    borderRadius: 8,
-                    fontWeight: 700,
-                    fontSize: 12,
-                    cursor: loading ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <FaArrowRight size={10} /> MTD
-                </button>
-              )}
-              {reportData.length > 0 && (
-                <ExportButton data={reportData} filename="FPA_Report" />
-              )}
+                {showQuickToday && (
+                  <button
+                    onClick={handleTodayQuery}
+                    disabled={loading}
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all border ${
+                      loading
+                        ? "opacity-50 cursor-not-allowed bg-slate-50 text-slate-400 border-slate-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                    }`}
+                  >
+                    Today
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
+                )}
+                {showQuickMTD && (
+                  <button
+                    onClick={handleMTDQuery}
+                    disabled={loading}
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all border ${
+                      loading
+                        ? "opacity-50 cursor-not-allowed bg-slate-50 text-slate-400 border-slate-200"
+                        : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                    }`}
+                  >
+                    Month to Date
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
+
+        {/* ── LOADING STATE ── */}
+        {loading && (
+          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-center gap-3">
+            <Spinner cls="w-5 h-5 text-blue-600" />
+            <p className="text-sm text-slate-400">Fetching report data…</p>
+          </div>
+        )}
+
+        {/* ── DATA PANELS ── */}
+        {!loading && reportData.length > 0 && (
+          <>
+            {/* Summary Card */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <BarChart3 className="w-3.5 h-3.5 text-blue-500" />
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                  Summary
+                </span>
+              </div>
+              {reportType === "fpaReport" ? (
+                <FpaDetailSummary data={filteredData} />
+              ) : (
+                <AggregateSummary data={reportData} reportType={reportType} />
+              )}
+            </div>
+
+            {/* Chart (aggregated reports) */}
+            {isAggregated && (
+              <FpqiTrendChart data={reportData} reportType={reportType} />
+            )}
+
+            {/* Analysis panels (detail report) */}
+            {reportType === "fpaReport" && reportData.length > 0 && (
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                <TopDefectsPanel data={filteredData} />
+                <ModelPerformancePanel data={filteredData} />
+              </div>
+            )}
+
+            {reportType === "fpaReport" && reportData.length > 0 && (
+              <CountryPanel data={filteredData} />
+            )}
+
+            {/* Data Table */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 shrink-0">
+                <Table2 className="w-3.5 h-3.5 text-blue-500" />
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                  Data Table
+                </span>
+                <span className="ml-auto px-2 py-0.5 bg-blue-50 text-blue-700 text-[11px] font-semibold rounded-full border border-blue-100">
+                  {reportType === "fpaReport"
+                    ? filteredData.length
+                    : reportData.length}{" "}
+                  rows
+                </span>
+              </div>
+              <div className="p-4">
+                {reportType === "fpaReport" && (
+                  <FpaReportTable data={filteredData} />
+                )}
+                {reportType === "dailyFpaReport" && (
+                  <DailyFpaReportTable data={reportData} />
+                )}
+                {reportType === "monthlyFpaReport" && (
+                  <MonthlyFpaReportTable data={reportData} />
+                )}
+                {reportType === "yearlyFpaReport" && (
+                  <YearlyFpaReportTable data={reportData} />
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Empty: no data ── */}
+        {!loading && reportData.length === 0 && <EmptyState />}
       </div>
-
-      {/* -- Loading -- */}
-      {loading && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: 48,
-            background: "#fff",
-            borderRadius: 12,
-            border: "1px solid #e5e7eb",
-          }}
-        >
-          <Loader />
-          <div style={{ color: "#6b7280", marginTop: 10, fontSize: 13 }}>
-            Fetching report data…
-          </div>
-        </div>
-      )}
-
-      {/* -- Data Panel -- */}
-      {!loading && reportData.length > 0 && (
-        <>
-          {/* Summary */}
-          <div
-            style={{
-              background: "#fff",
-              border: "1px solid #e5e7eb",
-              borderRadius: 12,
-              padding: 20,
-              marginBottom: 16,
-              boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-            }}
-          >
-            {reportType === "fpaReport" ? (
-              <FpaDetailSummary data={filteredData} />
-            ) : (
-              <AggregateSummary data={reportData} reportType={reportType} />
-            )}
-          </div>
-
-          {/* Chart (aggregated reports) */}
-          {isAggregated && (
-            <FpqiTrendChart data={reportData} reportType={reportType} />
-          )}
-
-          {/* Analysis panels (detail report) */}
-          {reportType === "fpaReport" && reportData.length > 0 && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
-                gap: 16,
-                marginBottom: 16,
-              }}
-            >
-              <TopDefectsPanel data={filteredData} />
-              <ModelPerformancePanel data={filteredData} />
-            </div>
-          )}
-          {reportType === "fpaReport" && reportData.length > 0 && (
-            <CountryPanel data={filteredData} />
-          )}
-
-          {/* Table */}
-          <div
-            style={{
-              background: "#fff",
-              border: "1px solid #e5e7eb",
-              borderRadius: 12,
-              padding: 20,
-              boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 14,
-              }}
-            >
-              <FaTable style={{ color: "#6366f1" }} />
-              <span style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>
-                Data Table
-              </span>
-              <span
-                style={{
-                  marginLeft: "auto",
-                  background: "#eef2ff",
-                  color: "#4338ca",
-                  padding: "2px 10px",
-                  borderRadius: 20,
-                  fontSize: 11,
-                  fontWeight: 700,
-                }}
-              >
-                {reportType === "fpaReport"
-                  ? filteredData.length
-                  : reportData.length}{" "}
-                rows
-              </span>
-            </div>
-            {reportType === "fpaReport" && (
-              <FpaReportTable data={filteredData} />
-            )}
-            {reportType === "dailyFpaReport" && (
-              <DailyFpaReportTable data={reportData} />
-            )}
-            {reportType === "monthlyFpaReport" && (
-              <MonthlyFpaReportTable data={reportData} />
-            )}
-            {reportType === "yearlyFpaReport" && (
-              <YearlyFpaReportTable data={reportData} />
-            )}
-          </div>
-        </>
-      )}
-
-      {/* -- Empty -- */}
-      {!loading && reportData.length === 0 && (
-        <div
-          style={{
-            background: "#fff",
-            border: "1px solid #e5e7eb",
-            borderRadius: 12,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-          }}
-        >
-          <EmptyState />
-        </div>
-      )}
-
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };
