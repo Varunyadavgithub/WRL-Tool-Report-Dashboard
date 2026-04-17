@@ -4,50 +4,40 @@ import toast from "react-hot-toast";
 import ExportButton from "../../components/ui/ExportButton";
 import Loader from "../../components/ui/Loader";
 import Pagination from "../../components/ui/Pagination";
+import DateTimePicker from "../../components/ui/DateTimePicker";
 import { baseURL } from "../../assets/assets";
 import {
-  FaThermometerHalf,
-  FaClock,
-  FaCheckCircle,
-  FaExclamationTriangle,
-  FaCalendarAlt,
-  FaSearch,
-  FaSyncAlt,
-  FaBatteryFull,
-  FaLightbulb,
-  FaArrowUp,
-  FaArrowDown,
-  FaBarcode,
-  FaMapMarkerAlt,
-  FaCog,
-  FaDatabase,
-  FaTimes,
-  FaCheck,
-  FaCalendarWeek,
-  FaHistory,
-  FaFilter,
-} from "react-icons/fa";
-import {
-  BsLightningChargeFill,
-  BsSpeedometer2,
-  BsCalendar2Day,
-  BsCalendar2Week,
-  BsCalendar2Month,
-  BsCalendar3,
-  BsThermometerHalf,
-} from "react-icons/bs";
-import {
-  MdElectricBolt,
-  MdDateRange,
-  MdAccessTime,
-  MdToday,
-  MdCalendarMonth,
-} from "react-icons/md";
-import { HiStatusOnline, HiDatabase } from "react-icons/hi";
-import { IoSpeedometer, IoCalendarOutline } from "react-icons/io5";
-import { RiCalendarEventLine } from "react-icons/ri";
-import { TbReportAnalytics, TbCalendarStats } from "react-icons/tb";
-import { AiOutlineFieldNumber } from "react-icons/ai";
+  Zap,
+  Search,
+  RefreshCw,
+  RotateCcw,
+  Calendar,
+  Clock,
+  Filter,
+  ChevronRight,
+  Download,
+  CheckCircle2,
+  XCircle,
+  ArrowUp,
+  ArrowDown,
+  Barcode,
+  MapPin,
+  Settings,
+  Database,
+  Hash,
+  Thermometer,
+  BatteryFull,
+  Lightbulb,
+  Gauge,
+  Activity,
+  AlertTriangle,
+  PackageOpen,
+  Loader2,
+  CalendarDays,
+  CalendarRange,
+  Plug,
+  FileText,
+} from "lucide-react";
 import {
   getTodayRange,
   getYesterdayRange,
@@ -55,9 +45,51 @@ import {
   formatDateTimeLocal,
 } from "../../utils/dateUtils";
 
-// --- Helpers ------------------------------------------------------------------
+// ─── Constants ─────────────────────────────────────────────────────────────────
 
-// Convert datetime-local value ? "YYYY-MM-DD HH:mm:ss" for the API
+const AREA_LABELS = { 5: "Other", 6: "SUS", 8: "Choc", 9: "VISI Cooler" };
+
+const TABLE_COLUMNS = [
+  { icon: Hash, label: "#" },
+  { icon: Database, label: "Result ID" },
+  { icon: Clock, label: "Date / Time" },
+  { icon: Barcode, label: "Barcode" },
+  { icon: Settings, label: "Model" },
+  { icon: Clock, label: "Runtime" },
+  { icon: Thermometer, label: "Temp (°C)" },
+  { icon: Zap, label: "Current (A)" },
+  { icon: BatteryFull, label: "Voltage (V)" },
+  { icon: Lightbulb, label: "Power (W)" },
+  { icon: Gauge, label: "Performance" },
+  { icon: Activity, label: "Status" },
+  { icon: AlertTriangle, label: "Fault Info" },
+  { icon: MapPin, label: "Area" },
+];
+
+const QUICK_FILTERS = [
+  { key: "yesterday", label: "Yesterday", color: "amber" },
+  { key: "today", label: "Today", color: "blue" },
+  { key: "thisMonth", label: "Month to Date", color: "emerald" },
+];
+
+const FILTER_LABELS = {
+  today: "Today",
+  yesterday: "Yesterday",
+  thisMonth: "This Month",
+  custom: "Custom Range",
+};
+
+const DEFAULT_STATS = {
+  avgRuntime: 0,
+  avgTemp: 0,
+  avgPower: 0,
+  passRate: 0,
+  faultCount: 0,
+  passCount: 0,
+};
+
+// ─── Utilities ─────────────────────────────────────────────────────────────────
+
 const toAPIDateTime = (datetimeLocalValue) => {
   if (!datetimeLocalValue) return "";
   const dt = new Date(datetimeLocalValue);
@@ -65,74 +97,73 @@ const toAPIDateTime = (datetimeLocalValue) => {
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
 };
 
-// Build datetime-local string for ranges NOT in dateUtils (isEndOfDay ? 23:59)
-const buildDatetimeLocal = (date, isEndOfDay = false) => {
-  const pad = (n) => String(n).padStart(2, "0");
-  const h = isEndOfDay ? "23" : "00";
-  const m = isEndOfDay ? "59" : "00";
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${h}:${m}`;
-};
+// ─── Spinner ───────────────────────────────────────────────────────────────────
+const Spinner = ({ cls = "w-4 h-4" }) => (
+  <Loader2 className={`animate-spin ${cls}`} />
+);
 
-const AREA_LABELS = { 5: "Other", 6: "SUS", 8: "Choc", 9: "VISI Cooler" };
+// ─── EmptyState ────────────────────────────────────────────────────────────────
+const EmptyState = ({ colSpan, onTodayClick }) => (
+  <tr>
+    <td colSpan={colSpan} className="py-16 text-center">
+      <div className="flex flex-col items-center gap-3 text-slate-400">
+        <PackageOpen className="w-10 h-10 opacity-20" strokeWidth={1.2} />
+        <p className="text-xs font-semibold text-slate-500">
+          No data available
+        </p>
+        <p className="text-xs">
+          Use quick filters or set a custom date & time range
+        </p>
+        {onTodayClick && (
+          <button
+            onClick={onTodayClick}
+            className="mt-1 px-4 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all shadow-sm shadow-blue-200 flex items-center gap-1.5"
+          >
+            <CalendarDays className="w-3.5 h-3.5" />
+            Today's Data
+          </button>
+        )}
+      </div>
+    </td>
+  </tr>
+);
 
-const QuickFilterBtn = ({
-  filterType,
-  label,
-  icon: Icon,
-  activeFilter,
-  onClick,
-  loading,
-}) => {
-  const isActive = activeFilter === filterType;
-  return (
-    <button
-      onClick={() => onClick(filterType)}
-      disabled={loading}
-      className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 border
-        ${
-          isActive
-            ? "bg-slate-800 text-white border-slate-800 shadow-md scale-105"
-            : "bg-white text-gray-600 border-gray-200 hover:border-slate-400 hover:bg-slate-50"
-        }
-        ${loading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-    >
-      <Icon className={isActive ? "text-white" : "text-gray-400"} />
-      {label}
-    </button>
-  );
-};
-
+// ─── StatusBadge ───────────────────────────────────────────────────────────────
 const StatusBadge = ({ status }) => {
   const isPass = status === "PASS";
   return (
     <span
-      className={`px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 tracking-wide
-      ${isPass ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200" : "bg-red-100 text-red-700 ring-1 ring-red-200"}`}
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded font-semibold text-xs ${
+        isPass
+          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+          : "bg-rose-50 text-rose-700 border border-rose-200"
+      }`}
     >
       {isPass ? (
-        <FaCheck className="w-2.5 h-2.5" />
+        <CheckCircle2 className="w-2.5 h-2.5" />
       ) : (
-        <FaTimes className="w-2.5 h-2.5" />
+        <XCircle className="w-2.5 h-2.5" />
       )}
       {status}
     </span>
   );
 };
 
+// ─── MinMaxCell ────────────────────────────────────────────────────────────────
 const MinMaxCell = ({ max, min }) => (
   <div className="flex flex-col items-center gap-0.5">
     <span className="flex items-center gap-1 text-rose-500 text-xs font-medium">
-      <FaArrowUp className="text-[9px]" />
+      <ArrowUp className="w-2.5 h-2.5" />
       {max ?? "—"}
     </span>
     <span className="flex items-center gap-1 text-sky-500 text-xs font-medium">
-      <FaArrowDown className="text-[9px]" />
+      <ArrowDown className="w-2.5 h-2.5" />
       {min ?? "—"}
     </span>
   </div>
 );
 
-// --- Main Component -----------------------------------------------------------
+// ─── Main Component ────────────────────────────────────────────────────────────
 
 const CPTReport = () => {
   const [loading, setLoading] = useState(false);
@@ -146,28 +177,11 @@ const CPTReport = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [totalRecords, setTotalRecords] = useState(0);
   const [limit, setLimit] = useState(50);
+  const [stats, setStats] = useState(DEFAULT_STATS);
 
-  const [stats, setStats] = useState({
-    avgRuntime: 0,
-    avgTemp: 0,
-    avgPower: 0,
-    passRate: 0,
-    faultCount: 0,
-    passCount: 0,
-  });
-
-  // -- Quick filter date resolver --------------------------------------------
-  //
-  // Strategy:
-  //   today / yesterday / thisMonth  ? use dateUtils (getTodayRange, getYesterdayRange, getMTDRange)
-  //                                    then format with the util's formatDateTimeLocal
-  //   everything else               ? compute locally with buildDatetimeLocal
-  //
+  // ── Quick filter date resolver ─────────────────────────────────────────────
   const getQuickFilterDates = (filterType) => {
-    const today = new Date();
-
     switch (filterType) {
-      // -- Backed by dateUtils ----------------------------------------------
       case "today": {
         const { startDate, endDate } = getTodayRange();
         return {
@@ -183,7 +197,6 @@ const CPTReport = () => {
         };
       }
       case "thisMonth": {
-        // getMTDRange ? 1st of current month 00:00 ? today 23:59
         const { startDate, endDate } = getMTDRange();
         return {
           start: formatDateTimeLocal(startDate),
@@ -195,17 +208,10 @@ const CPTReport = () => {
     }
   };
 
-  // -- Stats -----------------------------------------------------------------
+  // ── Stats calculator ───────────────────────────────────────────────────────
   const calculateStats = (data) => {
     if (!data?.length) {
-      setStats({
-        avgRuntime: 0,
-        avgTemp: 0,
-        avgPower: 0,
-        passRate: 0,
-        faultCount: 0,
-        passCount: 0,
-      });
+      setStats(DEFAULT_STATS);
       return;
     }
     const n = data.length;
@@ -238,7 +244,7 @@ const CPTReport = () => {
     });
   };
 
-  // -- Fetch -----------------------------------------------------------------
+  // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchDataWithDates = async (
     start,
     end,
@@ -274,7 +280,7 @@ const CPTReport = () => {
     }
   };
 
-  // -- Event handlers --------------------------------------------------------
+  // ── Handlers ───────────────────────────────────────────────────────────────
   const handleQuickFilter = (filterType) => {
     const dates = getQuickFilterDates(filterType);
     if (!dates) return;
@@ -285,14 +291,20 @@ const CPTReport = () => {
   };
 
   const handleQuery = () => {
+    if (!startTime || !endTime) {
+      toast.error("Please select both start and end date/time.");
+      return;
+    }
     setCurrentPage(1);
     setActiveFilter("custom");
     fetchDataWithDates(startTime, endTime, 1, limit);
   };
+
   const handlePageChange = (page) => {
     setCurrentPage(page);
     fetchDataWithDates(startTime, endTime, page, limit);
   };
+
   const handleLimitChange = (newLimit) => {
     setLimit(newLimit);
     setCurrentPage(1);
@@ -307,14 +319,7 @@ const CPTReport = () => {
     setTotalPages(0);
     setTotalRecords(0);
     setActiveFilter("");
-    setStats({
-      avgRuntime: 0,
-      avgTemp: 0,
-      avgPower: 0,
-      passRate: 0,
-      faultCount: 0,
-      passCount: 0,
-    });
+    setStats(DEFAULT_STATS);
   };
 
   const handleExportAll = async () => {
@@ -343,407 +348,472 @@ const CPTReport = () => {
     }
   };
 
-  // -- Static config ---------------------------------------------------------
-  const filterLabels = {
-    today: "Today",
-    yesterday: "Yesterday",
-    thisWeek: "This Week",
-    lastWeek: "Last Week",
-    thisMonth: "This Month",
-    lastMonth: "Last Month",
-    last7Days: "Last 7 Days",
-    last30Days: "Last 30 Days",
-    last90Days: "Last 90 Days",
-    custom: "Custom Range",
-  };
+  // ── Derived ────────────────────────────────────────────────────────────────
+  const hasData = reportData.length > 0;
+  const passRateNum = parseFloat(stats.passRate);
 
-  const quickFilters = [
-    { filterType: "today", label: "Today", icon: MdToday },
-    { filterType: "yesterday", label: "Yesterday", icon: BsCalendar2Day },
-    { filterType: "thisMonth", label: "This Month", icon: MdCalendarMonth },
-  ];
-
-  const TABLE_HEADERS = [
-    { icon: <AiOutlineFieldNumber className="text-slate-400" />, label: "#" },
-    { icon: <FaDatabase className="text-indigo-400" />, label: "Result ID" },
-    { icon: <MdAccessTime className="text-blue-400" />, label: "Date / Time" },
-    { icon: <FaBarcode className="text-slate-400" />, label: "Barcode" },
-    { icon: <FaCog className="text-slate-400" />, label: "Model" },
-    { icon: <FaClock className="text-emerald-400" />, label: "Runtime" },
-    {
-      icon: <FaThermometerHalf className="text-orange-400" />,
-      label: "Temp (°C)",
-    },
-    {
-      icon: <MdElectricBolt className="text-blue-400" />,
-      label: "Current (A)",
-    },
-    {
-      icon: <FaBatteryFull className="text-yellow-500" />,
-      label: "Voltage (V)",
-    },
-    { icon: <FaLightbulb className="text-amber-400" />, label: "Power (W)" },
-    {
-      icon: <BsSpeedometer2 className="text-purple-400" />,
-      label: "Performance",
-    },
-    { icon: <HiStatusOnline className="text-emerald-400" />, label: "Status" },
-    {
-      icon: <FaExclamationTriangle className="text-red-400" />,
-      label: "Fault Info",
-    },
-    { icon: <FaMapMarkerAlt className="text-purple-400" />, label: "Area" },
-  ];
-
-  // -- Render ----------------------------------------------------------------
+  /* ══════════════════════════════════════════════════════════
+     RENDER
+  ══════════════════════════════════════════════════════════ */
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-6">
-      {/* Header */}
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="bg-slate-800 p-3 rounded-2xl shadow-lg">
-            <BsLightningChargeFill className="text-2xl text-amber-400" />
+    <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
+      {/* ── PAGE HEADER — sticky ── */}
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
+        <div>
+          <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
+            CPT Performance Report
+          </h1>
+          <p className="text-[11px] text-slate-400">
+            Cooling Performance Testing — Quality Analytics
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {activeFilter && (
+            <span className="flex items-center gap-1.5 text-[11px] text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full font-medium">
+              <Filter className="w-3 h-3" />
+              {FILTER_LABELS[activeFilter] || activeFilter}
+            </span>
+          )}
+
+          <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-blue-50 border border-blue-100 min-w-[90px]">
+            <span className="text-xl font-bold font-mono text-blue-700">
+              {totalRecords.toLocaleString()}
+            </span>
+            <span className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">
+              Records
+            </span>
           </div>
-          <div>
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight">
-              CPT Performance Report
-            </h1>
-            <p className="text-sm text-slate-500 mt-0.5">
-              Cooling Performance Testing
+
+          {hasData && (
+            <div
+              className={`flex flex-col items-center px-4 py-1.5 rounded-lg border min-w-[90px] ${
+                passRateNum >= 95
+                  ? "bg-emerald-50 border-emerald-100"
+                  : passRateNum >= 80
+                    ? "bg-amber-50 border-amber-100"
+                    : "bg-rose-50 border-rose-100"
+              }`}
+            >
+              <span
+                className={`text-xl font-bold font-mono ${
+                  passRateNum >= 95
+                    ? "text-emerald-700"
+                    : passRateNum >= 80
+                      ? "text-amber-700"
+                      : "text-rose-700"
+                }`}
+              >
+                {stats.passRate}%
+              </span>
+              <span
+                className={`text-[10px] font-medium uppercase tracking-wide ${
+                  passRateNum >= 95
+                    ? "text-emerald-500"
+                    : passRateNum >= 80
+                      ? "text-amber-500"
+                      : "text-rose-500"
+                }`}
+              >
+                Pass Rate
+              </span>
+            </div>
+          )}
+
+          {hasData && (
+            <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-violet-50 border border-violet-100 min-w-[90px]">
+              <span className="text-xl font-bold font-mono text-violet-700">
+                {stats.avgRuntime}
+                <span className="text-[10px] font-medium ml-0.5">m</span>
+              </span>
+              <span className="text-[10px] text-violet-500 font-medium uppercase tracking-wide">
+                Avg Runtime
+              </span>
+            </div>
+          )}
+
+          {hasData && stats.faultCount > 0 && (
+            <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-rose-50 border border-rose-100 min-w-[90px]">
+              <span className="text-xl font-bold font-mono text-rose-700">
+                {stats.faultCount}
+              </span>
+              <span className="text-[10px] text-rose-500 font-medium uppercase tracking-wide">
+                Faults
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── BODY ── */}
+      <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
+        {/* ── FILTERS CARD ── */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
+          <div className="flex items-center gap-1.5 mb-3">
+            <Filter className="w-3 h-3 text-slate-400" />
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+              Filters & Date Range
             </p>
           </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto] gap-4">
+            {/* Left: controls */}
+            <div className="space-y-3">
+              {/* Date pickers + actions */}
+              <div className="flex flex-wrap gap-3 items-end">
+                <div className="min-w-[170px] flex-1">
+                  <DateTimePicker
+                    label="Start Time"
+                    name="startTime"
+                    value={startTime}
+                    onChange={(e) => {
+                      setStartTime(e.target.value);
+                      setActiveFilter("custom");
+                    }}
+                  />
+                </div>
+                <div className="min-w-[170px] flex-1">
+                  <DateTimePicker
+                    label="End Time"
+                    name="endTime"
+                    value={endTime}
+                    onChange={(e) => {
+                      setEndTime(e.target.value);
+                      setActiveFilter("custom");
+                    }}
+                  />
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex items-center gap-2 pb-0.5 shrink-0">
+                  <button
+                    onClick={handleQuery}
+                    disabled={loading || !startTime || !endTime}
+                    className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                      loading || !startTime || !endTime
+                        ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                        : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                    }`}
+                  >
+                    {loading ? (
+                      <Spinner cls="w-4 h-4" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    {loading ? "Loading…" : "Query"}
+                  </button>
+
+                  <button
+                    onClick={handleClear}
+                    title="Clear All"
+                    className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200 rounded-lg transition-colors"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+
+                  {hasData && (
+                    <ExportButton
+                      data={reportData}
+                      filename="CPT_Report"
+                      fetchAllData={handleExportAll}
+                      totalRecords={totalRecords}
+                      isLoading={exportLoading}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Active range badge */}
+              {startTime && endTime && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200 w-fit">
+                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="text-[11px] text-slate-400">Range:</span>
+                  <span className="text-[11px] font-semibold text-slate-700">
+                    {new Date(startTime).toLocaleString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  <span className="text-[11px] text-slate-400">→</span>
+                  <span className="text-[11px] font-semibold text-slate-700">
+                    {new Date(endTime).toLocaleString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Quick Filters (same as EST) */}
+            <div className="border-l border-slate-100 pl-5 flex flex-col justify-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <Zap className="w-3 h-3 text-amber-400" />
+                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                  Quick Select
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                {QUICK_FILTERS.map(({ key, label, color }) => {
+                  const active = activeFilter === key;
+                  const colorMap = {
+                    amber: active
+                      ? "bg-amber-500 text-white border-amber-500 shadow-sm shadow-amber-200"
+                      : "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100",
+                    blue: active
+                      ? "bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-200"
+                      : "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100",
+                    emerald: active
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-200"
+                      : "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100",
+                  };
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => handleQuickFilter(key)}
+                      disabled={loading}
+                      className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${colorMap[color]} ${
+                        loading ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
+                    >
+                      {label}
+                      <ChevronRight className="w-3 h-3" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </div>
-        {totalRecords > 0 && (
-          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm">
-            <HiDatabase className="text-slate-400" />
-            <span className="text-sm font-semibold text-slate-700">
-              {totalRecords.toLocaleString()} Records
-            </span>
+
+        {/* ── LOADING STATE ── */}
+        {loading && (
+          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-center gap-3">
+            <Spinner cls="w-5 h-5 text-blue-600" />
+            <p className="text-sm text-slate-400">Fetching CPT records…</p>
           </div>
         )}
-      </div>
 
-      {/* Filter Panel */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-5">
-        {/* Quick Filters */}
-        <div className="flex items-center gap-2 mb-3">
-          <FaFilter className="text-slate-400 text-sm" />
-          <span className="text-sm font-bold text-slate-600 uppercase tracking-wider">
-            Quick Filters
-          </span>
-          {activeFilter && activeFilter !== "custom" && (
-            <span className="ml-auto text-xs text-emerald-600 font-semibold flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-200">
-              <FaCheckCircle /> {filterLabels[activeFilter]}
-            </span>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2 mb-5">
-          {quickFilters.map((f) => (
-            <QuickFilterBtn
-              key={f.filterType}
-              {...f}
-              activeFilter={activeFilter}
-              onClick={handleQuickFilter}
-              loading={loading}
-            />
-          ))}
-        </div>
-
-        {/* Custom Range */}
-        <div className="border-t border-slate-100 pt-4">
-          <div className="flex items-center gap-2 mb-3">
-            <FaCalendarAlt className="text-slate-400 text-sm" />
-            <span className="text-sm font-bold text-slate-600 uppercase tracking-wider">
-              Custom Date & Time Range
-            </span>
-            {activeFilter === "custom" && (
-              <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
-                Custom
-              </span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div>
-              <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
-                <MdDateRange className="text-blue-400" /> Start Date & Time
-              </label>
-              <input
-                type="datetime-local"
-                value={startTime}
-                onChange={(e) => {
-                  setStartTime(e.target.value);
-                  setActiveFilter("custom");
-                }}
-                className="w-full border-2 border-slate-200 px-3 py-2.5 rounded-xl text-sm focus:border-slate-500 focus:ring-2 focus:ring-slate-100 outline-none transition-all text-slate-700"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
-                <MdDateRange className="text-rose-400" /> End Date & Time
-              </label>
-              <input
-                type="datetime-local"
-                value={endTime}
-                onChange={(e) => {
-                  setEndTime(e.target.value);
-                  setActiveFilter("custom");
-                }}
-                className="w-full border-2 border-slate-200 px-3 py-2.5 rounded-xl text-sm focus:border-slate-500 focus:ring-2 focus:ring-slate-100 outline-none transition-all text-slate-700"
-              />
-            </div>
-            <div className="md:col-span-2 flex items-end gap-3">
-              <button
-                onClick={handleQuery}
-                disabled={loading || !startTime || !endTime}
-                className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-sm text-white transition-all flex items-center justify-center gap-2
-                  ${
-                    loading || !startTime || !endTime
-                      ? "bg-slate-300 cursor-not-allowed"
-                      : "bg-slate-800 hover:bg-slate-700 shadow-md hover:shadow-lg active:scale-95"
-                  }`}
-              >
-                {loading ? (
-                  <>
-                    <svg
-                      className="animate-spin h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                    >
-                      <circle
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        className="opacity-25"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      />
-                    </svg>{" "}
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    <FaSearch /> Query
-                  </>
+        {/* ── DATA TABLE ── */}
+        {!loading && hasData && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            {/* Table header bar */}
+            <div className="border-b border-slate-100 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <FileText className="w-3.5 h-3.5 text-blue-500" />
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                  Detailed Test Results
+                </span>
+                {activeFilter && (
+                  <span className="ml-1 px-2 py-0.5 bg-slate-800 text-white text-[11px] font-semibold rounded-full flex items-center gap-1">
+                    <CalendarRange className="w-2.5 h-2.5 text-amber-400" />
+                    {FILTER_LABELS[activeFilter]}
+                  </span>
                 )}
-              </button>
-              <button
-                onClick={handleClear}
-                className="py-2.5 px-4 rounded-xl font-bold text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all flex items-center gap-2 active:scale-95"
-              >
-                <FaSyncAlt /> Clear
-              </button>
-              {reportData?.length > 0 && (
-                <ExportButton
-                  data={reportData}
-                  filename="CPT_Report"
-                  fetchAllData={handleExportAll}
-                  totalRecords={totalRecords}
-                  isLoading={exportLoading}
-                />
-              )}
-            </div>
-          </div>
-
-          {startTime && endTime && (
-            <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
-              <IoCalendarOutline className="text-slate-400 shrink-0" />
-              <span className="font-medium text-slate-600">
-                {new Date(startTime).toLocaleString("en-IN", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-              <span className="text-slate-400 mx-1">?</span>
-              <span className="font-medium text-slate-600">
-                {new Date(endTime).toLocaleString("en-IN", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Data Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <TbReportAnalytics className="text-slate-500 text-xl" />
-            <h2 className="font-bold text-slate-700">Detailed Test Results</h2>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {activeFilter && (
-              <span className="bg-slate-800 text-white px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
-                <TbCalendarStats className="text-amber-400" />{" "}
-                {filterLabels[activeFilter]}
-              </span>
-            )}
-            {totalRecords > 0 && (
-              <>
-                <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full text-xs font-semibold">
+                <span className="ml-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-[11px] font-semibold rounded-full border border-blue-100">
                   {totalRecords.toLocaleString()} records
                 </span>
-                <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-semibold">
-                  Page {currentPage}/{totalPages}
+              </div>
+              <div className="text-[11px] text-slate-400">
+                Page{" "}
+                <span className="font-semibold text-slate-600">
+                  {currentPage}
+                </span>{" "}
+                of{" "}
+                <span className="font-semibold text-slate-600">
+                  {totalPages}
                 </span>
-              </>
+                {" · "}Showing{" "}
+                <span className="font-semibold text-slate-600">
+                  {reportData.length}
+                </span>{" "}
+                records
+              </div>
+            </div>
+
+            {/* Pagination top */}
+            {totalRecords > 0 && (
+              <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 shrink-0">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalRecords={totalRecords}
+                  limit={limit}
+                  onPageChange={handlePageChange}
+                  onLimitChange={handleLimitChange}
+                  isLoading={loading}
+                />
+              </div>
+            )}
+
+            {/* Table */}
+            <div className="overflow-auto">
+              <table className="min-w-full text-xs text-left border-separate border-spacing-0">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-slate-100">
+                    {TABLE_COLUMNS.map(({ icon: Icon, label }) => (
+                      <th
+                        key={label}
+                        className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Icon className="w-3 h-3 opacity-50" />
+                          {label}
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.map((item, index) => (
+                    <tr
+                      key={item.Result_ID ?? index}
+                      className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
+                    >
+                      <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-400">
+                        {(currentPage - 1) * limit + index + 1}
+                      </td>
+                      <td className="px-3 py-2 border-b border-slate-100">
+                        <span className="font-mono text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded">
+                          #{item.Result_ID}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
+                        <div className="text-slate-700 font-semibold flex items-center gap-1">
+                          <Calendar className="w-2.5 h-2.5 text-slate-300" />
+                          {item.DATE}
+                        </div>
+                        <div className="text-slate-400 flex items-center gap-1 mt-0.5">
+                          <Clock className="w-2.5 h-2.5 text-slate-300" />
+                          {item.TIME}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 border-b border-slate-100">
+                        <span className="font-mono text-slate-600 bg-slate-100 px-2 py-1 rounded-lg flex items-center gap-1 w-fit">
+                          <Barcode className="w-2.5 h-2.5 text-slate-400" />
+                          {item.BARCODE}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 border-b border-slate-100">
+                        <div className="font-semibold text-slate-800">
+                          {item.MODEL}
+                        </div>
+                        <div className="text-slate-400">{item.MODELNAME}</div>
+                      </td>
+                      <td className="px-3 py-2 border-b border-slate-100 text-center">
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg font-bold inline-flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5 text-emerald-400" />
+                          {item.RUNTIME_MINUTES}m
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 border-b border-slate-100 text-center">
+                        <MinMaxCell
+                          max={item.MAX_TEMPERATURE}
+                          min={item.MIN_TEMPERATURE}
+                        />
+                      </td>
+                      <td className="px-3 py-2 border-b border-slate-100 text-center">
+                        <MinMaxCell
+                          max={item.MAX_CURRENT}
+                          min={item.MIN_CURRENT}
+                        />
+                      </td>
+                      <td className="px-3 py-2 border-b border-slate-100 text-center">
+                        <MinMaxCell
+                          max={item.MAX_VOLTAGE}
+                          min={item.MIN_VOLTAGE}
+                        />
+                      </td>
+                      <td className="px-3 py-2 border-b border-slate-100 text-center">
+                        <MinMaxCell max={item.MAX_POWER} min={item.MIN_POWER} />
+                      </td>
+                      <td className="px-3 py-2 border-b border-slate-100 text-center">
+                        <span className="font-bold text-slate-600 flex items-center justify-center gap-1">
+                          <Gauge className="w-3 h-3 text-violet-400" />
+                          {item.PERFORMANCE}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 border-b border-slate-100 text-center">
+                        <StatusBadge status={item.PERFORMANCE} />
+                      </td>
+                      <td className="px-3 py-2 border-b border-slate-100">
+                        <span className="text-slate-500">
+                          {item.FaultName || "—"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 border-b border-slate-100">
+                        <span className="bg-violet-50 text-violet-700 border border-violet-200 px-2 py-1 rounded-lg font-semibold flex items-center gap-1 w-fit">
+                          <MapPin className="w-2.5 h-2.5" />
+                          {AREA_LABELS[item.AREA_ID] ?? `Area ${item.AREA_ID}`}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {reportData.length === 0 && (
+                    <EmptyState
+                      colSpan={14}
+                      onTodayClick={() => handleQuickFilter("today")}
+                    />
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination bottom */}
+            {totalRecords > 0 && (
+              <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 shrink-0">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalRecords={totalRecords}
+                  limit={limit}
+                  onPageChange={handlePageChange}
+                  onLimitChange={handleLimitChange}
+                  isLoading={loading}
+                />
+              </div>
             )}
           </div>
-        </div>
+        )}
 
-        <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
-          <table className="min-w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200">
-              <tr>
-                {TABLE_HEADERS.map(({ icon, label }, i) => (
-                  <th key={i} className="px-4 py-3 text-left">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                      {icon} {label}
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {reportData.map((item, index) => (
-                <tr
-                  key={item.Result_ID ?? index}
-                  className="hover:bg-blue-50/40 transition-colors duration-100"
-                >
-                  <td className="px-4 py-3 text-xs text-slate-400 font-mono">
-                    {(currentPage - 1) * limit + index + 1}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="font-mono text-indigo-600 font-bold text-xs bg-indigo-50 px-2 py-0.5 rounded">
-                      #{item.Result_ID}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                      <FaCalendarAlt className="text-slate-300 text-[9px]" />
-                      {item.DATE}
-                    </div>
-                    <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                      <MdAccessTime className="text-slate-300" />
-                      {item.TIME}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="font-mono text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded-lg flex items-center gap-1 w-fit">
-                      <FaBarcode className="text-slate-400 text-[9px]" />
-                      {item.BARCODE}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="font-semibold text-slate-800 text-xs">
-                      {item.MODEL}
-                    </div>
-                    <div className="text-slate-400 text-xs">
-                      {item.MODELNAME}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1">
-                      <FaClock className="text-emerald-400 text-[9px]" />
-                      {item.RUNTIME_MINUTES}m
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <MinMaxCell
-                      max={item.MAX_TEMPERATURE}
-                      min={item.MIN_TEMPERATURE}
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <MinMaxCell max={item.MAX_CURRENT} min={item.MIN_CURRENT} />
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <MinMaxCell max={item.MAX_VOLTAGE} min={item.MIN_VOLTAGE} />
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <MinMaxCell max={item.MAX_POWER} min={item.MIN_POWER} />
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="font-bold text-xs text-slate-600 flex items-center justify-center gap-1">
-                      <IoSpeedometer className="text-purple-400" />
-                      {item.PERFORMANCE}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <StatusBadge status={item.PERFORMANCE} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="text-slate-500 text-xs mt-0.5">
-                      {item.FaultName}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="bg-purple-50 text-purple-700 border border-purple-200 px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 w-fit">
-                      <FaMapMarkerAlt className="text-[9px]" />
-                      {AREA_LABELS[item.AREA_ID] ?? `Area ${item.AREA_ID}`}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-
-              {!loading && reportData.length === 0 && (
-                <tr>
-                  <td colSpan={14} className="py-16 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="bg-slate-100 p-6 rounded-3xl">
-                        <TbReportAnalytics className="text-5xl text-slate-300" />
-                      </div>
-                      <p className="text-slate-500 font-semibold">
-                        No data available
-                      </p>
-                      <p className="text-slate-400 text-sm">
-                        Use quick filters or set a custom date & time range
-                      </p>
-                      <div className="flex gap-2 mt-1">
-                        <button
-                          onClick={() => handleQuickFilter("today")}
-                          className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-700 transition-colors flex items-center gap-2"
-                        >
-                          <MdToday /> Today's Data
-                        </button>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-
-          {loading && (
-            <div className="flex items-center justify-center py-16">
-              <Loader />
+        {/* ── Empty: no filters set ── */}
+        {!loading && !hasData && !activeFilter && (
+          <div className="bg-white rounded-xl border border-dashed border-slate-300 shadow-sm flex flex-col items-center justify-center py-16 gap-4">
+            <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center">
+              <Search className="w-6 h-6 text-blue-400" />
             </div>
-          )}
-        </div>
+            <h3 className="text-sm font-semibold text-slate-600">
+              Select a Date Range
+            </h3>
+            <p className="text-xs text-slate-400 max-w-sm text-center">
+              Use the quick select or set a custom date & time range to load CPT
+              report data.
+            </p>
+          </div>
+        )}
 
-        {totalRecords > 0 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalRecords={totalRecords}
-            limit={limit}
-            onPageChange={handlePageChange}
-            onLimitChange={handleLimitChange}
-            isLoading={loading}
-          />
+        {/* ── Empty: filters applied, no results ── */}
+        {!loading && !hasData && activeFilter && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center py-16 gap-3">
+            <AlertTriangle
+              className="w-10 h-10 text-slate-300"
+              strokeWidth={1.2}
+            />
+            <h3 className="text-sm font-semibold text-slate-600">
+              No Records Found
+            </h3>
+            <p className="text-xs text-slate-400 max-w-sm text-center">
+              No CPT records matched the selected date range. Try adjusting your
+              filters.
+            </p>
+          </div>
         )}
       </div>
     </div>

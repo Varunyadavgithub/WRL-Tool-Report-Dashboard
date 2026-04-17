@@ -496,31 +496,14 @@ const FPA = () => {
       <ImageModal src={previewImage} onClose={() => setPreviewImage(null)} />
 
       {/* -- Header -- */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center">
-            <svg
-              className="w-5 h-5 text-white"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
-              />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-gray-900 leading-none">
-              FPA Dashboard
-            </h1>
-            <p className="text-xs text-gray-400">
-              First Pass Audit · {getCurrentShift().label} Shift
-            </p>
-          </div>
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
+        <div>
+          <h1 className="text-lg font-bold text-gray-900 leading-none">
+            FPA Dashboard
+          </h1>
+          <p className="text-xs text-gray-400">
+            First Pass Audit · {getCurrentShift().label} Shift
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <span
