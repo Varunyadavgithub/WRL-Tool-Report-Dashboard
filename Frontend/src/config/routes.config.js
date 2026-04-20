@@ -59,6 +59,9 @@ const DispatchPerformanceReport = lazy(
   () => import("../pages/Dispatch/DispatchPerformanceReport"),
 );
 const DispatchReport = lazy(() => import("../pages/Dispatch/DispatchReport"));
+const FGDispatchReport = lazy(
+  () => import("../pages/Dispatch/Fgdispatchreport"),
+);
 const DispatchUnloading = lazy(
   () => import("../pages/Dispatch/DispatchUnloading"),
 );
@@ -191,16 +194,19 @@ export const ROUTE_CONFIG = [
         path: "/quality/rework-report",
         label: "Rework Report",
         component: ReworkReport,
+        roles: [ROLES.ADMIN],
       },
       {
         path: "/quality/gas-charging-report",
         label: "Gas Charging Report",
         component: GasChargingReport,
+        roles: [ROLES.ADMIN],
       },
       {
         path: "/quality/est-report",
         label: "EST Report",
         component: ESTReport,
+        roles: [ROLES.ADMIN],
       },
       {
         path: "/quality/cpt-report",
@@ -340,6 +346,11 @@ export const ROUTE_CONFIG = [
         path: "/dispatch/fg-casting",
         label: "FG Casting",
         component: FGCasting,
+      },
+      {
+        path: "/dispatch/fg-dispatchReport",
+        label: "FG Dispatch Report",
+        component: FGDispatchReport,
       },
       {
         path: "/dispatch/gate-entry",

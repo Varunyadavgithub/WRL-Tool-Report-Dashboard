@@ -4,10 +4,10 @@ import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { convertToIST } from "../../utils/convertToIST.js";
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------
    Shared helper – resolves station codes for a department string.
    Throws AppError if the department value is unrecognised.
-───────────────────────────────────────────────────────────────────────── */
+------------------------------------------------------------------------- */
 const getStationCodes = (department) => {
   const map = {
     final: ["1220010", "1230017"],
@@ -20,10 +20,10 @@ const getStationCodes = (department) => {
   return map[department];
 };
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------
    Shared SQL fragment that selects and splits Serial2 into NFC_UID /
    CustomerQR.  Used by every endpoint so the schema is consistent.
-───────────────────────────────────────────────────────────────────────── */
+------------------------------------------------------------------------- */
 const SERIAL2_SPLIT_SQL = `
       -- NFC UID: everything before the first '/'
       CASE
@@ -40,11 +40,11 @@ const SERIAL2_SPLIT_SQL = `
       END AS CustomerQR,
 `;
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------
    Shared CTE body.  Caller passes the already-built stationCodeString and
    an optional model clause so we avoid repeating the big SQL block.
-───────────────────────────────────────────────────────────────────────── */
-const buildCTE = (stationCodeString, includeModel) => `
+------------------------------------------------------------------------- */
+const buildCTE = (stationCodeStr, includeModel) => `
   WITH Psno AS (
       SELECT DocNo, Material, Serial, VSerial, Serial2, Alias
       FROM   MaterialBarcode
@@ -80,45 +80,48 @@ const buildCTE = (stationCodeString, includeModel) => `
       JOIN  Material          m  ON m.MatCode     = Psno.Material
       LEFT  JOIN MaterialCategory mc ON mc.CategoryCode = m.Category
       WHERE b.ActivityType   = 5
-        AND c.StationCode   IN (${stationCodeString})
+        AND c.StationCode   IN (${stationCodeStr})
         AND b.ActivityOn BETWEEN @startTime AND @endTime
         ${includeModel ? "AND Psno.Material = @model" : ""}
   )
 `;
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------
    1.  GET /prod/barcode-details   (paginated – used by main table)
    BUG FIX: was missing the NFC_UID / CustomerQR split; now uses shared CTE.
-───────────────────────────────────────────────────────────────────────── */
+------------------------------------------------------------------------- */
 export const getBarcodeDetails = tryCatch(async (req, res) => {
   const {
     startDate,
     endDate,
     model,
     department,
-    page  = 1,
+    page = 1,
     limit = 1000,
   } = req.query;
 
   if (!startDate || !endDate) {
-    throw new AppError("Missing required query parameters: startDate and endDate.", 400);
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate.",
+      400,
+    );
   }
 
-  const istStart        = convertToIST(startDate);
-  const istEnd          = convertToIST(endDate);
-  const offset          = (parseInt(page) - 1) * parseInt(limit);
-  const stationCodes    = getStationCodes(department);
-  const stationCodeStr  = stationCodes.join(", ");
-  const includeModel    = model && model != 0;
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
+  const offset = (parseInt(page) - 1) * parseInt(limit);
+  const stationCodes = getStationCodes(department);
+  const stationCodeStr = stationCodes.join(", ");
+  const includeModel = model && model != 0;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
   try {
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
-      .input("endTime",   sql.DateTime, istEnd)
-      .input("offset",    sql.Int,      offset)
-      .input("limit",     sql.Int,      parseInt(limit));
+      .input("endTime", sql.DateTime, istEnd)
+      .input("offset", sql.Int, offset)
+      .input("limit", sql.Int, parseInt(limit));
 
     if (includeModel) request.input("model", sql.VarChar, model);
 
@@ -155,7 +158,7 @@ export const getBarcodeDetails = tryCatch(async (req, res) => {
     JOIN Material m ON m.MatCode = Psno.Material
     LEFT JOIN MaterialCategory mc ON mc.CategoryCode = m.Category
     WHERE b.ActivityType = 5
-      AND c.StationCode IN (${stationCodeString})          
+      AND c.StationCode IN (${stationCodeStr})          
       AND b.ActivityOn BETWEEN @startTime AND @endTime
       ${model && model != 0 ? "AND Psno.Material = @model" : ""}
   )
@@ -169,41 +172,48 @@ export const getBarcodeDetails = tryCatch(async (req, res) => {
     const result = await request.query(query);
 
     res.status(200).json({
-      success:    true,
-      message:    "Barcode Details data retrieved successfully",
-      data:       result.recordset,
-      totalCount: result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
+      success: true,
+      message: "Barcode Details data retrieved successfully",
+      data: result.recordset,
+      totalCount:
+        result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
     });
   } catch (error) {
-    throw new AppError(`Failed to fetch Barcode Details data: ${error.message}`, 500);
+    throw new AppError(
+      `Failed to fetch Barcode Details data: ${error.message}`,
+      500,
+    );
   } finally {
     await pool.close();
   }
 });
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------
    2.  GET /prod/export-total-production   (full dataset – used for export)
    BUG FIX: was missing the NFC_UID / CustomerQR split; now uses shared CTE.
-───────────────────────────────────────────────────────────────────────── */
+------------------------------------------------------------------------- */
 export const totalProductionExportData = tryCatch(async (req, res) => {
   const { startDate, endDate, model, department } = req.query;
 
   if (!startDate || !endDate) {
-    throw new AppError("Missing required query parameters: startDate and endDate.", 400);
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate.",
+      400,
+    );
   }
 
-  const istStart       = convertToIST(startDate);
-  const istEnd         = convertToIST(endDate);
-  const stationCodes   = getStationCodes(department);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
+  const stationCodes = getStationCodes(department);
   const stationCodeStr = stationCodes.join(", ");
-  const includeModel   = model && model != 0;
+  const includeModel = model && model != 0;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
   try {
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
-      .input("endTime",   sql.DateTime, istEnd);
+      .input("endTime", sql.DateTime, istEnd);
 
     if (includeModel) request.input("model", sql.VarChar, model);
 
@@ -218,43 +228,50 @@ export const totalProductionExportData = tryCatch(async (req, res) => {
     const result = await request.query(query);
 
     res.status(200).json({
-      success:    true,
-      message:    "Total Production Export data retrieved successfully",
-      data:       result.recordset,
-      totalCount: result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
+      success: true,
+      message: "Total Production Export data retrieved successfully",
+      data: result.recordset,
+      totalCount:
+        result.recordset.length > 0 ? result.recordset[0].totalCount : 0,
     });
   } catch (error) {
-    throw new AppError(`Failed to fetch Total Production Export data: ${error.message}`, 500);
+    throw new AppError(
+      `Failed to fetch Total Production Export data: ${error.message}`,
+      500,
+    );
   } finally {
     await pool.close();
   }
 });
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------
    3.  GET /prod/yday-total-production
        GET /prod/today-total-production
        GET /prod/month-total-production
    (Quick-filter routes share the same handler – already had NFC_UID split)
-───────────────────────────────────────────────────────────────────────── */
+------------------------------------------------------------------------- */
 export const getQuickFiltersBarcodeDetails = tryCatch(async (req, res) => {
   const { startDate, endDate, model, department } = req.query;
 
   if (!startDate || !endDate) {
-    throw new AppError("Missing required query parameters: startDate and endDate.", 400);
+    throw new AppError(
+      "Missing required query parameters: startDate and endDate.",
+      400,
+    );
   }
 
-  const istStart       = convertToIST(startDate);
-  const istEnd         = convertToIST(endDate);
-  const stationCodes   = getStationCodes(department);
+  const istStart = convertToIST(startDate);
+  const istEnd = convertToIST(endDate);
+  const stationCodes = getStationCodes(department);
   const stationCodeStr = stationCodes.join(", ");
-  const includeModel   = model && model != 0;
+  const includeModel = model && model != 0;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
   try {
     const request = pool
       .request()
       .input("startTime", sql.DateTime, istStart)
-      .input("endTime",   sql.DateTime, istEnd);
+      .input("endTime", sql.DateTime, istEnd);
 
     if (includeModel) request.input("model", sql.VarChar, model);
 
@@ -269,13 +286,16 @@ export const getQuickFiltersBarcodeDetails = tryCatch(async (req, res) => {
     const result = await request.query(query);
 
     res.status(200).json({
-      success:    true,
-      message:    "Quick Filters Barcode Details data retrieved successfully",
-      data:       result.recordset,
+      success: true,
+      message: "Quick Filters Barcode Details data retrieved successfully",
+      data: result.recordset,
       totalCount: result.recordset.length,
     });
   } catch (error) {
-    throw new AppError(`Failed to fetch Quick Filters Barcode Details data: ${error.message}`, 500);
+    throw new AppError(
+      `Failed to fetch Quick Filters Barcode Details data: ${error.message}`,
+      500,
+    );
   } finally {
     await pool.close();
   }

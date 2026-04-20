@@ -16,7 +16,11 @@ import {
 import { getDispatchMasterBySession } from "../controllers/dispatch/fgCasting.controller.js";
 import { sendMaterialGateEntryAlertEmail } from "../controllers/dispatch/gateEntry.controller.js";
 import { getDispatchErrorLog } from "../controllers/dispatch/errorLog.controller.js";
-import { fetchDispatchErrorSerials, removeDispatchErrorSerials } from "../controllers/dispatch/removeDispatchError.controller.js";
+import {
+  fetchDispatchErrorSerials,
+  removeDispatchErrorSerials,
+} from "../controllers/dispatch/removeDispatchError.controller.js";
+import { getFGDispatchReport } from "../controllers/dispatch/getFGDispatchReport.controller.js";
 
 const router = express.Router();
 
@@ -39,6 +43,8 @@ router.get("/fg-casting", getDispatchMasterBySession);
 
 // -----------------> Gate Entry Routes
 router.post("/material-gate-entry", sendMaterialGateEntryAlertEmail);
+
+router.get("/fg-dispatch-report", getFGDispatchReport);
 
 // -----------------> Error Log Routes
 router.get("/error-log", getDispatchErrorLog);

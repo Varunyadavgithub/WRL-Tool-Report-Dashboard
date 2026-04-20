@@ -2,8 +2,13 @@
  * HourlyWidget.jsx — Model Summary Panels
  *
  * Two header buttons:
- *  1. "Hourly"  → compact stacked bar on top + full-width cross-tab pivot table below (Image 1 style)
- *  2. "Total"   → ranked table + horizontal bar chart side-by-side
+ *  1. "Hourly"  ? compact stacked bar on top + full-width cross-tab pivot table below
+ *  2. "Total"   ? ranked table + horizontal bar chart side-by-side
+ *
+ * Supports single-key datasets (e.g. Group A only, CHOC only, Group B only, FOW only)
+ * as well as multi-key datasets (e.g. GroupA + CHOC on the same chart).
+ * Each widget only renders the dataset keys it receives — no assumptions about
+ * which keys exist on the data rows.
  */
 
 import { useState, useMemo } from "react";
@@ -42,7 +47,7 @@ ChartJS.register(
   PointElement,
 );
 
-// ── Palette ───────────────────────────────────────────────────────────────────
+// -- Palette -------------------------------------------------------------------
 const DAY_COLOR = "rgba(14,165,233,0.75)";
 const NIGHT_COLOR = "rgba(139,92,246,0.65)";
 const AVG_COLOR = "rgba(234,88,12,0.85)";
@@ -61,6 +66,7 @@ const MODEL_COLORS = [
 ];
 
 const isDay = (h) => h >= 8 && h < 20;
+
 const heatBg = (frac) => {
   if (frac >= 0.85) return "rgba(14,165,233,0.08)";
   if (frac >= 0.65) return "rgba(20,184,166,0.06)";
@@ -68,6 +74,7 @@ const heatBg = (frac) => {
   return "";
 };
 
+// -- Chart option factories ----------------------------------------------------
 const makeOptions = (maxVal, showLegend) => ({
   responsive: true,
   maintainAspectRatio: false,
@@ -192,7 +199,7 @@ const makeHorizOptions = (maxVal) => ({
   },
 });
 
-// ── Category Widget ───────────────────────────────────────────────────────────
+// -- Category Widget -----------------------------------------------------------
 const CategoryWidget = ({ title, data = [], icon: Icon }) => {
   const total = data.reduce((s, r) => s + (r.TotalCount || 0), 0);
   const maxCount = Math.max(
@@ -203,7 +210,7 @@ const CategoryWidget = ({ title, data = [], icon: Icon }) => {
   const exportCSV = () => {
     if (!data.length) return;
     const csv = [
-      ["Sr. No.", "Category", "Count", "%"],
+      ["#", "Category", "Count", "%"],
       ...data.map((r, i) => [
         i + 1,
         r.category,
@@ -268,6 +275,7 @@ const CategoryWidget = ({ title, data = [], icon: Icon }) => {
         overflow: "hidden",
       }}
     >
+      {/* Header */}
       <div
         style={{
           height: 36,
@@ -296,8 +304,10 @@ const CategoryWidget = ({ title, data = [], icon: Icon }) => {
           </button>
         </div>
       </div>
+
       {data.length > 0 ? (
         <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+          {/* Ranked table */}
           <div
             style={{
               width: "44%",
@@ -321,7 +331,7 @@ const CategoryWidget = ({ title, data = [], icon: Icon }) => {
                     zIndex: 1,
                   }}
                 >
-                  {["Sr. No.", "Category", "Count", "Share"].map((h, i) => (
+                  {["#", "Category", "Count", "Share"].map((h, i) => (
                     <th
                       key={i}
                       style={{
@@ -430,6 +440,8 @@ const CategoryWidget = ({ title, data = [], icon: Icon }) => {
               </tbody>
             </table>
           </div>
+
+          {/* Horizontal bar chart */}
           <div style={{ flex: 1, padding: "10px 12px", minWidth: 0 }}>
             <Bar
               data={{
@@ -473,21 +485,21 @@ const CategoryWidget = ({ title, data = [], icon: Icon }) => {
   );
 };
 
-// ── Hourly Model Panel (Image 1 style) ────────────────────────────────────────
-// Compact stacked bar on top + full-width cross-tab pivot table below
-// ── Hourly Model Panel (Flat list: Time | Model Name | Count) ─────────────────
+// -- Hourly Model Panel --------------------------------------------------------
+// Compact stacked bar strip on top + flat list: Time | Model Name | Count
 const HourlyModelPanel = ({ modelData, onClose }) => {
-  // Sort rows by hour then by count desc
-  const flatRows = useMemo(() => {
-    return [...modelData].sort(
-      (a, b) =>
-        a.TIMEHOUR - b.TIMEHOUR || (b.Model_Count || 0) - (a.Model_Count || 0),
-    );
-  }, [modelData]);
+  const flatRows = useMemo(
+    () =>
+      [...modelData].sort(
+        (a, b) =>
+          a.TIMEHOUR - b.TIMEHOUR ||
+          (b.Model_Count || 0) - (a.Model_Count || 0),
+      ),
+    [modelData],
+  );
 
   const grandTotal = flatRows.reduce((s, r) => s + (r.Model_Count || 0), 0);
 
-  // For the stacked bar chart (unchanged)
   const MAX_MODELS = 10;
   const topModels = useMemo(() => {
     const map = {};
@@ -509,6 +521,7 @@ const HourlyModelPanel = ({ modelData, onClose }) => {
     () => [...new Set(modelData.map((d) => d.TIMEHOUR))].sort((a, b) => a - b),
     [modelData],
   );
+
   const lookup = useMemo(() => {
     const m = {};
     for (const item of modelData) {
@@ -522,7 +535,7 @@ const HourlyModelPanel = ({ modelData, onClose }) => {
   const hourTotals = hours.map((h) =>
     topModels.reduce((s, m) => s + (lookup[h]?.[m.MatCode] || 0), 0),
   );
-  const maxHourTotal = Math.max(...hourTotals, 0);
+  const maxHourTotal = hourTotals.length > 0 ? Math.max(...hourTotals, 0) : 0;
 
   const chartDatasets = topModels.map((model, i) => ({
     label: model.Name.length > 14 ? model.Name.slice(0, 12) + "…" : model.Name,
@@ -533,7 +546,6 @@ const HourlyModelPanel = ({ modelData, onClose }) => {
     stack: "s",
   }));
 
-  // Model color lookup by MatCode
   const modelColorMap = useMemo(() => {
     const map = {};
     topModels.forEach((m, i) => {
@@ -613,7 +625,7 @@ const HourlyModelPanel = ({ modelData, onClose }) => {
         </div>
       </div>
 
-      {/* Stacked bar chart strip — unchanged */}
+      {/* Stacked bar strip */}
       <div
         style={{
           height: 100,
@@ -632,7 +644,7 @@ const HourlyModelPanel = ({ modelData, onClose }) => {
         />
       </div>
 
-      {/* ── Flat list table: Time | Model Name | Count ── */}
+      {/* Flat list table */}
       <div
         style={{
           flex: 1,
@@ -707,7 +719,6 @@ const HourlyModelPanel = ({ modelData, onClose }) => {
                       background: isNewHour ? "rgba(14,165,233,0.03)" : "#fff",
                     }}
                   >
-                    {/* Time — only show on first row of each hour group */}
                     <td
                       style={{
                         padding: "7px 16px",
@@ -720,7 +731,6 @@ const HourlyModelPanel = ({ modelData, onClose }) => {
                     >
                       {isNewHour ? `${row.TIMEHOUR}:00` : ""}
                     </td>
-                    {/* Model Name */}
                     <td
                       style={{
                         padding: "7px 16px",
@@ -747,7 +757,6 @@ const HourlyModelPanel = ({ modelData, onClose }) => {
                         {row.Name || row.MatCode}
                       </div>
                     </td>
-                    {/* Count */}
                     <td
                       style={{
                         padding: "7px 16px",
@@ -806,7 +815,7 @@ const HourlyModelPanel = ({ modelData, onClose }) => {
   );
 };
 
-// ── Total Model Panel ─────────────────────────────────────────────────────────
+// -- Total Model Panel ---------------------------------------------------------
 const TotalModelPanel = ({ modelData, onClose }) => {
   const modelTotals = useMemo(() => {
     const map = {};
@@ -828,7 +837,7 @@ const TotalModelPanel = ({ modelData, onClose }) => {
 
   const exportCSV = () => {
     const csv = [
-      ["Sr. No.", "MatCode", "Name", "Category", "Count", "%"],
+      ["#", "MatCode", "Name", "Category", "Count", "%"],
       ...modelTotals.map((m, i) => [
         i + 1,
         m.MatCode,
@@ -862,6 +871,7 @@ const TotalModelPanel = ({ modelData, onClose }) => {
         overflow: "hidden",
       }}
     >
+      {/* Header */}
       <div
         style={{
           height: 36,
@@ -929,7 +939,7 @@ const TotalModelPanel = ({ modelData, onClose }) => {
                     zIndex: 1,
                   }}
                 >
-                  {["Sr. No.", "Model Name", "Count", "Share"].map((h, i) => (
+                  {["#", "Model Name", "Count", "Share"].map((h, i) => (
                     <th
                       key={i}
                       style={{
@@ -1020,7 +1030,6 @@ const TotalModelPanel = ({ modelData, onClose }) => {
                             gap: 4,
                           }}
                         >
-
                           <span
                             style={{
                               fontFamily: "monospace",
@@ -1040,6 +1049,8 @@ const TotalModelPanel = ({ modelData, onClose }) => {
               </tbody>
             </table>
           </div>
+
+          {/* Footer total */}
           <div
             style={{
               height: 28,
@@ -1112,7 +1123,21 @@ const TotalModelPanel = ({ modelData, onClose }) => {
   );
 };
 
-// ── Main HourlyWidget ─────────────────────────────────────────────────────────
+// -- Main HourlyWidget ---------------------------------------------------------
+/**
+ * Props:
+ *  title          — widget heading
+ *  data           — array of hourly rows (from API)
+ *  modelData      — array of model-level rows (for Hourly/Total overlay panels)
+ *  datasets       — [{ key, label, color }]  — which keys to read from each row
+ *  isCategoryChart — renders CategoryWidget instead
+ *  icon           — optional lucide/react-icon component
+ *
+ * For post_Foaming separated widgets, each widget receives a single-entry
+ * datasets array (e.g. [{key:"GroupA_Count", label:"Group A", color:sky}]).
+ * rowTotals, peakIdx, shiftTotals, and the chart all naturally respect
+ * whichever keys are present — no special-casing needed.
+ */
 const HourlyWidget = ({
   title,
   data = [],
@@ -1127,6 +1152,7 @@ const HourlyWidget = ({
 
   const hasModelData = modelData?.length > 0;
 
+  // -- Derived values — only iterate over provided dataset keys --------------
   const total = useMemo(
     () =>
       datasets.reduce(
@@ -1135,16 +1161,19 @@ const HourlyWidget = ({
       ),
     [data, datasets],
   );
+
   const rowTotals = useMemo(
     () =>
       data.map((row) => datasets.reduce((s, ds) => s + (row[ds.key] || 0), 0)),
     [data, datasets],
   );
-  const peakIdx = useMemo(
-    () => rowTotals.indexOf(Math.max(...rowTotals, 0)),
-    [rowTotals],
-  );
-  const peakRow = data[peakIdx];
+
+  // Guard against empty rowTotals before spreading into Math.max
+  const maxRowVal = rowTotals.length > 0 ? Math.max(...rowTotals, 0) : 0;
+  const peakIdx =
+    rowTotals.length > 0 ? rowTotals.indexOf(Math.max(...rowTotals, 0)) : -1;
+  const peakRow = peakIdx >= 0 ? data[peakIdx] : null;
+
   const avgPerRow = data.length > 0 ? Math.round(total / data.length) : 0;
 
   const cumulative = useMemo(() => {
@@ -1165,26 +1194,31 @@ const HourlyWidget = ({
       ),
     [data, rowTotals],
   );
+
   const dayPct = total > 0 ? Math.round((shiftTotals.day / total) * 100) : 0;
 
+  // -- Category shortcut -----------------------------------------------------
   if (isCategoryChart)
     return <CategoryWidget title={title} data={data} icon={Icon} />;
 
+  // -- CSV export ------------------------------------------------------------
   const exportCSV = () => {
     if (!data.length) return;
     const headers = [
       "Hr#",
       "Time",
       ...datasets.map((d) => d.label),
-      "Total",
-      "Cumulative",
+      ...(datasets.length > 1 ? ["Total"] : []),
+      "%",
+      ...(showCumul ? ["Cumulative"] : []),
     ];
     const rows = data.map((row, i) => [
       row.HOUR_NUMBER || row.HourNumber || i + 1,
       `${row.TIMEHOUR ?? ""}:00`,
       ...datasets.map((d) => row[d.key] || 0),
-      rowTotals[i],
-      cumulative[i],
+      ...(datasets.length > 1 ? [rowTotals[i]] : []),
+      total > 0 ? ((rowTotals[i] / total) * 100).toFixed(1) + "%" : "0%",
+      ...(showCumul ? [cumulative[i]] : []),
     ]);
     const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     const a = document.createElement("a");
@@ -1194,9 +1228,11 @@ const HourlyWidget = ({
     URL.revokeObjectURL(a.href);
   };
 
+  // -- Chart data ------------------------------------------------------------
   const labels = data.map((r) => `${r.TIMEHOUR ?? "?"}:00`);
   const allVals = datasets.flatMap((ds) => data.map((r) => r[ds.key] || 0));
-  const maxVal = Math.max(...allVals, avgPerRow, 0);
+  const maxVal = Math.max(...(allVals.length ? allVals : [0]), avgPerRow, 0);
+
   const chartDatasets = datasets.map((ds) => ({
     label: ds.label,
     data: data.map((r) => r[ds.key] || 0),
@@ -1216,6 +1252,7 @@ const HourlyWidget = ({
     tension: 0.35,
     order: 2,
   }));
+
   const avgDataset = {
     label: `Avg (${avgPerRow.toLocaleString()})`,
     data: data.map(() => avgPerRow),
@@ -1228,12 +1265,14 @@ const HourlyWidget = ({
     tension: 0,
     order: 1,
   };
+
   const showAvgLine = avgPerRow > 0;
   const showLegend = datasets.length > 1 || showAvgLine;
   const finalDatasets = showAvgLine
     ? [...chartDatasets, avgDataset]
     : chartDatasets;
 
+  // -- Render ----------------------------------------------------------------
   return (
     <div
       style={{
@@ -1261,7 +1300,7 @@ const HourlyWidget = ({
         />
       )}
 
-      {/* Header */}
+      {/* -- Header -- */}
       <div
         style={{
           height: 36,
@@ -1344,7 +1383,7 @@ const HourlyWidget = ({
         </div>
       </div>
 
-      {/* Shift bar */}
+      {/* -- Shift bar (only when there's data) -- */}
       {data.length > 0 && (
         <div
           style={{
@@ -1419,7 +1458,7 @@ const HourlyWidget = ({
         </div>
       )}
 
-      {/* Body */}
+      {/* -- Body -- */}
       {data.length > 0 ? (
         <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
           {/* Table */}
@@ -1487,6 +1526,7 @@ const HourlyWidget = ({
                         {ds.label}
                       </th>
                     ))}
+                    {/* "Tot" column only when more than one dataset key */}
                     {datasets.length > 1 && (
                       <th
                         style={{
@@ -1533,7 +1573,7 @@ const HourlyWidget = ({
                     const isPeak = i === peakIdx;
                     const bg = isPeak
                       ? "rgba(245,158,11,0.08)"
-                      : heatBg(rTotal / Math.max(...rowTotals, 1));
+                      : heatBg(maxRowVal > 0 ? rTotal / maxRowVal : 0);
                     return (
                       <tr
                         key={i}
@@ -1627,6 +1667,8 @@ const HourlyWidget = ({
                 </tbody>
               </table>
             </div>
+
+            {/* Table footer total */}
             <div
               style={{
                 height: 28,
@@ -1663,7 +1705,7 @@ const HourlyWidget = ({
             </div>
           </div>
 
-          {/* Chart */}
+          {/* Chart panel */}
           <div
             style={{
               flex: 1,
@@ -1673,6 +1715,7 @@ const HourlyWidget = ({
               padding: "6px 10px 8px",
             }}
           >
+            {/* Chart toolbar */}
             <div
               style={{
                 display: "flex",
@@ -1732,12 +1775,18 @@ const HourlyWidget = ({
                 <button
                   key={type}
                   onClick={() => setChartType(type)}
-                  className={`p-1 rounded transition-colors ${chartType === type ? "bg-slate-100 text-slate-700" : "text-slate-300 hover:text-slate-500 hover:bg-slate-50"}`}
+                  className={`p-1 rounded transition-colors ${
+                    chartType === type
+                      ? "bg-slate-100 text-slate-700"
+                      : "text-slate-300 hover:text-slate-500 hover:bg-slate-50"
+                  }`}
                 >
                   <Ico size={13} />
                 </button>
               ))}
             </div>
+
+            {/* Chart */}
             <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
               {chartType === "bar" ? (
                 <Bar
@@ -1754,6 +1803,7 @@ const HourlyWidget = ({
           </div>
         </div>
       ) : (
+        /* Empty state */
         <div
           style={{
             flex: 1,

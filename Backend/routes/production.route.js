@@ -20,9 +20,11 @@ import {
   getFoamingHpFomA,
   getFoamingHpFomB,
   getFoamingHpFomCat,
-  getManualPostHP,
+  getPostGrpAHPFrz,
+  getPostGrpBHPFrz,
+  getPostChocHP,
+  getPostFOWHP,
   getPostHPCAT,
-  getPostHPFrz,
   getPostHPSUS,
   getFinalLoadingHPVISI,
   getFinalHPVISI,
@@ -38,8 +40,10 @@ import {
   getFinalHPChocModelBreakdown,
   getFinalHPVISIModelBreakdown,
   getFinalHPSUSModelBreakdown,
-  getPostHPFrzModelBreakdown,
-  getManualPostHPModelBreakdown,
+  getPostHPGrpAModelBreakdown,
+  getPostHPGrpBModelBreakdown,
+  getChocPostHPModelBreakdown,
+  getFOWPostHPModelBreakdown,
   getPostHPVISIModelBreakdown,
   getPostHPSUSModelBreakdown,
   getFoamingHpFomAModelBreakdown,
@@ -105,8 +109,10 @@ router.get("/final-hp-sus", getFinalHPSUS);
 router.get("/final-hp-cat", getFinalHPCAT);
 
 // Post Foaming Routes
-router.get("/post-hp-frz", getPostHPFrz);
-router.get("/manual-post-hp", getManualPostHP);
+router.get("/post-hp-GrpA", getPostGrpAHPFrz);
+router.get("/post-hp-GrpB", getPostGrpBHPFrz);
+router.get("/post-hp-Choc", getPostChocHP);
+router.get("/post-hp-FOW", getPostFOWHP);
 router.get("/post-hp-sus", getPostHPSUS);
 router.get("/post-hp-cat", getPostHPCAT);
 
@@ -168,8 +174,10 @@ router.get("/visi-final-hp-model",           getFinalHPVISIModelBreakdown);
 router.get("/final-hp-sus-model",            getFinalHPSUSModelBreakdown);
  
 // Post Foaming — model breakdown
-router.get("/post-hp-frz-model",             getPostHPFrzModelBreakdown);
-router.get("/manual-post-hp-model",          getManualPostHPModelBreakdown);
+router.get("/post-Grp-A-model",             getPostHPGrpAModelBreakdown);
+router.get("/post-Grp-B-model",             getPostHPGrpBModelBreakdown);
+router.get("/post-Choc-model",             getChocPostHPModelBreakdown);
+router.get("/post-FOW-model",             getFOWPostHPModelBreakdown);
 router.get("/visi-post-hp-model",            getPostHPVISIModelBreakdown);
 router.get("/post-hp-sus-model",             getPostHPSUSModelBreakdown);
  
