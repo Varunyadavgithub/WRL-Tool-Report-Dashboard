@@ -1,16 +1,19 @@
 import { lazy } from "react";
 import {
-  FaIndustry,
-  FaClipboardCheck,
-  FaTruckMoving,
-  FaClipboardList,
-} from "react-icons/fa";
-import {
-  MdOutlineNotificationsActive,
-  MdOutlineDisplaySettings,
-  MdOutlineFactCheck,
-} from "react-icons/md";
-import { FaUserShield } from "react-icons/fa6";
+  Monitor,
+  Wrench,
+  Factory,
+  ShieldCheck,
+  Truck,
+  CalendarRange,
+  UserCheck,
+  SlidersHorizontal,
+  BellRing,
+  ClipboardCheck,
+  Gauge,
+  FileText,
+} from "lucide-react";
+import FinalAssembly from "../pages/Dashboard/FinalAssembly";
 
 // Lazy loaded components
 const ProductionOverview = lazy(() => import("../pages/Production/Overview"));
@@ -132,8 +135,41 @@ export const ROLES = {
 // Centralized route configuration
 export const ROUTE_CONFIG = [
   {
+    key: "display",
+    icon: Monitor,
+    label: "Display",
+    basePath: "/display",
+    items: [
+      {
+        path: "/display/final-assembly",
+        label: "Final Assembly",
+        icon: Wrench,
+        component: FinalAssembly,
+      },
+    ],
+  },
+  {
+    key: "planing",
+    icon: CalendarRange,
+    label: "Planning",
+    basePath: "/planing",
+    items: [
+      {
+        path: "/planing/production-planing",
+        label: "Production Planning",
+        component: ProductionPlaning,
+        roles: [ROLES.ADMIN, ROLES.PRODUCTION_MANAGER, ROLES.PLANNING_TEAM],
+      },
+      {
+        path: "/planing/daily-planing",
+        label: "Daily Plan",
+        component: DailyPlan,
+      },
+    ],
+  },
+  {
     key: "production",
-    icon: FaIndustry,
+    icon: Factory,
     label: "Production",
     basePath: "/production",
     items: [
@@ -192,7 +228,7 @@ export const ROUTE_CONFIG = [
   },
   {
     key: "quality",
-    icon: FaClipboardCheck,
+    icon: ShieldCheck,
     label: "Quality",
     basePath: "/quality",
     items: [
@@ -329,7 +365,7 @@ export const ROUTE_CONFIG = [
   },
   {
     key: "dispatch",
-    icon: FaTruckMoving,
+    icon: Truck,
     label: "Dispatch",
     basePath: "/dispatch",
     items: [
@@ -377,30 +413,11 @@ export const ROUTE_CONFIG = [
     ],
   },
   {
-    key: "planing",
-    icon: FaClipboardList,
-    label: "Planning",
-    basePath: "/planing",
-    items: [
-      {
-        path: "/planing/production-planing",
-        label: "Production Planning",
-        component: ProductionPlaning,
-        roles: [ROLES.ADMIN, ROLES.PRODUCTION_MANAGER, ROLES.PLANNING_TEAM],
-      },
-      {
-        path: "/planing/daily-planing",
-        label: "Daily Plan",
-        component: DailyPlan,
-      },
-    ],
-  },
-  {
     key: "visitor",
-    icon: FaUserShield,
+    icon: UserCheck,
     label: "Visitor",
     basePath: "/visitor",
-    roles: [ROLES.ADMIN, ROLES.SECURITY, ROLES.HR], // Section-level roles
+    roles: [ROLES.ADMIN, ROLES.SECURITY, ROLES.HR],
     items: [
       {
         path: "/visitor/dashboard",
@@ -434,7 +451,6 @@ export const ROUTE_CONFIG = [
         roles: [ROLES.ADMIN, ROLES.HR],
       },
     ],
-    // Hidden routes (not shown in sidebar but accessible)
     hiddenItems: [
       {
         path: "/visitor-pass-display/:passId",
@@ -444,7 +460,7 @@ export const ROUTE_CONFIG = [
   },
   {
     key: "compliance",
-    icon: MdOutlineDisplaySettings,
+    icon: SlidersHorizontal,
     label: "Compliance",
     basePath: "/compliance",
     roles: [ROLES.ADMIN],
@@ -458,7 +474,7 @@ export const ROUTE_CONFIG = [
   },
   {
     key: "taskReminders",
-    icon: MdOutlineNotificationsActive,
+    icon: BellRing,
     label: "Task Reminders",
     basePath: "/reminder",
     roles: [ROLES.ADMIN],
@@ -477,12 +493,10 @@ export const ROUTE_CONFIG = [
   },
   {
     key: "auditReport",
-    icon: MdOutlineFactCheck,
+    icon: ClipboardCheck,
     label: "Audit Report",
     basePath: "/auditreport",
     roles: [ROLES.ADMIN, ROLES.QUALITY_MANAGER],
-
-    // Sidebar items (VISIBLE)
     items: [
       {
         path: "/auditreport/build-templates",
@@ -500,8 +514,6 @@ export const ROUTE_CONFIG = [
         component: AuditList,
       },
     ],
-
-    // Hidden routes (NOT in sidebar)
     hiddenItems: [
       {
         path: "/auditreport/templates/:id",
@@ -511,7 +523,6 @@ export const ROUTE_CONFIG = [
         path: "/auditreport/audits/new",
         component: AuditEntry,
       },
-
       {
         path: "/auditreport/audits/:id",
         component: AuditEntry,
@@ -524,7 +535,7 @@ export const ROUTE_CONFIG = [
   },
   {
     key: "reading",
-    icon: FaClipboardList,
+    icon: Gauge,
     label: "Utility",
     basePath: "/reading",
     items: [
@@ -538,7 +549,7 @@ export const ROUTE_CONFIG = [
   },
   {
     key: "forms",
-    icon: FaClipboardList,
+    icon: FileText,
     label: "Forms",
     basePath: "/forms",
     items: [
@@ -575,12 +586,10 @@ export const getAccessibleRoutes = (userRole) => {
   const routes = [];
 
   ROUTE_CONFIG.forEach((section) => {
-    // Check section-level access
     if (section.roles && !canAccess(userRole, section.roles)) {
       return;
     }
 
-    // Filter items
     const accessibleItems = section.items.filter((item) => {
       if (item.roles) return canAccess(userRole, item.roles);
       if (section.roles) return canAccess(userRole, section.roles);
@@ -594,7 +603,6 @@ export const getAccessibleRoutes = (userRole) => {
       });
     });
 
-    // Add hidden items if user has section access
     if (section.hiddenItems) {
       section.hiddenItems.forEach((item) => {
         routes.push({
@@ -611,12 +619,10 @@ export const getAccessibleRoutes = (userRole) => {
 // Get filtered menu for sidebar
 export const getAccessibleMenu = (userRole) => {
   return ROUTE_CONFIG.map((section) => {
-    // Check section-level access
     if (section.roles && !canAccess(userRole, section.roles)) {
       return null;
     }
 
-    // Filter items (exclude hidden items from menu)
     const accessibleItems = section.items.filter((item) => {
       if (item.roles) return canAccess(userRole, item.roles);
       if (section.roles) return canAccess(userRole, section.roles);

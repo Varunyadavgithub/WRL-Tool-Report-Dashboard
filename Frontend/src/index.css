@@ -10,7 +10,7 @@
   font-family: Playfair !important;
 }
 
-/* Hide Scrollbar but keep scrolling */
+/* Hide Scrollbar globally but keep scrolling */
 
 /* Chrome, Safari, Edge */
 ::-webkit-scrollbar {
@@ -58,9 +58,15 @@
 }
 
 @keyframes alarmPulse {
-  0% { box-shadow: 0 0 0 0 rgba(220,38,38,0.7); }
-  70% { box-shadow: 0 0 0 18px rgba(220,38,38,0); }
-  100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 18px rgba(220, 38, 38, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+  }
 }
 
 .alarm-animate {
