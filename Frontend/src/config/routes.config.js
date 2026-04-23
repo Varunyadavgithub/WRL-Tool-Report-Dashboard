@@ -32,6 +32,7 @@ const TotalProduction = lazy(
   () => import("../pages/Production/TotalProduction"),
 );
 const StopLossReport = lazy(() => import("../pages/Production/StopLossReport"));
+const ManpowerReport = lazy(() => import("../pages/Production/manPowerReport"));
 
 const ReworkReport = lazy(() => import("../pages/Quality/ReworkReport"));
 const GasChargingReport = lazy(
@@ -181,6 +182,11 @@ export const ROUTE_CONFIG = [
         path: "/production/stop-loss-report",
         label: "Stop Loss Report",
         component: StopLossReport,
+      },
+      {
+        path: "/production/manpower-report",
+        label: "Manpower Report",
+        component: ManpowerReport,
       },
     ],
   },

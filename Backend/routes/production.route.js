@@ -83,6 +83,8 @@ import {
   getStopLossLocations,
   getStopLossSummary,
 } from "../controllers/production/stopLoss.controller.js";
+import { getManpower, getManpowerHourly } from "../controllers/production/manpower.controller.js";
+import { getManpowerReport } from "../controllers/production/getManPowerReport.controller.js";
 
 const router = express.Router();
 
@@ -184,5 +186,10 @@ router.get("/post-hp-sus-model",             getPostHPSUSModelBreakdown);
 // Foaming — model breakdown
 router.get("/Foaming-hp-fom-a-model",        getFoamingHpFomAModelBreakdown);
 router.get("/Foaming-hp-fom-b-model",        getFoamingHpFomBModelBreakdown);
+
+router.get("/manpower", getManpower);
+
+// manpower
+router.get("/manpower-report", getManpowerReport);
 
 export default router;
