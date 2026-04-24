@@ -2,34 +2,6 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import {
-  FaSync,
-  FaCalendarAlt,
-  FaIndustry,
-  FaChartBar,
-  FaChartLine,
-  FaExclamationTriangle,
-  FaCheckCircle,
-  FaTimesCircle,
-  FaArrowUp,
-  FaArrowDown,
-  FaMinus,
-  FaClipboardList,
-  FaBolt,
-  FaStar,
-  FaBox,
-  FaTruck,
-  FaTachometerAlt,
-  FaStopwatch,
-  FaLayerGroup,
-} from "react-icons/fa";
-import {
-  MdOutlineQueryStats,
-  MdSpeed,
-  MdDashboard,
-  MdWarningAmber,
-  MdCheckCircleOutline,
-} from "react-icons/md";
-import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
@@ -44,9 +16,38 @@ import {
   Filler,
 } from "chart.js";
 import { Chart } from "react-chartjs-2";
-import DateTimePicker from "../../components/ui/DateTimePicker";
 import Loader from "../../components/ui/Loader";
 import { baseURL } from "../../assets/assets";
+import {
+  Loader2,
+  Search,
+  LayoutDashboard,
+  RefreshCw,
+  Star,
+  Zap,
+  Pause,
+  Play,
+  Clock,
+  CalendarDays,
+  Factory,
+  BarChart3,
+  CheckCircle2,
+  AlertTriangle,
+  ArrowUp,
+  ArrowDown,
+  Minus,
+  ClipboardList,
+  Box,
+  Truck,
+  Gauge,
+  Timer,
+  Layers,
+  TrendingUp,
+  Activity,
+  ShieldAlert,
+  ShieldCheck,
+  PackageOpen,
+} from "lucide-react";
 
 ChartJS.register(
   CategoryScale,
@@ -62,7 +63,7 @@ ChartJS.register(
   Filler,
 );
 
-// ─── Constants ─────────────────────────────────────────────────────────────────
+// ─── Constants ──────────────────────────────────────────────────────────────────
 const PAGE_DURATION_MS = 8000;
 const TOTAL_PAGES = 5;
 
@@ -72,11 +73,11 @@ const SHIFT_OPTIONS = [
 ];
 
 const PAGES_META = [
-  { key: "fgPacking", label: "FG Packing", icon: <FaBox /> },
-  { key: "fgLoading", label: "FG Loading", icon: <FaTruck /> },
-  { key: "hourly", label: "Hourly", icon: <FaChartBar /> },
-  { key: "quality", label: "Quality", icon: <FaCheckCircle /> },
-  { key: "loss", label: "Loss", icon: <FaExclamationTriangle /> },
+  { key: "fgPacking", label: "FG Packing", icon: Box },
+  { key: "fgLoading", label: "FG Loading", icon: Truck },
+  { key: "hourly", label: "Hourly", icon: BarChart3 },
+  { key: "quality", label: "Quality", icon: CheckCircle2 },
+  { key: "loss", label: "Loss", icon: AlertTriangle },
 ];
 
 const GAUGE_COLORS = [
@@ -98,7 +99,7 @@ const GAUGE_COLORS = [
   "#14532d",
 ];
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────────────────────────
 const pad = (n) => String(n).padStart(2, "0");
 
 const todayISO = () => {
@@ -106,26 +107,11 @@ const todayISO = () => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
-const formatShiftTime = (dateStr) => {
-  if (!dateStr) return "—";
-  const d = new Date(dateStr);
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-};
+const Spinner = ({ cls = "w-4 h-4" }) => (
+  <Loader2 className={`animate-spin ${cls}`} />
+);
 
-const normalizeArray = (data) => {
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.data)) return data.data;
-  return [];
-};
-
-const normalizeObject = (data) => {
-  if (data && typeof data === "object" && !Array.isArray(data)) {
-    return data.data ?? data;
-  }
-  return {};
-};
-
-// ─── Canvas: Speedometer Gauge ─────────────────────────────────────────────────
+// ─── Canvas: Speedometer Gauge ──────────────────────────────────────────────────
 const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
   const ref = useRef(null);
 
@@ -141,14 +127,12 @@ const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
 
     ctx.clearRect(0, 0, W, H);
 
-    // Outer ring
     ctx.beginPath();
     ctx.arc(cx, cy, R + 3, Math.PI, 0);
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#374151";
     ctx.stroke();
 
-    // Color band
     const seg = Math.PI / GAUGE_COLORS.length;
     GAUGE_COLORS.forEach((col, i) => {
       ctx.beginPath();
@@ -159,13 +143,11 @@ const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
       ctx.fill();
     });
 
-    // Inner mask
     ctx.beginPath();
     ctx.arc(cx, cy, R - 22, 0, Math.PI * 2);
     ctx.fillStyle = "#111827";
     ctx.fill();
 
-    // Tick marks + labels
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (let i = 0; i <= 10; i++) {
@@ -188,7 +170,6 @@ const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
         );
       }
     }
-    // Minor ticks
     for (let i = 0; i <= 50; i++) {
       if (i % 5 === 0) continue;
       const angle = Math.PI + (i / 50) * Math.PI;
@@ -206,7 +187,6 @@ const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
       ctx.stroke();
     }
 
-    // Center labels
     ctx.font = "bold 10px monospace";
     ctx.fillStyle = "#d1d5db";
     ctx.fillText(label, cx, cy - 44);
@@ -214,7 +194,6 @@ const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
     ctx.fillStyle = "#9ca3af";
     ctx.fillText(sublabel, cx, cy - 28);
 
-    // Needle
     const clampedVal = Math.min(Math.max(value, 0), 1000);
     const angle = Math.PI + (clampedVal / 1000) * Math.PI;
     ctx.save();
@@ -229,7 +208,6 @@ const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
     ctx.fill();
     ctx.restore();
 
-    // Hub
     ctx.beginPath();
     ctx.arc(cx, cy, 11, 0, Math.PI * 2);
     ctx.fillStyle = "#6b7280";
@@ -241,16 +219,11 @@ const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
   }, [value, label, sublabel]);
 
   return (
-    <canvas
-      ref={ref}
-      width={300}
-      height={180}
-      style={{ display: "block", maxWidth: "100%" }}
-    />
+    <canvas ref={ref} width={300} height={180} className="block max-w-full" />
   );
 };
 
-// ─── Canvas: Donut ─────────────────────────────────────────────────────────────
+// ─── Canvas: Donut ──────────────────────────────────────────────────────────────
 const DonutCanvas = ({
   pct = 0,
   size = 150,
@@ -269,14 +242,12 @@ const DonutCanvas = ({
 
     ctx.clearRect(0, 0, c.width, c.height);
 
-    // Track
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.lineWidth = 15;
     ctx.strokeStyle = trackColor;
     ctx.stroke();
 
-    // Fill
     if (pct > 0) {
       ctx.beginPath();
       ctx.arc(
@@ -296,309 +267,165 @@ const DonutCanvas = ({
   return <canvas ref={ref} width={size} height={size} />;
 };
 
-// ─── Mini: Page Header ──────────────────────────────────────────────────────────
-const PageHeader = ({ title, shift, shiftDate, whiteStyle = false }) => {
+// ─── Live Clock Hook ────────────────────────────────────────────────────────────
+const useLiveClock = () => {
   const [tick, setTick] = useState(new Date());
-
   useEffect(() => {
     const id = setInterval(() => setTick(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
+  return `${pad(tick.getHours())}:${pad(tick.getMinutes())}:${pad(tick.getSeconds())}`;
+};
 
-  const timeStr = `${pad(tick.getHours())}:${pad(tick.getMinutes())}:${pad(tick.getSeconds())}`;
+// ─── Page Header ────────────────────────────────────────────────────────────────
+const PageHeader = ({ title, shift, shiftDate, whiteStyle = false }) => {
+  const timeStr = useLiveClock();
+  const shiftLabel =
+    shift === "A" ? "08:00:00 To 20:00:00" : "20:00:00 To 08:00:00";
 
   if (whiteStyle) {
     return (
-      <>
-        <div
-          style={{
-            background: "#fff",
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "8px 16px",
-            borderBottom: "3px solid #1a5a9a",
-            flexShrink: 0,
-          }}
-        >
+      <div className="shrink-0">
+        <div className="bg-white flex items-center gap-3 px-4 py-2 border-b-[3px] border-blue-700">
           <LogoCircle />
-          <div
-            style={{
-              flex: 1,
-              textAlign: "center",
-              fontWeight: 800,
-              fontSize: 20,
-              color: "#111827",
-              letterSpacing: 1,
-              textTransform: "uppercase",
-            }}
-          >
+          <div className="flex-1 text-center font-extrabold text-xl text-gray-900 uppercase tracking-wide">
             {title}
           </div>
         </div>
-        <MetaRow shift={shift} shiftDate={shiftDate} timeStr={timeStr} light />
-      </>
+        <MetaRow
+          shift={shift}
+          shiftDate={shiftDate}
+          timeStr={timeStr}
+          shiftLabel={shiftLabel}
+          light
+        />
+      </div>
     );
   }
 
   return (
-    <>
-      <div
-        style={{
-          background: "#1f2937",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "8px 16px",
-          borderBottom: "1px solid #374151",
-          flexShrink: 0,
-        }}
-      >
+    <div className="shrink-0">
+      <div className="bg-gray-800 flex items-center gap-3 px-4 py-2 border-b border-gray-700">
         <LogoCircle />
-        <div
-          style={{
-            flex: 1,
-            textAlign: "center",
-            fontWeight: 800,
-            fontSize: 18,
-            color: "#fff",
-            letterSpacing: 1,
-            textTransform: "uppercase",
-          }}
-        >
+        <div className="flex-1 text-center font-extrabold text-lg text-white uppercase tracking-wide">
           {title}
         </div>
       </div>
-      <MetaRow shift={shift} shiftDate={shiftDate} timeStr={timeStr} />
-    </>
+      <MetaRow
+        shift={shift}
+        shiftDate={shiftDate}
+        timeStr={timeStr}
+        shiftLabel={shiftLabel}
+      />
+    </div>
   );
 };
 
 const LogoCircle = () => (
+  <div className="w-12 h-12 rounded-full shrink-0 bg-gradient-to-br from-amber-200 to-amber-600 border-2 border-amber-700 flex items-center justify-center">
+    <span className="text-white font-black text-xl leading-none">W</span>
+  </div>
+);
+
+const MetaRow = ({ shift, shiftDate, timeStr, shiftLabel, light = false }) => (
   <div
-    style={{
-      width: 48,
-      height: 48,
-      borderRadius: "50%",
-      flexShrink: 0,
-      background: "radial-gradient(circle at 40% 35%, #fde68a, #d97706)",
-      border: "2px solid #b45309",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-    }}
+    className={`flex items-center px-4 py-1.5 text-xs gap-10 shrink-0 ${
+      light
+        ? "bg-blue-50 border-b border-blue-200"
+        : "bg-gray-900 border-b border-gray-800"
+    }`}
   >
-    <span
-      style={{ color: "#fff", fontWeight: 900, fontSize: 20, lineHeight: 1 }}
-    >
-      W
+    <span className={light ? "text-gray-500" : "text-gray-500"}>
+      Shift:{" "}
+      <span className={`font-bold ${light ? "text-gray-900" : "text-white"}`}>
+        {shift ? `SHIFT ${shift}` : "—"}
+      </span>
+    </span>
+    <span className={light ? "text-gray-500" : "text-gray-500"}>
+      Date:{" "}
+      <span className={`font-bold ${light ? "text-gray-900" : "text-white"}`}>
+        {shiftDate || "—"}
+      </span>
+    </span>
+    <span className={light ? "text-gray-500" : "text-gray-500"}>
+      Time:{" "}
+      <span className={`font-bold ${light ? "text-gray-900" : "text-white"}`}>
+        {timeStr}
+      </span>
+    </span>
+    <span className={`ml-auto ${light ? "text-gray-500" : "text-gray-500"}`}>
+      Shift Duration:{" "}
+      <span className={`font-bold ${light ? "text-gray-900" : "text-white"}`}>
+        {shift ? shiftLabel : "—"}
+      </span>
     </span>
   </div>
 );
 
-const MetaRow = ({ shift, shiftDate, timeStr, light = false }) => {
-  const shiftLabel =
-    shift === "A" ? "08:00:00 To 20:00:00" : "20:00:00 To 08:00:00";
-  const rowStyle = {
-    background: light ? "#e8f0f8" : "#111827",
-    display: "flex",
-    alignItems: "center",
-    padding: "5px 16px",
-    borderBottom: `1px solid ${light ? "#c0d4e8" : "#1f2937"}`,
-    fontSize: 12,
-    flexShrink: 0,
-    gap: 40,
-  };
-  const lblStyle = { color: light ? "#6b7280" : "#6b7280" };
-  const valStyle = { color: light ? "#111827" : "#fff", fontWeight: 700 };
-
-  return (
-    <div style={rowStyle}>
-      <span style={lblStyle}>
-        Shift: <span style={valStyle}>{shift ? `SHIFT ${shift}` : "—"}</span>
-      </span>
-      <span style={lblStyle}>
-        Date: <span style={valStyle}>{shiftDate || "—"}</span>
-      </span>
-      <span style={lblStyle}>
-        Time: <span style={valStyle}>{timeStr}</span>
-      </span>
-      <span style={{ ...lblStyle, marginLeft: "auto" }}>
-        Shift Duration: <span style={valStyle}>{shift ? shiftLabel : "—"}</span>
-      </span>
-    </div>
-  );
-};
-
-// ─── Mini: Timer Progress Bar ───────────────────────────────────────────────────
+// ─── Timer Progress Bar ─────────────────────────────────────────────────────────
 const TimerBar = ({ progress }) => (
-  <div style={{ height: 3, background: "#1f2937", flexShrink: 0 }}>
-    <div
-      style={{
-        height: "100%",
-        width: `${progress}%`,
-        background: "#10b981",
-        transition: "none",
-      }}
-    />
+  <div className="h-[3px] bg-gray-800 shrink-0">
+    <div className="h-full bg-emerald-500" style={{ width: `${progress}%` }} />
   </div>
 );
 
-// ─── Mini: Stat Card (bottom strip) ────────────────────────────────────────────
+// ─── Stat Card ──────────────────────────────────────────────────────────────────
 const StatCard = ({ label, value }) => (
-  <div
-    style={{
-      background: "#374151",
-      border: "1px solid #4b5563",
-      borderRadius: 6,
-      padding: "6px 8px",
-      textAlign: "center",
-    }}
-  >
-    <div style={{ fontSize: 10, color: "#9ca3af", lineHeight: 1.3 }}>
-      {label}
-    </div>
-    <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginTop: 3 }}>
+  <div className="bg-gray-700 border border-gray-600 rounded-md px-2 py-1.5 text-center">
+    <div className="text-[10px] text-gray-400 leading-tight">{label}</div>
+    <div className="text-[15px] font-bold text-white mt-0.5">
       {typeof value === "number" ? value.toLocaleString() : (value ?? "—")}
     </div>
   </div>
 );
 
-// ─── Mini: Metric Table Row ─────────────────────────────────────────────────────
+// ─── Metric Table Row ───────────────────────────────────────────────────────────
 const MetricRow = ({ label, unit, target, actual, highlight, odd }) => (
-  <tr style={{ background: odd ? "#172030" : "#1f2937" }}>
-    <td
-      style={{
-        padding: "6px 10px",
-        border: "1px solid #374151",
-        color: "#d1d5db",
-        fontWeight: 600,
-        fontSize: 12,
-      }}
-    >
+  <tr className={odd ? "bg-[#172030]" : "bg-gray-800"}>
+    <td className="px-2.5 py-1.5 border border-gray-700 text-gray-300 font-semibold text-xs">
       {label}
     </td>
-    <td
-      style={{
-        padding: "6px 10px",
-        border: "1px solid #374151",
-        color: "#6b7280",
-        fontSize: 12,
-        textAlign: "center",
-      }}
-    >
+    <td className="px-2.5 py-1.5 border border-gray-700 text-gray-500 text-xs text-center">
       {unit}
     </td>
-    <td
-      style={{
-        padding: "6px 10px",
-        border: "1px solid #374151",
-        color: "#fbbf24",
-        fontWeight: 700,
-        fontSize: 12,
-        textAlign: "center",
-      }}
-    >
+    <td className="px-2.5 py-1.5 border border-gray-700 text-amber-400 font-bold text-xs text-center">
       {target ?? ""}
     </td>
     <td
-      style={{
-        padding: "6px 10px",
-        border: "1px solid #374151",
-        fontSize: 12,
-        textAlign: "center",
-        fontWeight: 700,
-        color: highlight === "yellow" ? "#fde047" : "#f3f4f6",
-      }}
+      className={`px-2.5 py-1.5 border border-gray-700 font-bold text-xs text-center ${
+        highlight === "yellow" ? "text-yellow-300" : "text-gray-100"
+      }`}
     >
       {actual ?? "—"}
     </td>
   </tr>
 );
 
-// ─── Mini: Gauge + Value Box ────────────────────────────────────────────────────
+// ─── Gauge Panel ────────────────────────────────────────────────────────────────
 const GaugePanel = ({ value, label, sublabel }) => (
-  <div
-    style={{
-      width: 320,
-      flexShrink: 0,
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      background: "#111827",
-      borderRight: "1px solid #374151",
-      padding: "12px 0",
-    }}
-  >
+  <div className="w-80 shrink-0 flex flex-col items-center justify-center bg-gray-900 border-r border-gray-700 py-3">
     <GaugeCanvas value={value} label={label} sublabel={sublabel} />
-    <div
-      style={{
-        marginTop: 10,
-        padding: "4px 24px",
-        background: "#1f2937",
-        border: "2px solid #4b5563",
-        borderRadius: 4,
-        color: "#fff",
-        fontWeight: 700,
-        fontSize: 20,
-        fontFamily: "monospace",
-        letterSpacing: 3,
-      }}
-    >
+    <div className="mt-2.5 px-6 py-1 bg-gray-800 border-2 border-gray-600 rounded text-white font-bold text-xl font-mono tracking-widest">
       {String(value ?? 0).padStart(3, "0")}.00
     </div>
   </div>
 );
 
-// ─── Mini: Donut Panel (left sidebar) ──────────────────────────────────────────
+// ─── Donut Panel ────────────────────────────────────────────────────────────────
 const DonutPanel = ({
   pct = 0,
   fillColor = "#10b981",
   label = "CONSUMED TIME %",
 }) => (
   <div>
-    <div
-      style={{
-        fontSize: 10,
-        fontWeight: 700,
-        color: "#9ca3af",
-        letterSpacing: 1,
-        textTransform: "uppercase",
-        marginBottom: 6,
-      }}
-    >
+    <div className="text-[10px] font-bold text-gray-400 tracking-wider uppercase mb-1.5">
       {label}
     </div>
-    <div style={{ display: "flex", alignItems: "center" }}>
-      <div
-        style={{
-          width: 18,
-          background: "#1e3a5f",
-          flexShrink: 0,
-          alignSelf: "stretch",
-        }}
-      />
-      <div
-        style={{
-          flex: 1,
-          position: "relative",
-          display: "flex",
-          justifyContent: "center",
-        }}
-      >
+    <div className="flex items-center">
+      <div className="w-[18px] bg-[#1e3a5f] shrink-0 self-stretch" />
+      <div className="flex-1 relative flex justify-center">
         <DonutCanvas pct={pct} size={140} fillColor={fillColor} />
-        <div
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%,-50%)",
-            color: "#fff",
-            fontWeight: 700,
-            fontSize: 20,
-          }}
-        >
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white font-bold text-xl">
           {Number(pct || 0).toFixed(0)}%
         </div>
       </div>
@@ -606,111 +433,63 @@ const DonutPanel = ({
   </div>
 );
 
-// ─── Mini: Info Box ─────────────────────────────────────────────────────────────
+// ─── Info Box ───────────────────────────────────────────────────────────────────
 const InfoBox = ({ rows }) => (
-  <div
-    style={{
-      background: "#1e3a5f",
-      border: "1px solid #2a5080",
-      borderRadius: 6,
-      padding: "8px 10px",
-    }}
-  >
+  <div className="bg-[#1e3a5f] border border-[#2a5080] rounded-md px-2.5 py-2">
     {rows.map(([k, v], i) => (
-      <div key={i} style={{ fontSize: 11, color: "#93c5fd", lineHeight: 1.8 }}>
-        {k}: <b style={{ color: "#fff" }}>{v ?? "—"}</b>
+      <div key={i} className="text-[11px] text-blue-300 leading-[1.8]">
+        {k}: <b className="text-white">{v ?? "—"}</b>
       </div>
     ))}
   </div>
 );
 
-// ─── Mini: Left Sidebar (shared for pages 3-5) ──────────────────────────────────
+// ─── Left Sidebar ───────────────────────────────────────────────────────────────
 const LeftSidebar = ({
   consumedPct = 0,
   fillColor = "#10b981",
   infoRows = [],
 }) => (
-  <div
-    style={{
-      width: 210,
-      flexShrink: 0,
-      display: "flex",
-      flexDirection: "column",
-      gap: 12,
-      padding: 12,
-      background: "#1a2740",
-      borderRight: "1px solid #374151",
-      justifyContent: "center",
-    }}
-  >
+  <div className="w-[210px] shrink-0 flex flex-col gap-3 p-3 bg-[#1a2740] border-r border-gray-700 justify-center">
     <DonutPanel pct={consumedPct} fillColor={fillColor} />
     <InfoBox rows={infoRows} />
   </div>
 );
 
-// ─── Mini: Nav Dots ─────────────────────────────────────────────────────────────
+// ─── Nav Dots ───────────────────────────────────────────────────────────────────
 const NavDots = ({ currentPage, onGoTo }) => (
-  <div
-    style={{
-      flexShrink: 0,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 12,
-      padding: "6px 0",
-      background: "#030712",
-      borderTop: "1px solid #1f2937",
-    }}
-  >
-    {PAGES_META.map((pg, i) => (
-      <button
-        key={i}
-        onClick={() => onGoTo(i)}
-        style={{
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 3,
-        }}
-      >
-        <div
-          style={{
-            width: i === currentPage ? 28 : 10,
-            height: 10,
-            borderRadius: 5,
-            background: i === currentPage ? "#10b981" : "#374151",
-            transition: "all 0.3s ease",
-          }}
-        />
-        <span
-          style={{
-            fontSize: 9,
-            fontFamily: "monospace",
-            color: i === currentPage ? "#d1d5db" : "#6b7280",
-          }}
+  <div className="shrink-0 flex items-center justify-center gap-3 py-1.5 bg-gray-950 border-t border-gray-800">
+    {PAGES_META.map((pg, i) => {
+      const Icon = pg.icon;
+      return (
+        <button
+          key={i}
+          onClick={() => onGoTo(i)}
+          className="bg-transparent border-none cursor-pointer flex flex-col items-center gap-1"
         >
-          {pg.label}
-        </span>
-      </button>
-    ))}
+          <div
+            className={`flex items-center justify-center rounded-full transition-all duration-300 ${
+              i === currentPage
+                ? "w-7 h-7 bg-emerald-500"
+                : "w-2.5 h-2.5 bg-gray-700"
+            }`}
+          >
+            {i === currentPage && <Icon className="w-3.5 h-3.5 text-white" />}
+          </div>
+          <span
+            className={`text-[9px] font-mono ${
+              i === currentPage ? "text-gray-300" : "text-gray-600"
+            }`}
+          >
+            {pg.label}
+          </span>
+        </button>
+      );
+    })}
   </div>
 );
 
-// ─── Page Shared Styles ─────────────────────────────────────────────────────────
-const METRIC_TH = {
-  padding: "7px 10px",
-  background: "#374151",
-  color: "#d1d5db",
-  fontSize: 11,
-  fontWeight: 700,
-  border: "1px solid #4b5563",
-  textAlign: "center",
-};
-
-// ─── Page 1 — FG Packing ───────────────────────────────────────────────────────
+// ─── Page 1 — FG Packing ────────────────────────────────────────────────────────
 const Page1 = ({ apiData = {}, progress, shift, shiftDate }) => {
   const d = apiData;
   const rows = [
@@ -758,58 +537,38 @@ const Page1 = ({ apiData = {}, progress, shift, shiftDate }) => {
   ];
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        height: "100%",
-        background: "#111827",
-      }}
-    >
+    <div className="flex flex-col w-full h-full bg-gray-900">
       <PageHeader
         title="FINAL AREA PRODUCTION PERFORMANCE"
         shift={shift}
         shiftDate={shiftDate}
       />
       <TimerBar progress={progress} />
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+      <div className="flex flex-1 min-h-0">
         <GaugePanel
           value={d.GaugeValue ?? 0}
           label="Cabinet Packing"
           sublabel="FG/Shift"
         />
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            padding: 14,
-            minWidth: 0,
-          }}
-        >
-          <div
-            style={{
-              background: "#b8cfe8",
-              color: "#111827",
-              fontWeight: 700,
-              fontSize: 14,
-              textAlign: "center",
-              padding: "6px 0",
-              marginBottom: 0,
-            }}
-          >
+        <div className="flex-1 flex flex-col p-3.5 min-w-0">
+          <div className="bg-[#b8cfe8] text-gray-900 font-bold text-sm text-center py-1.5">
             FG PACKING
           </div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table className="w-full border-collapse">
             <thead>
               <tr>
-                <th style={{ ...METRIC_TH, textAlign: "left", width: "45%" }}>
+                <th className="px-2.5 py-[7px] bg-gray-700 text-gray-300 text-[11px] font-bold border border-gray-600 text-left w-[45%]">
                   Metric
                 </th>
-                <th style={{ ...METRIC_TH, width: "10%" }}>Unit</th>
-                <th style={{ ...METRIC_TH, width: "22%" }}>Target</th>
-                <th style={{ ...METRIC_TH, width: "23%" }}>Actual</th>
+                <th className="px-2.5 py-[7px] bg-gray-700 text-gray-300 text-[11px] font-bold border border-gray-600 text-center w-[10%]">
+                  Unit
+                </th>
+                <th className="px-2.5 py-[7px] bg-gray-700 text-gray-300 text-[11px] font-bold border border-gray-600 text-center w-[22%]">
+                  Target
+                </th>
+                <th className="px-2.5 py-[7px] bg-gray-700 text-gray-300 text-[11px] font-bold border border-gray-600 text-center w-[23%]">
+                  Actual
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -820,17 +579,7 @@ const Page1 = ({ apiData = {}, progress, shift, shiftDate }) => {
           </table>
         </div>
       </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5,1fr)",
-          gap: 4,
-          padding: "6px 8px",
-          background: "#1f2937",
-          borderTop: "1px solid #374151",
-          flexShrink: 0,
-        }}
-      >
+      <div className="grid grid-cols-5 gap-1 px-2 py-1.5 bg-gray-800 border-t border-gray-700 shrink-0">
         <StatCard label="Monthly Production Qty" value={d.MonthlyPlanQty} />
         <StatCard label="Monthly Achievement" value={d.MonthlyAchieved} />
         <StatCard label="Remaining Qty" value={d.MonthlyRemaining} />
@@ -841,7 +590,7 @@ const Page1 = ({ apiData = {}, progress, shift, shiftDate }) => {
   );
 };
 
-// ─── Page 2 — FG Loading ───────────────────────────────────────────────────────
+// ─── Page 2 — FG Loading ────────────────────────────────────────────────────────
 const Page2 = ({ apiData = {}, progress, shift, shiftDate }) => {
   const d = apiData;
   const rows = [
@@ -883,57 +632,38 @@ const Page2 = ({ apiData = {}, progress, shift, shiftDate }) => {
   ];
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        height: "100%",
-        background: "#111827",
-      }}
-    >
+    <div className="flex flex-col w-full h-full bg-gray-900">
       <PageHeader
         title="FINAL AREA PRODUCTION PERFORMANCE"
         shift={shift}
         shiftDate={shiftDate}
       />
       <TimerBar progress={progress} />
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+      <div className="flex flex-1 min-h-0">
         <GaugePanel
           value={d.GaugeValue ?? 0}
           label="FG Loading"
           sublabel="Units/Shift"
         />
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            padding: 14,
-            minWidth: 0,
-          }}
-        >
-          <div
-            style={{
-              background: "#b8cfe8",
-              color: "#111827",
-              fontWeight: 700,
-              fontSize: 14,
-              textAlign: "center",
-              padding: "6px 0",
-            }}
-          >
+        <div className="flex-1 flex flex-col p-3.5 min-w-0">
+          <div className="bg-[#b8cfe8] text-gray-900 font-bold text-sm text-center py-1.5">
             FG LOADING
           </div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table className="w-full border-collapse">
             <thead>
               <tr>
-                <th style={{ ...METRIC_TH, textAlign: "left", width: "45%" }}>
+                <th className="px-2.5 py-[7px] bg-gray-700 text-gray-300 text-[11px] font-bold border border-gray-600 text-left w-[45%]">
                   Metric
                 </th>
-                <th style={{ ...METRIC_TH, width: "10%" }}>Unit</th>
-                <th style={{ ...METRIC_TH, width: "22%" }}>Target</th>
-                <th style={{ ...METRIC_TH, width: "23%" }}>Actual</th>
+                <th className="px-2.5 py-[7px] bg-gray-700 text-gray-300 text-[11px] font-bold border border-gray-600 text-center w-[10%]">
+                  Unit
+                </th>
+                <th className="px-2.5 py-[7px] bg-gray-700 text-gray-300 text-[11px] font-bold border border-gray-600 text-center w-[22%]">
+                  Target
+                </th>
+                <th className="px-2.5 py-[7px] bg-gray-700 text-gray-300 text-[11px] font-bold border border-gray-600 text-center w-[23%]">
+                  Actual
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -944,17 +674,7 @@ const Page2 = ({ apiData = {}, progress, shift, shiftDate }) => {
           </table>
         </div>
       </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5,1fr)",
-          gap: 4,
-          padding: "6px 8px",
-          background: "#1f2937",
-          borderTop: "1px solid #374151",
-          flexShrink: 0,
-        }}
-      >
+      <div className="grid grid-cols-5 gap-1 px-2 py-1.5 bg-gray-800 border-t border-gray-700 shrink-0">
         <StatCard label="Monthly Production Qty" value={d.MonthlyPlanQty} />
         <StatCard label="Monthly Achievement" value={d.MonthlyAchieved} />
         <StatCard label="Remaining Qty" value={d.MonthlyRemaining} />
@@ -965,7 +685,7 @@ const Page2 = ({ apiData = {}, progress, shift, shiftDate }) => {
   );
 };
 
-// ─── Page 3 — Hourly Production ────────────────────────────────────────────────
+// ─── Page 3 — Hourly Production ─────────────────────────────────────────────────
 const Page3 = ({ apiData = {}, progress, shift, shiftDate }) => {
   const { hours = [], summary = {} } = apiData;
 
@@ -1047,22 +767,14 @@ const Page3 = ({ apiData = {}, progress, shift, shiftDate }) => {
   );
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        height: "100%",
-        background: "#111827",
-      }}
-    >
+    <div className="flex flex-col w-full h-full bg-gray-900">
       <PageHeader
         title="FINAL AREA HOURLY PRODUCTION PERFORMANCE"
         shift={shift}
         shiftDate={shiftDate}
       />
       <TimerBar progress={progress} />
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+      <div className="flex flex-1 min-h-0">
         <LeftSidebar
           consumedPct={summary.ConsumedTimePct}
           fillColor="#10b981"
@@ -1072,50 +784,19 @@ const Page3 = ({ apiData = {}, progress, shift, shiftDate }) => {
             ["Remaining", summary.Remaining],
           ]}
         />
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            padding: "8px 10px",
-            gap: 8,
-            background: "#1e2d45",
-            minWidth: 0,
-          }}
-        >
+        <div className="flex-1 flex flex-col p-2 gap-2 bg-[#1e2d45] min-w-0">
           {/* Hour table */}
-          <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                minWidth: "100%",
-                borderCollapse: "collapse",
-                fontSize: 11,
-              }}
-            >
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-collapse text-[11px]">
               <thead>
                 <tr>
-                  <th
-                    style={{
-                      background: "#1e3a5f",
-                      color: "#93c5fd",
-                      padding: "5px 8px",
-                      border: "1px solid #2a5a8a",
-                      textAlign: "left",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                  <th className="bg-[#1e3a5f] text-blue-300 px-2 py-1.5 border border-[#2a5a8a] text-left whitespace-nowrap">
                     Metric
                   </th>
                   {hours.map((h, i) => (
                     <th
                       key={i}
-                      style={{
-                        background: "#1e3a5f",
-                        color: "#93c5fd",
-                        padding: "5px 6px",
-                        border: "1px solid #2a5a8a",
-                        textAlign: "center",
-                      }}
+                      className="bg-[#1e3a5f] text-blue-300 px-1.5 py-1.5 border border-[#2a5a8a] text-center"
                     >
                       H{h.HourNo}
                     </th>
@@ -1124,42 +805,20 @@ const Page3 = ({ apiData = {}, progress, shift, shiftDate }) => {
               </thead>
               <tbody>
                 <tr>
-                  <td
-                    style={{
-                      background: "#1a3050",
-                      color: "#cbd5e1",
-                      padding: "5px 8px",
-                      border: "1px solid #2a4a70",
-                      fontWeight: 600,
-                    }}
-                  >
+                  <td className="bg-[#1a3050] text-slate-300 px-2 py-1.5 border border-[#2a4a70] font-semibold">
                     Cumul. Loss
                   </td>
                   {hours.map((h, i) => (
                     <td
                       key={i}
-                      style={{
-                        background: "#1a3050",
-                        color: "#f1f5f9",
-                        padding: "5px 6px",
-                        border: "1px solid #2a4a70",
-                        textAlign: "center",
-                      }}
+                      className="bg-[#1a3050] text-gray-100 px-1.5 py-1.5 border border-[#2a4a70] text-center"
                     >
                       {h.CumulativeLoss}
                     </td>
                   ))}
                 </tr>
                 <tr>
-                  <td
-                    style={{
-                      background: "#162840",
-                      color: "#cbd5e1",
-                      padding: "5px 8px",
-                      border: "1px solid #2a4a70",
-                      fontWeight: 600,
-                    }}
-                  >
+                  <td className="bg-[#162840] text-slate-300 px-2 py-1.5 border border-[#2a4a70] font-semibold">
                     Achievement
                   </td>
                   {hours.map((h, i) => {
@@ -1167,14 +826,9 @@ const Page3 = ({ apiData = {}, progress, shift, shiftDate }) => {
                     return (
                       <td
                         key={i}
-                        style={{
-                          background: "#162840",
-                          padding: "5px 6px",
-                          border: "1px solid #2a4a70",
-                          textAlign: "center",
-                          fontWeight: 700,
-                          color: ach >= 85 ? "#4ade80" : "#facc15",
-                        }}
+                        className={`bg-[#162840] px-1.5 py-1.5 border border-[#2a4a70] text-center font-bold ${
+                          ach >= 85 ? "text-green-400" : "text-yellow-400"
+                        }`}
                       >
                         {ach.toFixed(0)}%
                       </td>
@@ -1185,62 +839,26 @@ const Page3 = ({ apiData = {}, progress, shift, shiftDate }) => {
             </table>
           </div>
           {/* Chart */}
-          <div
-            style={{
-              flex: 1,
-              background: "#fff",
-              border: "1px solid #d1d5db",
-              borderRadius: 6,
-              padding: "8px 8px 4px",
-              minHeight: 140,
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#374151",
-                textAlign: "center",
-                marginBottom: 4,
-              }}
-            >
+          <div className="flex-1 bg-white border border-gray-300 rounded-md p-2 min-h-[140px] flex flex-col">
+            <div className="text-xs font-bold text-gray-700 text-center mb-1">
               Hourly Report
             </div>
-            <div
-              style={{
-                display: "flex",
-                gap: 14,
-                justifyContent: "center",
-                marginBottom: 6,
-                fontSize: 11,
-                color: "#374151",
-              }}
-            >
+            <div className="flex gap-3.5 justify-center mb-1.5 text-[11px] text-gray-700">
               {[
                 ["#4472c4", "Target"],
                 ["#ed7d31", "Actual"],
                 ["#9ca3af", "Unit Loss"],
               ].map(([c, l]) => (
-                <span
-                  key={l}
-                  style={{ display: "flex", alignItems: "center", gap: 4 }}
-                >
+                <span key={l} className="flex items-center gap-1">
                   <span
-                    style={{
-                      width: 10,
-                      height: 10,
-                      background: c,
-                      borderRadius: 2,
-                      display: "inline-block",
-                    }}
+                    className="w-2.5 h-2.5 rounded-sm inline-block"
+                    style={{ background: c }}
                   />
                   {l}
                 </span>
               ))}
             </div>
-            <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
+            <div className="flex-1 relative min-h-0">
               <Chart type="bar" data={chartData} options={chartOptions} />
             </div>
           </div>
@@ -1250,7 +868,7 @@ const Page3 = ({ apiData = {}, progress, shift, shiftDate }) => {
   );
 };
 
-// ─── Page 4 — Quality ──────────────────────────────────────────────────────────
+// ─── Page 4 — Quality ───────────────────────────────────────────────────────────
 const Page4 = ({ apiData = {}, progress, shift, shiftDate }) => {
   const { summary: qs = {}, defects = [] } = apiData;
 
@@ -1285,105 +903,48 @@ const Page4 = ({ apiData = {}, progress, shift, shiftDate }) => {
   );
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        height: "100%",
-        background: "#111827",
-      }}
-    >
+    <div className="flex flex-col w-full h-full bg-gray-900">
       <PageHeader
         title="FINAL AREA QUALITY PERFORMANCE"
         shift={shift}
         shiftDate={shiftDate}
       />
       <TimerBar progress={progress} />
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-        <div
-          style={{
-            width: 210,
-            flexShrink: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-            padding: 12,
-            background: "#1a2740",
-            borderRight: "1px solid #374151",
-            justifyContent: "center",
-          }}
-        >
+      <div className="flex flex-1 min-h-0">
+        {/* Left sidebar */}
+        <div className="w-[210px] shrink-0 flex flex-col gap-2.5 p-3 bg-[#1a2740] border-r border-gray-700 justify-center">
           <DonutPanel pct={qs.ConsumedTimePct} fillColor="#10b981" />
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: 11,
-              marginTop: 4,
-            }}
-          >
-            {[
-              ["Plan", qs.Plan],
-              ["Achieved", qs.TotalAchieved],
-              ["OK Unit", qs.OkUnit],
-              ["Defect", qs.DefectUnit],
-              ["OK %", qs.OkPct != null ? `${qs.OkPct}%` : null],
-              ["Defect %", qs.DefectPct != null ? `${qs.DefectPct}%` : null],
-              ["Rework", qs.ReworkDone],
-            ].map(([k, v], i) => (
-              <tr key={i}>
-                <td
-                  style={{
-                    padding: "3px 6px",
-                    border: "1px solid #2a5a8a",
-                    background: "#1a3050",
-                    color: "#93c5fd",
-                  }}
-                >
-                  {k}
-                </td>
-                <td
-                  style={{
-                    padding: "3px 6px",
-                    border: "1px solid #2a5a8a",
-                    background: "#1a3050",
-                    color: "#fff",
-                    textAlign: "right",
-                    fontWeight: 700,
-                  }}
-                >
-                  {v ?? "—"}
-                </td>
-              </tr>
-            ))}
+          <table className="w-full border-collapse text-[11px] mt-1">
+            <tbody>
+              {[
+                ["Plan", qs.Plan],
+                ["Achieved", qs.TotalAchieved],
+                ["OK Unit", qs.OkUnit],
+                ["Defect", qs.DefectUnit],
+                ["OK %", qs.OkPct != null ? `${qs.OkPct}%` : null],
+                ["Defect %", qs.DefectPct != null ? `${qs.DefectPct}%` : null],
+                ["Rework", qs.ReworkDone],
+              ].map(([k, v], i) => (
+                <tr key={i}>
+                  <td className="px-1.5 py-0.5 border border-[#2a5a8a] bg-[#1a3050] text-blue-300">
+                    {k}
+                  </td>
+                  <td className="px-1.5 py-0.5 border border-[#2a5a8a] bg-[#1a3050] text-white text-right font-bold">
+                    {v ?? "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-around",
-            padding: "12px 20px",
-            gap: 20,
-            background: "#1e2d45",
-            minWidth: 0,
-          }}
-        >
+        {/* Main area */}
+        <div className="flex-1 flex items-center justify-around p-3 gap-5 bg-[#1e2d45] min-w-0">
           {/* Pie */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <div style={{ fontSize: 12, color: "#93c5fd", fontWeight: 700 }}>
+          <div className="flex flex-col items-center gap-2">
+            <div className="text-xs text-blue-300 font-bold">
               Quality Overview
             </div>
-            <div style={{ position: "relative" }}>
+            <div className="relative">
               <Chart
                 type="doughnut"
                 data={pieChartData}
@@ -1391,96 +952,36 @@ const Page4 = ({ apiData = {}, progress, shift, shiftDate }) => {
                 width={220}
                 height={220}
               />
-              <div
-                style={{
-                  position: "absolute",
-                  top: "50%",
-                  left: "50%",
-                  transform: "translate(-50%,-50%)",
-                  textAlign: "center",
-                }}
-              >
-                <div style={{ fontSize: 28, fontWeight: 700, color: "#fff" }}>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+                <div className="text-[28px] font-bold text-white">
                   {qs.TotalAchieved ?? 0}
                 </div>
-                <div style={{ fontSize: 10, color: "#9ca3af" }}>Total</div>
+                <div className="text-[10px] text-gray-400">Total</div>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 12, fontSize: 11 }}>
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  color: "#86efac",
-                }}
-              >
-                <span
-                  style={{
-                    width: 10,
-                    height: 10,
-                    background: "#16a34a",
-                    borderRadius: 2,
-                    display: "inline-block",
-                  }}
-                />
+            <div className="flex gap-3 text-[11px]">
+              <span className="flex items-center gap-1 text-green-300">
+                <span className="w-2.5 h-2.5 bg-green-600 rounded-sm inline-block" />
                 OK: {qs.OkUnit ?? 0}
               </span>
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  color: "#fca5a5",
-                }}
-              >
-                <span
-                  style={{
-                    width: 10,
-                    height: 10,
-                    background: "#dc2626",
-                    borderRadius: 2,
-                    display: "inline-block",
-                  }}
-                />
+              <span className="flex items-center gap-1 text-red-300">
+                <span className="w-2.5 h-2.5 bg-red-600 rounded-sm inline-block" />
                 Defect: {qs.DefectUnit ?? 0}
               </span>
             </div>
           </div>
-          {/* Defect Table */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                background: "#1e3a5f",
-                color: "#fff",
-                fontWeight: 700,
-                fontSize: 14,
-                textAlign: "center",
-                padding: 8,
-                border: "1px solid #2a5a8a",
-              }}
-            >
+          {/* Defect table */}
+          <div className="flex-1 min-w-0">
+            <div className="bg-[#1e3a5f] text-white font-bold text-sm text-center p-2 border border-[#2a5a8a]">
               Today's Top Defects
             </div>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: 12,
-              }}
-            >
+            <table className="w-full border-collapse text-xs">
               <thead>
                 <tr>
                   {["Sr.", "Defect Description", "Count"].map((h) => (
                     <th
                       key={h}
-                      style={{
-                        background: "#1e3a5f",
-                        color: "#93c5fd",
-                        padding: "6px 10px",
-                        border: "1px solid #2a5a8a",
-                        textAlign: "left",
-                      }}
+                      className="bg-[#1e3a5f] text-blue-300 px-2.5 py-1.5 border border-[#2a5a8a] text-left"
                     >
                       {h}
                     </th>
@@ -1491,37 +992,13 @@ const Page4 = ({ apiData = {}, progress, shift, shiftDate }) => {
                 {defects.length > 0 ? (
                   defects.map((df, i) => (
                     <tr key={i}>
-                      <td
-                        style={{
-                          background: "#1a3050",
-                          color: "#fff",
-                          padding: "7px 10px",
-                          border: "1px solid #2a5a8a",
-                          textAlign: "center",
-                        }}
-                      >
+                      <td className="bg-[#1a3050] text-white px-2.5 py-[7px] border border-[#2a5a8a] text-center">
                         {df.SrNo}
                       </td>
-                      <td
-                        style={{
-                          background: "#1a3050",
-                          color: "#e2e8f0",
-                          padding: "7px 10px",
-                          border: "1px solid #2a5a8a",
-                        }}
-                      >
+                      <td className="bg-[#1a3050] text-slate-200 px-2.5 py-[7px] border border-[#2a5a8a]">
                         {df.DefectName}
                       </td>
-                      <td
-                        style={{
-                          background: "#1a3050",
-                          color: "#f87171",
-                          padding: "7px 10px",
-                          border: "1px solid #2a5a8a",
-                          textAlign: "center",
-                          fontWeight: 700,
-                        }}
-                      >
+                      <td className="bg-[#1a3050] text-red-400 px-2.5 py-[7px] border border-[#2a5a8a] text-center font-bold">
                         {df.DefectCount}
                       </td>
                     </tr>
@@ -1530,13 +1007,7 @@ const Page4 = ({ apiData = {}, progress, shift, shiftDate }) => {
                   <tr>
                     <td
                       colSpan={3}
-                      style={{
-                        background: "#1a3050",
-                        color: "#9ca3af",
-                        padding: "20px",
-                        textAlign: "center",
-                        border: "1px solid #2a5a8a",
-                      }}
+                      className="bg-[#1a3050] text-gray-400 px-5 py-5 text-center border border-[#2a5a8a]"
                     >
                       No defects recorded
                     </td>
@@ -1551,7 +1022,7 @@ const Page4 = ({ apiData = {}, progress, shift, shiftDate }) => {
   );
 };
 
-// ─── Page 5 — Loss ─────────────────────────────────────────────────────────────
+// ─── Page 5 — Loss ──────────────────────────────────────────────────────────────
 const Page5 = ({ apiData = {}, progress, shift, shiftDate }) => {
   const { stations = [], summary: ls = {} } = apiData;
   const maxTime = useMemo(
@@ -1560,15 +1031,7 @@ const Page5 = ({ apiData = {}, progress, shift, shiftDate }) => {
   );
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        height: "100%",
-        background: "#111827",
-      }}
-    >
+    <div className="flex flex-col w-full h-full bg-gray-900">
       <PageHeader
         title="FINAL AREA LOSS PERFORMANCE"
         shift={shift}
@@ -1576,7 +1039,7 @@ const Page5 = ({ apiData = {}, progress, shift, shiftDate }) => {
         whiteStyle
       />
       <TimerBar progress={progress} />
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+      <div className="flex flex-1 min-h-0">
         <LeftSidebar
           consumedPct={ls.ConsumedTimePct}
           fillColor="#f59e0b"
@@ -1586,31 +1049,17 @@ const Page5 = ({ apiData = {}, progress, shift, shiftDate }) => {
             ["Balance", ls.Remaining],
           ]}
         />
-        <div
-          style={{
-            flex: 1,
-            padding: 12,
-            overflow: "auto",
-            background: "#1e2d45",
-          }}
-        >
-          <table
-            style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}
-          >
+        <div className="flex-1 p-3 overflow-auto bg-[#1e2d45]">
+          <table className="w-full border-collapse text-xs">
             <thead>
               <tr>
                 {["Station Name", "Stop Time (Min)", "Stop Count"].map(
                   (h, i) => (
                     <th
                       key={i}
-                      style={{
-                        background: "#374151",
-                        color: "#d1d5db",
-                        padding: "8px 12px",
-                        border: "1px solid #4b5563",
-                        fontWeight: 700,
-                        textAlign: i === 0 ? "left" : "center",
-                      }}
+                      className={`bg-gray-700 text-gray-300 px-3 py-2 border border-gray-600 font-bold ${
+                        i === 0 ? "text-left" : "text-center"
+                      }`}
                     >
                       {h}
                     </th>
@@ -1619,66 +1068,52 @@ const Page5 = ({ apiData = {}, progress, shift, shiftDate }) => {
               </tr>
             </thead>
             <tbody>
-              {stations.map((s, i) => {
-                const intensity = s.TotalStopTime / maxTime;
-                const rVal = Math.round(160 + intensity * 95);
-                const rowBg =
-                  s.TotalStopTime > 100
-                    ? `rgb(${rVal},18,18)`
-                    : s.TotalStopTime > 20
-                      ? "#7f1d1d"
-                      : "#1f2937";
-                return (
-                  <tr key={i}>
-                    <td
-                      style={{
-                        padding: "7px 12px",
-                        border: "1px solid #4b5563",
-                        background: rowBg,
-                        color: "#f9fafb",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {s.StationName}
-                    </td>
-                    <td
-                      style={{
-                        padding: "7px 12px",
-                        border: "1px solid #4b5563",
-                        background: rowBg,
-                        color: s.TotalStopTime > 50 ? "#fca5a5" : "#d1d5db",
-                        textAlign: "center",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {s.TotalStopTime}
-                    </td>
-                    <td
-                      style={{
-                        padding: "7px 12px",
-                        border: "1px solid #4b5563",
-                        background: rowBg,
-                        color: s.TotalStopCount > 10 ? "#fca5a5" : "#d1d5db",
-                        textAlign: "center",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {s.TotalStopCount}
-                    </td>
-                  </tr>
-                );
-              })}
-              {stations.length === 0 && (
+              {stations.length > 0 ? (
+                stations.map((s, i) => {
+                  const intensity = s.TotalStopTime / maxTime;
+                  const rVal = Math.round(160 + intensity * 95);
+                  const rowBg =
+                    s.TotalStopTime > 100
+                      ? `rgb(${rVal},18,18)`
+                      : s.TotalStopTime > 20
+                        ? "#7f1d1d"
+                        : "#1f2937";
+                  return (
+                    <tr key={i}>
+                      <td
+                        className="px-3 py-[7px] border border-gray-600 font-semibold text-gray-50"
+                        style={{ background: rowBg }}
+                      >
+                        {s.StationName}
+                      </td>
+                      <td
+                        className={`px-3 py-[7px] border border-gray-600 text-center font-bold ${
+                          s.TotalStopTime > 50
+                            ? "text-red-300"
+                            : "text-gray-300"
+                        }`}
+                        style={{ background: rowBg }}
+                      >
+                        {s.TotalStopTime}
+                      </td>
+                      <td
+                        className={`px-3 py-[7px] border border-gray-600 text-center font-bold ${
+                          s.TotalStopCount > 10
+                            ? "text-red-300"
+                            : "text-gray-300"
+                        }`}
+                        style={{ background: rowBg }}
+                      >
+                        {s.TotalStopCount}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
                 <tr>
                   <td
                     colSpan={3}
-                    style={{
-                      padding: 20,
-                      textAlign: "center",
-                      color: "#6b7280",
-                      background: "#1f2937",
-                      border: "1px solid #374151",
-                    }}
+                    className="py-5 text-center text-gray-500 bg-gray-800 border border-gray-700"
                   >
                     No loss data recorded
                   </td>
@@ -1692,7 +1127,9 @@ const Page5 = ({ apiData = {}, progress, shift, shiftDate }) => {
   );
 };
 
-// ─── Main Component ─────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+//  MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
 const FinalAssembly = () => {
   const [loading, setLoading] = useState(false);
   const [shiftDate, setShiftDate] = useState(todayISO());
@@ -1707,9 +1144,9 @@ const FinalAssembly = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const [progress, setProgress] = useState(0);
   const [lastFetched, setLastFetched] = useState(null);
-  const [isRunning, setIsRunning] = useState(false); // auto-rotate active?
+  const [isRunning, setIsRunning] = useState(false);
 
-  // ── Auto-rotate pages once data is loaded
+  /* Auto-rotate */
   useEffect(() => {
     if (!isRunning) return;
     let elapsed = 0;
@@ -1726,7 +1163,7 @@ const FinalAssembly = () => {
     return () => clearInterval(id);
   }, [currentPage, isRunning]);
 
-  // ── Fetch all 4 endpoints in parallel
+  /* Fetch all endpoints */
   const fetchAllData = useCallback(async () => {
     if (!shiftDate) {
       toast.error("Please select a shift date.");
@@ -1743,7 +1180,6 @@ const FinalAssembly = () => {
     });
 
     const params = { shiftDate, shift };
-
     const endpoints = {
       fgPacking: `${baseURL}production/dashboard/fg-packing`,
       fgLoading: `${baseURL}production/dashboard/fg-loading`,
@@ -1763,11 +1199,7 @@ const FinalAssembly = () => {
 
       const merged = {};
       results.forEach((r) => {
-        if (r.status === "fulfilled") {
-          merged[r.value.key] = r.value.data;
-        } else {
-          console.error("Endpoint failed:", r.reason?.message);
-        }
+        if (r.status === "fulfilled") merged[r.value.key] = r.value.data;
       });
 
       const failedCount = results.filter((r) => r.status === "rejected").length;
@@ -1782,15 +1214,14 @@ const FinalAssembly = () => {
         setCurrentPage(0);
         setIsRunning(true);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       toast.error("Failed to fetch dashboard data.");
     } finally {
       setLoading(false);
     }
   }, [shiftDate, shift]);
 
-  // ── Quick buttons
+  /* Quick buttons */
   const handleTodayShiftA = useCallback(() => {
     setShiftDate(todayISO());
     setShift("A");
@@ -1812,7 +1243,6 @@ const FinalAssembly = () => {
     setProgress(0);
   }, []);
 
-  // ── Render pages
   const commonProps = { progress, shift, shiftDate };
   const pages = [
     <Page1 key={0} apiData={allData.fgPacking} {...commonProps} />,
@@ -1823,339 +1253,163 @@ const FinalAssembly = () => {
   ];
 
   return (
-    <div
-      style={{
-        padding: 20,
-        background: "#f1f5f9",
-        minHeight: "100vh",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-      }}
-    >
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div
-        style={{
-          background:
-            "linear-gradient(135deg, #111827 0%, #1f2937 60%, #374151 100%)",
-          borderRadius: 14,
-          padding: "20px 28px",
-          marginBottom: 16,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div
-            style={{
-              background: "rgba(255,255,255,0.1)",
-              borderRadius: 10,
-              padding: 10,
-              fontSize: 24,
-              color: "#fff",
-            }}
-          >
-            <MdDashboard />
+    <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
+      {/* ── Page sub-header ── */}
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="bg-slate-100 rounded-xl p-2.5">
+            <LayoutDashboard className="w-6 h-6 text-slate-700" />
           </div>
           <div>
-            <h1
-              style={{
-                margin: 0,
-                color: "#fff",
-                fontSize: 22,
-                fontWeight: 800,
-                letterSpacing: -0.5,
-              }}
-            >
+            <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
               Final Area Production Dashboard
             </h1>
-            <p style={{ margin: 0, color: "#9ca3af", fontSize: 13 }}>
+            <p className="text-[11px] text-slate-400">
               Live Shift Performance · FG Packing & Loading · Quality · Loss
             </p>
           </div>
         </div>
         {lastFetched && (
-          <div style={{ color: "#9ca3af", fontSize: 11, textAlign: "right" }}>
-            <div>Last refreshed</div>
-            <div style={{ fontWeight: 600, color: "#d1d5db" }}>
+          <div className="text-right">
+            <p className="text-[10px] text-slate-400">Last refreshed</p>
+            <p className="text-xs font-semibold text-slate-600">
               {lastFetched.toLocaleTimeString()}
-            </div>
+            </p>
           </div>
         )}
       </div>
 
-      {/* ── Filter Panel ────────────────────────────────────────────────────── */}
-      <div
-        style={{
-          background: "#fff",
-          border: "1px solid #e5e7eb",
-          borderRadius: 12,
-          padding: 18,
-          marginBottom: 16,
-          boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 20,
-            alignItems: "flex-end",
-          }}
-        >
-          {/* Shift Date */}
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: "#6b7280",
-                marginBottom: 6,
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
-              }}
-            >
-              Shift Date
+      {/* ── Body ── */}
+      <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3">
+        {/* ── Filter Panel ── */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
+          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
+            Filters
+          </p>
+          <div className="flex flex-wrap gap-4 items-end">
+            {/* Shift Date */}
+            <div className="min-w-[180px]">
+              <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">
+                Shift Date
+              </label>
+              <input
+                type="date"
+                value={shiftDate}
+                onChange={(e) => setShiftDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
+              />
             </div>
-            <input
-              type="date"
-              value={shiftDate}
-              onChange={(e) => setShiftDate(e.target.value)}
-              style={{
-                padding: "7px 12px",
-                border: "1px solid #d1d5db",
-                borderRadius: 7,
-                fontSize: 13,
-                outline: "none",
-              }}
-            />
-          </div>
 
-          {/* Shift selector */}
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: "#6b7280",
-                marginBottom: 6,
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
-              }}
-            >
-              Shift
+            {/* Shift Toggle */}
+            <div>
+              <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">
+                Shift
+              </label>
+              <div className="flex bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
+                {SHIFT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setShift(opt.value)}
+                    className={`px-5 py-2 text-sm font-bold transition-all border-r border-slate-200 last:border-r-0 ${
+                      shift === opt.value
+                        ? "bg-slate-700 text-white"
+                        : "bg-transparent text-slate-500 hover:bg-slate-100"
+                    }`}
+                  >
+                    Shift {opt.value}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div
-              style={{
-                display: "flex",
-                background: "#f9fafb",
-                border: "1px solid #e5e7eb",
-                borderRadius: 8,
-                overflow: "hidden",
-              }}
-            >
-              {SHIFT_OPTIONS.map((opt) => (
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 flex-wrap pb-0.5">
+              <button
+                onClick={fetchAllData}
+                disabled={loading}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  loading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-slate-800 hover:bg-slate-900 text-white shadow-sm shadow-slate-300"
+                }`}
+              >
+                {loading ? (
+                  <Spinner cls="w-4 h-4" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+                {loading ? "Loading..." : "Load Dashboard"}
+              </button>
+
+              <button
+                onClick={handleTodayShiftA}
+                disabled={loading}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Star className="w-3 h-3" /> TODAY A
+              </button>
+
+              <button
+                onClick={handleTodayShiftB}
+                disabled={loading}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold hover:bg-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Zap className="w-3 h-3" /> TODAY B
+              </button>
+
+              {isRunning && (
                 <button
-                  key={opt.value}
-                  onClick={() => setShift(opt.value)}
-                  style={{
-                    padding: "8px 20px",
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    background: shift === opt.value ? "#374151" : "transparent",
-                    color: shift === opt.value ? "#fff" : "#6b7280",
-                    border: "none",
-                    borderRight: "1px solid #e5e7eb",
-                    transition: "all 0.15s",
-                  }}
+                  onClick={() => setIsRunning(false)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors"
                 >
-                  {opt.value === "A" ? "Shift A" : "Shift B"}
+                  <Pause className="w-3 h-3" /> Pause
                 </button>
-              ))}
+              )}
+              {!isRunning && lastFetched && (
+                <button
+                  onClick={() => setIsRunning(true)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-colors"
+                >
+                  <Play className="w-3 h-3" /> Resume
+                </button>
+              )}
             </div>
           </div>
+        </div>
 
-          {/* Action buttons */}
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <button
-              onClick={fetchAllData}
-              disabled={loading}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "9px 22px",
-                background: loading ? "#9ca3af" : "#111827",
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: loading ? "not-allowed" : "pointer",
-                boxShadow: loading ? "none" : "0 2px 8px rgba(0,0,0,0.3)",
-              }}
-            >
-              {loading ? (
-                <FaSync style={{ animation: "spin 1s linear infinite" }} />
-              ) : (
-                <MdOutlineQueryStats />
-              )}
-              {loading ? "Loading…" : "Load Dashboard"}
-            </button>
+        {/* ── Dashboard Area ── */}
+        <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-0">
+          {loading && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3">
+              <Loader />
+              <p className="text-sm text-slate-400">
+                Fetching shift data from all endpoints...
+              </p>
+            </div>
+          )}
 
-            <button
-              onClick={handleTodayShiftA}
-              disabled={loading}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "9px 14px",
-                background: "#dbeafe",
-                color: "#1e40af",
-                border: "1px solid #bfdbfe",
-                borderRadius: 8,
-                fontWeight: 700,
-                fontSize: 12,
-                cursor: loading ? "not-allowed" : "pointer",
-              }}
-            >
-              <FaStar size={10} /> TODAY A
-            </button>
+          {!loading && lastFetched && (
+            <>
+              <div className="flex-1 min-h-0 overflow-hidden">
+                {pages[currentPage]}
+              </div>
+              <NavDots currentPage={currentPage} onGoTo={goTo} />
+            </>
+          )}
 
-            <button
-              onClick={handleTodayShiftB}
-              disabled={loading}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "9px 14px",
-                background: "#fef3c7",
-                color: "#92400e",
-                border: "1px solid #fde68a",
-                borderRadius: 8,
-                fontWeight: 700,
-                fontSize: 12,
-                cursor: loading ? "not-allowed" : "pointer",
-              }}
-            >
-              <FaBolt size={10} /> TODAY B
-            </button>
-
-            {isRunning && (
-              <button
-                onClick={() => setIsRunning(false)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  padding: "9px 14px",
-                  background: "#fef2f2",
-                  color: "#991b1b",
-                  border: "1px solid #fecaca",
-                  borderRadius: 8,
-                  fontWeight: 700,
-                  fontSize: 12,
-                  cursor: "pointer",
-                }}
-              >
-                ⏸ Pause
-              </button>
-            )}
-            {!isRunning && lastFetched && (
-              <button
-                onClick={() => setIsRunning(true)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  padding: "9px 14px",
-                  background: "#dcfce7",
-                  color: "#166534",
-                  border: "1px solid #86efac",
-                  borderRadius: 8,
-                  fontWeight: 700,
-                  fontSize: 12,
-                  cursor: "pointer",
-                }}
-              >
-                ▶ Resume
-              </button>
-            )}
-          </div>
+          {!loading && !lastFetched && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-slate-400">
+              <Factory className="w-12 h-12 opacity-20" strokeWidth={1.2} />
+              <p className="text-sm font-bold text-slate-600">
+                No data loaded yet
+              </p>
+              <p className="text-xs text-slate-400">
+                Select a shift date and click Load Dashboard
+              </p>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* ── Loading ──────────────────────────────────────────────────────────── */}
-      {loading && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: 48,
-            background: "#fff",
-            borderRadius: 12,
-            border: "1px solid #e5e7eb",
-          }}
-        >
-          <Loader />
-          <div style={{ color: "#6b7280", marginTop: 10, fontSize: 13 }}>
-            Fetching shift data from all endpoints…
-          </div>
-        </div>
-      )}
-
-      {/* ── Dashboard ────────────────────────────────────────────────────────── */}
-      {!loading && lastFetched && (
-        <div
-          style={{
-            borderRadius: 12,
-            overflow: "hidden",
-            border: "1px solid #374151",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.4)",
-            height: "72vh",
-            minHeight: 520,
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-            {pages[currentPage]}
-          </div>
-          <NavDots currentPage={currentPage} onGoTo={goTo} />
-        </div>
-      )}
-
-      {/* ── Empty ────────────────────────────────────────────────────────────── */}
-      {!loading && !lastFetched && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "56px 0",
-            background: "#fff",
-            borderRadius: 12,
-            border: "1px solid #e5e7eb",
-          }}
-        >
-          <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.3 }}>🏭</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#374151" }}>
-            No data loaded yet
-          </div>
-          <div style={{ fontSize: 12, marginTop: 6, color: "#9ca3af" }}>
-            Select a shift date and click Load Dashboard
-          </div>
-        </div>
-      )}
-
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };
