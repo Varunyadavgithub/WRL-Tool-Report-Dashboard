@@ -5,7 +5,7 @@ import {
   BarController, LineController, Title as ChartTitle, Tooltip, Legend, Filler,
 } from "chart.js";
 import { Chart } from "react-chartjs-2";
-import { PageHeader, TimerBar, SidebarPanel } from "../Monitoring";
+import { PageHeader, TimerBar, StatCard } from "../Monitoring";
 
 ChartJS.register(
   CategoryScale, LinearScale, BarElement, LineElement, PointElement,
@@ -24,17 +24,17 @@ const Hourly = ({ apiData = {}, progress, shift, shiftDate }) => {
         {
           type: "bar", label: "Target", data: hours.map((h) => h.Target),
           backgroundColor: "rgba(30,64,175,0.7)", borderColor: "#1e40af",
-          borderWidth: 1, borderRadius: 4, yAxisID: "y",
+          borderWidth: 1, borderRadius: 6, yAxisID: "y",
         },
         {
           type: "bar", label: "Actual", data: hours.map((h) => h.Actual),
           backgroundColor: "rgba(245,158,11,0.85)", borderColor: "#d97706",
-          borderWidth: 1, borderRadius: 4, yAxisID: "y",
+          borderWidth: 1, borderRadius: 6, yAxisID: "y",
         },
         {
           type: "line", label: "Loss", data: hours.map((h) => h.HourLoss),
-          borderColor: "#ef4444", borderWidth: 2, pointRadius: 4,
-          tension: 0.3, fill: false, yAxisID: "y2",
+          borderColor: "#ef4444", borderWidth: 3, pointRadius: 5,
+          pointBackgroundColor: "#ef4444", tension: 0.3, fill: false, yAxisID: "y2",
         },
       ],
     }),
@@ -48,12 +48,15 @@ const Hourly = ({ apiData = {}, progress, shift, shiftDate }) => {
       interaction: { mode: "index", intersect: false },
       plugins: {
         legend: { display: false },
-        tooltip: { backgroundColor: "#1e293b", titleColor: "#e2e8f0", bodyColor: "#94a3b8", padding: 10, cornerRadius: 8 },
+        tooltip: {
+          backgroundColor: "#1e293b", titleColor: "#e2e8f0", bodyColor: "#94a3b8",
+          padding: 14, cornerRadius: 10, titleFont: { size: 13 }, bodyFont: { size: 12 },
+        },
       },
       scales: {
-        x: { grid: { display: false }, ticks: { color: "#94a3b8", font: { size: 9 }, maxRotation: 0 } },
-        y: { position: "left", beginAtZero: true, ticks: { color: "#94a3b8", font: { size: 9 } }, grid: { color: "#f1f5f9" } },
-        y2: { position: "right", beginAtZero: true, ticks: { color: "#ef4444", font: { size: 9 } }, grid: { display: false } },
+        x: { grid: { display: false }, ticks: { color: "#64748b", font: { size: 12, weight: "bold" }, maxRotation: 0 } },
+        y: { position: "left", beginAtZero: true, ticks: { color: "#64748b", font: { size: 11 } }, grid: { color: "#f1f5f9" } },
+        y2: { position: "right", beginAtZero: true, ticks: { color: "#ef4444", font: { size: 11 } }, grid: { display: false } },
       },
     }),
     [],
@@ -76,14 +79,25 @@ const Hourly = ({ apiData = {}, progress, shift, shiftDate }) => {
     <div className="flex flex-col w-full h-full bg-slate-50">
       <PageHeader title="Hourly Production Performance" shift={shift} shiftDate={shiftDate} accentHex={ACCENT} />
       <TimerBar progress={progress} accentHex={ACCENT} />
-      <div className="flex flex-1 min-h-0">
-        <SidebarPanel
-          pct={summary.ConsumedTimePct}
-          fillColor="#8b5cf6"
-          infoRows={[["Plan", summary.ShiftPlan], ["Achieved", summary.TotalAchieved], ["Remaining", summary.Remaining]]}
+
+      {/* ── Hero KPI Strip ── */}
+      <div className="grid grid-cols-4 gap-3 px-5 py-3 bg-slate-50 shrink-0">
+        <StatCard label="Shift Plan" value={summary.ShiftPlan} accentHex="#7c3aed" />
+        <StatCard label="Total Achieved" value={summary.TotalAchieved} accentHex="#15803d" />
+        <StatCard label="Remaining" value={summary.Remaining} accentHex="#ef4444" />
+        <StatCard
+          label="Time Consumed"
+          value={summary.ConsumedTimePct != null ? `${Number(summary.ConsumedTimePct).toFixed(0)}%` : null}
+          accentHex="#f59e0b"
+          sub="of shift elapsed"
         />
-        <div className="flex-1 flex flex-col px-3 py-2.5 gap-2 min-w-0">
-          <div className="overflow-x-auto">
+      </div>
+
+      <div className="flex flex-1 min-h-0 px-4 py-3 gap-4">
+        {/* ── Chart — dominates ── */}
+        <div className="flex-1 flex flex-col min-w-0 gap-3">
+          {/* Compact table */}
+          <div className="overflow-x-auto shrink-0">
             <table className="min-w-full border-separate border-spacing-0 text-[11px]">
               <thead>
                 <tr>
@@ -114,11 +128,13 @@ const Hourly = ({ apiData = {}, progress, shift, shiftDate }) => {
               </tbody>
             </table>
           </div>
-          <div className="flex-1 bg-white border border-slate-100 rounded-lg px-2 pt-2 pb-1 min-h-[120px] flex flex-col">
-            <div className="flex gap-3.5 justify-center mb-1.5 text-[11px]">
+
+          {/* Large chart */}
+          <div className="flex-1 bg-white border border-slate-100 rounded-xl px-4 pt-3 pb-2 min-h-[200px] flex flex-col shadow-sm">
+            <div className="flex gap-5 justify-center mb-2 text-xs">
               {[["#1e40af", "Target"], ["#d97706", "Actual"], ["#ef4444", "Loss"]].map(([cl, l]) => (
-                <span key={l} className="flex items-center gap-1 text-slate-500">
-                  <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: cl }} />
+                <span key={l} className="flex items-center gap-1.5 text-slate-500 font-semibold">
+                  <span className="w-3 h-3 rounded-sm inline-block" style={{ background: cl }} />
                   {l}
                 </span>
               ))}

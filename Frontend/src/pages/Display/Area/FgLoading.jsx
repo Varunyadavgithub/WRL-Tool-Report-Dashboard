@@ -23,20 +23,43 @@ const FgLoading = ({ apiData = {}, progress, shift, shiftDate, config }) => {
     <div className="flex flex-col w-full h-full bg-slate-50">
       <PageHeader title="Final Area Production Performance" shift={shift} shiftDate={shiftDate} accentHex={ACCENT} />
       <TimerBar progress={progress} accentHex={ACCENT} />
-      <div className="flex flex-1 min-h-0">
-        <GaugePanel value={d.GaugeValue ?? 0} label={label} sublabel="Units / Shift" accentHex={ACCENT} />
-        <div className="flex-1 flex flex-col p-3 min-w-0 gap-2">
-          <div className="text-white font-bold text-[13px] text-center py-1.5 rounded-t-lg" style={{ background: ACCENT }}>
-            {label}
+
+      {/* ── Hero KPI Strip ── */}
+      <div className="grid grid-cols-6 gap-3 px-5 py-3 bg-slate-50 shrink-0">
+        <StatCard label="Loading Till Now" value={d.LoadingTillNow} accentHex="#0f766e" />
+        <StatCard label="Prorated Target" value={d.ProratedTarget} accentHex="#15803d" />
+        <StatCard label="Efficiency" value={d.EfficiencyTillNow != null ? `${d.EfficiencyTillNow}%` : null} accentHex="#f59e0b" />
+        <StatCard label="Performance" value={d.PerformancePct != null ? `${d.PerformancePct}%` : null} accentHex="#7c3aed" />
+        <StatCard label="Loss Units" value={d.LossUnits} accentHex="#ef4444" />
+        <StatCard label="Balance Qty" value={d.BalanceQty} accentHex="#b45309" />
+      </div>
+
+      {/* ── Main body ── */}
+      <div className="flex flex-1 min-h-0 px-4 py-3 gap-4">
+        <div className="w-[42%] shrink-0 flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+          <div className="scale-[1.35] origin-center">
+            <GaugePanel value={d.GaugeValue ?? 0} label={label} sublabel="Units / Shift" accentHex={ACCENT} />
           </div>
-          <MetricTable rows={rows} accentHex={ACCENT} />
+        </div>
+        <div className="flex-1 flex flex-col min-w-0 gap-3">
+          <div
+            className="text-white font-bold text-sm text-center py-2 rounded-t-xl tracking-wider uppercase"
+            style={{ background: ACCENT }}
+          >
+            {label} — Shift Metrics
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <MetricTable rows={rows} accentHex={ACCENT} />
+          </div>
         </div>
       </div>
-      <div className="grid grid-cols-5 gap-2 px-3 py-2.5 bg-white border-t border-slate-100 shrink-0">
+
+      {/* ── Monthly footer ── */}
+      <div className="grid grid-cols-5 gap-3 px-5 py-3 bg-white border-t border-slate-200 shrink-0">
         <StatCard label="Monthly Plan" value={d.MonthlyPlanQty} accentHex={ACCENT} />
         <StatCard label="Monthly Achievement" value={d.MonthlyAchieved} accentHex="#15803d" />
         <StatCard label="Remaining Qty" value={d.MonthlyRemaining} accentHex="#b45309" />
-        <StatCard label="Asking Rate" value={d.AskingRate} accentHex="#0f766e" />
+        <StatCard label="Asking Rate" value={d.AskingRate} accentHex="#0f766e" sub="Units / Day" />
         <StatCard label="Remaining Days" value={d.RemainingDays} accentHex="#64748b" />
       </div>
     </div>
