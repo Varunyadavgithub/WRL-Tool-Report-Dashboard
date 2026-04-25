@@ -13,7 +13,6 @@ import {
   Gauge,
   FileText,
 } from "lucide-react";
-import FinalAssembly from "../pages/Dashboard/FinalAssembly";
 
 // Lazy loaded components
 const ProductionOverview = lazy(() => import("../pages/Production/Overview"));
@@ -115,6 +114,8 @@ const ManpowerApproval = lazy(() => import("../pages/Forms/ManpowerApproval"));
 const SecurityManpowerList = lazy(
   () => import("../pages/Forms/SecurityManpowerList"),
 );
+import FinalAssembly from "../pages/Dashboard/FinalAssembly";
+import Dashboardconfig from "../pages/Dashboard/Dashboardconfig";
 
 // Role constants for consistency
 export const ROLES = {
@@ -145,6 +146,12 @@ export const ROUTE_CONFIG = [
         label: "Final Assembly",
         icon: Wrench,
         component: FinalAssembly,
+      },
+      {
+        path: "/display/dashboard-manger",
+        label: "Dashboard Manager",
+        icon: Wrench,
+        component: Dashboardconfig,
       },
     ],
   },
