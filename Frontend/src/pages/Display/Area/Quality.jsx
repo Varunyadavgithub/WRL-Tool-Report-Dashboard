@@ -1,7 +1,13 @@
 import { useMemo } from "react";
-import { Chart as ChartJS, ArcElement, DoughnutController, Tooltip, Legend } from "chart.js";
+import {
+  Chart as ChartJS,
+  ArcElement,
+  DoughnutController,
+  Tooltip,
+  Legend,
+} from "chart.js";
 import { Chart } from "react-chartjs-2";
-import { PageHeader, TimerBar, StatCard, DonutCanvas } from "../Monitoring";
+import { PageHeader, TimerBar, StatCard } from "../Monitoring";
 
 ChartJS.register(ArcElement, DoughnutController, Tooltip, Legend);
 
@@ -13,14 +19,16 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
   const pieData = useMemo(
     () => ({
       labels: ["OK Units", "Defect Units"],
-      datasets: [{
-        type: "doughnut",
-        data: [qs.OkUnit || 0, qs.DefectUnit || 0],
-        backgroundColor: ["rgba(21,128,61,0.85)", "rgba(220,38,38,0.85)"],
-        borderColor: ["#15803d", "#b91c1c"],
-        borderWidth: 3,
-        hoverOffset: 0,
-      }],
+      datasets: [
+        {
+          type: "doughnut",
+          data: [qs.OkUnit || 0, qs.DefectUnit || 0],
+          backgroundColor: ["rgba(21,128,61,0.85)", "rgba(220,38,38,0.85)"],
+          borderColor: ["#15803d", "#b91c1c"],
+          borderWidth: 3,
+          hoverOffset: 0,
+        },
+      ],
     }),
     [qs],
   );
@@ -33,7 +41,9 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
         legend: { display: false },
         tooltip: {
           callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.raw}` },
-          titleFont: { size: 14 }, bodyFont: { size: 13 }, padding: 12,
+          titleFont: { size: 16 },
+          bodyFont: { size: 15 },
+          padding: 14,
         },
       },
       animation: { duration: 400 },
@@ -43,50 +53,84 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
 
   return (
     <div className="flex flex-col w-full h-full bg-slate-50">
-      <PageHeader title="Quality Performance" shift={shift} shiftDate={shiftDate} accentHex={ACCENT} />
-      <TimerBar progress={progress} accentHex={ACCENT} />
+      {/* ── STICKY HEADER ── */}
+      <div className="sticky top-0 z-20 bg-slate-50 shrink-0">
+        <PageHeader
+          title="Quality Performance"
+          shift={shift}
+          shiftDate={shiftDate}
+          accentHex={ACCENT}
+        />
+        <TimerBar progress={progress} accentHex={ACCENT} />
 
-      {/* ── Hero KPI Strip ── */}
-      <div className="grid grid-cols-7 gap-3 px-5 py-3 bg-slate-50 shrink-0">
-        <StatCard label="Plan" value={qs.Plan} accentHex="#7c3aed" />
-        <StatCard label="Achieved" value={qs.TotalAchieved} accentHex="#15803d" />
-        <StatCard label="OK Units" value={qs.OkUnit} accentHex="#059669" />
-        <StatCard label="Defects" value={qs.DefectUnit} accentHex="#ef4444" />
-        <StatCard label="Rework Done" value={qs.ReworkDone} accentHex="#f59e0b" />
-        <StatCard label="OK %" value={qs.OkPct != null ? `${qs.OkPct}%` : null} accentHex="#0f766e" sub="First pass yield" />
-        <StatCard label="Defect %" value={qs.DefectPct != null ? `${qs.DefectPct}%` : null} accentHex="#dc2626" />
+        {/* Hero KPI Strip */}
+        <div className="grid grid-cols-7 gap-3 px-5 py-3 bg-slate-50">
+          <StatCard label="Plan" value={qs.Plan} accentHex="#7c3aed" />
+          <StatCard
+            label="Achieved"
+            value={qs.TotalAchieved}
+            accentHex="#15803d"
+          />
+          <StatCard label="OK Units" value={qs.OkUnit} accentHex="#059669" />
+          <StatCard label="Defects" value={qs.DefectUnit} accentHex="#ef4444" />
+          <StatCard
+            label="Rework Done"
+            value={qs.ReworkDone}
+            accentHex="#f59e0b"
+          />
+          <StatCard
+            label="OK %"
+            value={qs.OkPct != null ? `${qs.OkPct}%` : null}
+            accentHex="#0f766e"
+            sub="First pass yield"
+          />
+          <StatCard
+            label="Defect %"
+            value={qs.DefectPct != null ? `${qs.DefectPct}%` : null}
+            accentHex="#dc2626"
+          />
+        </div>
       </div>
 
-      {/* ── Main body ── */}
+      {/* ── Main body — 50% Doughnut + 50% Table ── */}
       <div className="flex flex-1 min-h-0 px-4 py-3 gap-4">
-        {/* Large doughnut */}
-        <div className="w-[35%] shrink-0 flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-100 shadow-sm p-6 gap-4">
-          <p className="text-sm font-bold text-slate-700 uppercase tracking-wider">Quality Overview</p>
+        {/* LEFT 50% — Large doughnut */}
+        <div className="w-1/2 shrink-0 flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-100 shadow-sm p-6 gap-5">
+          <p className="text-base font-bold text-slate-700 uppercase tracking-wider">
+            Quality Overview
+          </p>
           <div className="relative">
             <Chart
               key={`q-${qs.OkUnit}-${qs.DefectUnit}`}
-              type="doughnut" data={pieData} options={pieOptions}
-              width={280} height={280}
+              type="doughnut"
+              data={pieData}
+              options={pieOptions}
+              width={300}
+              height={300}
             />
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-              <div className="text-[40px] font-black text-slate-900 leading-none">
+              <div className="text-[48px] font-black text-slate-900 leading-none">
                 {qs.TotalAchieved ?? 0}
               </div>
-              <div className="text-xs text-slate-400 mt-1 font-semibold">Total</div>
+              <div className="text-sm text-slate-400 mt-1 font-semibold">
+                Total
+              </div>
             </div>
           </div>
-          <div className="flex gap-6 text-sm font-bold">
+          <div className="flex gap-8 text-base font-bold">
             <span className="flex items-center gap-2 text-green-700">
-              <span className="w-4 h-4 bg-green-700 rounded inline-block" /> OK: {qs.OkUnit ?? 0}
+              <span className="w-5 h-5 bg-green-700 rounded inline-block" /> OK:{" "}
+              {qs.OkUnit ?? 0}
             </span>
             <span className="flex items-center gap-2 text-red-500">
-              <span className="w-4 h-4 bg-red-500 rounded inline-block" /> Defect: {qs.DefectUnit ?? 0}
+              <span className="w-5 h-5 bg-red-500 rounded inline-block" />{" "}
+              Defect: {qs.DefectUnit ?? 0}
             </span>
           </div>
         </div>
 
-        {/* Defects table */}
-        <div className="flex-1 flex flex-col min-w-0 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        {/* RIGHT 50% — Defects table */}
+        <div className="w-1/2 flex flex-col min-w-0 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           <div
             className="text-white font-bold text-sm text-center py-2.5 tracking-wider uppercase shrink-0"
             style={{ background: ACCENT }}
@@ -100,7 +144,7 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
                   {["Sr.", "Defect Description", "Count"].map((h) => (
                     <th
                       key={h}
-                      className="bg-emerald-50 px-4 py-3 border-b border-slate-200 text-left font-bold text-xs uppercase tracking-wider"
+                      className="bg-emerald-50 px-4 py-3 border-b border-slate-200 text-left font-bold text-sm uppercase tracking-wider"
                       style={{ color: ACCENT }}
                     >
                       {h}
@@ -111,15 +155,18 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
               <tbody>
                 {defects.length > 0 ? (
                   defects.map((df, i) => (
-                    <tr key={i} className={`transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`}>
-                      <td className="px-4 py-3 border-b border-slate-100 text-center text-slate-400 font-mono w-16">
+                    <tr
+                      key={i}
+                      className={`transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`}
+                    >
+                      <td className="px-4 py-3 border-b border-slate-100 text-center text-slate-400 font-mono text-base w-16">
                         {df.SrNo}
                       </td>
-                      <td className="px-4 py-3 border-b border-slate-100 text-slate-700 font-medium">
+                      <td className="px-4 py-3 border-b border-slate-100 text-slate-700 font-semibold text-base">
                         {df.DefectName}
                       </td>
-                      <td className="px-4 py-3 border-b border-slate-100 text-center w-24">
-                        <span className="inline-block bg-red-50 text-red-600 font-black text-lg px-3 py-0.5 rounded-lg border border-red-200">
+                      <td className="px-4 py-3 border-b border-slate-100 text-center w-28">
+                        <span className="inline-block bg-red-50 text-red-600 font-black text-xl px-4 py-1 rounded-lg border border-red-200">
                           {df.DefectCount}
                         </span>
                       </td>
@@ -127,7 +174,10 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={3} className="py-12 text-center text-slate-400 text-base">
+                    <td
+                      colSpan={3}
+                      className="py-16 text-center text-slate-400 text-lg"
+                    >
                       No defects recorded this shift ✓
                     </td>
                   </tr>

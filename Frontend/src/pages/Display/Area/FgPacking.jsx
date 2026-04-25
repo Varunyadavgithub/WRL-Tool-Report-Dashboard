@@ -1,4 +1,10 @@
-import { PageHeader, TimerBar, GaugePanel, MetricTable, StatCard } from "../Monitoring";
+import {
+  PageHeader,
+  TimerBar,
+  GaugePanel,
+  MetricTable,
+  StatCard,
+} from "../Monitoring";
 
 const ACCENT = "#1e40af";
 
@@ -7,51 +13,121 @@ const FgPacking = ({ apiData = {}, progress, shift, shiftDate, config }) => {
   const label = config?.stationName1 || "FG PACKING";
 
   const rows = [
-    { label: "Working Time", unit: "Min", target: 570, actual: d.WorkingTimeMin },
-    { label: "Takt Time", unit: "Sec", target: d.TactTimeSec, actual: d.TactTimeSec },
-    { label: "Shift Output Target", unit: "No's", target: d.ShiftOutputTarget, actual: d.ShiftOutputTarget },
-    { label: "Packing Till Now", unit: "No's", target: d.ProratedTarget, actual: d.PackingTillNow },
+    {
+      label: "Working Time",
+      unit: "Min",
+      target: 570,
+      actual: d.WorkingTimeMin,
+    },
+    {
+      label: "Takt Time",
+      unit: "Sec",
+      target: d.TactTimeSec,
+      actual: d.TactTimeSec,
+    },
+    {
+      label: "Shift Output Target",
+      unit: "No's",
+      target: d.ShiftOutputTarget,
+      actual: d.ShiftOutputTarget,
+    },
+    {
+      label: "Packing Till Now",
+      unit: "No's",
+      target: d.ProratedTarget,
+      actual: d.PackingTillNow,
+    },
     { label: "Loss Units", unit: "No's", target: null, actual: d.LossUnits },
     { label: "Loss Time", unit: "Min", target: null, actual: d.LossTime },
-    { label: "UPH Target", unit: "No's", target: d.UPHTarget, actual: d.ActualUPH },
-    { label: "Efficiency Till Now", unit: "%", target: null, actual: d.EfficiencyTillNow, highlight: "yellow" },
+    {
+      label: "UPH Target",
+      unit: "No's",
+      target: d.UPHTarget,
+      actual: d.ActualUPH,
+    },
+    {
+      label: "Efficiency Till Now",
+      unit: "%",
+      target: null,
+      actual: d.EfficiencyTillNow,
+      highlight: "yellow",
+    },
     { label: "Performance", unit: "%", target: null, actual: d.PerformancePct },
     { label: "Balance Qty", unit: "No's", target: null, actual: d.BalanceQty },
   ];
 
   return (
     <div className="flex flex-col w-full h-full bg-slate-50">
-      <PageHeader title="Final Area Production Performance" shift={shift} shiftDate={shiftDate} accentHex={ACCENT} />
-      <TimerBar progress={progress} accentHex={ACCENT} />
+      {/* ── STICKY HEADER ── */}
+      <div className="sticky top-0 z-20 bg-slate-50 shrink-0">
+        <PageHeader
+          title="Final Area Production Performance"
+          shift={shift}
+          shiftDate={shiftDate}
+          accentHex={ACCENT}
+        />
+        <TimerBar progress={progress} accentHex={ACCENT} />
 
-      {/* ── Hero KPI Strip ── */}
-      <div className="grid grid-cols-6 gap-3 px-5 py-3 bg-slate-50 shrink-0">
-        <StatCard label="Packing Till Now" value={d.PackingTillNow} accentHex="#1e40af" />
-        <StatCard label="Prorated Target" value={d.ProratedTarget} accentHex="#15803d" />
-        <StatCard label="Efficiency" value={d.EfficiencyTillNow != null ? `${d.EfficiencyTillNow}%` : null} accentHex="#f59e0b" />
-        <StatCard label="Performance" value={d.PerformancePct != null ? `${d.PerformancePct}%` : null} accentHex="#7c3aed" />
-        <StatCard label="Loss Units" value={d.LossUnits} accentHex="#ef4444" />
-        <StatCard label="Balance Qty" value={d.BalanceQty} accentHex="#b45309" />
+        {/* Hero KPI Strip */}
+        <div className="grid grid-cols-6 gap-3 px-5 py-3 bg-slate-50">
+          <StatCard
+            label="Packing Till Now"
+            value={d.PackingTillNow}
+            accentHex="#1e40af"
+          />
+          <StatCard
+            label="Prorated Target"
+            value={d.ProratedTarget}
+            accentHex="#15803d"
+          />
+          <StatCard
+            label="Efficiency"
+            value={
+              d.EfficiencyTillNow != null ? `${d.EfficiencyTillNow}%` : null
+            }
+            accentHex="#f59e0b"
+          />
+          <StatCard
+            label="Performance"
+            value={d.PerformancePct != null ? `${d.PerformancePct}%` : null}
+            accentHex="#7c3aed"
+          />
+          <StatCard
+            label="Loss Units"
+            value={d.LossUnits}
+            accentHex="#ef4444"
+          />
+          <StatCard
+            label="Balance Qty"
+            value={d.BalanceQty}
+            accentHex="#b45309"
+          />
+        </div>
       </div>
 
-      {/* ── Main body — Gauge (large) + Table (compact) ── */}
+      {/* ── Main body — 50% Gauge + 50% Table ── */}
       <div className="flex flex-1 min-h-0 px-4 py-3 gap-4">
-        {/* Gauge — takes ~40% width, centered, large */}
-        <div className="w-[42%] shrink-0 flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+        {/* LEFT 50% — Gauge */}
+        <div className="w-1/2 shrink-0 flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
           <div className="scale-[1.35] origin-center">
-            <GaugePanel value={d.GaugeValue ?? 0} label={label} sublabel="Units / Shift" accentHex={ACCENT} />
+            <GaugePanel
+              value={d.GaugeValue ?? 0}
+              label={label}
+              sublabel="Units / Shift"
+              accentHex={ACCENT}
+            />
           </div>
         </div>
 
-        {/* Table — compact, right side */}
-        <div className="flex-1 flex flex-col min-w-0 gap-3">
+        {/* RIGHT 50% — Table */}
+        <div className="w-1/2 flex flex-col min-w-0 gap-3">
           <div
             className="text-white font-bold text-sm text-center py-2 rounded-t-xl tracking-wider uppercase"
             style={{ background: ACCENT }}
           >
             {label} — Shift Metrics
           </div>
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-auto">
             <MetricTable rows={rows} accentHex={ACCENT} />
           </div>
         </div>
@@ -59,11 +135,32 @@ const FgPacking = ({ apiData = {}, progress, shift, shiftDate, config }) => {
 
       {/* ── Monthly footer ── */}
       <div className="grid grid-cols-5 gap-3 px-5 py-3 bg-white border-t border-slate-200 shrink-0">
-        <StatCard label="Monthly Plan" value={d.MonthlyPlanQty} accentHex="#1e40af" />
-        <StatCard label="Monthly Achievement" value={d.MonthlyAchieved} accentHex="#15803d" />
-        <StatCard label="Remaining Qty" value={d.MonthlyRemaining} accentHex="#b45309" />
-        <StatCard label="Asking Rate" value={d.AskingRate} accentHex="#0f766e" sub="Units / Day" />
-        <StatCard label="Remaining Days" value={d.RemainingDays} accentHex="#64748b" />
+        <StatCard
+          label="Monthly Plan"
+          value={d.MonthlyPlanQty}
+          accentHex="#1e40af"
+        />
+        <StatCard
+          label="Monthly Achievement"
+          value={d.MonthlyAchieved}
+          accentHex="#15803d"
+        />
+        <StatCard
+          label="Remaining Qty"
+          value={d.MonthlyRemaining}
+          accentHex="#b45309"
+        />
+        <StatCard
+          label="Asking Rate"
+          value={d.AskingRate}
+          accentHex="#0f766e"
+          sub="Units / Day"
+        />
+        <StatCard
+          label="Remaining Days"
+          value={d.RemainingDays}
+          accentHex="#64748b"
+        />
       </div>
     </div>
   );
