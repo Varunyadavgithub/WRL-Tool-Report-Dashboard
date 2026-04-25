@@ -3,23 +3,25 @@ import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 import {
-  FiRefreshCw,
-  FiPlay,
-  FiPause,
-  FiX,
-  FiClock,
-  FiCalendar,
-  FiAlertTriangle,
-  FiCheckCircle,
-  FiPackage,
-  FiTruck,
-  FiBarChart2,
-  FiActivity,
-  FiSettings,
-  FiTrendingUp,
-  FiArrowLeft,
-  FiArrowRight,
-} from "react-icons/fi";
+  Loader2,
+  RefreshCw,
+  Play,
+  Pause,
+  X,
+  Clock,
+  Calendar,
+  AlertTriangle,
+  CheckCircle,
+  Package,
+  Truck,
+  BarChart2,
+  Activity,
+  Settings,
+  TrendingUp,
+  ArrowLeft,
+  ArrowRight,
+  PackageOpen,
+} from "lucide-react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -55,6 +57,7 @@ ChartJS.register(
   Filler,
 );
 
+/* ── Constants ── */
 const PAGE_DURATION_MS = 30000;
 const TOTAL_PAGES = 5;
 
@@ -62,67 +65,39 @@ const PAGES_META = [
   {
     key: "fgPacking",
     label: "FG Packing",
-    Icon: FiPackage,
-    accent: "#1e40af",
-    light: "#dbeafe",
+    Icon: Package,
+    accent: "blue",
+    accentHex: "#1e40af",
   },
   {
     key: "fgLoading",
     label: "FG Loading",
-    Icon: FiTruck,
-    accent: "#0f766e",
-    light: "#ccfbf1",
+    Icon: Truck,
+    accent: "teal",
+    accentHex: "#0f766e",
   },
   {
     key: "hourly",
     label: "Hourly",
-    Icon: FiBarChart2,
-    accent: "#7c3aed",
-    light: "#ede9fe",
+    Icon: BarChart2,
+    accent: "violet",
+    accentHex: "#7c3aed",
   },
   {
     key: "quality",
     label: "Quality",
-    Icon: FiCheckCircle,
-    accent: "#15803d",
-    light: "#dcfce7",
+    Icon: CheckCircle,
+    accent: "green",
+    accentHex: "#15803d",
   },
   {
     key: "loss",
     label: "Loss",
-    Icon: FiAlertTriangle,
-    accent: "#b45309",
-    light: "#fef3c7",
+    Icon: AlertTriangle,
+    accent: "amber",
+    accentHex: "#b45309",
   },
 ];
-
-const pad = (n) => String(n).padStart(2, "0");
-const todayISO = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
-
-// ─── Build query params from saved config ─────────────────────────────────────
-// Maps form/config keys → the exact query param names the controller expects:
-//
-//  getFGPackingData    : stationCode1, lineCode, sectionName, lineTaktTime1
-//  getFGLoadingData    : stationCode1, stationCode2, sectionName, lineTaktTime2
-//  getHourlyProduction : stationCode1, lineCode
-//  getQualityData      : stationCode1
-//  getLossData         : stationCode1, sectionName
-//
-// All endpoints also require: shiftDate, shift (added per-call below)
-const buildParams = (cfg, shiftDate, shift) => ({
-  shiftDate,
-  shift,
-  stationCode1: cfg?.stationCode1 || "1220010",
-  stationCode2: cfg?.stationCode2 || "1220005",
-  lineCode: cfg?.lineCode || "12501",
-  sectionName: cfg?.sectionName || "FINAL ASSEMBLY",
-  lineTaktTime1: cfg?.lineTaktTime1 || "40",
-  lineTaktTime2: cfg?.lineTaktTime2 || "40",
-  // stationName1/2 are display-only on the frontend; not sent to API
-});
 
 const GAUGE_COLORS = [
   "#dc2626",
@@ -141,7 +116,32 @@ const GAUGE_COLORS = [
   "#166534",
 ];
 
-// ─── Gauge Canvas ─────────────────────────────────────────────────────────────
+/* ── Helpers ── */
+const pad = (n) => String(n).padStart(2, "0");
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+const buildParams = (cfg, shiftDate, shift) => ({
+  shiftDate,
+  shift,
+  stationCode1: cfg?.stationCode1 || "1220010",
+  stationCode2: cfg?.stationCode2 || "1220005",
+  lineCode: cfg?.lineCode || "12501",
+  sectionName: cfg?.sectionName || "FINAL ASSEMBLY",
+  lineTaktTime1: cfg?.lineTaktTime1 || "40",
+  lineTaktTime2: cfg?.lineTaktTime2 || "40",
+});
+
+/* ── Spinner ── */
+const Spinner = ({ cls = "w-4 h-4" }) => (
+  <Loader2 className={`animate-spin ${cls}`} />
+);
+
+/* ════════════════════════════════════════════
+   CANVAS: Gauge
+════════════════════════════════════════════ */
 const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
   const ref = useRef(null);
   useEffect(() => {
@@ -153,7 +153,6 @@ const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
     const cx = W / 2,
       cy = H - 16;
     const R = Math.min(cx - 12, cy - 8);
-
     ctx.clearRect(0, 0, W, H);
 
     const seg = Math.PI / GAUGE_COLORS.length;
@@ -228,16 +227,13 @@ const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
   }, [value, label, sublabel]);
 
   return (
-    <canvas
-      ref={ref}
-      width={280}
-      height={160}
-      style={{ display: "block", maxWidth: "100%" }}
-    />
+    <canvas ref={ref} width={280} height={160} className="block max-w-full" />
   );
 };
 
-// ─── Donut Canvas ─────────────────────────────────────────────────────────────
+/* ════════════════════════════════════════════
+   CANVAS: Donut
+════════════════════════════════════════════ */
 const DonutCanvas = ({
   pct = 0,
   size = 120,
@@ -276,162 +272,93 @@ const DonutCanvas = ({
   return <canvas ref={ref} width={size} height={size} />;
 };
 
-// ─── Live Clock ───────────────────────────────────────────────────────────────
-const LiveClock = ({ shift, shiftDate, accent }) => {
+/* ════════════════════════════════════════════
+   Live Clock
+════════════════════════════════════════════ */
+const LiveClock = ({ shift, shiftDate, accentHex }) => {
   const [tick, setTick] = useState(new Date());
   useEffect(() => {
     const id = setInterval(() => setTick(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
   const timeStr = `${pad(tick.getHours())}:${pad(tick.getMinutes())}:${pad(tick.getSeconds())}`;
+
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 20,
-        padding: "6px 16px",
-        background: "#f8fafc",
-        borderBottom: "1px solid #f1f5f9",
-        fontSize: 12,
-        flexShrink: 0,
-      }}
-    >
-      <span
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 5,
-          color: "#64748b",
-        }}
-      >
-        <FiActivity size={11} color={accent} />
+    <div className="flex items-center gap-5 px-4 py-1.5 bg-slate-50 border-b border-slate-100 text-xs shrink-0">
+      <span className="flex items-center gap-1.5 text-slate-500">
+        <Activity className="w-3 h-3" style={{ color: accentHex }} />
         Shift{" "}
-        <strong style={{ color: "#0f172a", marginLeft: 2 }}>
+        <strong className="text-slate-900 ml-0.5">
           {shift ? `SHIFT ${shift}` : "—"}
         </strong>
       </span>
-      <span
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 5,
-          color: "#64748b",
-        }}
-      >
-        <FiCalendar size={11} color={accent} />
-        <strong style={{ color: "#0f172a" }}>{shiftDate || "—"}</strong>
+      <span className="flex items-center gap-1.5 text-slate-500">
+        <Calendar className="w-3 h-3" style={{ color: accentHex }} />
+        <strong className="text-slate-900">{shiftDate || "—"}</strong>
       </span>
-      <span
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 5,
-          color: "#64748b",
-        }}
-      >
-        <FiClock size={11} color={accent} />
-        <strong style={{ color: "#0f172a", fontFamily: "monospace" }}>
-          {timeStr}
-        </strong>
+      <span className="flex items-center gap-1.5 text-slate-500">
+        <Clock className="w-3 h-3" style={{ color: accentHex }} />
+        <strong className="text-slate-900 font-mono">{timeStr}</strong>
       </span>
-      <span style={{ marginLeft: "auto", color: "#94a3b8", fontSize: 11 }}>
+      <span className="ml-auto text-slate-400 text-[11px]">
         {shift ? (shift === "A" ? "08:00 – 20:00" : "20:00 – 08:00") : "—"}
       </span>
     </div>
   );
 };
 
-// ─── Page Header ──────────────────────────────────────────────────────────────
-const PageHeader = ({ title, shift, shiftDate, accent }) => (
-  <div style={{ flexShrink: 0 }}>
+/* ════════════════════════════════════════════
+   Page Header
+════════════════════════════════════════════ */
+const PageHeader = ({ title, shift, shiftDate, accentHex }) => (
+  <div className="shrink-0">
     <div
-      style={{
-        background: accent,
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: "9px 16px",
-      }}
+      className="flex items-center gap-3 px-4 py-2.5"
+      style={{ background: accentHex }}
     >
-      <div
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: "50%",
-          background: "rgba(255,255,255,0.25)",
-          border: "2px solid rgba(255,255,255,0.5)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <span style={{ color: "#fff", fontWeight: 900, fontSize: 16 }}>W</span>
+      <div className="w-9 h-9 rounded-full bg-white/25 border-2 border-white/50 flex items-center justify-center">
+        <span className="text-white font-black text-base">W</span>
       </div>
-      <span
-        style={{
-          flex: 1,
-          textAlign: "center",
-          fontWeight: 800,
-          fontSize: 15,
-          color: "#fff",
-          letterSpacing: 1.5,
-          textTransform: "uppercase",
-          fontFamily: "'Courier New', monospace",
-        }}
-      >
+      <span className="flex-1 text-center font-extrabold text-[15px] text-white tracking-widest uppercase font-mono">
         {title}
       </span>
     </div>
-    <LiveClock shift={shift} shiftDate={shiftDate} accent={accent} />
+    <LiveClock shift={shift} shiftDate={shiftDate} accentHex={accentHex} />
   </div>
 );
 
-// ─── Timer Bar ────────────────────────────────────────────────────────────────
-const TimerBar = ({ progress, accent }) => (
-  <div style={{ height: 3, background: "#f1f5f9", flexShrink: 0 }}>
+/* ════════════════════════════════════════════
+   Timer Bar
+════════════════════════════════════════════ */
+const TimerBar = ({ progress, accentHex }) => (
+  <div className="h-[3px] bg-slate-100 shrink-0">
     <div
-      style={{
-        height: "100%",
-        width: `${progress}%`,
-        background: accent,
-        transition: "none",
-      }}
+      className="h-full"
+      style={{ width: `${progress}%`, background: accentHex }}
     />
   </div>
 );
 
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-const StatCard = ({ label, value, accent = "#1e40af" }) => (
+/* ════════════════════════════════════════════
+   Stat Card
+════════════════════════════════════════════ */
+const StatCard = ({ label, value, accentHex = "#1e40af" }) => (
   <div
-    style={{
-      background: "#fff",
-      borderRadius: 10,
-      padding: "10px 12px",
-      textAlign: "center",
-      borderTop: `3px solid ${accent}`,
-      border: "1px solid #f1f5f9",
-    }}
+    className="bg-white rounded-lg px-3 py-2.5 text-center border border-slate-100"
+    style={{ borderTopWidth: 3, borderTopColor: accentHex }}
   >
-    <div
-      style={{
-        fontSize: 10,
-        color: "#94a3b8",
-        lineHeight: 1.4,
-        marginBottom: 3,
-      }}
-    >
-      {label}
-    </div>
-    <div style={{ fontSize: 18, fontWeight: 800, color: accent }}>
+    <div className="text-[10px] text-slate-400 leading-tight mb-1">{label}</div>
+    <div className="text-lg font-extrabold" style={{ color: accentHex }}>
       {typeof value === "number" ? value.toLocaleString() : (value ?? "—")}
     </div>
   </div>
 );
 
-// ─── Metric Table ─────────────────────────────────────────────────────────────
-const MetricTable = ({ rows, accent }) => (
-  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+/* ════════════════════════════════════════════
+   Metric Table
+════════════════════════════════════════════ */
+const MetricTable = ({ rows, accentHex }) => (
+  <table className="w-full border-separate border-spacing-0 text-xs">
     <thead>
       <tr>
         {[
@@ -442,15 +369,12 @@ const MetricTable = ({ rows, accent }) => (
         ].map(([w, lbl, align]) => (
           <th
             key={lbl}
+            className="px-2.5 py-2 text-white font-bold border border-white/20"
             style={{
-              padding: "8px 10px",
-              background: accent,
-              color: "#fff",
-              fontSize: 11,
-              fontWeight: 700,
-              border: "1px solid rgba(255,255,255,0.2)",
+              background: accentHex,
               textAlign: align,
               width: w,
+              fontSize: 11,
             }}
           >
             {lbl}
@@ -467,50 +391,22 @@ const MetricTable = ({ rows, accent }) => (
               ? "#15803d"
               : "#0f172a";
         return (
-          <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#f8fafc" }}>
-            <td
-              style={{
-                padding: "7px 10px",
-                border: "1px solid #f1f5f9",
-                color: "#334155",
-                fontWeight: 600,
-                fontSize: 12,
-              }}
-            >
+          <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}>
+            <td className="px-2.5 py-1.5 border border-slate-100 text-slate-700 font-semibold">
               {r.label}
             </td>
-            <td
-              style={{
-                padding: "7px 10px",
-                border: "1px solid #f1f5f9",
-                color: "#94a3b8",
-                fontSize: 11,
-                textAlign: "center",
-              }}
-            >
+            <td className="px-2.5 py-1.5 border border-slate-100 text-slate-400 text-center text-[11px]">
               {r.unit}
             </td>
             <td
-              style={{
-                padding: "7px 10px",
-                border: "1px solid #f1f5f9",
-                color: accent,
-                fontWeight: 700,
-                fontSize: 12,
-                textAlign: "center",
-              }}
+              className="px-2.5 py-1.5 border border-slate-100 font-bold text-center"
+              style={{ color: accentHex }}
             >
               {r.target ?? "—"}
             </td>
             <td
-              style={{
-                padding: "7px 10px",
-                border: "1px solid #f1f5f9",
-                fontSize: 12,
-                textAlign: "center",
-                fontWeight: 800,
-                color: actualColor,
-              }}
+              className="px-2.5 py-1.5 border border-slate-100 font-extrabold text-center"
+              style={{ color: actualColor }}
             >
               {r.actual ?? "—"}
             </td>
@@ -521,121 +417,54 @@ const MetricTable = ({ rows, accent }) => (
   </table>
 );
 
-// ─── Gauge Panel ──────────────────────────────────────────────────────────────
-const GaugePanel = ({ value, label, sublabel, accent }) => (
-  <div
-    style={{
-      width: 280,
-      flexShrink: 0,
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      background: "#fff",
-      borderRight: "1px solid #f1f5f9",
-      padding: "16px 12px",
-    }}
-  >
+/* ════════════════════════════════════════════
+   Gauge Panel
+════════════════════════════════════════════ */
+const GaugePanel = ({ value, label, sublabel, accentHex }) => (
+  <div className="w-[280px] shrink-0 flex flex-col items-center justify-center bg-white border-r border-slate-100 px-3 py-4">
     <GaugeCanvas value={value} label={label} sublabel={sublabel} />
     <div
-      style={{
-        marginTop: 12,
-        padding: "6px 28px",
-        background: accent,
-        borderRadius: 8,
-        color: "#fff",
-        fontWeight: 800,
-        fontSize: 24,
-        fontFamily: "'Courier New', monospace",
-        letterSpacing: 4,
-        boxShadow: `0 4px 14px ${accent}44`,
-      }}
+      className="mt-3 px-7 py-1.5 rounded-lg text-white font-extrabold text-2xl font-mono tracking-widest"
+      style={{ background: accentHex, boxShadow: `0 4px 14px ${accentHex}44` }}
     >
       {String(value ?? 0).padStart(3, "0")}.00
     </div>
   </div>
 );
 
-// ─── Sidebar Panel (Donut + info rows) ────────────────────────────────────────
+/* ════════════════════════════════════════════
+   Sidebar Panel (Donut + info rows)
+════════════════════════════════════════════ */
 const SidebarPanel = ({
   pct = 0,
   fillColor,
   infoRows = [],
   label = "Consumed Time",
 }) => (
-  <div
-    style={{
-      width: 190,
-      flexShrink: 0,
-      display: "flex",
-      flexDirection: "column",
-      gap: 12,
-      padding: "14px 12px",
-      background: "#f8fafc",
-      borderRight: "1px solid #f1f5f9",
-      justifyContent: "center",
-    }}
-  >
+  <div className="w-[190px] shrink-0 flex flex-col gap-3 px-3 py-3.5 bg-slate-50 border-r border-slate-100 justify-center">
     <div>
-      <div
-        style={{
-          fontSize: 10,
-          fontWeight: 700,
-          color: "#94a3b8",
-          letterSpacing: 1,
-          textTransform: "uppercase",
-          marginBottom: 8,
-          textAlign: "center",
-        }}
-      >
+      <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-2 text-center">
         {label}
-      </div>
-      <div
-        style={{
-          position: "relative",
-          display: "flex",
-          justifyContent: "center",
-        }}
-      >
+      </p>
+      <div className="relative flex justify-center">
         <DonutCanvas pct={pct} size={130} fillColor={fillColor} />
-        <div
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%,-50%)",
-            textAlign: "center",
-          }}
-        >
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+          <div className="text-[22px] font-extrabold text-slate-900">
             {Number(pct || 0).toFixed(0)}%
           </div>
         </div>
       </div>
     </div>
-    <div
-      style={{
-        background: "#fff",
-        border: "1px solid #f1f5f9",
-        borderRadius: 10,
-        padding: "10px 12px",
-      }}
-    >
+    <div className="bg-white border border-slate-100 rounded-lg px-3 py-2.5">
       {infoRows.map(([k, v], i) => (
         <div
           key={i}
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            padding: "4px 0",
-            borderBottom:
-              i < infoRows.length - 1 ? "1px solid #f8fafc" : "none",
-            fontSize: 11,
-            color: "#94a3b8",
-          }}
+          className={`flex justify-between py-1 text-[11px] text-slate-400 ${
+            i < infoRows.length - 1 ? "border-b border-slate-50" : ""
+          }`}
         >
           <span>{k}</span>
-          <strong style={{ color: "#0f172a" }}>
+          <strong className="text-slate-900">
             {v != null ? (typeof v === "number" ? v.toLocaleString() : v) : "—"}
           </strong>
         </div>
@@ -644,104 +473,56 @@ const SidebarPanel = ({
   </div>
 );
 
-// ─── Nav Dots ─────────────────────────────────────────────────────────────────
+/* ════════════════════════════════════════════
+   Nav Dots
+════════════════════════════════════════════ */
 const NavDots = ({ currentPage, onGoTo, onPrev, onNext }) => (
-  <div
-    style={{
-      flexShrink: 0,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 6,
-      padding: "8px 16px",
-      background: "#fff",
-      borderTop: "1px solid #f1f5f9",
-      position: "relative",
-    }}
-  >
+  <div className="shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 bg-white border-t border-slate-100 relative">
     <button
       onClick={onPrev}
-      style={{
-        position: "absolute",
-        left: 12,
-        background: "none",
-        border: "none",
-        cursor: "pointer",
-        color: "#94a3b8",
-        display: "flex",
-        padding: 4,
-      }}
+      className="absolute left-3 p-1 text-slate-400 hover:text-slate-600 transition-colors"
     >
-      <FiArrowLeft size={14} />
+      <ArrowLeft className="w-3.5 h-3.5" />
     </button>
-    {PAGES_META.map(({ label, Icon, accent, light }, i) => (
-      <button
-        key={i}
-        onClick={() => onGoTo(i)}
-        style={{
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 3,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-            padding: "4px 12px",
-            borderRadius: 20,
-            background: i === currentPage ? light : "transparent",
-            border:
-              i === currentPage
-                ? `1.5px solid ${accent}`
-                : "1.5px solid transparent",
-            transition: "all 0.25s",
-          }}
+    {PAGES_META.map(({ label, Icon, accentHex }, i) => {
+      const active = i === currentPage;
+      return (
+        <button
+          key={i}
+          onClick={() => onGoTo(i)}
+          className="flex flex-col items-center gap-0.5"
         >
-          <Icon size={11} color={i === currentPage ? accent : "#cbd5e1"} />
-          {i === currentPage && (
-            <span style={{ fontSize: 10, color: accent, fontWeight: 700 }}>
-              {label}
-            </span>
-          )}
-        </div>
-      </button>
-    ))}
+          <div
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full border-[1.5px] transition-all ${
+              active ? "border-current" : "border-transparent"
+            }`}
+            style={{
+              background: active ? `${accentHex}15` : "transparent",
+              color: active ? accentHex : "#cbd5e1",
+            }}
+          >
+            <Icon className="w-3 h-3" />
+            {active && <span className="text-[10px] font-bold">{label}</span>}
+          </div>
+        </button>
+      );
+    })}
     <button
       onClick={onNext}
-      style={{
-        position: "absolute",
-        right: 12,
-        background: "none",
-        border: "none",
-        cursor: "pointer",
-        color: "#94a3b8",
-        display: "flex",
-        padding: 4,
-      }}
+      className="absolute right-3 p-1 text-slate-400 hover:text-slate-600 transition-colors"
     >
-      <FiArrowRight size={14} />
+      <ArrowRight className="w-3.5 h-3.5" />
     </button>
   </div>
 );
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PAGE 1 — FG PACKING
-//  API: GET /dashboard/fg-packing?shiftDate&shift&stationCode1&lineCode&sectionName&lineTaktTime1
-//  Response keys: WorkingTimeMin, TactTimeSec, ShiftOutputTarget, ProratedTarget,
-//                 PackingTillNow, LossUnits, LossTime, UPHTarget, ActualUPH,
-//                 EfficiencyTillNow, PerformancePct, BalanceQty, GaugeValue,
-//                 MonthlyPlanQty, MonthlyAchieved, MonthlyRemaining, AskingRate, RemainingDays
-// ═══════════════════════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════
+   PAGE 1 — FG PACKING
+════════════════════════════════════════════ */
 const Page1 = ({ apiData = {}, progress, shift, shiftDate, config }) => {
   const d = apiData;
   const label = config?.stationName1 || "FG PACKING";
-  const accent = PAGES_META[0].accent;
+  const { accentHex } = PAGES_META[0];
 
   const rows = [
     {
@@ -788,101 +569,69 @@ const Page1 = ({ apiData = {}, progress, shift, shiftDate, config }) => {
   ];
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        height: "100%",
-        background: "#f8fafc",
-      }}
-    >
+    <div className="flex flex-col w-full h-full bg-slate-50">
       <PageHeader
         title="Final Area Production Performance"
         shift={shift}
         shiftDate={shiftDate}
-        accent={accent}
+        accentHex={accentHex}
       />
-      <TimerBar progress={progress} accent={accent} />
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+      <TimerBar progress={progress} accentHex={accentHex} />
+      <div className="flex flex-1 min-h-0">
         <GaugePanel
           value={d.GaugeValue ?? 0}
           label={label}
           sublabel="Units / Shift"
-          accent={accent}
+          accentHex={accentHex}
         />
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            padding: 12,
-            minWidth: 0,
-            gap: 8,
-          }}
-        >
+        <div className="flex-1 flex flex-col p-3 min-w-0 gap-2">
           <div
-            style={{
-              background: accent,
-              color: "#fff",
-              fontWeight: 700,
-              fontSize: 13,
-              textAlign: "center",
-              padding: "7px 0",
-              borderRadius: "8px 8px 0 0",
-            }}
+            className="text-white font-bold text-[13px] text-center py-1.5 rounded-t-lg"
+            style={{ background: accentHex }}
           >
             {label}
           </div>
-          <MetricTable rows={rows} accent={accent} />
+          <MetricTable rows={rows} accentHex={accentHex} />
         </div>
       </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5,1fr)",
-          gap: 8,
-          padding: "10px 12px",
-          background: "#fff",
-          borderTop: "1px solid #f1f5f9",
-          flexShrink: 0,
-        }}
-      >
+      <div className="grid grid-cols-5 gap-2 px-3 py-2.5 bg-white border-t border-slate-100 shrink-0">
         <StatCard
           label="Monthly Plan"
           value={d.MonthlyPlanQty}
-          accent="#1e40af"
+          accentHex="#1e40af"
         />
         <StatCard
           label="Monthly Achievement"
           value={d.MonthlyAchieved}
-          accent="#15803d"
+          accentHex="#15803d"
         />
         <StatCard
           label="Remaining Qty"
           value={d.MonthlyRemaining}
-          accent="#b45309"
+          accentHex="#b45309"
         />
-        <StatCard label="Asking Rate" value={d.AskingRate} accent="#0f766e" />
+        <StatCard
+          label="Asking Rate"
+          value={d.AskingRate}
+          accentHex="#0f766e"
+        />
         <StatCard
           label="Remaining Days"
           value={d.RemainingDays}
-          accent="#64748b"
+          accentHex="#64748b"
         />
       </div>
     </div>
   );
 };
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PAGE 2 — FG LOADING
-//  API: GET /dashboard/fg-loading?shiftDate&shift&stationCode1&stationCode2&sectionName&lineTaktTime2
-//  Response keys: same shape as fg-packing but LoadingTillNow instead of PackingTillNow
-// ═══════════════════════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════
+   PAGE 2 — FG LOADING
+════════════════════════════════════════════ */
 const Page2 = ({ apiData = {}, progress, shift, shiftDate, config }) => {
   const d = apiData;
   const label = config?.stationName2 || "FG LOADING";
-  const accent = PAGES_META[1].accent;
+  const { accentHex } = PAGES_META[1];
 
   const rows = [
     {
@@ -929,101 +678,68 @@ const Page2 = ({ apiData = {}, progress, shift, shiftDate, config }) => {
   ];
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        height: "100%",
-        background: "#f8fafc",
-      }}
-    >
+    <div className="flex flex-col w-full h-full bg-slate-50">
       <PageHeader
         title="Final Area Production Performance"
         shift={shift}
         shiftDate={shiftDate}
-        accent={accent}
+        accentHex={accentHex}
       />
-      <TimerBar progress={progress} accent="#14b8a6" />
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+      <TimerBar progress={progress} accentHex={accentHex} />
+      <div className="flex flex-1 min-h-0">
         <GaugePanel
           value={d.GaugeValue ?? 0}
           label={label}
           sublabel="Units / Shift"
-          accent={accent}
+          accentHex={accentHex}
         />
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            padding: 12,
-            minWidth: 0,
-            gap: 8,
-          }}
-        >
+        <div className="flex-1 flex flex-col p-3 min-w-0 gap-2">
           <div
-            style={{
-              background: accent,
-              color: "#fff",
-              fontWeight: 700,
-              fontSize: 13,
-              textAlign: "center",
-              padding: "7px 0",
-              borderRadius: "8px 8px 0 0",
-            }}
+            className="text-white font-bold text-[13px] text-center py-1.5 rounded-t-lg"
+            style={{ background: accentHex }}
           >
             {label}
           </div>
-          <MetricTable rows={rows} accent={accent} />
+          <MetricTable rows={rows} accentHex={accentHex} />
         </div>
       </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5,1fr)",
-          gap: 8,
-          padding: "10px 12px",
-          background: "#fff",
-          borderTop: "1px solid #f1f5f9",
-          flexShrink: 0,
-        }}
-      >
+      <div className="grid grid-cols-5 gap-2 px-3 py-2.5 bg-white border-t border-slate-100 shrink-0">
         <StatCard
           label="Monthly Plan"
           value={d.MonthlyPlanQty}
-          accent={accent}
+          accentHex={accentHex}
         />
         <StatCard
           label="Monthly Achievement"
           value={d.MonthlyAchieved}
-          accent="#15803d"
+          accentHex="#15803d"
         />
         <StatCard
           label="Remaining Qty"
           value={d.MonthlyRemaining}
-          accent="#b45309"
+          accentHex="#b45309"
         />
-        <StatCard label="Asking Rate" value={d.AskingRate} accent="#0f766e" />
+        <StatCard
+          label="Asking Rate"
+          value={d.AskingRate}
+          accentHex="#0f766e"
+        />
         <StatCard
           label="Remaining Days"
           value={d.RemainingDays}
-          accent="#64748b"
+          accentHex="#64748b"
         />
       </div>
     </div>
   );
 };
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PAGE 3 — HOURLY
-//  API: GET /dashboard/hourly?shiftDate&shift&stationCode1&lineCode
-//  Response: { hours: [{HourNo,Target,Actual,HourLoss,CumulativeLoss,AchievementPct}],
-//              summary: {ShiftPlan,TotalAchieved,Remaining,ConsumedTimePct} }
-// ═══════════════════════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════
+   PAGE 3 — HOURLY
+════════════════════════════════════════════ */
 const Page3 = ({ apiData = {}, progress, shift, shiftDate }) => {
   const { hours = [], summary = {} } = apiData;
-  const accent = PAGES_META[2].accent;
+  const { accentHex } = PAGES_META[2];
 
   const chartData = useMemo(
     () => ({
@@ -1103,23 +819,15 @@ const Page3 = ({ apiData = {}, progress, shift, shiftDate }) => {
   );
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        height: "100%",
-        background: "#f8fafc",
-      }}
-    >
+    <div className="flex flex-col w-full h-full bg-slate-50">
       <PageHeader
         title="Hourly Production Performance"
         shift={shift}
         shiftDate={shiftDate}
-        accent={accent}
+        accentHex={accentHex}
       />
-      <TimerBar progress={progress} accent="#8b5cf6" />
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+      <TimerBar progress={progress} accentHex={accentHex} />
+      <div className="flex flex-1 min-h-0">
         <SidebarPanel
           pct={summary.ConsumedTimePct}
           fillColor="#8b5cf6"
@@ -1129,48 +837,23 @@ const Page3 = ({ apiData = {}, progress, shift, shiftDate }) => {
             ["Remaining", summary.Remaining],
           ]}
         />
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            padding: "10px 12px",
-            gap: 8,
-            minWidth: 0,
-          }}
-        >
-          <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                minWidth: "100%",
-                borderCollapse: "collapse",
-                fontSize: 11,
-              }}
-            >
+        <div className="flex-1 flex flex-col px-3 py-2.5 gap-2 min-w-0">
+          {/* Hourly table */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-separate border-spacing-0 text-[11px]">
               <thead>
                 <tr>
                   <th
-                    style={{
-                      background: accent,
-                      color: "#fff",
-                      padding: "6px 10px",
-                      border: "1px solid rgba(255,255,255,0.2)",
-                      textAlign: "left",
-                    }}
+                    className="px-2.5 py-1.5 text-white font-bold border border-white/20 text-left"
+                    style={{ background: accentHex }}
                   >
                     Metric
                   </th>
                   {hours.map((h, i) => (
                     <th
                       key={i}
-                      style={{
-                        background: accent,
-                        color: "#fff",
-                        padding: "6px 8px",
-                        border: "1px solid rgba(255,255,255,0.2)",
-                        textAlign: "center",
-                        minWidth: 52,
-                      }}
+                      className="px-2 py-1.5 text-white font-bold border border-white/20 text-center min-w-[52px]"
+                      style={{ background: accentHex }}
                     >
                       H{h.HourNo}
                     </th>
@@ -1208,16 +891,9 @@ const Page3 = ({ apiData = {}, progress, shift, shiftDate }) => {
                 ].map((row, ri) => (
                   <tr
                     key={ri}
-                    style={{ background: ri % 2 === 0 ? "#fff" : "#f8fafc" }}
+                    className={ri % 2 === 0 ? "bg-white" : "bg-slate-50/40"}
                   >
-                    <td
-                      style={{
-                        padding: "5px 10px",
-                        border: "1px solid #f1f5f9",
-                        color: "#334155",
-                        fontWeight: 600,
-                      }}
-                    >
+                    <td className="px-2.5 py-1 border border-slate-100 text-slate-700 font-semibold">
                       {row.label}
                     </td>
                     {hours.map((_, ci) => {
@@ -1227,13 +903,8 @@ const Page3 = ({ apiData = {}, progress, shift, shiftDate }) => {
                       return (
                         <td
                           key={ci}
-                          style={{
-                            padding: "5px 8px",
-                            border: "1px solid #f1f5f9",
-                            textAlign: "center",
-                            fontWeight: 700,
-                            color: item.c,
-                          }}
+                          className="px-2 py-1 border border-slate-100 text-center font-bold"
+                          style={{ color: item.c }}
                         >
                           {item.v}
                         </td>
@@ -1244,27 +915,10 @@ const Page3 = ({ apiData = {}, progress, shift, shiftDate }) => {
               </tbody>
             </table>
           </div>
-          <div
-            style={{
-              flex: 1,
-              background: "#fff",
-              border: "1px solid #f1f5f9",
-              borderRadius: 10,
-              padding: "8px 8px 4px",
-              minHeight: 120,
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                gap: 14,
-                justifyContent: "center",
-                marginBottom: 6,
-                fontSize: 11,
-              }}
-            >
+
+          {/* Chart */}
+          <div className="flex-1 bg-white border border-slate-100 rounded-lg px-2 pt-2 pb-1 min-h-[120px] flex flex-col">
+            <div className="flex gap-3.5 justify-center mb-1.5 text-[11px]">
               {[
                 ["#1e40af", "Target"],
                 ["#d97706", "Actual"],
@@ -1272,27 +926,17 @@ const Page3 = ({ apiData = {}, progress, shift, shiftDate }) => {
               ].map(([cl, l]) => (
                 <span
                   key={l}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                    color: "#64748b",
-                  }}
+                  className="flex items-center gap-1 text-slate-500"
                 >
                   <span
-                    style={{
-                      width: 10,
-                      height: 10,
-                      background: cl,
-                      borderRadius: 2,
-                      display: "inline-block",
-                    }}
+                    className="w-2.5 h-2.5 rounded-sm inline-block"
+                    style={{ background: cl }}
                   />
                   {l}
                 </span>
               ))}
             </div>
-            <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
+            <div className="flex-1 relative min-h-0">
               <Chart
                 key={`hrly-${hours.length}`}
                 type="bar"
@@ -1307,15 +951,12 @@ const Page3 = ({ apiData = {}, progress, shift, shiftDate }) => {
   );
 };
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PAGE 4 — QUALITY
-//  API: GET /dashboard/quality?shiftDate&shift&stationCode1
-//  Response: { summary: {Plan,TotalAchieved,OkUnit,DefectUnit,ReworkDone,OkPct,DefectPct,ConsumedTimePct},
-//              defects: [{SrNo,DefectName,DefectCount}] }
-// ═══════════════════════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════
+   PAGE 4 — QUALITY
+════════════════════════════════════════════ */
 const Page4 = ({ apiData = {}, progress, shift, shiftDate }) => {
   const { summary: qs = {}, defects = [] } = apiData;
-  const accent = PAGES_META[3].accent;
+  const { accentHex } = PAGES_META[3];
 
   const pieData = useMemo(
     () => ({
@@ -1348,71 +989,31 @@ const Page4 = ({ apiData = {}, progress, shift, shiftDate }) => {
   );
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        height: "100%",
-        background: "#f8fafc",
-      }}
-    >
+    <div className="flex flex-col w-full h-full bg-slate-50">
       <PageHeader
         title="Quality Performance"
         shift={shift}
         shiftDate={shiftDate}
-        accent={accent}
+        accentHex={accentHex}
       />
-      <TimerBar progress={progress} accent="#22c55e" />
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-        <div
-          style={{
-            width: 190,
-            flexShrink: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-            padding: "14px 12px",
-            background: "#f8fafc",
-            borderRight: "1px solid #f1f5f9",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              position: "relative",
-              display: "flex",
-              justifyContent: "center",
-            }}
-          >
+      <TimerBar progress={progress} accentHex={accentHex} />
+      <div className="flex flex-1 min-h-0">
+        {/* Sidebar */}
+        <div className="w-[190px] shrink-0 flex flex-col gap-2.5 px-3 py-3.5 bg-slate-50 border-r border-slate-100 justify-center">
+          <div className="relative flex justify-center">
             <DonutCanvas
               pct={qs.ConsumedTimePct}
               size={130}
               fillColor="#22c55e"
             />
-            <div
-              style={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%,-50%)",
-                textAlign: "center",
-              }}
-            >
-              <div style={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+              <div className="text-xl font-extrabold text-slate-900">
                 {Number(qs.ConsumedTimePct || 0).toFixed(0)}%
               </div>
-              <div style={{ fontSize: 9, color: "#94a3b8" }}>Time</div>
+              <div className="text-[9px] text-slate-400">Time</div>
             </div>
           </div>
-          <div
-            style={{
-              background: "#fff",
-              border: "1px solid #f1f5f9",
-              borderRadius: 10,
-              overflow: "hidden",
-            }}
-          >
+          <div className="bg-white border border-slate-100 rounded-lg overflow-hidden">
             {[
               ["Plan", qs.Plan],
               ["Achieved", qs.TotalAchieved],
@@ -1424,46 +1025,25 @@ const Page4 = ({ apiData = {}, progress, shift, shiftDate }) => {
             ].map(([k, v], i) => (
               <div
                 key={i}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "5px 10px",
-                  background: i % 2 === 0 ? "#fff" : "#f8fafc",
-                  fontSize: 11,
-                  color: "#94a3b8",
-                  borderBottom: "1px solid #f8fafc",
-                }}
+                className={`flex justify-between px-2.5 py-1 text-[11px] text-slate-400 border-b border-slate-50 ${
+                  i % 2 === 0 ? "bg-white" : "bg-slate-50/40"
+                }`}
               >
                 <span>{k}</span>
-                <strong style={{ color: "#0f172a" }}>{v ?? "—"}</strong>
+                <strong className="text-slate-900">{v ?? "—"}</strong>
               </div>
             ))}
           </div>
         </div>
 
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-around",
-            padding: "12px 20px",
-            gap: 20,
-            minWidth: 0,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 10,
-            }}
-          >
-            <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 700 }}>
+        {/* Main content */}
+        <div className="flex-1 flex items-center justify-around px-5 py-3 gap-5 min-w-0">
+          {/* Doughnut */}
+          <div className="flex flex-col items-center gap-2.5">
+            <p className="text-[13px] text-slate-900 font-bold">
               Quality Overview
-            </div>
-            <div style={{ position: "relative" }}>
+            </p>
+            <div className="relative">
               <Chart
                 key={`q-${qs.OkUnit}-${qs.DefectUnit}`}
                 type="doughnut"
@@ -1472,99 +1052,41 @@ const Page4 = ({ apiData = {}, progress, shift, shiftDate }) => {
                 width={200}
                 height={200}
               />
-              <div
-                style={{
-                  position: "absolute",
-                  top: "50%",
-                  left: "50%",
-                  transform: "translate(-50%,-50%)",
-                  textAlign: "center",
-                }}
-              >
-                <div
-                  style={{ fontSize: 26, fontWeight: 800, color: "#0f172a" }}
-                >
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+                <div className="text-[26px] font-extrabold text-slate-900">
                   {qs.TotalAchieved ?? 0}
                 </div>
-                <div style={{ fontSize: 10, color: "#94a3b8" }}>Total</div>
+                <div className="text-[10px] text-slate-400">Total</div>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 14, fontSize: 11 }}>
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  color: "#15803d",
-                }}
-              >
-                <span
-                  style={{
-                    width: 10,
-                    height: 10,
-                    background: "#15803d",
-                    borderRadius: 2,
-                    display: "inline-block",
-                  }}
-                />{" "}
+            <div className="flex gap-3.5 text-[11px]">
+              <span className="flex items-center gap-1 text-green-700">
+                <span className="w-2.5 h-2.5 bg-green-700 rounded-sm inline-block" />
                 OK: {qs.OkUnit ?? 0}
               </span>
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  color: "#ef4444",
-                }}
-              >
-                <span
-                  style={{
-                    width: 10,
-                    height: 10,
-                    background: "#ef4444",
-                    borderRadius: 2,
-                    display: "inline-block",
-                  }}
-                />{" "}
+              <span className="flex items-center gap-1 text-red-500">
+                <span className="w-2.5 h-2.5 bg-red-500 rounded-sm inline-block" />
                 Defect: {qs.DefectUnit ?? 0}
               </span>
             </div>
           </div>
 
-          <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Defects table */}
+          <div className="flex-1 min-w-0">
             <div
-              style={{
-                background: accent,
-                color: "#fff",
-                fontWeight: 700,
-                fontSize: 13,
-                textAlign: "center",
-                padding: 8,
-                borderRadius: "8px 8px 0 0",
-              }}
+              className="text-white font-bold text-[13px] text-center py-2 rounded-t-lg"
+              style={{ background: accentHex }}
             >
               Top Defects Today
             </div>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: 12,
-              }}
-            >
+            <table className="w-full border-separate border-spacing-0 text-xs">
               <thead>
                 <tr>
                   {["Sr.", "Defect Description", "Count"].map((h) => (
                     <th
                       key={h}
-                      style={{
-                        background: "#dcfce7",
-                        color: accent,
-                        padding: "7px 10px",
-                        border: "1px solid #f1f5f9",
-                        textAlign: "left",
-                        fontWeight: 700,
-                      }}
+                      className="bg-emerald-100 px-2.5 py-1.5 border border-slate-100 text-left font-bold"
+                      style={{ color: accentHex }}
                     >
                       {h}
                     </th>
@@ -1576,36 +1098,15 @@ const Page4 = ({ apiData = {}, progress, shift, shiftDate }) => {
                   defects.map((df, i) => (
                     <tr
                       key={i}
-                      style={{ background: i % 2 === 0 ? "#fff" : "#f8fafc" }}
+                      className={i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}
                     >
-                      <td
-                        style={{
-                          padding: "7px 10px",
-                          border: "1px solid #f1f5f9",
-                          textAlign: "center",
-                          color: "#94a3b8",
-                        }}
-                      >
+                      <td className="px-2.5 py-1.5 border border-slate-100 text-center text-slate-400">
                         {df.SrNo}
                       </td>
-                      <td
-                        style={{
-                          padding: "7px 10px",
-                          border: "1px solid #f1f5f9",
-                          color: "#334155",
-                        }}
-                      >
+                      <td className="px-2.5 py-1.5 border border-slate-100 text-slate-700">
                         {df.DefectName}
                       </td>
-                      <td
-                        style={{
-                          padding: "7px 10px",
-                          border: "1px solid #f1f5f9",
-                          textAlign: "center",
-                          fontWeight: 800,
-                          color: "#ef4444",
-                        }}
-                      >
+                      <td className="px-2.5 py-1.5 border border-slate-100 text-center font-extrabold text-red-500">
                         {df.DefectCount}
                       </td>
                     </tr>
@@ -1614,12 +1115,7 @@ const Page4 = ({ apiData = {}, progress, shift, shiftDate }) => {
                   <tr>
                     <td
                       colSpan={3}
-                      style={{
-                        padding: 24,
-                        textAlign: "center",
-                        color: "#94a3b8",
-                        border: "1px solid #f1f5f9",
-                      }}
+                      className="py-6 text-center text-slate-400 border border-slate-100"
                     >
                       No defects recorded this shift
                     </td>
@@ -1634,38 +1130,27 @@ const Page4 = ({ apiData = {}, progress, shift, shiftDate }) => {
   );
 };
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PAGE 5 — LOSS
-//  API: GET /dashboard/loss?shiftDate&shift&stationCode1&sectionName
-//  Response: { stations: [{StationName,TotalStopTimeHMS,TotalStopTime,TotalStopCount}],
-//              summary: {Plan,Achieved,Remaining,ConsumedTimePct} }
-// ═══════════════════════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════
+   PAGE 5 — LOSS
+════════════════════════════════════════════ */
 const Page5 = ({ apiData = {}, progress, shift, shiftDate }) => {
   const { stations = [], summary: ls = {} } = apiData;
-  const accent = PAGES_META[4].accent;
+  const { accentHex } = PAGES_META[4];
   const maxTime = useMemo(
     () => Math.max(...stations.map((s) => s.TotalStopTime ?? 0), 1),
     [stations],
   );
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        height: "100%",
-        background: "#f8fafc",
-      }}
-    >
+    <div className="flex flex-col w-full h-full bg-slate-50">
       <PageHeader
         title="Loss Performance"
         shift={shift}
         shiftDate={shiftDate}
-        accent={accent}
+        accentHex={accentHex}
       />
-      <TimerBar progress={progress} accent="#f59e0b" />
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+      <TimerBar progress={progress} accentHex={accentHex} />
+      <div className="flex flex-1 min-h-0">
         <SidebarPanel
           pct={ls.ConsumedTimePct}
           fillColor="#f59e0b"
@@ -1675,11 +1160,9 @@ const Page5 = ({ apiData = {}, progress, shift, shiftDate }) => {
             ["Balance", ls.Remaining],
           ]}
         />
-        <div style={{ flex: 1, padding: 12, overflow: "auto" }}>
-          <table
-            style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}
-          >
-            <thead>
+        <div className="flex-1 p-3 overflow-auto">
+          <table className="w-full border-separate border-spacing-0 text-xs">
+            <thead className="sticky top-0 z-10">
               <tr>
                 {[
                   "Station Name",
@@ -1689,14 +1172,10 @@ const Page5 = ({ apiData = {}, progress, shift, shiftDate }) => {
                 ].map((h, i) => (
                   <th
                     key={i}
-                    style={{
-                      background: accent,
-                      color: "#fff",
-                      padding: "8px 12px",
-                      border: "1px solid rgba(255,255,255,0.2)",
-                      fontWeight: 700,
-                      textAlign: i === 0 ? "left" : "center",
-                    }}
+                    className={`px-3 py-2 text-white font-bold border border-white/20 ${
+                      i === 0 ? "text-left" : "text-center"
+                    }`}
+                    style={{ background: accentHex }}
                   >
                     {h}
                   </th>
@@ -1705,61 +1184,45 @@ const Page5 = ({ apiData = {}, progress, shift, shiftDate }) => {
             </thead>
             <tbody>
               {stations.map((s, i) => {
-                const intensity = s.TotalStopTime / maxTime;
                 const isCritical = s.TotalStopTime > 100;
                 const isHigh = s.TotalStopTime > 20;
+                const intensity = s.TotalStopTime / maxTime;
                 const rowBg = isCritical
                   ? `rgba(239,68,68,${0.08 + intensity * 0.12})`
                   : isHigh
                     ? "#fef3c7"
-                    : "#fff";
+                    : i % 2 === 0
+                      ? "#fff"
+                      : "#f8fafc";
                 const textCol = isCritical
                   ? "#ef4444"
                   : isHigh
                     ? "#b45309"
                     : "#334155";
+
                 return (
                   <tr key={i} style={{ background: rowBg }}>
-                    <td
-                      style={{
-                        padding: "8px 12px",
-                        border: "1px solid #f1f5f9",
-                        color: "#334155",
-                        fontWeight: 600,
-                      }}
-                    >
+                    <td className="px-3 py-2 border border-slate-100 text-slate-700 font-semibold">
                       {s.StationName}
                     </td>
                     <td
-                      style={{
-                        padding: "8px 12px",
-                        border: "1px solid #f1f5f9",
-                        color: textCol,
-                        textAlign: "center",
-                        fontWeight: 700,
-                      }}
+                      className="px-3 py-2 border border-slate-100 text-center font-bold"
+                      style={{ color: textCol }}
                     >
                       {s.TotalStopTimeHMS ?? "—"}
                     </td>
                     <td
-                      style={{
-                        padding: "8px 12px",
-                        border: "1px solid #f1f5f9",
-                        color: textCol,
-                        textAlign: "center",
-                        fontWeight: 700,
-                      }}
+                      className="px-3 py-2 border border-slate-100 text-center font-bold"
+                      style={{ color: textCol }}
                     >
                       {s.TotalStopTime}
                     </td>
                     <td
-                      style={{
-                        padding: "8px 12px",
-                        border: "1px solid #f1f5f9",
-                        color: s.TotalStopCount > 10 ? "#ef4444" : "#334155",
-                        textAlign: "center",
-                        fontWeight: 700,
-                      }}
+                      className={`px-3 py-2 border border-slate-100 text-center font-bold ${
+                        s.TotalStopCount > 10
+                          ? "text-red-500"
+                          : "text-slate-700"
+                      }`}
                     >
                       {s.TotalStopCount}
                     </td>
@@ -1770,14 +1233,17 @@ const Page5 = ({ apiData = {}, progress, shift, shiftDate }) => {
                 <tr>
                   <td
                     colSpan={4}
-                    style={{
-                      padding: 28,
-                      textAlign: "center",
-                      color: "#94a3b8",
-                      border: "1px solid #f1f5f9",
-                    }}
+                    className="py-7 text-center text-slate-400 border border-slate-100"
                   >
-                    No loss data recorded this shift
+                    <div className="flex flex-col items-center gap-2">
+                      <PackageOpen
+                        className="w-10 h-10 opacity-20"
+                        strokeWidth={1.2}
+                      />
+                      <p className="text-sm">
+                        No loss data recorded this shift
+                      </p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -1789,9 +1255,9 @@ const Page5 = ({ apiData = {}, progress, shift, shiftDate }) => {
   );
 };
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+════════════════════════════════════════════════════════════════════════════════ */
 const Monitoring = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -1802,6 +1268,7 @@ const Monitoring = () => {
   const launchedShift = routerState.shift || "A";
   const isLaunched = !!routerState.autoLoad;
 
+  /* ── State ── */
   const [shiftDate, setShiftDate] = useState(launchedDate);
   const [shift, setShift] = useState(launchedShift);
   const [allData, setAllData] = useState({
@@ -1817,7 +1284,7 @@ const Monitoring = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // ── Auto-rotate pages ─────────────────────────────────────────────────────
+  /* ── Auto-rotate ── */
   useEffect(() => {
     if (!isRunning) return;
     let elapsed = 0;
@@ -1834,7 +1301,7 @@ const Monitoring = () => {
     return () => clearInterval(id);
   }, [currentPage, isRunning]);
 
-  // ── Fetch all 5 endpoints in parallel ────────────────────────────────────
+  /* ── Fetch all endpoints ── */
   const fetchData = useCallback(async (dateParam, shiftParam, cfg) => {
     if (!dateParam) {
       toast.error("Please select a shift date.");
@@ -1850,9 +1317,7 @@ const Monitoring = () => {
       loss: {},
     });
 
-    // buildParams produces all query params; each endpoint only reads what it needs
     const params = buildParams(cfg, dateParam, shiftParam);
-
     const endpoints = {
       fgPacking: `${baseURL}dashboard/fg-packing`,
       fgLoading: `${baseURL}dashboard/fg-loading`,
@@ -1869,12 +1334,10 @@ const Monitoring = () => {
             .then((res) => ({ key, data: res.data?.data ?? res.data })),
         ),
       );
-
       const merged = {};
       results.forEach((r) => {
         if (r.status === "fulfilled") merged[r.value.key] = r.value.data;
       });
-
       const failed = results.filter((r) => r.status === "rejected").length;
       if (failed === TOTAL_PAGES) {
         toast.error("All endpoints failed. Check server connection.");
@@ -1887,14 +1350,14 @@ const Monitoring = () => {
         setCurrentPage(0);
         setIsRunning(true);
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to fetch dashboard data.");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Auto-load if launched from config manager
+  /* ── Auto-load on launch ── */
   useEffect(() => {
     if (isLaunched) fetchData(launchedDate, launchedShift, launchedConfig);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1905,6 +1368,7 @@ const Monitoring = () => {
     [fetchData, shiftDate, shift, launchedConfig],
   );
 
+  /* ── Navigation ── */
   const goTo = useCallback((i) => {
     setCurrentPage(i);
     setProgress(0);
@@ -1927,65 +1391,27 @@ const Monitoring = () => {
     <Page5 key={4} apiData={allData.loss} {...commonProps} />,
   ];
 
-  // ── LAUNCHED (full-screen kiosk mode) ─────────────────────────────────────
+  /* ════════════════════════════════════════════
+     LAUNCHED — Full-screen kiosk mode
+  ════════════════════════════════════════════ */
   if (isLaunched) {
     return (
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 9999,
-          display: "flex",
-          flexDirection: "column",
-          background: "#f8fafc",
-          overflow: "hidden",
-          fontFamily: "system-ui, -apple-system, sans-serif",
-        }}
-      >
+      <div className="fixed inset-0 z-[9999] flex flex-col bg-slate-50 overflow-hidden font-sans">
         {/* Control bar */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "7px 16px",
-            background: "#fff",
-            borderBottom: "1px solid #f1f5f9",
-            flexShrink: 0,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-          }}
-        >
+        <div className="flex items-center gap-2.5 px-4 py-1.5 bg-white border-b border-slate-100 shrink-0 shadow-sm">
           {launchedConfig && (
-            <span
-              style={{
-                fontWeight: 800,
-                fontSize: 13,
-                color: "#0f172a",
-                display: "flex",
-                alignItems: "center",
-                gap: 7,
-              }}
-            >
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: "#10b981",
-                  display: "inline-block",
-                }}
-              />
+            <span className="font-extrabold text-[13px] text-slate-900 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
               {launchedConfig.dashboardName}
             </span>
           )}
-          <div style={{ width: 1, height: 20, background: "#f1f5f9" }} />
+          <div className="w-px h-5 bg-slate-100" />
 
-          {/* Shift buttons — also re-fetch on shift change */}
+          {/* Shift toggle */}
           {["A", "B"].map((s) => (
             <button
               key={s}
               onClick={() => {
-                // For shift B, use previous calendar date if currently before 08:00
                 const dt =
                   s === "B"
                     ? (() => {
@@ -1998,18 +1424,13 @@ const Monitoring = () => {
                 setShiftDate(dt);
                 fetchData(dt, s, launchedConfig);
               }}
-              style={{
-                padding: "4px 12px",
-                borderRadius: 7,
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: "pointer",
-                background:
-                  shift === s ? (s === "A" ? "#dbeafe" : "#fef3c7") : "#f8fafc",
-                color:
-                  shift === s ? (s === "A" ? "#1e40af" : "#d97706") : "#94a3b8",
-                border: `1.5px solid ${shift === s ? (s === "A" ? "#93c5fd" : "#fcd34d") : "#f1f5f9"}`,
-              }}
+              className={`px-3 py-1 rounded-lg text-xs font-bold border-[1.5px] transition-all ${
+                shift === s
+                  ? s === "A"
+                    ? "bg-blue-50 text-blue-700 border-blue-300"
+                    : "bg-amber-50 text-amber-700 border-amber-300"
+                  : "bg-slate-50 text-slate-400 border-slate-100"
+              }`}
             >
               Shift {s}
             </button>
@@ -2019,151 +1440,70 @@ const Monitoring = () => {
             type="date"
             value={shiftDate}
             onChange={(e) => setShiftDate(e.target.value)}
-            style={{
-              padding: "4px 10px",
-              border: "1.5px solid #f1f5f9",
-              borderRadius: 7,
-              fontSize: 12,
-              color: "#0f172a",
-              background: "#f8fafc",
-            }}
+            className="px-2.5 py-1 border-[1.5px] border-slate-100 rounded-lg text-xs text-slate-900 bg-slate-50 outline-none"
           />
 
           <button
             onClick={fetchAllData}
             disabled={loading}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              padding: "5px 12px",
-              borderRadius: 7,
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: loading ? "not-allowed" : "pointer",
-              background: "#1e40af",
-              color: "#fff",
-              border: "none",
-            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              loading
+                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                : "bg-blue-700 hover:bg-blue-800 text-white shadow-sm shadow-blue-200"
+            }`}
           >
-            <FiRefreshCw
-              size={11}
-              style={{
-                animation: loading ? "spin 1s linear infinite" : "none",
-              }}
-            />
+            {loading ? (
+              <Spinner cls="w-3 h-3" />
+            ) : (
+              <RefreshCw className="w-3 h-3" />
+            )}
             {loading ? "Loading…" : "Refresh"}
           </button>
 
-          <div
-            style={{
-              marginLeft: "auto",
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-            }}
-          >
+          <div className="ml-auto flex gap-2 items-center">
             {lastFetched && (
-              <span style={{ fontSize: 11, color: "#94a3b8" }}>
+              <span className="text-[11px] text-slate-400">
                 Updated {lastFetched.toLocaleTimeString()}
               </span>
             )}
             {isRunning ? (
               <button
                 onClick={() => setIsRunning(false)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  padding: "5px 12px",
-                  borderRadius: 7,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  background: "#fef3c7",
-                  color: "#d97706",
-                  border: "1.5px solid #fcd34d",
-                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border-[1.5px] border-amber-300 transition-all hover:bg-amber-100"
               >
-                <FiPause size={11} /> Pause
+                <Pause className="w-3 h-3" /> Pause
               </button>
             ) : (
               lastFetched && (
                 <button
                   onClick={() => setIsRunning(true)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    padding: "5px 12px",
-                    borderRadius: 7,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    background: "#dcfce7",
-                    color: "#15803d",
-                    border: "1.5px solid #86efac",
-                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border-[1.5px] border-emerald-300 transition-all hover:bg-emerald-100"
                 >
-                  <FiPlay size={11} /> Resume
+                  <Play className="w-3 h-3" /> Resume
                 </button>
               )
             )}
             <button
               onClick={() => navigate(-1)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "5px 12px",
-                borderRadius: 7,
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: "pointer",
-                background: "#fee2e2",
-                color: "#ef4444",
-                border: "1.5px solid #fca5a5",
-              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-500 border-[1.5px] border-red-300 transition-all hover:bg-red-100"
             >
-              <FiX size={11} /> Exit
+              <X className="w-3 h-3" /> Exit
             </button>
           </div>
         </div>
 
-        {/* Loading spinner */}
+        {/* Loading */}
         {loading && (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "#fff",
-            }}
-          >
-            <FiRefreshCw
-              size={32}
-              color="#6366f1"
-              style={{ animation: "spin 1s linear infinite" }}
-            />
-            <div style={{ color: "#94a3b8", marginTop: 14, fontSize: 14 }}>
-              Fetching shift data…
-            </div>
+          <div className="flex-1 flex flex-col items-center justify-center bg-white gap-3.5">
+            <Spinner cls="w-8 h-8 text-indigo-500" />
+            <p className="text-sm text-slate-400">Fetching shift data…</p>
           </div>
         )}
 
         {/* Active dashboard */}
         {!loading && lastFetched && (
-          <div
-            style={{
-              flex: 1,
-              minHeight: 0,
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="flex-1 min-h-0 overflow-hidden">
               {pages[currentPage]}
             </div>
             <NavDots
@@ -2175,374 +1515,171 @@ const Monitoring = () => {
           </div>
         )}
 
-        {/* Waiting for first load */}
+        {/* Waiting */}
         {!loading && !lastFetched && (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "#fff",
-            }}
-          >
-            <div
-              style={{
-                width: 72,
-                height: 72,
-                borderRadius: 18,
-                background: "#f1f5f9",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: 16,
-              }}
-            >
-              <FiSettings size={32} color="#cbd5e1" />
+          <div className="flex-1 flex flex-col items-center justify-center bg-white gap-4">
+            <div className="w-[72px] h-[72px] rounded-2xl bg-slate-100 flex items-center justify-center">
+              <Settings className="w-8 h-8 text-slate-300" />
             </div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#475569" }}>
+            <p className="text-base font-bold text-slate-500">
               Loading dashboard data…
-            </div>
+            </p>
           </div>
         )}
-
-        <style>{`
-          @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-          ::-webkit-scrollbar { width: 5px; height: 5px; }
-          ::-webkit-scrollbar-track { background: #f8fafc; }
-          ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
-          input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; }
-        `}</style>
       </div>
     );
   }
 
-  // ── STANDALONE (not launched from config manager) ─────────────────────────
+  /* ════════════════════════════════════════════
+     STANDALONE — Not launched from config manager
+  ════════════════════════════════════════════ */
   return (
-    <div
-      style={{
-        padding: 24,
-        background: "#f8fafc",
-        minHeight: "100vh",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          background: "#fff",
-          border: "1px solid #f1f5f9",
-          borderRadius: 16,
-          padding: "20px 24px",
-          marginBottom: 16,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          boxShadow: "0 1px 6px rgba(0,0,0,0.05)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 12,
-              background: "linear-gradient(135deg,#f59e0b,#d97706)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <span style={{ color: "#fff", fontWeight: 900, fontSize: 20 }}>
-              W
-            </span>
-          </div>
-          <div>
-            <h1
-              style={{
-                margin: 0,
-                color: "#0f172a",
-                fontSize: 20,
-                fontWeight: 800,
-                fontFamily: "'Georgia', serif",
-              }}
-            >
-              Display Monitoring
-            </h1>
-            <p style={{ margin: 0, color: "#94a3b8", fontSize: 12 }}>
-              Live Shift Performance · FG Packing & Loading · Quality · Loss
-            </p>
-          </div>
+    <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
+      {/* Sub-header */}
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
+        <div>
+          <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
+            Production Monitoring
+          </h1>
+          <p className="text-[11px] text-slate-400">
+            Dashboard · Shift performance overview
+          </p>
         </div>
         {lastFetched && (
-          <div style={{ color: "#94a3b8", fontSize: 12, textAlign: "right" }}>
-            <div>Last refreshed</div>
-            <div style={{ fontWeight: 700, color: "#0f172a" }}>
-              {lastFetched.toLocaleTimeString()}
-            </div>
-          </div>
+          <span className="text-[11px] text-slate-400">
+            Updated {lastFetched.toLocaleTimeString()}
+          </span>
         )}
       </div>
 
-      {/* Controls */}
-      <div
-        style={{
-          background: "#fff",
-          border: "1px solid #f1f5f9",
-          borderRadius: 12,
-          padding: 16,
-          marginBottom: 16,
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 16,
-            alignItems: "flex-end",
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: "#94a3b8",
-                marginBottom: 5,
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
-              }}
-            >
-              Shift Date
-            </div>
-            <input
-              type="date"
-              value={shiftDate}
-              onChange={(e) => setShiftDate(e.target.value)}
-              style={{
-                padding: "9px 12px",
-                border: "1.5px solid #e2e8f0",
-                borderRadius: 9,
-                fontSize: 13,
-                outline: "none",
-                color: "#0f172a",
-                background: "#f8fafc",
-              }}
-            />
-          </div>
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: "#94a3b8",
-                marginBottom: 5,
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
-              }}
-            >
-              Shift
-            </div>
-            <div
-              style={{
-                display: "flex",
-                background: "#f8fafc",
-                border: "1.5px solid #e2e8f0",
-                borderRadius: 9,
-                overflow: "hidden",
-              }}
-            >
-              {[
-                ["A", "08:00–20:00"],
-                ["B", "20:00–08:00"],
-              ].map(([s]) => (
-                <button
-                  key={s}
-                  onClick={() => setShift(s)}
-                  style={{
-                    padding: "9px 18px",
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    background: shift === s ? "#1e40af" : "transparent",
-                    color: shift === s ? "#fff" : "#94a3b8",
-                    border: "none",
-                    borderRight: "1.5px solid #e2e8f0",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  Shift {s}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={fetchAllData}
-              disabled={loading}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 7,
-                padding: "10px 22px",
-                background: loading ? "#94a3b8" : "#1e40af",
-                color: "#fff",
-                border: "none",
-                borderRadius: 9,
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: loading ? "not-allowed" : "pointer",
-                boxShadow: loading ? "none" : "0 4px 14px rgba(30,64,175,0.3)",
-              }}
-            >
-              <FiRefreshCw
-                style={{
-                  animation: loading ? "spin 1s linear infinite" : "none",
-                }}
+      {/* Body */}
+      <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3">
+        {/* Filters card */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
+          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
+            Filters
+          </p>
+          <div className="flex flex-wrap gap-4 items-end">
+            {/* Shift Date */}
+            <div className="min-w-[180px]">
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                Date
+              </label>
+              <input
+                type="date"
+                value={shiftDate}
+                onChange={(e) => setShiftDate(e.target.value)}
+                className="w-full px-3 py-2 border-[1.5px] border-slate-200 rounded-lg text-[13px] text-slate-900 bg-slate-50 outline-none focus:border-blue-400 transition-colors"
               />
-              {loading ? "Loading…" : "Load Dashboard"}
-            </button>
-            {isRunning ? (
+            </div>
+
+            {/* Shift toggle */}
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                Shift
+              </label>
+              <div className="flex bg-slate-50 border-[1.5px] border-slate-200 rounded-lg overflow-hidden">
+                {["A", "B"].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setShift(s)}
+                    className={`px-5 py-2 text-[13px] font-bold transition-all border-r border-slate-200 last:border-r-0 ${
+                      shift === s
+                        ? "bg-blue-700 text-white"
+                        : "bg-transparent text-slate-400 hover:text-slate-600"
+                    }`}
+                  >
+                    Shift {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 pb-0.5">
               <button
-                onClick={() => setIsRunning(false)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  padding: "10px 16px",
-                  background: "#fef3c7",
-                  color: "#d97706",
-                  border: "1.5px solid #fcd34d",
-                  borderRadius: 9,
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: "pointer",
-                }}
+                onClick={fetchAllData}
+                disabled={loading}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  loading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                }`}
               >
-                <FiPause size={13} /> Pause
+                {loading ? (
+                  <Spinner cls="w-4 h-4" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                {loading ? "Loading…" : "Load Dashboard"}
               </button>
-            ) : (
-              lastFetched && (
+              {isRunning ? (
                 <button
-                  onClick={() => setIsRunning(true)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    padding: "10px 16px",
-                    background: "#dcfce7",
-                    color: "#15803d",
-                    border: "1.5px solid #86efac",
-                    borderRadius: 9,
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: "pointer",
-                  }}
+                  onClick={() => setIsRunning(false)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-amber-50 text-amber-700 border-[1.5px] border-amber-300 hover:bg-amber-100 transition-all"
                 >
-                  <FiPlay size={13} /> Resume
+                  <Pause className="w-4 h-4" /> Pause
                 </button>
-              )
-            )}
+              ) : (
+                lastFetched && (
+                  <button
+                    onClick={() => setIsRunning(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-50 text-emerald-700 border-[1.5px] border-emerald-300 hover:bg-emerald-100 transition-all"
+                  >
+                    <Play className="w-4 h-4" /> Resume
+                  </button>
+                )
+              )}
+            </div>
           </div>
+        </div>
+
+        {/* Dashboard area — fills remaining height */}
+        <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-0">
+          {/* Loading state */}
+          {loading && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3.5">
+              <Spinner cls="w-8 h-8 text-blue-600" />
+              <p className="text-sm text-slate-400">Fetching shift data…</p>
+            </div>
+          )}
+
+          {/* Active dashboard */}
+          {!loading && lastFetched && (
+            <div className="flex-1 min-h-0 flex flex-col">
+              <div className="flex-1 min-h-0 overflow-hidden">
+                {pages[currentPage]}
+              </div>
+              <NavDots
+                currentPage={currentPage}
+                onGoTo={goTo}
+                onPrev={goPrev}
+                onNext={goNext}
+              />
+            </div>
+          )}
+
+          {/* Empty / waiting state */}
+          {!loading && !lastFetched && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 py-4">
+              <div className="w-[72px] h-[72px] rounded-2xl bg-slate-100 flex items-center justify-center">
+                <Settings
+                  className="w-8 h-8 text-slate-300"
+                  strokeWidth={1.2}
+                />
+              </div>
+              <div className="text-center">
+                <p className="text-base font-bold text-slate-500">
+                  No data loaded
+                </p>
+                <p className="text-[13px] text-slate-400 mt-1">
+                  Select a date and click Load Dashboard to begin
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
-
-      {loading && (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 64,
-            background: "#fff",
-            borderRadius: 12,
-            border: "1px solid #f1f5f9",
-          }}
-        >
-          <FiRefreshCw
-            size={32}
-            color="#1e40af"
-            style={{ animation: "spin 1s linear infinite" }}
-          />
-          <div style={{ color: "#94a3b8", marginTop: 14, fontSize: 14 }}>
-            Fetching shift data…
-          </div>
-        </div>
-      )}
-
-      {!loading && lastFetched && (
-        <div
-          style={{
-            borderRadius: 14,
-            overflow: "hidden",
-            border: "1px solid #f1f5f9",
-            boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
-          }}
-        >
-          <div style={{ height: "70vh", overflow: "hidden" }}>
-            {pages[currentPage]}
-          </div>
-          <NavDots
-            currentPage={currentPage}
-            onGoTo={goTo}
-            onPrev={goPrev}
-            onNext={goNext}
-          />
-        </div>
-      )}
-
-      {!loading && !lastFetched && (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 64,
-            background: "#fff",
-            borderRadius: 12,
-            border: "1px solid #f1f5f9",
-          }}
-        >
-          <div
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: 18,
-              background: "#f1f5f9",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 16,
-            }}
-          >
-            <FiSettings size={32} color="#cbd5e1" />
-          </div>
-          <div
-            style={{
-              fontSize: 16,
-              fontWeight: 700,
-              color: "#475569",
-              marginBottom: 6,
-            }}
-          >
-            No data loaded
-          </div>
-          <div style={{ fontSize: 13, color: "#94a3b8" }}>
-            Select a date and click Load Dashboard to begin
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-track { background: #f8fafc; }
-        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
-        input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; }
-      `}</style>
     </div>
   );
 };
