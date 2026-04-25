@@ -510,7 +510,7 @@ const DeleteModal = ({ name, saving, onClose, onConfirm }) => (
 );
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-const DashboardConfigPage = () => {
+const Management = () => {
   const navigate = useNavigate();
   const [configs,  setConfigs]  = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -627,7 +627,7 @@ const DashboardConfigPage = () => {
           </div>
           <div>
             <h1 style={{ margin: 0, color: "#0f172a", fontSize: 22, fontWeight: 800, fontFamily: "'Georgia', serif" }}>
-              Dashboard Manager
+              Display Manager
             </h1>
             <p style={{ margin: "3px 0 0", color: "#94a3b8", fontSize: 13 }}>
               Manage production line configurations · Launch shift dashboards
@@ -962,4 +962,4 @@ const DashboardConfigPage = () => {
   );
 };
 
-export default DashboardConfigPage;
+export default Management;

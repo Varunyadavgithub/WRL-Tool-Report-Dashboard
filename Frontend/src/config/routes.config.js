@@ -114,8 +114,8 @@ const ManpowerApproval = lazy(() => import("../pages/Forms/ManpowerApproval"));
 const SecurityManpowerList = lazy(
   () => import("../pages/Forms/SecurityManpowerList"),
 );
-import FinalAssembly from "../pages/Dashboard/FinalAssembly";
-import Dashboardconfig from "../pages/Dashboard/Dashboardconfig";
+import Monitoring from "../pages/Display/Monitoring";
+import Management from "../pages/Display/Management";
 
 // Role constants for consistency
 export const ROLES = {
@@ -142,16 +142,16 @@ export const ROUTE_CONFIG = [
     basePath: "/display",
     items: [
       {
-        path: "/display/final-assembly",
-        label: "Final Assembly",
+        path: "/display/monitoring",
+        label: "Monitoring",
         icon: Wrench,
-        component: FinalAssembly,
+        component: Monitoring,
       },
       {
-        path: "/display/dashboard-manger",
-        label: "Dashboard Manager",
+        path: "/display/management",
+        label: "Management",
         icon: Wrench,
-        component: Dashboardconfig,
+        component: Management,
       },
     ],
   },
