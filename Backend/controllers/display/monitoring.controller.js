@@ -716,7 +716,7 @@ export const getLossData = tryCatch(async (req, res) => {
     FINAL AS (
       SELECT StationName, (TotalSeconds - BreakSeconds) AS NetSeconds FROM CALC
     )
-    SELECT TOP 5
+    SELECT
       StationName,
       CONVERT(VARCHAR, DATEADD(SECOND, SUM(NetSeconds), 0), 108) AS TotalStopTimeHMS,
       CAST(SUM(NetSeconds) / 60.0 AS DECIMAL(8,1))               AS TotalStopTime,

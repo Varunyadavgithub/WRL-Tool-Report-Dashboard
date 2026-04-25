@@ -10,7 +10,7 @@ import {
   getHourlyProductionData,
   getQualityData,
   getLossData,
-} from "../controllers/display/finalAreaProduction.controller.js";
+} from "../controllers/display/monitoring.controller.js";
 
 const router = express.Router();
 
