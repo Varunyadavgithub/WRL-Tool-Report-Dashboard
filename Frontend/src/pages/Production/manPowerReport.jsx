@@ -1,116 +1,131 @@
 import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import {
-  FiSearch, FiCalendar, FiFilter, FiInbox,
-  FiHash, FiClock, FiList, FiBarChart2,
-  FiX, FiLoader, FiChevronDown, FiUsers,
-  FiUser, FiMapPin, FiLayers, FiCheckCircle,
-  FiAlertCircle, FiBriefcase, FiActivity,
-} from "react-icons/fi";
 import ExportButton from "../../components/ui/ExportButton";
 import { baseURL } from "../../assets/assets";
+import {
+  Search,
+  Loader2,
+  PackageOpen,
+  Calendar,
+  Filter,
+  X,
+  Clock,
+  List,
+  BarChart3,
+  Users,
+  User,
+  MapPin,
+  Layers,
+  CheckCircle2,
+  AlertCircle,
+  Briefcase,
+  Activity,
+  Hash,
+  ChevronDown,
+  Inbox,
+  Zap,
+} from "lucide-react";
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────────────────
 const pad = (n) => (n < 10 ? "0" + n : n);
 const fmt = (d) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-
 const fmtDisplay = (v) =>
   v ? String(v).replace("T", " ").replace("Z", "").slice(0, 16) : "—";
 
 const SCAN_OPTIONS = [
-  { label: "All Workmen",       value: "all"     },
-  { label: "Currently Inside",  value: "inside"  },
-  { label: "Checked Out",       value: "out"     },
+  { label: "All Workmen", value: "all" },
+  { label: "Currently Inside", value: "inside" },
+  { label: "Checked Out", value: "out" },
 ];
 
 const SUMMARY_GROUP_OPTIONS = [
-  { label: "Contractor",  value: "Contractor"  },
-  { label: "Department",  value: "Department"  },
-  { label: "Shift",       value: "Shift"       },
+  { label: "Contractor", value: "Contractor" },
+  { label: "Department", value: "Department" },
+  { label: "Shift", value: "Shift" },
 ];
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+/* ── Spinner ── */
+const Spinner = ({ cls = "w-4 h-4" }) => (
+  <Loader2 className={`animate-spin ${cls}`} />
+);
+
+/* ── Quick filter button ── */
+const QuickBtn = ({ label, sublabel, loading, onClick, colorClass }) => (
+  <button
+    disabled={loading}
+    onClick={onClick}
+    className={`w-full flex flex-col items-center justify-center gap-0.5 px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-150 ${
+      loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : colorClass
+    }`}
+  >
+    {loading ? (
+      <span className="flex items-center gap-2">
+        <Spinner /> Loading…
+      </span>
+    ) : (
+      <>
+        <span className="text-[15px] font-bold tracking-widest">{label}</span>
+        <span className="text-[10px] opacity-75 font-normal">{sublabel}</span>
+      </>
+    )}
+  </button>
+);
+
+/* ── Status Badge ── */
 const StatusBadge = ({ outTime }) => {
   const inside = !outTime;
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
-      inside
-        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-        : "bg-gray-100 text-gray-500 border border-gray-200"
-    }`}>
-      {inside
-        ? <><FiCheckCircle size={9} /> Inside</>
-        : <><FiAlertCircle size={9} /> Checked Out</>
-      }
+    <span
+      className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+        inside
+          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+          : "bg-slate-100 text-slate-500 border border-slate-200"
+      }`}
+    >
+      {inside ? (
+        <>
+          <CheckCircle2 className="w-2.5 h-2.5" /> Inside
+        </>
+      ) : (
+        <>
+          <AlertCircle className="w-2.5 h-2.5" /> Out
+        </>
+      )}
     </span>
   );
 };
 
-const StatCard = ({ icon: Icon, label, value, sub, color }) => {
-  const colors = {
-    blue:    "bg-blue-50 text-blue-600 border-blue-100",
-    emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
-    amber:   "bg-amber-50 text-amber-600 border-amber-100",
-    red:     "bg-red-50 text-red-600 border-red-100",
-    violet:  "bg-violet-50 text-violet-600 border-violet-100",
-    gray:    "bg-gray-100 text-gray-600 border-gray-200",
-  };
-  return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex items-start gap-3">
-      <div className={`p-2.5 rounded-xl border ${colors[color]}`}>
-        <Icon size={16} />
-      </div>
-      <div>
-        <p className="text-xs text-gray-400 tracking-wide uppercase">{label}</p>
-        <p className="text-xl font-bold text-gray-900 leading-tight">{value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
-      </div>
-    </div>
-  );
-};
-
-const QuickBtn = ({ label, onClick, loading, color }) => {
-  const colors = {
-    yellow: "bg-amber-500 hover:bg-amber-400 shadow-amber-200",
-    blue:   "bg-blue-500 hover:bg-blue-400 shadow-blue-200",
-    green:  "bg-emerald-500 hover:bg-emerald-400 shadow-emerald-200",
-  };
-  return (
-    <button
-      onClick={onClick}
-      disabled={loading}
-      className={`px-5 py-2 rounded-lg text-white text-sm font-bold tracking-wide transition-all active:scale-95 disabled:opacity-50 shadow-md flex items-center gap-2 ${colors[color]}`}
-    >
-      {loading ? <FiLoader size={13} className="animate-spin" /> : <FiClock size={13} />}
-      {label}
-    </button>
-  );
-};
-
-// ── Main Component ────────────────────────────────────────────────────────────
+/* ════════════════════════════════════════════
+   MAIN COMPONENT
+════════════════════════════════════════════ */
 const ManpowerReport = () => {
-  const [loading,      setLoading]      = useState(false);
-  const [ydayLoading,  setYdayLoading]  = useState(false);
+  /* ── Loading states ── */
+  const [loading, setLoading] = useState(false);
+  const [ydayLoading, setYdayLoading] = useState(false);
   const [todayLoading, setTodayLoading] = useState(false);
   const [monthLoading, setMonthLoading] = useState(false);
 
-  const [startTime,   setStartTime]   = useState("");
-  const [endTime,     setEndTime]     = useState("");
-  const [data,        setData]        = useState([]);
-  const [scanFilter,  setScanFilter]  = useState(SCAN_OPTIONS[0]);
-  const [searchTerm,  setSearchTerm]  = useState("");
+  /* ── Filter state ── */
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [scanFilter, setScanFilter] = useState(SCAN_OPTIONS[0]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [activeTab,   setActiveTab]   = useState("table");
-  const [groupBy,     setGroupBy]     = useState(SUMMARY_GROUP_OPTIONS[0]);
 
+  /* ── Data state ── */
+  const [data, setData] = useState([]);
+  const [activeTab, setActiveTab] = useState("table");
+  const [groupBy, setGroupBy] = useState(SUMMARY_GROUP_OPTIONS[0]);
+
+  /* ── Debounced search ── */
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchTerm), 300);
     return () => clearTimeout(t);
   }, [searchTerm]);
 
-  // ── fetch ──────────────────────────────────────────────────────────────────
+  /* ── Fetch ── */
   const fetchData = async (startDate, endDate, loaderFn) => {
     loaderFn(true);
     setData([]);
@@ -127,63 +142,74 @@ const ManpowerReport = () => {
   };
 
   const handleQuery = () => {
-    if (!startTime || !endTime) return toast.error("Please select Start and End time.");
+    if (!startTime || !endTime)
+      return toast.error("Please select Start and End time.");
     fetchData(startTime, endTime, setLoading);
   };
 
   const handleYesterday = () => {
     const now = new Date();
-    const t8  = new Date(now); t8.setHours(7, 0, 0, 0);
-    const y8  = new Date(t8);  y8.setDate(t8.getDate() - 1);
+    const t8 = new Date(now);
+    t8.setHours(7, 0, 0, 0);
+    const y8 = new Date(t8);
+    y8.setDate(t8.getDate() - 1);
     fetchData(fmt(y8), fmt(t8), setYdayLoading);
   };
 
   const handleToday = () => {
     const now = new Date();
-    const t8  = new Date(now); t8.setHours(7, 0, 0, 0);
+    const t8 = new Date(now);
+    t8.setHours(7, 0, 0, 0);
     fetchData(fmt(t8), fmt(now), setTodayLoading);
   };
 
   const handleMTD = () => {
     const now = new Date();
-    const s   = new Date(now.getFullYear(), now.getMonth(), 1, 8, 0, 0);
+    const s = new Date(now.getFullYear(), now.getMonth(), 1, 8, 0, 0);
     fetchData(fmt(s), fmt(now), setMonthLoading);
   };
 
   const handleClear = () => {
-    setStartTime(""); setEndTime(""); setData([]);
-    setScanFilter(SCAN_OPTIONS[0]); setSearchTerm("");
+    setStartTime("");
+    setEndTime("");
+    setData([]);
+    setScanFilter(SCAN_OPTIONS[0]);
+    setSearchTerm("");
     setGroupBy(SUMMARY_GROUP_OPTIONS[0]);
   };
 
-  // ── derived stats ──────────────────────────────────────────────────────────
+  /* ── Derived stats ── */
   const stats = useMemo(() => {
-    const total       = data.length;
-    const inside      = data.filter(r => !r["Out Date Time"]).length;
-    const checkedOut  = total - inside;
-    const contractors = new Set(data.map(r => r.Contractor).filter(Boolean)).size;
-    const departments = new Set(data.map(r => r.Department).filter(Boolean)).size;
-    const shifts      = new Set(data.map(r => r.Shift).filter(Boolean)).size;
+    const total = data.length;
+    const inside = data.filter((r) => !r["Out Date Time"]).length;
+    const checkedOut = total - inside;
+    const contractors = new Set(data.map((r) => r.Contractor).filter(Boolean))
+      .size;
+    const departments = new Set(data.map((r) => r.Department).filter(Boolean))
+      .size;
+    const shifts = new Set(data.map((r) => r.Shift).filter(Boolean)).size;
     return { total, inside, checkedOut, contractors, departments, shifts };
   }, [data]);
 
-  // ── filter ─────────────────────────────────────────────────────────────────
+  /* ── Filtered data ── */
   const filteredData = useMemo(() => {
     let d = data;
-    if      (scanFilter.value === "inside") d = d.filter(r => !r["Out Date Time"]);
-    else if (scanFilter.value === "out")    d = d.filter(r =>  r["Out Date Time"]);
+    if (scanFilter.value === "inside") d = d.filter((r) => !r["Out Date Time"]);
+    else if (scanFilter.value === "out")
+      d = d.filter((r) => r["Out Date Time"]);
 
     if (debouncedSearch) {
       const s = debouncedSearch.toLowerCase();
-      d = d.filter(r =>
-        [r.Contractor, r["Workmen Name"], r.Department, r.Shift]
-          .some(v => v?.toString().toLowerCase().includes(s))
+      d = d.filter((r) =>
+        [r.Contractor, r["Workmen Name"], r.Department, r.Shift].some((v) =>
+          v?.toString().toLowerCase().includes(s),
+        ),
       );
     }
     return d;
   }, [data, scanFilter, debouncedSearch]);
 
-  // ── grouped summary ────────────────────────────────────────────────────────
+  /* ── Grouped summary ── */
   const groupedData = useMemo(() => {
     if (!data.length) return [];
     const map = data.reduce((acc, item) => {
@@ -198,391 +224,539 @@ const ManpowerReport = () => {
 
   const anyLoading = loading || ydayLoading || todayLoading || monthLoading;
 
+  /* ════════════════════════════════════════════
+     RENDER
+  ════════════════════════════════════════════ */
   return (
-    <div
-      className="min-h-screen bg-gray-50 text-gray-800 p-5"
-      style={{ fontFamily: "'DM Mono', 'Courier New', monospace" }}
-    >
-      {/* ── Header ── */}
-      <div className="mb-6 flex items-center justify-between border-b border-gray-200 pb-5">
+    <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
+      {/* ── Page sub-header ── */}
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
         <div>
-          <p className="text-xs tracking-[0.3em] text-gray-400 uppercase mb-1">
-            Security · Manpower Tracking
-          </p>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
-            <FiUsers className="text-blue-500" size={22} />
+          <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
             Manpower Report
           </h1>
+          <p className="text-[11px] text-slate-400">
+            Security · Workmen tracking · Contractor management
+          </p>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-gray-400 mb-1">Total Workmen</p>
-          <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
+        <div className="flex items-center gap-2">
+          <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-blue-50 border border-blue-100 min-w-[90px]">
+            <span className="text-xl font-bold font-mono text-blue-700">
+              {stats.total}
+            </span>
+            <span className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">
+              Total
+            </span>
+          </div>
+          {stats.total > 0 && (
+            <>
+              <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100 min-w-[90px]">
+                <span className="text-xl font-bold font-mono text-emerald-700">
+                  {stats.inside}
+                </span>
+                <span className="text-[10px] text-emerald-500 font-medium uppercase tracking-wide">
+                  Inside
+                </span>
+              </div>
+              <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-slate-50 border border-slate-200 min-w-[90px]">
+                <span className="text-xl font-bold font-mono text-slate-600">
+                  {stats.checkedOut}
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">
+                  Out
+                </span>
+              </div>
+              <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-amber-50 border border-amber-100 min-w-[90px]">
+                <span className="text-xl font-bold font-mono text-amber-700">
+                  {stats.contractors}
+                </span>
+                <span className="text-[10px] text-amber-500 font-medium uppercase tracking-wide">
+                  Contractors
+                </span>
+              </div>
+              <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-violet-50 border border-violet-100 min-w-[90px]">
+                <span className="text-xl font-bold font-mono text-violet-700">
+                  {stats.departments}
+                </span>
+                <span className="text-[10px] text-violet-500 font-medium uppercase tracking-wide">
+                  Departments
+                </span>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* ── Filter Row ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-        <div className="lg:col-span-2 bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-          <p className="text-xs tracking-widest text-gray-400 uppercase mb-4 flex items-center gap-2">
-            <FiFilter size={12} /> Filters
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                <FiCalendar size={11} /> Start Time
-              </label>
-              <input
-                type="datetime-local"
-                value={startTime}
-                onChange={e => setStartTime(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                <FiCalendar size={11} /> End Time
-              </label>
-              <input
-                type="datetime-local"
-                value={endTime}
-                onChange={e => setEndTime(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                <FiFilter size={11} /> Status
-              </label>
-              <div className="relative">
-                <select
-                  value={scanFilter.value}
-                  onChange={e => setScanFilter(SCAN_OPTIONS.find(o => o.value === e.target.value))}
-                  className="w-full appearance-none px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all pr-8"
-                >
-                  {SCAN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-                <FiChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-3 items-end">
-            <div className="flex-1 min-w-[160px]">
-              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                <FiSearch size={11} /> Search
-              </label>
-              <div className="relative">
-                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
+      {/* ── Body ── */}
+      <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3">
+        {/* ── Filters + Quick filters row ── */}
+        <div className="flex gap-3 shrink-0">
+          {/* Filters card */}
+          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
+              Filters
+            </p>
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="min-w-[185px] flex-1">
+                <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1 block">
+                  <Calendar className="w-3 h-3" /> Start Time
+                </label>
                 <input
-                  type="text"
-                  placeholder="Contractor, Workmen, Dept, Shift…"
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  className="w-full pl-8 pr-8 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  type="datetime-local"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
                 />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm("")}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              </div>
+              <div className="min-w-[185px] flex-1">
+                <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1 block">
+                  <Calendar className="w-3 h-3" /> End Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
+                />
+              </div>
+              <div className="min-w-[170px] flex-1">
+                <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1 block">
+                  <Filter className="w-3 h-3" /> Status
+                </label>
+                <div className="relative">
+                  <select
+                    value={scanFilter.value}
+                    onChange={(e) =>
+                      setScanFilter(
+                        SCAN_OPTIONS.find((o) => o.value === e.target.value),
+                      )
+                    }
+                    className="w-full appearance-none px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors pr-8"
                   >
-                    <FiX size={13} />
-                  </button>
-                )}
-              </div>
-            </div>
-            <button
-              onClick={handleQuery}
-              disabled={anyLoading}
-              className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2 shadow-md shadow-blue-200"
-            >
-              {loading ? <FiLoader size={13} className="animate-spin" /> : <FiSearch size={13} />}
-              Query
-            </button>
-            <ExportButton data={filteredData} filename="manpower_report" />
-            <button
-              onClick={handleClear}
-              className="px-4 py-2 rounded-lg border border-gray-200 hover:bg-red-50 hover:border-red-300 text-gray-400 hover:text-red-500 text-sm transition-all flex items-center gap-1.5"
-            >
-              <FiX size={13} /> Clear
-            </button>
-          </div>
-        </div>
-
-        {/* Quick Filters */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-          <p className="text-xs tracking-widest text-gray-400 uppercase mb-4 flex items-center gap-2">
-            <FiClock size={12} /> Quick Filters
-          </p>
-          <div className="flex flex-col gap-2.5">
-            <QuickBtn label="Yesterday"     onClick={handleYesterday} loading={ydayLoading}  color="yellow" />
-            <QuickBtn label="Today"         onClick={handleToday}     loading={todayLoading} color="blue"   />
-            <QuickBtn label="Month to Date" onClick={handleMTD}       loading={monthLoading} color="green"  />
-          </div>
-        </div>
-      </div>
-
-      {/* ── KPI Cards ── */}
-      {stats.total > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-          <StatCard icon={FiUsers}     label="Total Workmen"  value={stats.total}        color="blue"    />
-          <StatCard icon={FiCheckCircle} label="Inside"       value={stats.inside}
-            sub={`${Math.round((stats.inside / stats.total) * 100)}%`}                   color="emerald" />
-          <StatCard icon={FiAlertCircle} label="Checked Out"  value={stats.checkedOut}
-            sub={`${Math.round((stats.checkedOut / stats.total) * 100)}%`}               color="gray"    />
-          <StatCard icon={FiBriefcase} label="Contractors"    value={stats.contractors}  color="amber"   />
-          <StatCard icon={FiMapPin}    label="Departments"    value={stats.departments}  color="violet"  />
-          <StatCard icon={FiActivity}  label="Shifts"         value={stats.shifts}       color="red"     />
-        </div>
-      )}
-
-      {/* ── Presence bar ── */}
-      {stats.total > 0 && (
-        <div className="mb-4 bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs tracking-widest text-gray-400 uppercase flex items-center gap-2">
-              <FiActivity size={12} /> Presence Overview
-            </p>
-            <p className="text-xs text-gray-400">
-              {stats.inside} inside · {stats.checkedOut} checked out
-            </p>
-          </div>
-          <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-            <div
-              className="h-2.5 rounded-full bg-emerald-500 transition-all duration-700"
-              style={{ width: `${Math.round((stats.inside / stats.total) * 100)}%` }}
-            />
-          </div>
-          <div className="flex items-center gap-4 mt-2">
-            <span className="flex items-center gap-1.5 text-xs text-emerald-600">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-              Inside ({Math.round((stats.inside / stats.total) * 100)}%)
-            </span>
-            <span className="flex items-center gap-1.5 text-xs text-gray-400">
-              <span className="w-2 h-2 rounded-full bg-gray-200 inline-block" />
-              Checked Out ({Math.round((stats.checkedOut / stats.total) * 100)}%)
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* ── Tab Bar ── */}
-      <div className="flex items-center gap-1 mb-4 bg-white border border-gray-200 rounded-xl p-1 w-fit shadow-sm">
-        {[
-          { key: "table",   label: "Detail View", icon: FiList      },
-          { key: "summary", label: "Summary",     icon: FiBarChart2 },
-        ].map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setActiveTab(key)}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${
-              activeTab === key
-                ? "bg-blue-600 text-white shadow-md shadow-blue-200"
-                : "text-gray-400 hover:text-gray-700"
-            }`}
-          >
-            <Icon size={14} /> {label}
-          </button>
-        ))}
-        {filteredData.length > 0 && (
-          <span className="ml-2 text-xs bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded-full border border-gray-200">
-            {filteredData.length} rows
-          </span>
-        )}
-      </div>
-
-      {/* ── Detail Table ── */}
-      {activeTab === "table" && (
-        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-            <p className="text-xs tracking-widest text-gray-400 uppercase flex items-center gap-2">
-              <FiList size={12} /> Records
-            </p>
-            {filteredData.length > 0 && (
-              <span className="text-xs bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded-full border border-gray-200">
-                {filteredData.length} of {stats.total}
-              </span>
-            )}
-          </div>
-          <div className="max-h-[560px] overflow-auto">
-            {anyLoading ? (
-              <div className="flex items-center justify-center py-20 gap-3 text-gray-400">
-                <FiLoader size={20} className="animate-spin text-blue-500" />
-                <span className="text-sm">Loading records…</span>
-              </div>
-            ) : filteredData.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-2 text-gray-300 select-none">
-                <FiInbox size={40} />
-                <p className="text-sm text-gray-400">No records found</p>
-                <p className="text-xs text-gray-300">Apply filters and click Query</p>
-              </div>
-            ) : (
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 z-10">
-                  <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wider">
-                    {[
-                      ["#",             FiHash       ],
-                      ["Contractor",    FiBriefcase  ],
-                      ["Workmen Name",  FiUser       ],
-                      ["Department",    FiMapPin     ],
-                      ["Shift",         FiLayers     ],
-                      ["In Date Time",  FiCalendar   ],
-                      ["Out Date Time", FiCalendar   ],
-                      ["Status",        FiCheckCircle],
-                    ].map(([h, Icon]) => (
-                      <th key={h} className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                        <span className="flex items-center gap-1"><Icon size={10} /> {h}</span>
-                      </th>
+                    {SCAN_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredData.map((row, i) => (
-                    <tr key={i} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-2.5 text-gray-400">{i + 1}</td>
-
-                      <td className="px-4 py-2.5">
-                        <span className="font-medium text-gray-700 text-xs max-w-[180px] truncate block" title={row.Contractor}>
-                          {row.Contractor || "—"}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-2.5">
-                        <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md font-medium">
-                          <FiUser size={9} /> {row["Workmen Name"] || "—"}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap">
-                        {row.Department ? (
-                          <span className="inline-flex items-center gap-1 text-xs bg-violet-50 text-violet-600 border border-violet-200 px-2 py-0.5 rounded-md">
-                            <FiMapPin size={9} /> {row.Department}
-                          </span>
-                        ) : "—"}
-                      </td>
-
-                      <td className="px-4 py-2.5 text-gray-500">
-                        {row.Shift ? (
-                          <span className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-md">
-                            <FiLayers size={9} /> {row.Shift}
-                          </span>
-                        ) : "—"}
-                      </td>
-
-                      <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap font-mono">
-                        {fmtDisplay(row["In Date Time"])}
-                      </td>
-
-                      <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap font-mono">
-                        {fmtDisplay(row["Out Date Time"])}
-                      </td>
-
-                      <td className="px-4 py-2.5">
-                        <StatusBadge outTime={row["Out Date Time"]} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Summary Tab ── */}
-      {activeTab === "summary" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm lg:col-span-1">
-            <p className="text-xs tracking-widest text-gray-400 uppercase mb-4 flex items-center gap-2">
-              <FiBarChart2 size={12} /> Group By
-            </p>
-            <div className="flex flex-col gap-2">
-              {SUMMARY_GROUP_OPTIONS.map(opt => (
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="min-w-[180px] flex-1">
+                <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1 block">
+                  <Search className="w-3 h-3" /> Search
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
+                  <input
+                    type="text"
+                    placeholder="Contractor, Workmen, Dept…"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-8 pr-8 py-2 border border-slate-300 rounded-lg text-sm placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 pb-0.5 shrink-0">
                 <button
-                  key={opt.value}
-                  onClick={() => setGroupBy(opt)}
-                  className={`px-4 py-2.5 rounded-xl text-sm font-medium text-left transition-all flex items-center justify-between ${
-                    groupBy.value === opt.value
-                      ? "bg-blue-600 text-white shadow-md shadow-blue-200"
-                      : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200"
+                  onClick={handleQuery}
+                  disabled={anyLoading}
+                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    anyLoading
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
                   }`}
                 >
-                  {opt.label}
-                  {groupBy.value === opt.value && (
-                    <span className="text-xs bg-white/20 px-2 py-0.5 rounded-md">
-                      {groupedData.length} groups
-                    </span>
+                  {loading ? (
+                    <Spinner cls="w-4 h-4" />
+                  ) : (
+                    <Search className="w-4 h-4" />
                   )}
+                  {loading ? "Fetching…" : "Query"}
                 </button>
-              ))}
-            </div>
-            <div className="mt-4">
-              <ExportButton data={groupedData} filename="manpower_summary" />
+                {filteredData.length > 0 && (
+                  <ExportButton
+                    data={filteredData}
+                    filename="manpower_report"
+                  />
+                )}
+                <button
+                  onClick={handleClear}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-300 hover:bg-red-50 text-sm transition-all"
+                >
+                  <X className="w-3.5 h-3.5" /> Clear
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm lg:col-span-2">
-            <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-              <p className="text-xs tracking-widest text-gray-400 uppercase flex items-center gap-2">
-                <FiBarChart2 size={12} /> {groupBy.label} Breakdown
+          {/* Quick filters card */}
+          <div className="w-60 shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">
+              Quick Filters
+            </p>
+            <p className="text-[10px] text-slate-400 mb-3">
+              Pre-defined time ranges.
+            </p>
+            <div className="flex flex-col gap-2">
+              <QuickBtn
+                label="YESTERDAY"
+                sublabel="Prev day 07:00 → today 07:00"
+                loading={ydayLoading}
+                onClick={handleYesterday}
+                colorClass="bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+              />
+              <QuickBtn
+                label="TODAY"
+                sublabel="07:00 → now"
+                loading={todayLoading}
+                onClick={handleToday}
+                colorClass="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+              />
+              <QuickBtn
+                label="MTD"
+                sublabel="Month to date"
+                loading={monthLoading}
+                onClick={handleMTD}
+                colorClass="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Presence bar ── */}
+        {stats.total > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 shrink-0">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <Activity className="w-3 h-3" /> Presence Overview
               </p>
-              {groupedData.length > 0 && (
-                <span className="text-xs bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded-full border border-gray-200">
-                  {groupedData.length} groups
+              <p className="text-[11px] text-slate-400">
+                {stats.inside} inside · {stats.checkedOut} checked out
+              </p>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+              <div
+                className="h-2 rounded-full bg-emerald-500 transition-all duration-700"
+                style={{
+                  width: `${Math.round((stats.inside / stats.total) * 100)}%`,
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-4 mt-1.5">
+              <span className="flex items-center gap-1.5 text-[11px] text-emerald-600">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                Inside ({Math.round((stats.inside / stats.total) * 100)}%)
+              </span>
+              <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                <span className="w-2 h-2 rounded-full bg-slate-200 inline-block" />
+                Checked Out (
+                {Math.round((stats.checkedOut / stats.total) * 100)}%)
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* ── Tab Bar ── */}
+        <div className="flex items-center gap-1 shrink-0">
+          {[
+            { key: "table", label: "Detail View", icon: List },
+            { key: "summary", label: "Summary", icon: BarChart3 },
+          ].map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${
+                activeTab === key
+                  ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
+                  : "bg-white text-slate-400 hover:text-slate-700 border border-slate-200"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" /> {label}
+            </button>
+          ))}
+          {filteredData.length > 0 && (
+            <span className="ml-2 text-[11px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-full border border-slate-200 font-medium">
+              {filteredData.length} rows
+            </span>
+          )}
+        </div>
+
+        {/* ── Detail Table ── */}
+        {activeTab === "table" && (
+          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-0">
+            {/* Section header */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <List className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                  Records
+                </span>
+              </div>
+              {filteredData.length > 0 && (
+                <span className="text-[11px] text-slate-400">
+                  {filteredData.length} of {stats.total}
                 </span>
               )}
             </div>
-            <div className="max-h-[480px] overflow-y-auto">
-              {groupedData.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-300 select-none">
-                  <FiInbox size={36} />
-                  <p className="text-sm text-gray-400">No data to group</p>
+
+            {/* Table */}
+            <div className="flex-1 overflow-auto min-w-0">
+              {anyLoading && data.length === 0 ? (
+                <div className="flex items-center justify-center h-full gap-2 text-blue-600">
+                  <Spinner cls="w-5 h-5" />
+                  <span className="text-sm">Loading records…</span>
+                </div>
+              ) : filteredData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400">
+                  <PackageOpen
+                    className="w-12 h-12 opacity-20"
+                    strokeWidth={1.2}
+                  />
+                  <p className="text-sm">No records found</p>
+                  <p className="text-xs text-slate-300">
+                    Apply filters and click Query
+                  </p>
                 </div>
               ) : (
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0">
-                    <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider">
-                      <th className="px-5 py-3 text-left font-medium w-10"><FiHash size={11} /></th>
-                      <th className="px-5 py-3 text-left font-medium">{groupBy.label}</th>
-                      <th className="px-5 py-3 text-right font-medium">Total</th>
-                      <th className="px-5 py-3 text-right font-medium">Inside</th>
-                      <th className="px-5 py-3 text-right font-medium">Share</th>
+                <table className="min-w-[1200px] w-full text-xs text-left border-separate border-spacing-0">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-slate-100">
+                      {[
+                        ["#", Hash],
+                        ["Contractor", Briefcase],
+                        ["Workmen Name", User],
+                        ["Department", MapPin],
+                        ["Shift", Layers],
+                        ["In Date Time", Calendar],
+                        ["Out Date Time", Calendar],
+                        ["Status", CheckCircle2],
+                      ].map(([h, Icon]) => (
+                        <th
+                          key={h}
+                          className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap"
+                        >
+                          <span className="flex items-center gap-1">
+                            <Icon className="w-2.5 h-2.5" /> {h}
+                          </span>
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {groupedData.map((item, i) => {
-                      const pct    = stats.total ? Math.round((item.total  / stats.total) * 100) : 0;
-                      const insPct = item.total  ? Math.round((item.inside / item.total)  * 100) : 0;
-                      return (
-                        <tr key={i} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="px-5 py-3 text-gray-400 text-xs">{i + 1}</td>
-                          <td className="px-5 py-3">
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="h-1.5 rounded-full bg-blue-400"
-                                style={{ width: `${Math.max(pct, 4)}%`, maxWidth: "100px" }}
-                              />
-                              <span className="text-gray-700 text-xs font-medium truncate max-w-[200px]" title={item.key}>
-                                {item.key}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-5 py-3 text-right font-bold text-gray-900">{item.total}</td>
-                          <td className="px-5 py-3 text-right">
-                            <span className={`text-xs font-semibold ${insPct === 100 ? "text-emerald-600" : insPct > 50 ? "text-amber-500" : "text-red-500"}`}>
-                              {item.inside} ({insPct}%)
+                    {filteredData.map((row, i) => (
+                      <tr
+                        key={i}
+                        className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
+                      >
+                        <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-400 whitespace-nowrap">
+                          {i + 1}
+                        </td>
+                        <td
+                          className="px-3 py-2 border-b border-slate-100 font-medium text-slate-700 whitespace-nowrap max-w-[180px] truncate"
+                          title={row.Contractor}
+                        >
+                          {row.Contractor || "—"}
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 text-[11px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md font-medium">
+                            <User className="w-2.5 h-2.5" />{" "}
+                            {row["Workmen Name"] || "—"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100 text-slate-500 whitespace-nowrap">
+                          {row.Department ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] bg-violet-50 text-violet-600 border border-violet-200 px-2 py-0.5 rounded-md">
+                              <MapPin className="w-2.5 h-2.5" />{" "}
+                              {row.Department}
                             </span>
-                          </td>
-                          <td className="px-5 py-3 text-right text-xs text-gray-500">{pct}%</td>
-                        </tr>
-                      );
-                    })}
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100 text-slate-500 whitespace-nowrap">
+                          {row.Shift ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-md">
+                              <Layers className="w-2.5 h-2.5" /> {row.Shift}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100 text-slate-500 whitespace-nowrap font-mono text-[10px]">
+                          {fmtDisplay(row["In Date Time"])}
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100 text-slate-500 whitespace-nowrap font-mono text-[10px]">
+                          {fmtDisplay(row["Out Date Time"])}
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100">
+                          <StatusBadge outTime={row["Out Date Time"]} />
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* ── Summary Tab ── */}
+        {activeTab === "summary" && (
+          <div className="flex-1 flex gap-3 min-h-0 overflow-hidden">
+            {/* Group By panel */}
+            <div className="w-64 shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+              <div className="px-4 py-2.5 border-b border-slate-100 shrink-0">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <BarChart3 className="w-3 h-3" /> Group By
+                </span>
+              </div>
+              <div className="flex flex-col gap-2 p-3 flex-1">
+                {SUMMARY_GROUP_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setGroupBy(opt)}
+                    className={`px-4 py-2.5 rounded-lg text-sm font-medium text-left transition-all flex items-center justify-between ${
+                      groupBy.value === opt.value
+                        ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
+                        : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+                    }`}
+                  >
+                    {opt.label}
+                    {groupBy.value === opt.value && (
+                      <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-md">
+                        {groupedData.length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="p-3 border-t border-slate-100 shrink-0">
+                {groupedData.length > 0 && (
+                  <ExportButton
+                    data={groupedData}
+                    filename="manpower_summary"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Breakdown table */}
+            <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-0">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 shrink-0">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                    {groupBy.label} Breakdown
+                  </span>
+                </div>
+                {groupedData.length > 0 && (
+                  <span className="text-[11px] text-slate-400">
+                    {groupedData.length} groups
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 overflow-auto min-w-0">
+                {groupedData.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400">
+                    <PackageOpen
+                      className="w-12 h-12 opacity-20"
+                      strokeWidth={1.2}
+                    />
+                    <p className="text-sm">No data to group</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-xs text-left border-separate border-spacing-0">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="bg-slate-100">
+                        <th className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 w-10">
+                          <Hash className="w-3 h-3" />
+                        </th>
+                        <th className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200">
+                          {groupBy.label}
+                        </th>
+                        <th className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-right">
+                          Total
+                        </th>
+                        <th className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-right">
+                          Inside
+                        </th>
+                        <th className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-right">
+                          Share
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupedData.map((item, i) => {
+                        const pct = stats.total
+                          ? Math.round((item.total / stats.total) * 100)
+                          : 0;
+                        const insPct = item.total
+                          ? Math.round((item.inside / item.total) * 100)
+                          : 0;
+                        return (
+                          <tr
+                            key={i}
+                            className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
+                          >
+                            <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-400">
+                              {i + 1}
+                            </td>
+                            <td className="px-3 py-2 border-b border-slate-100">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="h-1.5 rounded-full bg-blue-400"
+                                  style={{
+                                    width: `${Math.max(pct, 4)}%`,
+                                    maxWidth: "100px",
+                                  }}
+                                />
+                                <span
+                                  className="text-slate-700 font-medium truncate max-w-[200px]"
+                                  title={item.key}
+                                >
+                                  {item.key}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 border-b border-slate-100 text-right font-bold text-slate-800">
+                              {item.total}
+                            </td>
+                            <td className="px-3 py-2 border-b border-slate-100 text-right">
+                              <span
+                                className={`font-semibold ${
+                                  insPct === 100
+                                    ? "text-emerald-600"
+                                    : insPct > 50
+                                      ? "text-amber-500"
+                                      : "text-red-500"
+                                }`}
+                              >
+                                {item.inside} ({insPct}%)
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 border-b border-slate-100 text-right text-slate-500">
+                              {pct}%
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
