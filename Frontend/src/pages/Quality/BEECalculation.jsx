@@ -1,36 +1,57 @@
 import { useState, useEffect } from "react";
-import InputField from "../../components/ui/InputField";
-import Title from "../../components/ui/Title";
-import Button from "../../components/ui/Button";
 import axios from "axios";
+import toast from "react-hot-toast";
+import InputField from "../../components/ui/InputField";
 import { baseURL } from "../../assets/assets";
 import {
-  FaStar,
-  FaSave,
-  FaCog,
-  FaBoxOpen,
-  FaSearch,
-  FaTrash,
-  FaPlus,
-  FaArrowUp,
-} from "react-icons/fa";
-import toast from "react-hot-toast";
-import { RxCross1 } from "react-icons/rx";
+  Star,
+  Save,
+  Settings,
+  PackageOpen,
+  Search,
+  Trash2,
+  Plus,
+  ArrowUp,
+  X,
+  Loader2,
+  Zap,
+  Thermometer,
+  GlassWater,
+  Box,
+  ChevronDown,
+} from "lucide-react";
 
-/* ================= CONSTANTS ================= */
+/* ── Spinner ── */
+const Spinner = ({ cls = "w-4 h-4" }) => (
+  <Loader2 className={`animate-spin ${cls}`} />
+);
+
+/* ═══════════════════════════════════════════
+   CONSTANTS
+═══════════════════════════════════════════ */
 const STAR_COLORS = {
   1: "bg-red-500",
   2: "bg-orange-500",
   3: "bg-yellow-500",
-  4: "bg-green-600",
+  4: "bg-emerald-600",
   5: "bg-blue-700",
 };
 
-/* ================= HELPER FUNCTIONS ================= */
+const STAR_BADGE_COLORS = {
+  1: "bg-red-50 text-red-700 border-red-200",
+  2: "bg-orange-50 text-orange-700 border-orange-200",
+  3: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  4: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  5: "bg-blue-50 text-blue-700 border-blue-200",
+};
+
+/* ═══════════════════════════════════════════
+   HELPER FUNCTIONS
+═══════════════════════════════════════════ */
 const getAchievedStar = (table) =>
   table.find((r) => r.status === "TRUE")?.star || "Not Qualified";
 
-const getStarClass = (star) => STAR_COLORS[star] || "bg-gray-500";
+const getStarClass = (star) => STAR_COLORS[star] || "bg-slate-500";
 
 const calcHard = (V, E) => {
   const A = E * 365;
@@ -41,7 +62,6 @@ const calcHard = (V, E) => {
     { star: 4, min: 1.8 * V + 54.04, max: 2.25 * V + 67.55 },
     { star: 5, min: 0, max: 1.8 * V + 54.04 },
   ];
-
   return ranges.map((r) => ({
     star: r.star,
     min: r.min,
@@ -67,7 +87,6 @@ const calcGlass = (V, E) => {
     { star: 4, min: 2.61 * V + 174.47, max: 3.27 * V + 218.09 },
     { star: 5, min: 0, max: 2.61 * V + 174.47 },
   ];
-
   return ranges.map((r) => ({
     star: r.star,
     min: r.min,
@@ -86,49 +105,253 @@ const calcGlass = (V, E) => {
 
 const getNextStarImprovement = (table, currentKWh) => {
   if (!table || table.length === 0) return null;
-
   const row = table.find((r) => r.status === "TRUE");
 
-  // If no row achieved TRUE yet
   if (!row) {
-    const next = table[table.length - 1]; // pick the last star (lowest) as next
+    const next = table[table.length - 1];
     const requiredKWh = (next.max / 365).toFixed(2);
     const improve = (currentKWh - requiredKWh).toFixed(2);
-
     return (
-      <span className="flex items-center justify-center gap-2">
-        <FaArrowUp />
-        Reduce {improve} kWh/day to reach <FaStar /> {next.star}
+      <span className="flex items-center justify-center gap-1.5 text-xs">
+        <ArrowUp className="w-3 h-3" />
+        Reduce {improve} kWh/day to reach
+        <Star className="w-3 h-3" /> {next.star}
       </span>
     );
   }
 
-  // Already 5-star?
   if (row.star === 5) {
     return (
-      <span className="flex items-center justify-center gap-2">
-        <FaStar /> Already 5 Star — Best Efficiency Achieved
+      <span className="flex items-center justify-center gap-1.5 text-xs">
+        <Star className="w-3 h-3" /> Already 5 Star — Best Efficiency Achieved
       </span>
     );
   }
 
-  // Otherwise, get the next higher star
   const currentIndex = table.findIndex((r) => r.star === row.star);
-  const next = table[currentIndex - 1]; // previous in array = higher star
-  if (!next) return null; // safety check
+  const next = table[currentIndex - 1];
+  if (!next) return null;
 
   const requiredKWh = (next.max / 365).toFixed(2);
   const improve = (currentKWh - requiredKWh).toFixed(2);
-
   return (
-    <span className="flex items-center justify-center gap-2">
-      <FaArrowUp />
-      Reduce {improve} kWh/day to reach <FaStar /> {next.star}
+    <span className="flex items-center justify-center gap-1.5 text-xs">
+      <ArrowUp className="w-3 h-3" />
+      Reduce {improve} kWh/day to reach
+      <Star className="w-3 h-3" /> {next.star}
     </span>
   );
 };
 
-/* ================= COMPONENT ================= */
+/* ═══════════════════════════════════════════
+   CALCULATOR PANEL (reusable for Hard/Glass)
+═══════════════════════════════════════════ */
+const CalcPanel = ({
+  type,
+  icon: Icon,
+  accentColor,
+  state,
+  setState,
+  otherState,
+  setOtherState,
+  table,
+  setTable,
+  calcFn,
+  models,
+  showList,
+  setShowList,
+  energyLabel,
+}) => {
+  const filteredModels = models.filter(
+    (m) =>
+      m.type === type &&
+      m.model.toLowerCase().includes(state.model.toLowerCase()),
+  );
+
+  const achievedStar = getAchievedStar(table);
+  const isQualified = typeof achievedStar === "number";
+
+  return (
+    <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-0">
+      {/* Panel header */}
+      <div
+        className={`flex items-center justify-between px-4 py-2.5 border-b border-slate-100 shrink-0`}
+      >
+        <div className="flex items-center gap-2">
+          <Icon className={`w-4 h-4 ${accentColor}`} />
+          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+            {type}
+          </span>
+        </div>
+        {table.length > 0 && (
+          <span
+            className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border ${
+              isQualified
+                ? STAR_BADGE_COLORS[achievedStar] ||
+                  "bg-slate-100 text-slate-600 border-slate-200"
+                : "bg-red-50 text-red-600 border-red-200"
+            }`}
+          >
+            <Star className="w-3 h-3" />
+            {isQualified ? `${achievedStar} Star` : "Not Qualified"}
+          </span>
+        )}
+      </div>
+
+      {/* Panel body */}
+      <div className="flex-1 overflow-auto p-4">
+        {/* Model input with dropdown */}
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
+          <InputField
+            label="Model"
+            value={state.model}
+            disabled={!!otherState.model}
+            onFocus={() => setShowList(true)}
+            onChange={(e) => {
+              setState({ ...state, model: e.target.value });
+              setShowList(true);
+              if (e.target.value)
+                setOtherState({
+                  ...otherState,
+                  model: "",
+                  energy: "",
+                  volume: "",
+                });
+            }}
+          />
+          {showList && state.model && (
+            <ul className="absolute w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto z-50 mt-1">
+              {filteredModels.length > 0 ? (
+                filteredModels.map((m, i) => (
+                  <li
+                    key={i}
+                    className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm text-slate-700 transition-colors"
+                    onClick={() => {
+                      setState({
+                        model: m.model,
+                        volume: m.volume,
+                        energy: "",
+                      });
+                      setTable([]);
+                      setShowList(false);
+                    }}
+                  >
+                    <span className="font-medium">{m.model}</span>
+                    <span className="text-slate-400 ml-2">— {m.volume}L</span>
+                  </li>
+                ))
+              ) : (
+                <li className="px-3 py-2 text-sm text-slate-400">
+                  No models found
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
+
+        <InputField label="Volume (L)" value={state.volume} disabled />
+
+        <InputField
+          label="Energy kWh/day"
+          type="number"
+          value={state.energy}
+          onChange={(e) => {
+            setState({ ...state, energy: e.target.value });
+            setTable(calcFn(state.volume, e.target.value));
+          }}
+        />
+
+        {/* Improvement hint */}
+        {table.length > 0 && (
+          <div className={`mt-3 text-center ${accentColor} font-semibold`}>
+            {getNextStarImprovement(table, state.energy)}
+          </div>
+        )}
+
+        {/* Results table */}
+        {table.length > 0 && (
+          <div className="mt-4">
+            <table className="w-full text-xs border-separate border-spacing-0">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-slate-100">
+                  <th className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-center">
+                    Star
+                  </th>
+                  <th
+                    colSpan={3}
+                    className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-center"
+                  >
+                    {energyLabel}
+                  </th>
+                  <th className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-center">
+                    Status
+                  </th>
+                </tr>
+                <tr className="bg-slate-50">
+                  <th className="px-3 py-1.5 text-[10px] text-slate-400 border-b border-slate-200"></th>
+                  <th className="px-3 py-1.5 text-[10px] text-slate-400 border-b border-slate-200 text-center">
+                    Min
+                  </th>
+                  <th className="px-3 py-1.5 text-[10px] text-slate-400 border-b border-slate-200 text-center">
+                    Actual
+                  </th>
+                  <th className="px-3 py-1.5 text-[10px] text-slate-400 border-b border-slate-200 text-center">
+                    Max
+                  </th>
+                  <th className="px-3 py-1.5 text-[10px] text-slate-400 border-b border-slate-200"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {table.map((r, i) => (
+                  <tr
+                    key={i}
+                    className={`transition-colors ${
+                      r.status === "TRUE"
+                        ? "bg-emerald-50 font-bold"
+                        : "hover:bg-blue-50/60 even:bg-slate-50/40"
+                    }`}
+                  >
+                    <td className="px-3 py-2 border-b border-slate-100 text-center">
+                      <span
+                        className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md text-white ${getStarClass(r.star)}`}
+                      >
+                        <Star className="w-2.5 h-2.5" /> {r.star}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 border-b border-slate-100 text-center font-mono text-slate-600">
+                      {r.min.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 border-b border-slate-100 text-center font-mono text-slate-800 font-semibold">
+                      {(r.Et ?? r.AEC)?.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 border-b border-slate-100 text-center font-mono text-slate-600">
+                      {r.max.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 border-b border-slate-100 text-center">
+                      <span
+                        className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                          r.status === "TRUE"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-red-50 text-red-500"
+                        }`}
+                      >
+                        {r.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════
+   MAIN COMPONENT
+═══════════════════════════════════════════ */
 export default function BEECalculation() {
   const [models, setModels] = useState([]);
   const [hard, setHard] = useState({ model: "", volume: "", energy: "" });
@@ -139,10 +362,15 @@ export default function BEECalculation() {
   const [showHardList, setShowHardList] = useState(false);
   const [showGlassList, setShowGlassList] = useState(false);
   const [showModelPopup, setShowModelPopup] = useState(false);
-  const [newModel, setNewModel] = useState({ model: "", volume: "" });
+  const [newModel, setNewModel] = useState({
+    model: "",
+    volume: "",
+    type: "",
+  });
   const [searchModel, setSearchModel] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  /* ================= FETCH MODELS ================= */
+  /* ── Fetch models ── */
   useEffect(() => {
     (async () => {
       try {
@@ -154,7 +382,7 @@ export default function BEECalculation() {
     })();
   }, []);
 
-  /* ================= CLOSE DROPDOWNS ================= */
+  /* ── Close dropdowns on outside click ── */
   useEffect(() => {
     const close = () => {
       setShowHardList(false);
@@ -164,15 +392,12 @@ export default function BEECalculation() {
     return () => document.removeEventListener("click", close);
   }, []);
 
-  /* ================= API ACTIONS ================= */
+  /* ── Save rating ── */
   const saveRating = async () => {
-    const toastId = toast.loading("Saving BEE Rating...");
-
     if (!hard.model && !glass.model) {
-      toast.error("Please enter either Hard Top or Glass Top", { id: toastId });
+      toast.error("Please enter either Hard Top or Glass Top.");
       return;
     }
-
     const payload = hard.model
       ? {
           hardModel: hard.model,
@@ -186,31 +411,36 @@ export default function BEECalculation() {
           glassModel: glass.model,
           glassRating: getAchievedStar(glassTable),
         };
-
+    setSaving(true);
     try {
       await axios.post(`${baseURL}quality/bee/save-rating`, payload);
-      toast.success("BEE Rating saved successfully", { id: toastId });
+      toast.success("BEE Rating saved successfully.");
       setHard({ model: "", volume: "", energy: "" });
       setGlass({ model: "", volume: "", energy: "" });
       setHardTable([]);
       setGlassTable([]);
     } catch {
-      toast.error("Failed to save BEE Rating", { id: toastId });
+      toast.error("Failed to save BEE Rating.");
+    } finally {
+      setSaving(false);
     }
   };
 
+  /* ── Save models ── */
   const saveModels = async () => {
-    const toastId = toast.loading("Saving models...");
+    setSaving(true);
     try {
       await axios.post(`${baseURL}quality/bee/models`, models);
-      toast.success("Model updated successfully", { id: toastId });
+      toast.success("Models updated successfully.");
       setShowModelPopup(false);
     } catch {
-      toast.error("Failed to save models", { id: toastId });
+      toast.error("Failed to save models.");
+    } finally {
+      setSaving(false);
     }
   };
 
-  /* ================= MODEL CRUD ================= */
+  /* ── Model CRUD ── */
   const addModel = () => {
     if (!newModel.model || !newModel.volume || !newModel.type)
       return toast.error("Please enter Model name, Volume and Type.");
@@ -219,339 +449,209 @@ export default function BEECalculation() {
   };
 
   const deleteModel = async (name) => {
-    const toastId = toast.loading(`Deleting model ${name}...`);
-
     try {
-      // Call API to delete the model
       await axios.delete(`${baseURL}quality/bee/models/${name}`);
-
-      // Remove from frontend state after successful deletion
       setModels((prev) => prev.filter((m) => m.model !== name));
-
-      toast.success(`Model ${name} deleted successfully`, { id: toastId });
-    } catch (error) {
-      console.error(error);
-      toast.error(`Failed to delete model ${name}`, { id: toastId });
+      toast.success(`Model ${name} deleted.`);
+    } catch {
+      toast.error(`Failed to delete model ${name}.`);
     }
   };
 
+  /* ── Computed ── */
+  const hardStar = hardTable.length > 0 ? getAchievedStar(hardTable) : null;
+  const glassStar = glassTable.length > 0 ? getAchievedStar(glassTable) : null;
+
+  /* ════════════════════════════════════════════
+     RENDER
+  ════════════════════════════════════════════ */
   return (
-    <div className="p-10 bg-gray-100 min-h-screen">
-      <Title
-        title="BEE Star Rating Calculator"
-        align="center"
-        className="text-3xl font-bold mb-8"
-      />
-
-      <div className="flex justify-end mb-4">
-        <Button
-          onClick={() => setShowModelPopup(true)}
-          className="bg-indigo-600 text-white px-6 rounded"
-        >
-          <FaCog className="inline mr-2" />
-          Manage Models
-        </Button>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-10">
-        {/* ================= HARD TOP ================= */}
-        <div className="bg-white p-7 rounded-xl shadow border border-blue-400">
-          <h2 className="text-center text-xl font-bold text-blue-700 mb-3">
-            Hard Top
-          </h2>
-
-          <div className="relative" onClick={(e) => e.stopPropagation()}>
-            <InputField
-              label="Model"
-              value={hard.model}
-              disabled={!!glass.model}
-              onFocus={() => setShowHardList(true)}
-              onChange={(e) => {
-                setHard({ ...hard, model: e.target.value });
-                setShowHardList(true);
-                if (e.target.value)
-                  setGlass({ ...glass, model: "", energy: "", volume: "" });
-              }}
-            />
-
-            {showHardList && hard.model && (
-              <ul className="absolute w-full bg-white border rounded shadow max-h-40 overflow-y-auto z-50">
-                {models.filter(
-                  (m) =>
-                    m.type === "Hard Top" &&
-                    m.model.toLowerCase().includes(hard.model.toLowerCase()),
-                ).length > 0 ? (
-                  models
-                    .filter(
-                      (m) =>
-                        m.type === "Hard Top" &&
-                        m.model
-                          .toLowerCase()
-                          .includes(hard.model.toLowerCase()),
-                    )
-                    .map((m, i) => (
-                      <li
-                        key={i}
-                        className="p-2 hover:bg-blue-100 cursor-pointer"
-                        onClick={() => {
-                          setHard({
-                            model: m.model,
-                            volume: m.volume,
-                            energy: "",
-                          });
-                          setHardTable([]);
-                          setShowHardList(false);
-                        }}
-                      >
-                        {m.model} - {m.volume}L
-                      </li>
-                    ))
-                ) : (
-                  <li className="p-2 text-gray-400">No models found</li>
-                )}
-              </ul>
-            )}
-          </div>
-
-          <InputField label="Volume" value={hard.volume} disabled />
-
-          <InputField
-            label="Energy kWh/day"
-            type="number"
-            value={hard.energy}
-            onChange={(e) => {
-              setHard({ ...hard, energy: e.target.value });
-              setHardTable(calcHard(hard.volume, e.target.value));
-            }}
-          />
-
-          {hardTable.length > 0 && (
-            <div className="mt-3 text-center">
-              <span
-                className={`px-5 py-2 text-white rounded inline-block ${getStarClass(
-                  getAchievedStar(hardTable),
-                )}`}
-              >
-                <FaStar className="inline mr-2" />
-                {getAchievedStar(hardTable)}
-              </span>
-
-              <p className="mt-1 text-blue-700 font-semibold text-sm">
-                {getNextStarImprovement(hardTable, hard.energy)}
-              </p>
-            </div>
-          )}
-
-          {hardTable.length > 0 && (
-            <table className="w-full mt-4 text-center border">
-              <thead className="bg-blue-100">
-                <tr>
-                  <th>Star</th>
-                  <th colSpan={3}>
-                    Annual Energy Consumption (Et) in kWh/year at 38°C
-                  </th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {hardTable.map((r, i) => (
-                  <tr
-                    key={i}
-                    className={
-                      r.status === "TRUE" ? "bg-green-200 font-bold" : ""
-                    }
-                  >
-                    <td>{r.star}</td>
-                    <td>{r.min.toFixed(2)}</td>
-                    <td>{r.Et.toFixed(2)}</td>
-                    <td>{r.max.toFixed(2)}</td>
-                    <td
-                      className={
-                        r.status === "TRUE" ? "text-green-700" : "text-red-600"
-                      }
-                    >
-                      {r.status}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+    <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
+      {/* ── Page sub-header ── */}
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
+        <div>
+          <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
+            BEE Star Rating Calculator
+          </h1>
+          <p className="text-[11px] text-slate-400">
+            Bureau of Energy Efficiency · Hard Top & Glass Top rating
+          </p>
         </div>
-
-        {/* ================= GLASS TOP ================= */}
-        <div className="bg-white p-7 rounded-xl shadow border border-green-400">
-          <h2 className="text-center text-xl font-bold text-green-700 mb-3">
-            Glass Top
-          </h2>
-
-          <div className="relative" onClick={(e) => e.stopPropagation()}>
-            <InputField
-              label="Model"
-              value={glass.model}
-              disabled={!!hard.model}
-              onFocus={() => setShowGlassList(true)}
-              onChange={(e) => {
-                setGlass({ ...glass, model: e.target.value });
-                setShowGlassList(true);
-                if (e.target.value)
-                  setHard({ ...hard, model: "", energy: "", volume: "" });
-              }}
-            />
-
-            {showGlassList && glass.model && (
-              <ul className="absolute w-full bg-white border rounded shadow max-h-40 overflow-y-auto z-50">
-                {models.filter(
-                  (m) =>
-                    m.type === "Glass Top" &&
-                    m.model.toLowerCase().includes(glass.model.toLowerCase()),
-                ).length > 0 ? (
-                  models
-                    .filter(
-                      (m) =>
-                        m.type === "Glass Top" &&
-                        m.model
-                          .toLowerCase()
-                          .includes(glass.model.toLowerCase()),
-                    )
-                    .map((m, i) => (
-                      <li
-                        key={i}
-                        className="p-2 hover:bg-green-100 cursor-pointer"
-                        onClick={() => {
-                          setGlass({
-                            model: m.model,
-                            volume: m.volume,
-                            energy: "",
-                          });
-                          setGlassTable([]);
-                          setShowGlassList(false);
-                        }}
-                      >
-                        {m.model} - {m.volume}L
-                      </li>
-                    ))
-                ) : (
-                  <li className="p-2 text-gray-400">No models found</li>
-                )}
-              </ul>
-            )}
-          </div>
-
-          <InputField label="Volume" value={glass.volume} disabled />
-
-          <InputField
-            label="Energy kWh/day"
-            type="number"
-            value={glass.energy}
-            onChange={(e) => {
-              setGlass({ ...glass, energy: e.target.value });
-              setGlassTable(calcGlass(glass.volume, e.target.value));
-            }}
-          />
-
-          {glassTable.length > 0 && (
-            <div className="mt-3 text-center">
-              <span
-                className={`px-5 py-2 text-white rounded inline-block ${getStarClass(
-                  getAchievedStar(glassTable),
-                )}`}
-              >
-                <FaStar className="inline mr-2" />
-                {getAchievedStar(glassTable)}
+        <div className="flex items-center gap-2">
+          {hardStar && (
+            <div
+              className={`flex flex-col items-center px-4 py-1.5 rounded-lg border min-w-[90px] ${
+                typeof hardStar === "number"
+                  ? STAR_BADGE_COLORS[hardStar]
+                  : "bg-red-50 border-red-200"
+              }`}
+            >
+              <span className="text-xl font-bold font-mono flex items-center gap-1">
+                <Star className="w-4 h-4" />
+                {typeof hardStar === "number" ? hardStar : "—"}
               </span>
-
-              <p className="mt-1 text-green-700 font-semibold text-sm">
-                {getNextStarImprovement(glassTable, glass.energy)}
-              </p>
+              <span className="text-[10px] font-medium uppercase tracking-wide">
+                Hard Top
+              </span>
             </div>
           )}
-
-          {glassTable.length > 0 && (
-            <table className="w-full mt-4 text-center border">
-              <thead className="bg-green-100">
-                <tr>
-                  <th>Star</th>
-                  <th colSpan={3}>
-                    Annual Energy Consumption (AEC) in kWh/year at 38°C
-                  </th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {glassTable.map((r, i) => (
-                  <tr
-                    key={i}
-                    className={
-                      r.status === "TRUE" ? "bg-green-200 font-bold" : ""
-                    }
-                  >
-                    <td>{r.star}</td>
-                    <td>{r.min.toFixed(2)}</td>
-                    <td>{r.AEC.toFixed(2)}</td>
-                    <td>{r.max.toFixed(2)}</td>
-                    <td
-                      className={
-                        r.status === "TRUE" ? "text-green-700" : "text-red-600"
-                      }
-                    >
-                      {r.status}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {glassStar && (
+            <div
+              className={`flex flex-col items-center px-4 py-1.5 rounded-lg border min-w-[90px] ${
+                typeof glassStar === "number"
+                  ? STAR_BADGE_COLORS[glassStar]
+                  : "bg-red-50 border-red-200"
+              }`}
+            >
+              <span className="text-xl font-bold font-mono flex items-center gap-1">
+                <Star className="w-4 h-4" />
+                {typeof glassStar === "number" ? glassStar : "—"}
+              </span>
+              <span className="text-[10px] font-medium uppercase tracking-wide">
+                Glass Top
+              </span>
+            </div>
           )}
+          <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-slate-50 border border-slate-200 min-w-[90px]">
+            <span className="text-xl font-bold font-mono text-slate-700">
+              {models.length}
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">
+              Models
+            </span>
+          </div>
         </div>
       </div>
 
-      <div className="text-center mt-10">
-        <Button
-          onClick={saveRating}
-          className="bg-blue-600 text-white px-8 py-2 rounded text-lg"
-        >
-          <FaSave className="inline mr-2" />
-          Save BEE Rating
-        </Button>
+      {/* ── Body ── */}
+      <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3">
+        {/* ── Actions bar ── */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+              Actions
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowModelPopup(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 transition-all"
+              >
+                <Settings className="w-4 h-4" /> Manage Models
+              </button>
+              <button
+                onClick={saveRating}
+                disabled={saving || (!hard.model && !glass.model)}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  saving || (!hard.model && !glass.model)
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                }`}
+              >
+                {saving ? (
+                  <Spinner cls="w-4 h-4" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                {saving ? "Saving..." : "Save BEE Rating"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Two-panel calculators ── */}
+        <div className="flex-1 flex gap-3 min-h-0 overflow-hidden">
+          <CalcPanel
+            type="Hard Top"
+            icon={Thermometer}
+            accentColor="text-blue-600"
+            state={hard}
+            setState={setHard}
+            otherState={glass}
+            setOtherState={setGlass}
+            table={hardTable}
+            setTable={setHardTable}
+            calcFn={calcHard}
+            models={models}
+            showList={showHardList}
+            setShowList={setShowHardList}
+            energyLabel="Annual Energy (Et) kWh/year at 38°C"
+          />
+          <CalcPanel
+            type="Glass Top"
+            icon={GlassWater}
+            accentColor="text-emerald-600"
+            state={glass}
+            setState={setGlass}
+            otherState={hard}
+            setOtherState={setHard}
+            table={glassTable}
+            setTable={setGlassTable}
+            calcFn={calcGlass}
+            models={models}
+            showList={showGlassList}
+            setShowList={setShowGlassList}
+            energyLabel="Annual Energy (AEC) kWh/year at 38°C"
+          />
+        </div>
       </div>
 
-      {/* ================= MODEL MASTER POPUP ================= */}
+      {/* ═══════════════════════════════════════════
+         MODEL MASTER POPUP
+      ═══════════════════════════════════════════ */}
       {showModelPopup && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[999] p-4">
-          <div className="bg-white w-full max-w-3xl p-6 rounded-2xl shadow-2xl relative">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-5 border-b pb-2">
-              <h2 className="text-2xl font-bold text-indigo-700 flex items-center gap-2">
-                <FaBoxOpen /> Model Master Management
-              </h2>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[999] p-4">
+          <div className="bg-white w-full max-w-3xl rounded-xl shadow-2xl border border-slate-200 flex flex-col max-h-[90vh]">
+            {/* Popup header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 shrink-0">
+              <div className="flex items-center gap-2">
+                <Box className="w-5 h-5 text-slate-600" />
+                <div>
+                  <h2 className="text-base font-bold text-slate-800">
+                    Model Master Management
+                  </h2>
+                  <p className="text-[11px] text-slate-400">
+                    Add, edit or remove BEE models
+                  </p>
+                </div>
+              </div>
               <button
                 onClick={() => setShowModelPopup(false)}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-600 hover:text-gray-800 transition-colors duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400 cursor-pointer"
+                className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors"
               >
-                <RxCross1 className="text-xl" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Search */}
-            <div className="flex items-center gap-2 mb-4 p-2 border rounded-lg shadow-sm bg-gray-50">
-              <FaSearch className="text-gray-400" />
-              <input
-                placeholder="Search Model..."
-                className="outline-none flex-1 bg-transparent text-gray-700"
-                value={searchModel}
-                onChange={(e) => setSearchModel(e.target.value.toLowerCase())}
-              />
+            <div className="px-5 pt-4 pb-2 shrink-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input
+                  placeholder="Search model..."
+                  className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
+                  value={searchModel}
+                  onChange={(e) => setSearchModel(e.target.value.toLowerCase())}
+                />
+              </div>
             </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto max-h-[300px] border rounded-lg shadow-sm bg-white">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-indigo-50 sticky top-0 text-indigo-700 font-semibold">
-                  <tr>
-                    <th className="px-3 py-2">Model</th>
-                    <th className="px-3 py-2">Volume (L)</th>
-                    <th className="px-3 py-2">Type</th>
-                    <th className="px-3 py-2 text-center">Delete</th>
+            {/* Model table */}
+            <div className="flex-1 overflow-auto px-5 min-h-0">
+              <table className="w-full text-xs border-separate border-spacing-0">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-slate-100">
+                    <th className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-left">
+                      Model
+                    </th>
+                    <th className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-left">
+                      Volume (L)
+                    </th>
+                    <th className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-left">
+                      Type
+                    </th>
+                    <th className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-center w-16">
+                      Delete
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -560,14 +660,16 @@ export default function BEECalculation() {
                     .map((m, i) => (
                       <tr
                         key={i}
-                        className="border-b hover:bg-indigo-50 transition-colors duration-200"
+                        className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
                       >
-                        <td className="px-3 py-2">{m.model}</td>
-                        <td className="px-3 py-2">
+                        <td className="px-3 py-2 border-b border-slate-100 font-medium text-slate-800">
+                          {m.model}
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100">
                           <input
                             type="number"
                             value={m.volume}
-                            className="border p-1 w-24 rounded outline-none focus:ring-1 focus:ring-indigo-400"
+                            className="border border-slate-300 rounded-md px-2 py-1 w-20 text-xs outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
                             onChange={(e) => {
                               const arr = [...models];
                               arr[i].volume = e.target.value;
@@ -575,88 +677,123 @@ export default function BEECalculation() {
                             }}
                           />
                         </td>
-                        <td className="px-3 py-2">
-                          <select
-                            value={m.type || "Not Defined"}
-                            className="border p-1 rounded outline-none focus:ring-1 focus:ring-indigo-400"
-                            onChange={(e) => {
-                              const arr = [...models];
-                              arr[i].type = e.target.value;
-                              setModels(arr);
-                            }}
-                          >
-                            <option value="Not Defined">Not Defined</option>
-                            <option value="Hard Top">Hard Top</option>
-                            <option value="Glass Top">Glass Top</option>
-                          </select>
+                        <td className="px-3 py-2 border-b border-slate-100">
+                          <div className="relative">
+                            <select
+                              value={m.type || "Not Defined"}
+                              className="appearance-none border border-slate-300 rounded-md px-2 py-1 pr-7 text-xs outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 w-full"
+                              onChange={(e) => {
+                                const arr = [...models];
+                                arr[i].type = e.target.value;
+                                setModels(arr);
+                              }}
+                            >
+                              <option value="Not Defined">Not Defined</option>
+                              <option value="Hard Top">Hard Top</option>
+                              <option value="Glass Top">Glass Top</option>
+                            </select>
+                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                          </div>
                         </td>
-                        <td className="px-3 py-2 text-center">
+                        <td className="px-3 py-2 border-b border-slate-100 text-center">
                           <button
                             onClick={() => deleteModel(m.model)}
-                            className="text-red-600 hover:text-red-800 transition-colors duration-200 cursor-pointer"
+                            className="text-slate-400 hover:text-red-500 transition-colors"
                           >
-                            <FaTrash />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </td>
                       </tr>
                     ))}
+                  {models.filter((m) =>
+                    m.model.toLowerCase().includes(searchModel),
+                  ).length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="py-10 text-center">
+                        <div className="flex flex-col items-center gap-2 text-slate-400">
+                          <PackageOpen
+                            className="w-10 h-10 opacity-20"
+                            strokeWidth={1.2}
+                          />
+                          <p className="text-sm">No models found.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
 
-            {/* Add New Model */}
-            <div className="mt-4 p-3 rounded-lg bg-indigo-50 flex flex-col sm:flex-row gap-2 items-center shadow-sm">
-              <input
-                placeholder="Model"
-                value={newModel.model}
-                onChange={(e) =>
-                  setNewModel({ ...newModel, model: e.target.value })
-                }
-                className="border p-2 rounded flex-1 outline-none focus:ring-1 focus:ring-indigo-400"
-              />
-              <input
-                placeholder="Volume"
-                type="number"
-                value={newModel.volume}
-                onChange={(e) =>
-                  setNewModel({ ...newModel, volume: e.target.value })
-                }
-                className="border p-2 w-24 rounded outline-none focus:ring-1 focus:ring-indigo-400"
-              />
-              <select
-                value={newModel.type || "Not Defined"}
-                onChange={(e) =>
-                  setNewModel({ ...newModel, type: e.target.value })
-                }
-                className="border p-2 rounded w-32 outline-none focus:ring-1 focus:ring-indigo-400"
-              >
-                <option value="Not Defined">Not Defined</option>
-                <option value="Hard Top">Hard Top</option>
-                <option value="Glass Top">Glass Top</option>
-              </select>
-              <Button
-                onClick={addModel}
-                className="bg-indigo-600 text-white px-5 py-2 rounded hover:bg-indigo-700 transition-colors duration-200 flex items-center gap-1"
-              >
-                <FaPlus /> Add
-              </Button>
+            {/* Add new model */}
+            <div className="px-5 py-3 border-t border-slate-200 shrink-0">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-2">
+                Add New Model
+              </p>
+              <div className="flex flex-wrap gap-2 items-end">
+                <input
+                  placeholder="Model name"
+                  value={newModel.model}
+                  onChange={(e) =>
+                    setNewModel({ ...newModel, model: e.target.value })
+                  }
+                  className="flex-1 min-w-[140px] border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                />
+                <input
+                  placeholder="Volume"
+                  type="number"
+                  value={newModel.volume}
+                  onChange={(e) =>
+                    setNewModel({ ...newModel, volume: e.target.value })
+                  }
+                  className="w-24 border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                />
+                <div className="relative">
+                  <select
+                    value={newModel.type || "Not Defined"}
+                    onChange={(e) =>
+                      setNewModel({ ...newModel, type: e.target.value })
+                    }
+                    className="appearance-none border border-slate-300 rounded-lg px-3 py-2 pr-8 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 w-36"
+                  >
+                    <option value="Not Defined">Not Defined</option>
+                    <option value="Hard Top">Hard Top</option>
+                    <option value="Glass Top">Glass Top</option>
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                </div>
+                <button
+                  onClick={addModel}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-200 transition-all"
+                >
+                  <Plus className="w-4 h-4" /> Add
+                </button>
+              </div>
             </div>
 
-            {/* Footer Buttons */}
-            <div className="mt-5 flex justify-end gap-3">
-              <Button
+            {/* Popup footer */}
+            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-200 shrink-0">
+              <button
                 onClick={() => setShowModelPopup(false)}
-                className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 transition-colors duration-200"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 transition-all"
               >
                 Close
-              </Button>
-              <Button
+              </button>
+              <button
                 onClick={saveModels}
-                className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition-colors duration-200"
+                disabled={saving}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  saving
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                }`}
               >
-                <FaSave className="inline mr-2" />
-                Save
-              </Button>
+                {saving ? (
+                  <Spinner cls="w-4 h-4" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                {saving ? "Saving..." : "Save Models"}
+              </button>
             </div>
           </div>
         </div>
