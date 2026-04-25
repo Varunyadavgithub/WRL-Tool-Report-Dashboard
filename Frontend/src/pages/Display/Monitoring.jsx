@@ -270,9 +270,6 @@ const PageHeader = ({ title, shift, shiftDate, accentHex }) => (
       className="flex items-center gap-3 px-4 py-2.5"
       style={{ background: accentHex }}
     >
-      <div className="w-9 h-9 rounded-full bg-white/25 border-2 border-white/50 flex items-center justify-center">
-        <span className="text-white font-black text-base">W</span>
-      </div>
       <span className="flex-1 text-center font-extrabold text-[15px] text-white tracking-widest uppercase font-mono">
         {title}
       </span>

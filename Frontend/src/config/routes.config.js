@@ -230,6 +230,7 @@ export const ROUTE_CONFIG = [
         path: "/production/manpower-report",
         label: "Manpower Report",
         component: ManpowerReport,
+        roles: [ROLES.ADMIN],
       },
     ],
   },

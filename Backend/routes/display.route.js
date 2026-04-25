@@ -1,4 +1,3 @@
-// routes/dashboard.routes.js
 import express from "express";
 import {
   getAllDashboardConfigs,
@@ -11,7 +10,7 @@ import {
   getHourlyProductionData,
   getQualityData,
   getLossData,
-} from "../controllers/dashboard/finalAreaProduction.controller.js";
+} from "../controllers/display/finalAreaProduction.controller.js";
 
 const router = express.Router();
 

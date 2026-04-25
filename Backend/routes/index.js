@@ -13,7 +13,7 @@ import taskReminders from "./taskReminder.route.js";
 import auditReport from "./auditReport.route.js";
 import readingRoute from "./reading.route.js";
 import manpowerRoute from "./manpower.routes.js";
-import dashboardRoute from "./dashboardReport.route.js";
+import dashboardRoute from "./display.route.js";
 
 const routers = Router();
 
