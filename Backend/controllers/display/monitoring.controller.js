@@ -728,59 +728,84 @@ export const getHourlyProductionData = tryCatch(async (req, res) => {
     const lineCode = config.LineCode;
 
     const hoursQuery = `
-      WITH HourlySummary AS (
-        SELECT
-          DATEPART(HOUR, b.ActivityOn) AS TIMEHOUR,
-          CAST(
-            CAST(CAST(b.ActivityOn AS DATE) AS VARCHAR) + ' ' +
-            CAST(DATEPART(HOUR, b.ActivityOn) AS VARCHAR) + ':00:00'
-          AS DATETIME) AS HourTime,
-          COUNT(*) AS Loading_Count
-        FROM MaterialBarcode mb
-        JOIN ProcessActivity b  ON b.PSNo        = mb.DocNo
-        JOIN WorkCenter      c  ON b.StationCode = c.StationCode
-        WHERE mb.PrintStatus = 1
-          AND mb.Status     <> 99
-          AND mb.Type NOT IN (200)
-          AND c.StationCode  = @stationCode1
-          AND b.Remark       = @lineCode
-          AND b.ActivityType = 5
-          AND b.ActivityOn BETWEEN @shiftStart AND @shiftEnd
-        GROUP BY
-          DATEPART(HOUR, b.ActivityOn),
-          CAST(
-            CAST(CAST(b.ActivityOn AS DATE) AS VARCHAR) + ' ' +
-            CAST(DATEPART(HOUR, b.ActivityOn) AS VARCHAR) + ':00:00'
-          AS DATETIME)
-      ),
-      Config AS (
-        SELECT LineMonthlyProduction1 FROM dbo.DashboardConfig WHERE Id = @configId AND IsActive = 1
-      ),
-      HourlyTarget AS (
-        SELECT CAST(
-          c.LineMonthlyProduction1 * 1.0
-          / NULLIF(DAY(EOMONTH(@shiftStart)), 0)
-          / 12.0
-        AS INT) AS HourTarget
-        FROM Config c
-      )
+            WITH HourlySummary AS (
+              SELECT
+                DATEPART(HOUR, b.ActivityOn) AS TIMEHOUR,
+                CAST(
+                  CAST(CAST(b.ActivityOn AS DATE) AS VARCHAR) + ' ' +
+                  CAST(DATEPART(HOUR, b.ActivityOn) AS VARCHAR) + ':00:00'
+                AS DATETIME) AS HourTime,
+                COUNT(*) AS Loading_Count
+              FROM MaterialBarcode mb
+              JOIN ProcessActivity b  ON b.PSNo        = mb.DocNo
+              JOIN WorkCenter      c  ON b.StationCode = c.StationCode
+              WHERE mb.PrintStatus = 1
+                AND mb.Status     <> 99
+                AND mb.Type NOT IN (200)
+                AND c.StationCode  = @stationCode1
+                AND b.Remark       = @lineCode
+                AND b.ActivityType = 5
+                AND b.ActivityOn BETWEEN @shiftStart AND @shiftEnd
+              GROUP BY
+                DATEPART(HOUR, b.ActivityOn),
+                CAST(
+                  CAST(CAST(b.ActivityOn AS DATE) AS VARCHAR) + ' ' +
+                  CAST(DATEPART(HOUR, b.ActivityOn) AS VARCHAR) + ':00:00'
+                AS DATETIME)
+            ),
+            Config AS (
+              SELECT LineTarget1,LineMonthlyProduction1 FROM dbo.DashboardConfig WHERE Id = @configId AND IsActive = 1
+            ),
+            HourlyTarget AS (
+              SELECT
+                c.LineTarget1 AS HourTarget
+              FROM Config c
+            )
       SELECT
         ROW_NUMBER() OVER (ORDER BY hs.HourTime) AS HourNo,
         hs.TIMEHOUR,
-        ht.HourTarget                            AS Target,
-        hs.Loading_Count                         AS Actual,
-        CASE WHEN ht.HourTarget > hs.Loading_Count
-             THEN ht.HourTarget - hs.Loading_Count ELSE 0 END AS HourLoss,
-        SUM(
-          CASE WHEN ht.HourTarget > hs.Loading_Count
-               THEN ht.HourTarget - hs.Loading_Count ELSE 0 END
-        ) OVER (ORDER BY hs.HourTime ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
-                                                 AS CumulativeLoss,
+
+        CAST(t.AdjustedTarget AS INT) AS Target,
+        hs.Loading_Count AS Actual,
+
+        -- Hour Loss
         CAST(
-          hs.Loading_Count * 100.0 / NULLIF(ht.HourTarget, 0)
-        AS DECIMAL(5,1))                         AS AchievementPct
+          CASE 
+            WHEN t.AdjustedTarget > hs.Loading_Count
+            THEN t.AdjustedTarget - hs.Loading_Count
+            ELSE 0
+          END AS INT
+        ) AS HourLoss,
+
+        -- Cumulative Loss
+        CAST(
+          SUM(
+            CASE 
+              WHEN t.AdjustedTarget > hs.Loading_Count
+              THEN t.AdjustedTarget - hs.Loading_Count
+              ELSE 0
+            END
+          ) OVER (ORDER BY hs.HourTime ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+        AS INT) AS CumulativeLoss,
+
+        -- Achievement %
+        CAST(
+          hs.Loading_Count * 100.0 /
+          NULLIF(t.AdjustedTarget, 0)
+        AS DECIMAL(5,1)) AS AchievementPct
+
       FROM HourlySummary hs
       CROSS JOIN HourlyTarget ht
+
+      CROSS APPLY (
+        SELECT 
+          CASE 
+            WHEN hs.TIMEHOUR = 12 
+              THEN ROUND(ht.HourTarget / 2.0, 0)
+            ELSE ht.HourTarget
+          END AS AdjustedTarget
+      ) t
+
       ORDER BY hs.HourTime;
     `;
 
@@ -817,8 +842,18 @@ export const getHourlyProductionData = tryCatch(async (req, res) => {
           ((60.0 / NULLIF(cfg.LineTaktTime1, 0)) * cfg.WorkingTimeMin) * 0.85
         AS INT) - sa.TotalAchieved AS Remaining,
 
-        DATEDIFF(MINUTE, @shiftStart, GETDATE()) * 100.0
-          / NULLIF(DATEDIFF(MINUTE, @shiftStart, @shiftEnd), 0) AS ConsumedTimePct
+        CAST(
+          ROUND(
+            DATEDIFF(MINUTE, @shiftStart,
+              CASE 
+                WHEN GETDATE() > @shiftEnd THEN @shiftEnd
+                WHEN GETDATE() < @shiftStart THEN @shiftStart
+                ELSE GETDATE()
+              END
+            ) * 100.0
+            / NULLIF(DATEDIFF(MINUTE, @shiftStart, @shiftEnd), 0)
+          , 2)
+        AS DECIMAL(5,2)) AS ConsumedTimePct
 
       FROM Config cfg
       CROSS JOIN ShiftActual sa;
@@ -917,8 +952,18 @@ export const getQualityData = tryCatch(async (req, res) => {
           (SELECT COUNT(*) FROM ReworkBase WHERE Rework_Status = 'Active') * 100.0
           / NULLIF(sa.TotalAchieved, 0)
         AS DECIMAL(5,1))                                                               AS DefectPct,
-        DATEDIFF(MINUTE, @shiftStart, GETDATE()) * 100.0
-          / NULLIF(DATEDIFF(MINUTE, @shiftStart, @shiftEnd), 0)                      AS ConsumedTimePct
+        CAST(
+          ROUND(
+            DATEDIFF(MINUTE, @shiftStart,
+              CASE 
+                WHEN GETDATE() > @shiftEnd THEN @shiftEnd
+                WHEN GETDATE() < @shiftStart THEN @shiftStart
+                ELSE GETDATE()
+              END
+            ) * 100.0
+            / NULLIF(DATEDIFF(MINUTE, @shiftStart, @shiftEnd), 0)
+          , 2)
+        AS DECIMAL(5,2)) AS ConsumedTimePct
       FROM Config cfg CROSS JOIN ShiftActual sa;
     `;
 
@@ -976,7 +1021,7 @@ export const getLossData = tryCatch(async (req, res) => {
     if (!config) throw new AppError("Dashboard config not found.", 404);
 
     const stationCode1 = config.StationCode1;
-    // FIX #8: Corrected typo "LinceCode" → "lineCode".
+    const LineName = config.LineName;
     const lineCode = config.LineCode;
     const sectionName = config.SectionName;
     if (!sectionName)
@@ -997,6 +1042,7 @@ export const getLossData = tryCatch(async (req, res) => {
           ON T.PLCCode = M.PLCCode AND T.MEMBit = M.MEMBit AND M.Active = 1
         WHERE T.EmgOff IS NOT NULL
           AND T.EmgOn >= @shiftStart AND T.EmgOn < @shiftEnd
+          AND M.LineName = @LineName
           AND M.Location = @sectionName
       ),
       BREAKS AS (
@@ -1054,8 +1100,18 @@ export const getLossData = tryCatch(async (req, res) => {
         CAST(cfg.LineMonthlyProduction1 * 1.0
           / NULLIF(DAY(EOMONTH(@shiftStart)), 0)
         AS INT) - sa.Achieved                                                  AS Remaining,
-        DATEDIFF(MINUTE, @shiftStart, GETDATE()) * 100.0
-          / NULLIF(DATEDIFF(MINUTE, @shiftStart, @shiftEnd), 0)              AS ConsumedTimePct
+        CAST(
+          ROUND(
+            DATEDIFF(MINUTE, @shiftStart,
+              CASE 
+                WHEN GETDATE() > @shiftEnd THEN @shiftEnd
+                WHEN GETDATE() < @shiftStart THEN @shiftStart
+                ELSE GETDATE()
+              END
+            ) * 100.0
+            / NULLIF(DATEDIFF(MINUTE, @shiftStart, @shiftEnd), 0)
+          , 2)
+        AS DECIMAL(5,2)) AS ConsumedTimePct
       FROM Config cfg CROSS JOIN ShiftActual sa;
     `;
 
@@ -1065,6 +1121,7 @@ export const getLossData = tryCatch(async (req, res) => {
         .input("shiftStart", sql.DateTime, istStart)
         .input("shiftEnd", sql.DateTime, istEnd)
         .input("sectionName", sql.NVarChar(200), sectionName)
+        .input("LineName", sql.NVarChar(50), LineName)
         .query(stationsQuery),
       pool
         .request()
