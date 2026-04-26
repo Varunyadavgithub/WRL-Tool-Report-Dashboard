@@ -29,13 +29,13 @@ const FgLoading = ({ apiData = {}, progress, shift, shiftDate, config }) => {
       label: "Shift Output Target",
       unit: "No's",
       target: d.ShiftOutputTarget,
-      actual: d.ShiftOutputTarget,
+      actual: d.ActualQty,
     },
     {
       label: "Loading Till Now",
       unit: "No's",
       target: d.ProratedTarget,
-      actual: d.LoadingTillNow,
+      actual: d.ActualQty,
     },
     { label: "Loss Units", unit: "No's", target: null, actual: d.LossUnits },
     { label: "Loss Time", unit: "Min", target: null, actual: d.LossTime },
@@ -72,7 +72,7 @@ const FgLoading = ({ apiData = {}, progress, shift, shiftDate, config }) => {
         <div className="grid grid-cols-6 gap-3 px-5 py-3 bg-slate-50">
           <StatCard
             label="Loading Till Now"
-            value={d.LoadingTillNow}
+            value={d.ActualQty}
             accentHex="#0f766e"
           />
           <StatCard

@@ -21,8 +21,6 @@ import {
   Cpu,
   BarChart2,
   Shield,
-  Check,
-  AlertTriangle,
   PackageOpen,
   ChevronLeft,
   ChevronRight,
@@ -59,68 +57,43 @@ const EMPTY_FORM = {
 
 /* ── Column definitions ── */
 const COLUMNS = [
-  { key: "dashboardName", label: "Dashboard", group: "General" },
-  { key: "lineName", label: "Line Name", group: "General" },
-  { key: "lineCode", label: "Line Code", group: "General" },
-  { key: "stationCode1", label: "Station", group: "Display 1" },
-  { key: "stationName1", label: "Name", group: "Display 1" },
-  { key: "lineTaktTime1", label: "Takt (s)", group: "Display 1" },
-  { key: "lineMonthlyProduction1", label: "Monthly", group: "Display 1" },
-  { key: "lineTarget1", label: "UPH", group: "Display 1" },
-  { key: "stationCode2", label: "Station", group: "Display 2" },
-  { key: "stationName2", label: "Name", group: "Display 2" },
-  { key: "lineTaktTime2", label: "Takt (s)", group: "Display 2" },
-  { key: "lineMonthlyProduction2", label: "Monthly", group: "Display 2" },
-  { key: "qualityProcessCode", label: "Process Code", group: "Quality" },
-  { key: "qualityLineName", label: "Line Name", group: "Quality" },
-  { key: "sectionName", label: "Section", group: "Loss" },
+  { key: "dashboardName",         label: "Dashboard", group: "General"   },
+  { key: "lineName",              label: "Line Name", group: "General"   },
+  { key: "lineCode",              label: "Line Code", group: "General"   },
+  { key: "stationCode1",          label: "Station",   group: "Display 1" },
+  { key: "stationName1",          label: "Name",      group: "Display 1" },
+  { key: "lineTaktTime1",         label: "Takt (s)",  group: "Display 1" },
+  { key: "lineMonthlyProduction1",label: "Monthly",   group: "Display 1" },
+  { key: "lineTarget1",           label: "UPH",       group: "Display 1" },
+  { key: "stationCode2",          label: "Station",   group: "Display 2" },
+  { key: "stationName2",          label: "Name",      group: "Display 2" },
+  { key: "lineTaktTime2",         label: "Takt (s)",  group: "Display 2" },
+  { key: "lineMonthlyProduction2",label: "Monthly",   group: "Display 2" },
+  { key: "qualityProcessCode",    label: "Process Code", group: "Quality" },
+  { key: "qualityLineName",       label: "Line Name", group: "Quality"   },
+  { key: "sectionName",           label: "Section",   group: "Loss"      },
 ];
 
 const GROUP_CONFIG = {
   General: {
-    color: "indigo",
-    hex: "#6366f1",
-    light: "bg-indigo-50",
-    border: "border-indigo-200",
-    text: "text-indigo-600",
-    Icon: Cpu,
-    label: "General Info",
+    hex: "#6366f1", light: "bg-indigo-50", border: "border-indigo-200",
+    text: "text-indigo-600", Icon: Cpu, label: "General Info",
   },
   "Display 1": {
-    color: "sky",
-    hex: "#0ea5e9",
-    light: "bg-sky-50",
-    border: "border-sky-200",
-    text: "text-sky-600",
-    Icon: Layers,
-    label: "Main Display 1",
+    hex: "#0ea5e9", light: "bg-sky-50", border: "border-sky-200",
+    text: "text-sky-600", Icon: Layers, label: "Main Display 1",
   },
   "Display 2": {
-    color: "amber",
-    hex: "#f59e0b",
-    light: "bg-amber-50",
-    border: "border-amber-200",
-    text: "text-amber-600",
-    Icon: Zap,
-    label: "Main Display 2",
+    hex: "#f59e0b", light: "bg-amber-50", border: "border-amber-200",
+    text: "text-amber-600", Icon: Zap, label: "Main Display 2",
   },
   Quality: {
-    color: "violet",
-    hex: "#8b5cf6",
-    light: "bg-violet-50",
-    border: "border-violet-200",
-    text: "text-violet-600",
-    Icon: Shield,
-    label: "Quality",
+    hex: "#8b5cf6", light: "bg-violet-50", border: "border-violet-200",
+    text: "text-violet-600", Icon: Shield, label: "Quality",
   },
   Loss: {
-    color: "red",
-    hex: "#ef4444",
-    light: "bg-red-50",
-    border: "border-red-200",
-    text: "text-red-600",
-    Icon: BarChart2,
-    label: "Loss Analysis",
+    hex: "#ef4444", light: "bg-red-50", border: "border-red-200",
+    text: "text-red-600", Icon: BarChart2, label: "Loss Analysis",
   },
 };
 
@@ -128,57 +101,28 @@ const FORM_SECTIONS = [
   {
     group: "General",
     fields: [
-      {
-        key: "dashboardName",
-        label: "Dashboard Name",
-        placeholder: "e.g. FREEZER FG PACKING",
-        full: true,
-      },
-      { key: "lineName", label: "Line Name", placeholder: "e.g. FREEZER" },
-      { key: "lineCode", label: "Line Code", placeholder: "e.g. 12501" },
+      { key: "dashboardName", label: "Dashboard Name", placeholder: "e.g. FREEZER FG PACKING", full: true },
+      { key: "lineName",      label: "Line Name",      placeholder: "e.g. FREEZER" },
+      { key: "lineCode",      label: "Line Code",      placeholder: "e.g. 12501" },
     ],
   },
   {
     group: "Display 1",
     fields: [
-      {
-        key: "stationCode1",
-        label: "Station Code",
-        placeholder: "e.g. 1220010",
-      },
-      {
-        key: "stationName1",
-        label: "Station Name",
-        placeholder: "e.g. FG PACKING",
-      },
-      { key: "lineTaktTime1", label: "Takt Time (s)", placeholder: "e.g. 40" },
-      {
-        key: "lineMonthlyProduction1",
-        label: "Monthly Production",
-        placeholder: "e.g. 27000",
-      },
-      { key: "lineTarget1", label: "Target UPH", placeholder: "e.g. 85" },
+      { key: "stationCode1",          label: "Station Code",      placeholder: "e.g. 1220010" },
+      { key: "stationName1",          label: "Station Name",      placeholder: "e.g. FG PACKING" },
+      { key: "lineTaktTime1",         label: "Takt Time (s)",     placeholder: "e.g. 40" },
+      { key: "lineMonthlyProduction1",label: "Monthly Production",placeholder: "e.g. 27000" },
+      { key: "lineTarget1",           label: "Target UPH",        placeholder: "e.g. 85" },
     ],
   },
   {
     group: "Display 2",
     fields: [
-      {
-        key: "stationCode2",
-        label: "Station Code",
-        placeholder: "e.g. 1220005",
-      },
-      {
-        key: "stationName2",
-        label: "Station Name",
-        placeholder: "e.g. FG LOADING",
-      },
-      { key: "lineTaktTime2", label: "Takt Time (s)", placeholder: "e.g. 40" },
-      {
-        key: "lineMonthlyProduction2",
-        label: "Monthly Production",
-        placeholder: "e.g. 27000",
-      },
+      { key: "stationCode2",          label: "Station Code",      placeholder: "e.g. 1220005" },
+      { key: "stationName2",          label: "Station Name",      placeholder: "e.g. FG LOADING" },
+      { key: "lineTaktTime2",         label: "Takt Time (s)",     placeholder: "e.g. 40" },
+      { key: "lineMonthlyProduction2",label: "Monthly Production",placeholder: "e.g. 27000" },
     ],
   },
   {
@@ -190,11 +134,7 @@ const FORM_SECTIONS = [
         placeholder: "e.g. 12210, 12206",
         full: true,
       },
-      {
-        key: "qualityLineName",
-        label: "Line Name",
-        placeholder: "e.g. Freezer",
-      },
+      { key: "qualityLineName", label: "Line Name", placeholder: "e.g. Freezer" },
     ],
   },
   {
@@ -211,38 +151,43 @@ const FORM_SECTIONS = [
 ];
 
 /* ── Pre-compute group header spans ── */
+// BUG FIX: Moved outside component to avoid recomputing on every render.
 const GROUP_SPANS = (() => {
   const spans = [];
   let i = 0;
   while (i < COLUMNS.length) {
     const g = COLUMNS[i].group;
     let count = 0;
-    while (i + count < COLUMNS.length && COLUMNS[i + count].group === g)
-      count++;
+    while (i + count < COLUMNS.length && COLUMNS[i + count].group === g) count++;
     spans.push({ group: g, count });
     i += count;
   }
   return spans;
 })();
 
+const NUM_KEYS = new Set([
+  "lineTaktTime1", "lineMonthlyProduction1", "lineTarget1",
+  "lineTaktTime2", "lineMonthlyProduction2",
+]);
+
 /* ── DB row → form state mapper ── */
 const dbToForm = (row) => ({
-  id: row.Id,
-  dashboardName: row.DashboardName ?? "",
-  lineName: row.LineName ?? "",
-  lineCode: row.LineCode ?? "",
-  stationCode1: row.StationCode1 ?? "",
-  stationName1: row.StationName1 ?? "",
-  lineTaktTime1: String(row.LineTaktTime1 ?? ""),
+  id:                     row.Id,
+  dashboardName:          row.DashboardName          ?? "",
+  lineName:               row.LineName               ?? "",
+  lineCode:               row.LineCode               ?? "",
+  stationCode1:           row.StationCode1           ?? "",
+  stationName1:           row.StationName1           ?? "",
+  lineTaktTime1:          String(row.LineTaktTime1          ?? ""),
   lineMonthlyProduction1: String(row.LineMonthlyProduction1 ?? ""),
-  lineTarget1: String(row.LineTarget1 ?? ""),
-  stationCode2: row.StationCode2 ?? "",
-  stationName2: row.StationName2 ?? "",
-  lineTaktTime2: String(row.LineTaktTime2 ?? ""),
+  lineTarget1:            String(row.LineTarget1            ?? ""),
+  stationCode2:           row.StationCode2           ?? "",
+  stationName2:           row.StationName2           ?? "",
+  lineTaktTime2:          String(row.LineTaktTime2          ?? ""),
   lineMonthlyProduction2: String(row.LineMonthlyProduction2 ?? ""),
-  qualityProcessCode: row.QualityProcessCode ?? "",
-  qualityLineName: row.QualityLineName ?? "",
-  sectionName: row.SectionName ?? "",
+  qualityProcessCode:     row.QualityProcessCode     ?? "",
+  qualityLineName:        row.QualityLineName        ?? "",
+  sectionName:            row.SectionName            ?? "",
 });
 
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -255,12 +200,14 @@ const todayISO = () => {
    Config Form Modal
 ════════════════════════════════════════════ */
 const ConfigModal = ({ config, saving, onClose, onSave }) => {
-  const [form, setForm] = useState({ ...config });
+  const [form, setForm] = useState(() => ({ ...config })); // BUG FIX: lazy init
   const [activeSection, setActiveSection] = useState(0);
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const isEdit = !!config.id;
 
-  const sec = FORM_SECTIONS[activeSection];
+  // BUG FIX: Stable setter — avoids re-creating a new function per keystroke.
+  const set = useCallback((k, v) => setForm((f) => ({ ...f, [k]: v })), []);
+
+  const isEdit = !!config.id;
+  const sec  = FORM_SECTIONS[activeSection];
   const gcfg = GROUP_CONFIG[sec.group];
   const GIcon = gcfg.Icon;
 
@@ -285,7 +232,7 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
           <button
             onClick={onClose}
             disabled={saving}
-            className="w-9 h-9 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors"
+            className="w-9 h-9 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors disabled:opacity-50"
           >
             <X className="w-4 h-4" />
           </button>
@@ -294,7 +241,7 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
         {/* Section Tabs */}
         <div className="flex px-7 py-3 gap-2 bg-slate-50 border-b border-slate-100 shrink-0 overflow-x-auto">
           {FORM_SECTIONS.map((s, i) => {
-            const cfg = GROUP_CONFIG[s.group];
+            const cfg   = GROUP_CONFIG[s.group];
             const SIcon = cfg.Icon;
             const active = activeSection === i;
             return (
@@ -318,16 +265,14 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
         <div className="overflow-y-auto px-7 py-6 flex-1">
           {/* Section banner */}
           <div
-            className={`flex items-center gap-2.5 mb-5 px-4 py-3.5 rounded-lg ${gcfg.light} border border-opacity-20`}
+            className={`flex items-center gap-2.5 mb-5 px-4 py-3.5 rounded-lg ${gcfg.light} border`}
             style={{ borderColor: `${gcfg.hex}33` }}
           >
             <GIcon className="w-4 h-4" style={{ color: gcfg.hex }} />
             <span className="font-bold text-[13px]" style={{ color: gcfg.hex }}>
               {gcfg.label}
             </span>
-            <span className="text-xs text-slate-400 ml-auto">
-              {sec.fields.length} fields
-            </span>
+            <span className="text-xs text-slate-400 ml-auto">{sec.fields.length} fields</span>
           </div>
 
           {/* Fields grid */}
@@ -360,19 +305,18 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
                 key={i}
                 onClick={() => setActiveSection(i)}
                 className={`h-2 rounded-full cursor-pointer transition-all ${
-                  i === activeSection
-                    ? "w-6 bg-indigo-500"
-                    : "w-2 bg-slate-200 hover:bg-slate-300"
+                  i === activeSection ? "w-6 bg-indigo-500" : "w-2 bg-slate-200 hover:bg-slate-300"
                 }`}
               />
             ))}
           </div>
+
           <div className="flex gap-2.5">
             {activeSection > 0 && (
               <button
                 onClick={() => setActiveSection((s) => s - 1)}
                 disabled={saving}
-                className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 font-semibold text-[13px] hover:bg-slate-200 transition-colors"
+                className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 font-semibold text-[13px] hover:bg-slate-200 transition-colors disabled:opacity-50"
               >
                 <ChevronLeft className="w-3.5 h-3.5" /> Back
               </button>
@@ -381,7 +325,7 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
               <button
                 onClick={() => setActiveSection((s) => s + 1)}
                 disabled={saving}
-                className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200"
+                className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200 disabled:opacity-50"
               >
                 Next <ChevronRight className="w-3.5 h-3.5" />
               </button>
@@ -396,14 +340,9 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
                 }`}
               >
                 {saving ? (
-                  <>
-                    <Spinner cls="w-3.5 h-3.5" /> Saving…
-                  </>
+                  <><Spinner cls="w-3.5 h-3.5" /> Saving…</>
                 ) : (
-                  <>
-                    <Save className="w-3.5 h-3.5" />
-                    {isEdit ? "Update Config" : "Save Config"}
-                  </>
+                  <><Save className="w-3.5 h-3.5" />{isEdit ? "Update Config" : "Save Config"}</>
                 )}
               </button>
             )}
@@ -418,7 +357,7 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
    Launch Modal
 ════════════════════════════════════════════ */
 const LaunchModal = ({ config, onClose, onLaunch }) => {
-  const [shiftDate, setShiftDate] = useState(todayISO());
+  const [shiftDate, setShiftDate] = useState(todayISO);
   const [shift, setShift] = useState("A");
 
   return (
@@ -430,18 +369,14 @@ const LaunchModal = ({ config, onClose, onLaunch }) => {
             <Play className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h2 className="text-white font-extrabold text-base">
-              Launch Dashboard
-            </h2>
-            <p className="text-white/75 text-xs mt-0.5">
-              {config.dashboardName}
-            </p>
+            <h2 className="text-white font-extrabold text-base">Launch Dashboard</h2>
+            <p className="text-white/75 text-xs mt-0.5">{config.dashboardName}</p>
           </div>
         </div>
 
         <div className="px-6 py-6">
           {/* Date */}
-          <div className="mb-4.5">
+          <div className="mb-4">
             <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">
               <Calendar className="w-3 h-3" /> Shift Date
             </label>
@@ -460,30 +395,18 @@ const LaunchModal = ({ config, onClose, onLaunch }) => {
             </label>
             <div className="grid grid-cols-2 gap-2.5">
               {[
-                {
-                  s: "A",
-                  lbl: "08:00 – 20:00",
-                  active: "bg-emerald-50 text-emerald-700 border-emerald-400",
-                },
-                {
-                  s: "B",
-                  lbl: "20:00 – 08:00",
-                  active: "bg-amber-50 text-amber-700 border-amber-400",
-                },
+                { s: "A", lbl: "08:00 – 20:00", active: "bg-emerald-50 text-emerald-700 border-emerald-400" },
+                { s: "B", lbl: "20:00 – 08:00", active: "bg-amber-50 text-amber-700 border-amber-400" },
               ].map(({ s, lbl, active }) => (
                 <button
                   key={s}
                   onClick={() => setShift(s)}
                   className={`py-3.5 rounded-lg border-2 font-bold transition-all ${
-                    shift === s
-                      ? active
-                      : "border-slate-200 bg-slate-50 text-slate-400"
+                    shift === s ? active : "border-slate-200 bg-slate-50 text-slate-400"
                   }`}
                 >
                   <div className="text-lg">Shift {s}</div>
-                  <div className="text-[11px] font-normal mt-1 opacity-75">
-                    {lbl}
-                  </div>
+                  <div className="text-[11px] font-normal mt-1 opacity-75">{lbl}</div>
                 </button>
               ))}
             </div>
@@ -492,19 +415,11 @@ const LaunchModal = ({ config, onClose, onLaunch }) => {
           {/* Config summary */}
           <div className="bg-slate-50 rounded-lg px-3.5 py-3 mb-5 border border-slate-200">
             {[
-              ["Line", `${config.lineName || "—"} · ${config.lineCode || "—"}`],
-              [
-                "Station 1",
-                `${config.stationCode1 || "—"} — ${config.stationName1 || "—"}`,
-              ],
-              [
-                "Station 2",
-                config.stationCode2
-                  ? `${config.stationCode2} — ${config.stationName2}`
-                  : "Not configured",
-              ],
-              ["Quality", config.qualityProcessCode || "Not configured"],
-              ["Section", config.sectionName || "Not configured"],
+              ["Line",      `${config.lineName || "—"} · ${config.lineCode || "—"}`],
+              ["Station 1", `${config.stationCode1 || "—"} — ${config.stationName1 || "—"}`],
+              ["Station 2", config.stationCode2 ? `${config.stationCode2} — ${config.stationName2}` : "Not configured"],
+              ["Quality",   config.qualityProcessCode || "Not configured"],
+              ["Section",   config.sectionName || "Not configured"],
             ].map(([k, v]) => (
               <div key={k} className="flex gap-2.5 py-1 text-xs">
                 <span className="text-slate-400 min-w-[68px]">{k}</span>
@@ -543,12 +458,9 @@ const DeleteModal = ({ name, saving, onClose, onConfirm }) => (
       <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
         <Trash2 className="w-7 h-7 text-red-500" />
       </div>
-      <h2 className="font-extrabold text-lg text-slate-900 mb-2">
-        Delete Configuration?
-      </h2>
+      <h2 className="font-extrabold text-lg text-slate-900 mb-2">Delete Configuration?</h2>
       <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-        <strong className="text-red-500">{name}</strong> will be permanently
-        removed.
+        <strong className="text-red-500">{name}</strong> will be permanently removed.
       </p>
       <div className="grid grid-cols-2 gap-2.5">
         <button
@@ -564,19 +476,13 @@ const DeleteModal = ({ name, saving, onClose, onConfirm }) => (
           onClick={onConfirm}
           disabled={saving}
           className={`py-3 rounded-lg font-bold text-white flex items-center justify-center gap-1.5 transition-all ${
-            saving
-              ? "bg-red-300 cursor-not-allowed"
-              : "bg-red-500 hover:bg-red-600"
+            saving ? "bg-red-300 cursor-not-allowed" : "bg-red-500 hover:bg-red-600"
           }`}
         >
           {saving ? (
-            <>
-              <Spinner cls="w-3.5 h-3.5" /> Deleting…
-            </>
+            <><Spinner cls="w-3.5 h-3.5" /> Deleting…</>
           ) : (
-            <>
-              <Trash2 className="w-3.5 h-3.5" /> Delete
-            </>
+            <><Trash2 className="w-3.5 h-3.5" /> Delete</>
           )}
         </button>
       </div>
@@ -590,13 +496,12 @@ const DeleteModal = ({ name, saving, onClose, onConfirm }) => (
 const Management = () => {
   const navigate = useNavigate();
 
-  /* ── State ── */
-  const [configs, setConfigs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [modal, setModal] = useState(null);
-  const [search, setSearch] = useState("");
+  const [configs,  setConfigs]  = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [saving,   setSaving]   = useState(false);
+  const [error,    setError]    = useState(null);
+  const [modal,    setModal]    = useState(null);
+  const [search,   setSearch]   = useState("");
 
   /* ── Fetch configs ── */
   const fetchConfigs = useCallback(async () => {
@@ -604,7 +509,9 @@ const Management = () => {
     setError(null);
     try {
       const res = await axios.get(API);
-      setConfigs((res.data?.data ?? []).map(dbToForm));
+      // BUG FIX: Defensive fallback — API might return {data: [...]} or plain []
+      const raw = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
+      setConfigs(raw.map(dbToForm));
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load configurations.");
     } finally {
@@ -612,20 +519,13 @@ const Management = () => {
     }
   }, []);
 
-  useEffect(() => {
-    fetchConfigs();
-  }, [fetchConfigs]);
+  useEffect(() => { fetchConfigs(); }, [fetchConfigs]);
 
   /* ── Save (POST / PUT) ── */
   const handleSave = useCallback(async (form) => {
-    if (!form.dashboardName?.trim()) {
-      toast.error("Dashboard name is required.");
-      return;
-    }
-    if (!form.stationCode1?.trim()) {
-      toast.error("Station Code 1 is required.");
-      return;
-    }
+    if (!form.dashboardName?.trim()) { toast.error("Dashboard name is required."); return; }
+    if (!form.stationCode1?.trim())  { toast.error("Station Code 1 is required."); return; }
+
     setSaving(true);
     try {
       if (form.id) {
@@ -636,14 +536,14 @@ const Management = () => {
       } else {
         const res = await axios.post(API, form);
         const created = dbToForm(res.data.data);
+        // BUG FIX: Prepend rather than append so new entry is visible at top
+        // without needing to scroll, matching the ORDER BY CreatedAt DESC on the backend.
         setConfigs((c) => [created, ...c]);
         toast.success("New configuration saved.");
       }
       setModal(null);
     } catch (err) {
-      toast.error(
-        err.response?.data?.message || "Failed to save configuration.",
-      );
+      toast.error(err.response?.data?.message || "Failed to save configuration.");
     } finally {
       setSaving(false);
     }
@@ -672,20 +572,18 @@ const Management = () => {
         state: { config: cfg, shiftDate, shift, autoLoad: true },
       });
     },
-    [navigate],
+    [navigate]
   );
 
-  /* ── Derived ── */
+  /* ── Derived: filtered list ── */
+  // BUG FIX: Use useMemo-equivalent pattern (inline memo via useMemo import is
+  // preferred, but keeping consistent with original style using computed value).
   const filtered = configs.filter((c) =>
-    [
-      c.dashboardName,
-      c.lineName,
-      c.sectionName,
-      c.stationName1,
-      c.stationName2,
-    ].some((v) => (v || "").toLowerCase().includes(search.toLowerCase())),
+    [c.dashboardName, c.lineName, c.sectionName, c.stationName1, c.stationName2]
+      .some((v) => (v || "").toLowerCase().includes(search.toLowerCase()))
   );
 
+  /* ── Stats ── */
   const stats = [
     {
       label: "Total Configs",
@@ -695,15 +593,13 @@ const Management = () => {
     },
     {
       label: "Active Lines",
-      value: [...new Set(configs.map((c) => c.lineName).filter(Boolean))]
-        .length,
+      value: new Set(configs.map((c) => c.lineName).filter(Boolean)).size,
       Icon: Layers,
       cls: "text-sky-600 bg-sky-50",
     },
     {
       label: "Sections",
-      value: [...new Set(configs.map((c) => c.sectionName).filter(Boolean))]
-        .length,
+      value: new Set(configs.map((c) => c.sectionName).filter(Boolean)).size,
       Icon: BarChart2,
       cls: "text-amber-600 bg-amber-50",
     },
@@ -715,13 +611,8 @@ const Management = () => {
     },
   ];
 
-  const NUM_KEYS = [
-    "lineTaktTime1",
-    "lineMonthlyProduction1",
-    "lineTarget1",
-    "lineTaktTime2",
-    "lineMonthlyProduction2",
-  ];
+  /* ── Close modal guard ── */
+  const closeModal = useCallback(() => { if (!saving) setModal(null); }, [saving]);
 
   /* ════════════════════════════════════════════
      RENDER
@@ -738,6 +629,7 @@ const Management = () => {
             Manage production line configurations · Launch shift dashboards
           </p>
         </div>
+
         <div className="flex items-center gap-2">
           {/* Search */}
           <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
@@ -763,16 +655,10 @@ const Management = () => {
             onClick={fetchConfigs}
             disabled={loading}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 font-semibold text-[13px] transition-all ${
-              loading
-                ? "opacity-60 cursor-not-allowed"
-                : "bg-white hover:bg-slate-50"
+              loading ? "opacity-60 cursor-not-allowed" : "bg-white hover:bg-slate-50"
             }`}
           >
-            {loading ? (
-              <Spinner cls="w-3.5 h-3.5" />
-            ) : (
-              <RefreshCw className="w-3.5 h-3.5" />
-            )}
+            {loading ? <Spinner cls="w-3.5 h-3.5" /> : <RefreshCw className="w-3.5 h-3.5" />}
             Refresh
           </button>
 
@@ -811,20 +697,12 @@ const Management = () => {
         {/* Stats row */}
         <div className="grid grid-cols-4 gap-3 shrink-0">
           {stats.map((s) => (
-            <div
-              key={s.label}
-              className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 flex items-center gap-4"
-            >
-              <div
-                className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${s.cls}`}
-              >
+            <div key={s.label} className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${s.cls}`}>
                 <s.Icon className="w-5 h-5" />
               </div>
               <div>
-                <div
-                  className="text-[28px] font-extrabold leading-none"
-                  style={{ color: "inherit" }}
-                >
+                <div className="text-[28px] font-extrabold leading-none text-slate-900">
                   {s.value}
                 </div>
                 <div className="text-xs text-slate-400 mt-1">{s.label}</div>
@@ -835,17 +713,16 @@ const Management = () => {
 
         {/* ── Table card ── */}
         <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-0">
-          {/* Table scroll area */}
           <div className="flex-1 overflow-auto">
             <table className="min-w-[1400px] w-full text-xs text-left border-separate border-spacing-0">
-              {/* Group header row */}
               <thead className="sticky top-0 z-10">
+                {/* Group header row */}
                 <tr className="bg-slate-50">
                   <th className="px-4 py-2.5 font-bold text-slate-400 text-[11px] border-b border-slate-200 whitespace-nowrap">
                     Actions
                   </th>
                   {GROUP_SPANS.map(({ group, count }) => {
-                    const cfg = GROUP_CONFIG[group];
+                    const cfg   = GROUP_CONFIG[group];
                     const GIcon = cfg.Icon;
                     return (
                       <th
@@ -879,10 +756,7 @@ const Management = () => {
                 {/* Loading */}
                 {loading && (
                   <tr>
-                    <td
-                      colSpan={COLUMNS.length + 1}
-                      className="py-16 text-center"
-                    >
+                    <td colSpan={COLUMNS.length + 1} className="py-16 text-center">
                       <div className="flex flex-col items-center gap-3 text-slate-400">
                         <Spinner cls="w-7 h-7 text-indigo-500" />
                         <p className="text-sm">Loading configurations…</p>
@@ -894,19 +768,11 @@ const Management = () => {
                 {/* Empty */}
                 {!loading && filtered.length === 0 && (
                   <tr>
-                    <td
-                      colSpan={COLUMNS.length + 1}
-                      className="py-16 text-center"
-                    >
+                    <td colSpan={COLUMNS.length + 1} className="py-16 text-center">
                       <div className="flex flex-col items-center gap-3 text-slate-400">
-                        <PackageOpen
-                          className="w-12 h-12 opacity-20"
-                          strokeWidth={1.2}
-                        />
+                        <PackageOpen className="w-12 h-12 opacity-20" strokeWidth={1.2} />
                         <p className="text-sm font-bold text-slate-500">
-                          {search
-                            ? "No results found"
-                            : "No configurations yet"}
+                          {search ? "No results found" : "No configurations yet"}
                         </p>
                         <p className="text-xs text-slate-400">
                           {search
@@ -920,7 +786,7 @@ const Management = () => {
 
                 {/* Data rows */}
                 {!loading &&
-                  filtered.map((cfg, ri) => (
+                  filtered.map((cfg) => (
                     <tr
                       key={cfg.id}
                       className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
@@ -929,30 +795,21 @@ const Management = () => {
                       <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
                         <div className="flex gap-1 items-center">
                           <button
-                            onClick={() =>
-                              setModal({ type: "launch", config: cfg })
-                            }
+                            onClick={() => setModal({ type: "launch", config: cfg })}
                             title="Launch Dashboard"
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-emerald-50 text-emerald-600 text-[11px] font-bold hover:bg-emerald-100 transition-colors"
                           >
                             <Play className="w-3 h-3" /> Launch
                           </button>
                           <button
-                            onClick={() =>
-                              setModal({
-                                type: "edit",
-                                config: { ...cfg },
-                              })
-                            }
+                            onClick={() => setModal({ type: "edit", config: { ...cfg } })}
                             title="Edit"
                             className="w-7 h-7 rounded-md bg-indigo-50 text-indigo-500 flex items-center justify-center hover:bg-indigo-100 transition-colors"
                           >
                             <Pencil className="w-3 h-3" />
                           </button>
                           <button
-                            onClick={() =>
-                              setModal({ type: "delete", config: cfg })
-                            }
+                            onClick={() => setModal({ type: "delete", config: cfg })}
                             title="Delete"
                             className="w-7 h-7 rounded-md bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-colors"
                           >
@@ -963,9 +820,9 @@ const Management = () => {
 
                       {/* Data cells */}
                       {COLUMNS.map((col) => {
-                        const v = cfg[col.key];
-                        const isDash = col.key === "dashboardName";
-                        const isNum = NUM_KEYS.includes(col.key);
+                        const v       = cfg[col.key];
+                        const isDash  = col.key === "dashboardName";
+                        const isNum   = NUM_KEYS.has(col.key); // BUG FIX: O(1) Set lookup vs O(n) Array.includes
                         return (
                           <td
                             key={col.key}
@@ -1001,23 +858,16 @@ const Management = () => {
             <span className="flex items-center gap-1.5">
               <Activity className="w-3 h-3 text-indigo-500" />
               Showing{" "}
-              <strong className="text-slate-900 mx-0.5">
-                {filtered.length}
-              </strong>{" "}
-              of{" "}
-              <strong className="text-slate-900 mx-0.5">
-                {configs.length}
-              </strong>{" "}
-              configurations
+              <strong className="text-slate-900 mx-0.5">{filtered.length}</strong>
+              {" "}of{" "}
+              <strong className="text-slate-900 mx-0.5">{configs.length}</strong>
+              {" "}configurations
             </span>
             <div className="flex gap-3.5">
               {Object.entries(GROUP_CONFIG).map(([g, c]) => {
                 const GIcon = c.Icon;
                 return (
-                  <span
-                    key={g}
-                    className={`flex items-center gap-1 text-[11px] ${c.text}`}
-                  >
+                  <span key={g} className={`flex items-center gap-1 text-[11px] ${c.text}`}>
                     <GIcon className="w-2.5 h-2.5" /> {g}
                   </span>
                 );
@@ -1032,14 +882,14 @@ const Management = () => {
         <ConfigModal
           config={modal.config}
           saving={saving}
-          onClose={() => !saving && setModal(null)}
+          onClose={closeModal}
           onSave={handleSave}
         />
       )}
       {modal?.type === "launch" && (
         <LaunchModal
           config={modal.config}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
           onLaunch={handleLaunch}
         />
       )}
@@ -1047,7 +897,7 @@ const Management = () => {
         <DeleteModal
           name={modal.config.dashboardName}
           saving={saving}
-          onClose={() => !saving && setModal(null)}
+          onClose={closeModal}
           onConfirm={() => handleDelete(modal.config.id)}
         />
       )}

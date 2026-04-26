@@ -13,6 +13,7 @@ import {
   Legend,
   Filler,
 } from "chart.js";
+import ChartDataLabels from "chartjs-plugin-datalabels";
 import { Chart } from "react-chartjs-2";
 import { PageHeader, TimerBar, StatCard } from "../Monitoring";
 
@@ -24,6 +25,7 @@ ChartJS.register(
   PointElement,
   BarController,
   LineController,
+  ChartDataLabels,
   ChartTitle,
   Tooltip,
   Legend,
@@ -40,7 +42,7 @@ const Hourly = ({ apiData = {}, progress, shift, shiftDate }) => {
       labels: hours.map((h) => `H${h.HourNo}`),
       datasets: [
         {
-          type: "bar",
+          type: "line",
           label: "Target",
           data: hours.map((h) => h.Target),
           backgroundColor: "rgba(30,64,175,0.7)",
@@ -60,7 +62,7 @@ const Hourly = ({ apiData = {}, progress, shift, shiftDate }) => {
           yAxisID: "y",
         },
         {
-          type: "line",
+          type: "bar",
           label: "Loss",
           data: hours.map((h) => h.HourLoss),
           borderColor: "#ef4444",
@@ -91,6 +93,20 @@ const Hourly = ({ apiData = {}, progress, shift, shiftDate }) => {
           cornerRadius: 10,
           titleFont: { size: 13 },
           bodyFont: { size: 12 },
+        },
+        datalabels: {
+          display: true,
+          anchor: (ctx) => (ctx.dataset.type === "line" ? "center" : "end"),
+          align: (ctx) => (ctx.dataset.type === "line" ? "top" : "top"),
+          color: (ctx) => {
+            if (ctx.dataset.label === "Target") return "#1e40af";
+            if (ctx.dataset.label === "Actual") return "#d97706";
+            return "#ef4444"; // Loss
+          },
+          font: { size: 10, weight: "bold" },
+          formatter: (value) => (value != null && value !== 0 ? value : ""),
+          padding: 2,
+          clip: false,
         },
       },
       scales: {

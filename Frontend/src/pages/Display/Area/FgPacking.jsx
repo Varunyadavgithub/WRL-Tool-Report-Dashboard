@@ -29,16 +29,16 @@ const FgPacking = ({ apiData = {}, progress, shift, shiftDate, config }) => {
       label: "Shift Output Target",
       unit: "No's",
       target: d.ShiftOutputTarget,
-      actual: d.ShiftOutputTarget,
+      actual: d.ActualQty,
     },
     {
       label: "Packing Till Now",
       unit: "No's",
       target: d.ProratedTarget,
-      actual: d.PackingTillNow,
+      actual: d.ActualQty,
     },
     { label: "Loss Units", unit: "No's", target: null, actual: d.LossUnits },
-    { label: "Loss Time", unit: "Min", target: null, actual: d.LossTime },
+
     {
       label: "UPH Target",
       unit: "No's",
@@ -72,7 +72,7 @@ const FgPacking = ({ apiData = {}, progress, shift, shiftDate, config }) => {
         <div className="grid grid-cols-6 gap-3 px-5 py-3 bg-slate-50">
           <StatCard
             label="Packing Till Now"
-            value={d.PackingTillNow}
+            value={d.ActualQty}
             accentHex="#1e40af"
           />
           <StatCard
