@@ -16,14 +16,14 @@ const FgLoading = ({ apiData = {}, progress, shift, shiftDate, config }) => {
     {
       label: "Working Time",
       unit: "Min",
-      target: 570,
-      actual: d.WorkingTimeMin,
+      target: d.WorkingTimeMin,
+      actual: d.ActualWorkingMin,
     },
     {
       label: "Takt Time",
       unit: "Sec",
       target: d.TactTimeSec,
-      actual: d.TactTimeSec,
+      actual: d.ActualTaktTimeSec,
     },
     {
       label: "Shift Output Target",
@@ -32,18 +32,18 @@ const FgLoading = ({ apiData = {}, progress, shift, shiftDate, config }) => {
       actual: d.ActualQty,
     },
     {
-      label: "Loading Till Now",
+      label: "Packing Till Now",
       unit: "No's",
-      target: d.ProratedTarget,
+      target: d.ShiftOutputTarget,
       actual: d.ActualQty,
     },
     { label: "Loss Units", unit: "No's", target: null, actual: d.LossUnits },
-    { label: "Loss Time", unit: "Min", target: null, actual: d.LossTime },
+
     {
       label: "UPH Target",
       unit: "No's",
       target: d.UPHTarget,
-      actual: d.ActualUPH,
+      actual: d.ActualUPH_Avg,
     },
     {
       label: "Efficiency Till Now",
@@ -53,7 +53,12 @@ const FgLoading = ({ apiData = {}, progress, shift, shiftDate, config }) => {
       highlight: "yellow",
     },
     { label: "Performance", unit: "%", target: null, actual: d.PerformancePct },
-    { label: "Balance Qty", unit: "No's", target: null, actual: d.BalanceQty },
+    {
+      label: "Balance Qty",
+      unit: "No's",
+      target: null,
+      actual: d.ShiftOutputTarget - d.ActualQty,
+    },
   ];
 
   return (
@@ -71,14 +76,14 @@ const FgLoading = ({ apiData = {}, progress, shift, shiftDate, config }) => {
         {/* Hero KPI Strip */}
         <div className="grid grid-cols-6 gap-3 px-5 py-3 bg-slate-50">
           <StatCard
-            label="Loading Till Now"
-            value={d.ActualQty}
-            accentHex="#0f766e"
+            label="Shift Target"
+            value={d.ShiftOutputTarget}
+            accentHex="#15803d"
           />
           <StatCard
-            label="Prorated Target"
-            value={d.ProratedTarget}
-            accentHex="#15803d"
+            label="Shift Output"
+            value={d.ActualQty}
+            accentHex="#1e40af"
           />
           <StatCard
             label="Efficiency"
@@ -99,7 +104,7 @@ const FgLoading = ({ apiData = {}, progress, shift, shiftDate, config }) => {
           />
           <StatCard
             label="Balance Qty"
-            value={d.BalanceQty}
+            value={d.ShiftOutputTarget - d.ActualQty}
             accentHex="#b45309"
           />
         </div>

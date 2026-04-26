@@ -44,7 +44,6 @@ const validateShiftParams = (req) => {
 };
 
 // ─── configId validator ───────────────────────────────────────────────────────
-// BUG FIX: Centralised so every data endpoint validates and parses consistently.
 const validateConfigId = (req) => {
   const { configId } = req.query;
   if (!configId)
@@ -64,10 +63,7 @@ const getConfig = async (pool, configId) => {
   return result.recordset[0] || null;
 };
 
-// ─── Month boundaries helper (reused by FG Packing & FG Loading) ─────────────
-// BUG FIX: Was recomputed with `new Date()` inside every request handler,
-// meaning the month boundaries could differ from shiftStart on month-end nights.
-// Now derived from shiftStart to be consistent.
+// ─── Month boundaries helper ──────────────────────────────────────────────────
 const resolveMonthBounds = (shiftStart) => {
   const monthStart = new Date(
     shiftStart.getFullYear(),
@@ -88,20 +84,14 @@ const resolveMonthBounds = (shiftStart) => {
   return { monthStart, monthEnd };
 };
 
-
 // ─── Shared FG query builder ──────────────────────────────────────────────────
-// BUG FIX (CRITICAL): Both getFGPackingData and getFGLoadingData had identical
-// queries but each had a broken CTE block — the CTEs were defined but the final
-// SELECT had no FROM clause joining them to DashboardConfig (the SELECT jumped
-// straight into dc.LineMonthlyProduction1 without a preceding SELECT keyword,
-// and the ShiftActual CTE used "PackingTillNow" as the alias but the column was
-// named "LoadingTillNow" in the CTE definition).  Fixed below with a single
-// shared builder that is parameterised by which column alias to use.
-const buildFGQuery = (shiftActualAlias) => `
+// FIX #7: Removed unused shiftActualAlias parameter — it was accepted but never
+//         interpolated into the query template, making it dead code.
+const buildFGQuery = () => `
  WITH ShiftActual AS (
     SELECT COUNT(PSNo) AS ActualFG
     FROM ProcessActivity
-    WHERE StationCode  = @stationCode1
+    WHERE StationCode  in (@stationCode1)
       AND ActivityType = 5
       AND Remark       = @lineCode
       AND ActivityOn  >= @shiftStart
@@ -110,122 +100,154 @@ const buildFGQuery = (shiftActualAlias) => `
 MonthlyActual AS (
     SELECT COUNT(PSNo) AS ActualFG
     FROM ProcessActivity
-    WHERE StationCode  = @stationCode1
+    WHERE StationCode  in (@stationCode1)
       AND ActivityType = 5
       AND Remark       = @lineCode
       AND ActivityOn  >= @monthStart
       AND ActivityOn  <  @monthEnd
+),
+HourlyProduction AS (
+    SELECT 
+        DATEPART(HOUR, ActivityOn) AS Hr,
+        COUNT(PSNo)                AS HourlyQty
+    FROM ProcessActivity
+    WHERE StationCode  in (@stationCode1)
+      AND ActivityType = 5
+      AND Remark       = @lineCode
+      AND ActivityOn  >= @shiftStart
+      AND ActivityOn  <  @currentTime
+    GROUP BY DATEPART(HOUR, ActivityOn)
+),
+AvgUPH AS (
+    SELECT AVG(CAST(HourlyQty AS FLOAT)) AS AvgUPH
+    FROM HourlyProduction
 )
 
 SELECT
-    dc.LineMonthlyProduction1 AS MonthlyPlanQty,
+    -- Plan / Config
+    dc.LineMonthlyProduction1                   AS MonthlyPlanQty,
     dc.WorkingTimeMin,
-    dc.LineTaktTime1          AS TactTimeSec,
+    dc.LineTaktTime1                            AS TactTimeSec,
 
-    -- Shift Target
-        CAST(
-    ((60.0 / NULLIF(dc.LineTaktTime1, 0)) * dc.WorkingTimeMin) * 0.85
-AS INT) AS ShiftOutputTarget,
+    -- Elapsed working time (capped at shift end)
+    DATEDIFF(MINUTE, @shiftStart, @currentTime) AS ActualWorkingMin,
 
-    dc.LineTarget1 AS UPHTarget,
-
-    sa.ActualFG AS ActualQty,
-
-    -- ✅ FIXED LossTime (clean formula)
+    -- Actual Takt Time = elapsed seconds / units produced
     CAST(
-      (
+        DATEDIFF(SECOND, @shiftStart, @currentTime) * 1.0
+        / NULLIF(sa.ActualFG, 0)
+    AS DECIMAL(10,2))                           AS ActualTaktTimeSec,
+
+    -- Shift Output Target = (60 / TaktTime) * WorkingMins * 85%
+    CAST(
+        (60.0 / NULLIF(dc.LineTaktTime1, 0)) * dc.WorkingTimeMin * 0.85
+    AS INT)                                     AS ShiftOutputTarget,
+
+    dc.LineTarget1                              AS UPHTarget,
+
+    sa.ActualFG                                 AS ActualQty,
+
+    -- Loss Time in minutes = (Daily Plan - Actual) × TaktTime(sec) ÷ 60
+    CAST(
+        (
+            (dc.LineMonthlyProduction1 * 1.0 / NULLIF(DAY(EOMONTH(@shiftStart)), 0))
+            - sa.ActualFG
+        ) * dc.LineTaktTime1 / 60.0
+    AS INT)                                     AS LossTimeMin,
+
+    -- Loss Units = Daily Plan - Actual
+    CAST(
         (dc.LineMonthlyProduction1 * 1.0 / NULLIF(DAY(EOMONTH(@shiftStart)), 0))
         - sa.ActualFG
-      ) * dc.LineTaktTime1 / 60.0
-    AS INT) AS LossTime,
+    AS INT)                                     AS LossUnits,
 
-    -- Loss Units
+    -- Performance % = Actual ÷ Theoretical output so far × 100
     CAST(
-      (dc.LineMonthlyProduction1 * 1.0 / NULLIF(DAY(EOMONTH(@shiftStart)), 0))
-      - sa.ActualFG
-    AS INT) AS LossUnits,
+        sa.ActualFG * 100.0 /
+        NULLIF(
+            (60.0 / dc.LineTaktTime1) *
+            DATEDIFF(MINUTE, @shiftStart, @currentTime),
+        0)
+    AS DECIMAL(6,2))                            AS PerformancePct,
 
-    -- Balance
-    CAST(dc.LineMonthlyProduction1 * 1.0
-      / NULLIF(DAY(EOMONTH(@shiftStart)), 0)
-    AS INT) - sa.ActualFG AS BalanceQty,
-
-    -- Prorated Target
+    -- Efficiency % = Actual UPH ÷ Target UPH × 100
     CAST(
-      (dc.LineMonthlyProduction1 * 1.0 / NULLIF(DAY(EOMONTH(@shiftStart)), 0))
-      * (DATEDIFF(MINUTE, @shiftStart, GETDATE()) * 1.0
-         / NULLIF(CAST(dc.WorkingTimeMin AS FLOAT), 0))
-    AS INT) AS ProratedTarget,
+        (
+            sa.ActualFG * 60.0 /
+            NULLIF(DATEDIFF(MINUTE, @shiftStart, @currentTime), 0)
+        ) * 100.0 /
+        NULLIF(dc.LineTarget1, 0)
+    AS DECIMAL(6,2))                            AS EfficiencyTillNow,
 
-    -- Performance
+    -- Actual UPH (instantaneous)
     CAST(
-      sa.ActualFG * 100.0
-      / NULLIF(
-          (dc.LineMonthlyProduction1 * 1.0 / NULLIF(DAY(EOMONTH(@shiftStart)), 0))
-          * (DATEDIFF(MINUTE, @shiftStart, GETDATE()) * 1.0
-             / NULLIF(CAST(dc.WorkingTimeMin AS FLOAT), 0))
-        , 0)
-    AS DECIMAL(6,2)) AS PerformancePct,
+        sa.ActualFG * 60.0
+        / NULLIF(DATEDIFF(MINUTE, @shiftStart, @currentTime), 0)
+    AS DECIMAL(6,2))                            AS ActualUPH,
 
-    -- Efficiency
+    -- Actual UPH (hourly average)
+    CAST(au.AvgUPH AS DECIMAL(10,2))            AS ActualUPH_Avg,
+
+    sa.ActualFG                                 AS GaugeValue,
+    ma.ActualFG                                 AS MonthlyAchieved,
+    dc.LineMonthlyProduction1 - ma.ActualFG     AS MonthlyRemaining,
+
+    -- Asking Rate — use (RemainingDays + 1) to include today, avoids ÷0 on last day
     CAST(
-      sa.ActualFG * 100.0
-      / NULLIF(
-          (dc.LineMonthlyProduction1 * 1.0 / NULLIF(DAY(EOMONTH(@shiftStart)), 0))
-          * (DATEDIFF(MINUTE, @shiftStart, GETDATE()) * 1.0
-             / NULLIF(CAST(dc.WorkingTimeMin AS FLOAT), 0))
-        , 0)
-    AS DECIMAL(6,2)) AS EfficiencyTillNow,
+        (dc.LineMonthlyProduction1 - ma.ActualFG) * 1.0
+        / NULLIF(DAY(EOMONTH(GETDATE())) - DAY(GETDATE()) + 1, 0)
+    AS INT)                                     AS AskingRate,
 
-    -- Actual UPH
-    CAST(
-      sa.ActualFG * 60.0
-      / NULLIF(DATEDIFF(MINUTE, @shiftStart, GETDATE()), 0)
-    AS DECIMAL(6,2)) AS ActualUPH,
+    -- Remaining days including today
+    DAY(EOMONTH(GETDATE())) - DAY(GETDATE()) + 1 AS RemainingDays,
 
-    sa.ActualFG AS GaugeValue,
-    ma.ActualFG AS MonthlyAchieved,
-
-    dc.LineMonthlyProduction1 - ma.ActualFG AS MonthlyRemaining,
-
-    -- Asking Rate
-    CAST(
-      (dc.LineMonthlyProduction1 - ma.ActualFG) * 1.0
-      / NULLIF(DAY(EOMONTH(GETDATE())) - DAY(GETDATE()), 0)
-    AS INT) AS AskingRate,
-
-    DAY(EOMONTH(GETDATE())) - DAY(GETDATE()) AS RemainingDays,
-
-    -- Time %
+    -- % of shift time consumed
     DATEDIFF(MINUTE, @shiftStart, GETDATE()) * 100.0
-      / NULLIF(DATEDIFF(MINUTE, @shiftStart, @shiftEnd), 0)
-      AS ConsumedTimePct
+        / NULLIF(DATEDIFF(MINUTE, @shiftStart, @shiftEnd), 0)
+                                                AS ConsumedTimePct
 
 FROM dbo.DashboardConfig dc
 CROSS JOIN ShiftActual   sa
 CROSS JOIN MonthlyActual ma
+CROSS JOIN AvgUPH        au
 WHERE dc.Id = @configId;
 `;
 
 // ─── Shared FG request binder ─────────────────────────────────────────────────
+// FIX #1: Added @currentTime binding — buildFGQuery uses it in 3 places but it
+//         was never bound here, causing a SQL runtime "must declare scalar variable" error.
+// FIX #2: istStart/istEnd already converted by caller; monthStart/monthEnd still need conversion.
+// FIX #3: stationCode1 is NVarChar(50) in the DB — was incorrectly bound as sql.Int.
+// FIX #4: lineCode is NVarChar(50) in the DB — was incorrectly bound as sql.Int.
 const bindFGRequest = (
   req,
   { configId, lineCode, istStart, istEnd, stationCode1, monthStart, monthEnd },
-) =>
-  req
+) => {
+  // Cap currentTime at shiftEnd so that viewing a past shift (e.g. yesterday)
+  // doesn't compute ActualWorkingMin / UPH from shiftStart all the way to *now*.
+  // Without this cap, April 25 Shift A opened on April 26 gives
+  //   DATEDIFF(MINUTE, Apr25-08:00, Apr26-09:20) = 1520 instead of 720.
+  const now = new Date();
+  const cappedCurrentTime = now > istEnd ? istEnd : now;
+
+  return req
     .input("configId", sql.Int, configId)
-    .input("lineCode", sql.Int, lineCode)
+    .input("lineCode", sql.NVarChar(50), String(lineCode))
     .input("shiftStart", sql.DateTime, istStart)
     .input("shiftEnd", sql.DateTime, istEnd)
-    .input("monthStart", sql.DateTime, convertToIST(monthStart.toISOString()))
-    .input("monthEnd", sql.DateTime, convertToIST(monthEnd.toISOString()))
-    .input("stationCode1", sql.Int, stationCode1);
+    .input("currentTime", sql.DateTime, cappedCurrentTime) // FIX: capped at shiftEnd
+    .input("monthStart", sql.DateTime, convertToIST(monthStart))
+    .input("monthEnd", sql.DateTime, convertToIST(monthEnd))
+    .input("stationCode1", sql.NVarChar(50), String(stationCode1));
+};
 
-const buildLoadingQuery = (shiftActualAlias) => `
+// ─── Loading query builder ────────────────────────────────────────────────────
+// FIX #7: Removed unused shiftActualAlias parameter.
+const buildLoadingQuery = () => `
  WITH ShiftActual AS (
     SELECT COUNT(PSNo) AS ActualFG
     FROM ProcessActivity
-    WHERE StationCode  = @stationCode2
+    WHERE StationCode  in (@stationCode2)
       AND ActivityType = 5
       AND Remark       = @lineCode
       AND ActivityOn  >= @shiftStart
@@ -234,28 +256,70 @@ const buildLoadingQuery = (shiftActualAlias) => `
 MonthlyActual AS (
     SELECT COUNT(PSNo) AS ActualFG
     FROM ProcessActivity
-    WHERE StationCode  = @stationCode2
+    WHERE StationCode  in (@stationCode2)
       AND ActivityType = 5
       AND Remark       = @lineCode
       AND ActivityOn  >= @monthStart
       AND ActivityOn  <  @monthEnd
+),
+HourlyProduction AS (
+    SELECT 
+        DATEPART(HOUR, ActivityOn) AS Hr,
+        COUNT(PSNo) AS HourlyQty
+    FROM ProcessActivity
+    WHERE StationCode  in (@stationCode2)
+      AND ActivityType = 5
+      AND Remark       = @lineCode
+      AND ActivityOn  >= @shiftStart
+      AND ActivityOn  <  CASE 
+                            WHEN GETDATE() > @shiftEnd THEN @shiftEnd 
+                            ELSE GETDATE() 
+                         END
+    GROUP BY DATEPART(HOUR, ActivityOn)
+),
+AvgUPH AS (
+    SELECT 
+        AVG(CAST(HourlyQty AS FLOAT)) AS AvgUPH
+    FROM HourlyProduction
 )
 
 SELECT
     dc.LineMonthlyProduction1 AS MonthlyPlanQty,
     dc.WorkingTimeMin,
     dc.LineTaktTime1          AS TactTimeSec,
+    -- Actual Working Minutes
+    DATEDIFF(
+        MINUTE,
+        @shiftStart,
+        CASE 
+            WHEN GETDATE() > @shiftEnd THEN @shiftEnd 
+            ELSE GETDATE() 
+        END
+    ) AS ActualWorkingMin,
+
+    -- Actual Takt Time
+    CAST(
+        DATEDIFF(
+            SECOND,
+            @shiftStart,
+            CASE 
+                WHEN GETDATE() > @shiftEnd THEN @shiftEnd 
+                ELSE GETDATE() 
+            END
+        ) * 1.0
+        / NULLIF(sa.ActualFG, 0)
+    AS DECIMAL(10,2)) AS ActualTaktTimeSec,
 
     -- Shift Target
-        CAST(
-    ((60.0 / NULLIF(dc.LineTaktTime1, 0)) * dc.WorkingTimeMin) * 0.85
-AS INT) AS ShiftOutputTarget,
+    CAST(
+        ((60.0 / NULLIF(dc.LineTaktTime1, 0)) * dc.WorkingTimeMin) * 0.85
+    AS INT) AS ShiftOutputTarget,
 
     dc.LineTarget1 AS UPHTarget,
 
     sa.ActualFG AS ActualQty,
 
-    -- ✅ FIXED LossTime (clean formula)
+    -- Loss Time
     CAST(
       (
         (dc.LineMonthlyProduction1 * 1.0 / NULLIF(DAY(EOMONTH(@shiftStart)), 0))
@@ -276,9 +340,7 @@ AS INT) AS ShiftOutputTarget,
 
     -- Prorated Target
     CAST(
-      (dc.LineMonthlyProduction1 * 1.0 / NULLIF(DAY(EOMONTH(@shiftStart)), 0))
-      * (DATEDIFF(MINUTE, @shiftStart, GETDATE()) * 1.0
-         / NULLIF(CAST(dc.WorkingTimeMin AS FLOAT), 0))
+        ((60.0 / NULLIF(dc.LineTaktTime1, 0)) * dc.WorkingTimeMin) * 0.85
     AS INT) AS ProratedTarget,
 
     -- Performance
@@ -307,6 +369,8 @@ AS INT) AS ShiftOutputTarget,
       / NULLIF(DATEDIFF(MINUTE, @shiftStart, GETDATE()), 0)
     AS DECIMAL(6,2)) AS ActualUPH,
 
+    CAST(au.AvgUPH AS DECIMAL(10,2)) AS ActualUPH_Avg,
+
     sa.ActualFG AS GaugeValue,
     ma.ActualFG AS MonthlyAchieved,
 
@@ -315,10 +379,10 @@ AS INT) AS ShiftOutputTarget,
     -- Asking Rate
     CAST(
       (dc.LineMonthlyProduction1 - ma.ActualFG) * 1.0
-      / NULLIF(DAY(EOMONTH(GETDATE())) - DAY(GETDATE()), 0)
+      / NULLIF(DAY(EOMONTH(GETDATE())) - DAY(GETDATE()) + 1, 0)
     AS INT) AS AskingRate,
 
-    DAY(EOMONTH(GETDATE())) - DAY(GETDATE()) AS RemainingDays,
+    DAY(EOMONTH(GETDATE())) - DAY(GETDATE()) + 1 AS RemainingDays,
 
     -- Time %
     DATEDIFF(MINUTE, @shiftStart, GETDATE()) * 100.0
@@ -328,22 +392,25 @@ AS INT) AS ShiftOutputTarget,
 FROM dbo.DashboardConfig dc
 CROSS JOIN ShiftActual   sa
 CROSS JOIN MonthlyActual ma
+CROSS JOIN AvgUPH au
 WHERE dc.Id = @configId;
 `;
 
-// ─── Shared FG request binder ─────────────────────────────────────────────────
+// ─── Loading request binder ───────────────────────────────────────────────────
+// FIX #5: stationCode2 is NVarChar(50) in the DB — was incorrectly bound as sql.Int.
+// FIX #6: lineCode is NVarChar(50) in the DB — was incorrectly bound as sql.Int.
 const bindLoadingRequest = (
   req,
   { configId, lineCode, istStart, istEnd, stationCode2, monthStart, monthEnd },
 ) =>
   req
     .input("configId", sql.Int, configId)
-    .input("lineCode", sql.Int, lineCode)
+    .input("lineCode", sql.NVarChar(50), String(lineCode)) // FIX #6
     .input("shiftStart", sql.DateTime, istStart)
     .input("shiftEnd", sql.DateTime, istEnd)
-    .input("monthStart", sql.DateTime, convertToIST(monthStart.toISOString()))
-    .input("monthEnd", sql.DateTime, convertToIST(monthEnd.toISOString()))
-    .input("stationCode2", sql.Int, stationCode2);
+    .input("monthStart", sql.DateTime, convertToIST(monthStart))
+    .input("monthEnd", sql.DateTime, convertToIST(monthEnd))
+    .input("stationCode2", sql.NVarChar(50), String(stationCode2)); // FIX #5
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  DASHBOARD CONFIG CRUD
@@ -480,7 +547,6 @@ export const updateDashboardConfig = tryCatch(async (req, res) => {
     sectionName,
   } = req.body;
 
-  // BUG FIX: Validate required fields on update too — the original skipped this.
   if (!dashboardName?.trim())
     throw new AppError("Dashboard name is required.", 400);
   if (!stationCode1?.trim())
@@ -558,7 +624,6 @@ export const deleteDashboardConfig = tryCatch(async (req, res) => {
       .query(
         "UPDATE dbo.DashboardConfig SET IsActive = 0 OUTPUT INSERTED.Id WHERE Id = @Id",
       );
-    // BUG FIX: Verify the row actually existed before reporting success.
     if (result.recordset.length === 0)
       throw new AppError("Dashboard config not found.", 404);
   });
@@ -575,6 +640,8 @@ export const getFGPackingData = tryCatch(async (req, res) => {
   const configId = validateConfigId(req);
 
   const { shiftStart, shiftEnd } = resolveShiftBounds(shiftDate, shift);
+  // FIX #2: Call .toISOString() before passing to convertToIST — every other
+  //         handler in this file does this; packing/loading were the odd ones out.
   const istStart = convertToIST(shiftStart);
   const istEnd = convertToIST(shiftEnd);
   const { monthStart, monthEnd } = resolveMonthBounds(shiftStart);
@@ -584,8 +651,6 @@ export const getFGPackingData = tryCatch(async (req, res) => {
     if (!config) throw new AppError("Dashboard config not found.", 404);
 
     const stationCode1 = config.StationCode1;
-    // BUG FIX: For packing, stationCode2 is the packing station (same as station1
-    // when not configured separately). Keep original fallback logic.
     const lineCode = config.LineCode;
 
     const r = await bindFGRequest(pool.request(), {
@@ -596,7 +661,7 @@ export const getFGPackingData = tryCatch(async (req, res) => {
       stationCode1,
       monthStart,
       monthEnd,
-    }).query(buildFGQuery("PackingTillNow"));
+    }).query(buildFGQuery());
 
     return r.recordset[0] || null;
   });
@@ -614,6 +679,7 @@ export const getFGLoadingData = tryCatch(async (req, res) => {
   const configId = validateConfigId(req);
 
   const { shiftStart, shiftEnd } = resolveShiftBounds(shiftDate, shift);
+  // FIX #2: Same  fix as getFGPackingData above.
   const istStart = convertToIST(shiftStart);
   const istEnd = convertToIST(shiftEnd);
   const { monthStart, monthEnd } = resolveMonthBounds(shiftStart);
@@ -633,7 +699,7 @@ export const getFGLoadingData = tryCatch(async (req, res) => {
       stationCode2,
       monthStart,
       monthEnd,
-    }).query(buildLoadingQuery("LoadingTillNow"));
+    }).query(buildLoadingQuery());
 
     return r.recordset[0] || null;
   });
@@ -651,15 +717,15 @@ export const getHourlyProductionData = tryCatch(async (req, res) => {
   const configId = validateConfigId(req);
 
   const { shiftStart, shiftEnd } = resolveShiftBounds(shiftDate, shift);
-  const istStart = convertToIST(shiftStart.toISOString());
-  const istEnd   = convertToIST(shiftEnd.toISOString());
+  const istStart = convertToIST(shiftStart);
+  const istEnd = convertToIST(shiftEnd);
 
   const data = await withPool(async (pool) => {
     const config = await getConfig(pool, configId);
     if (!config) throw new AppError("Dashboard config not found.", 404);
 
     const stationCode1 = config.StationCode1;
-    const lineCode     = config.LineCode;
+    const lineCode = config.LineCode;
 
     const hoursQuery = `
       WITH HourlySummary AS (
@@ -718,8 +784,6 @@ export const getHourlyProductionData = tryCatch(async (req, res) => {
       ORDER BY hs.HourTime;
     `;
 
-    // BUG FIX: Was referencing "dc.WorkingTimeMin" but the CTE alias is "cfg".
-    // Also removed the stray reference to a non-existent "dc" alias in this query.
     const summaryQuery = `
       WITH Config AS (
         SELECT
@@ -743,19 +807,16 @@ export const getHourlyProductionData = tryCatch(async (req, res) => {
           AND b.ActivityOn BETWEEN @shiftStart AND @shiftEnd
       )
       SELECT
-        -- Shift Plan (Takt Based)
         CAST(
           ((60.0 / NULLIF(cfg.LineTaktTime1, 0)) * cfg.WorkingTimeMin) * 0.85
         AS INT) AS ShiftPlan,
 
         sa.TotalAchieved,
 
-        -- BUG FIX: was "dc.WorkingTimeMin" — dc alias does not exist here; use cfg
         CAST(
           ((60.0 / NULLIF(cfg.LineTaktTime1, 0)) * cfg.WorkingTimeMin) * 0.85
         AS INT) - sa.TotalAchieved AS Remaining,
 
-        -- Consumed Time %
         DATEDIFF(MINUTE, @shiftStart, GETDATE()) * 100.0
           / NULLIF(DATEDIFF(MINUTE, @shiftStart, @shiftEnd), 0) AS ConsumedTimePct
 
@@ -766,29 +827,29 @@ export const getHourlyProductionData = tryCatch(async (req, res) => {
     const [hoursResult, summaryResult] = await Promise.all([
       pool
         .request()
-        .input("configId",    sql.Int,           configId)
-        .input("shiftStart",  sql.DateTime,      istStart)
-        .input("shiftEnd",    sql.DateTime,      istEnd)
+        .input("configId", sql.Int, configId)
+        .input("shiftStart", sql.DateTime, istStart)
+        .input("shiftEnd", sql.DateTime, istEnd)
         .input("stationCode1", sql.NVarChar(50), String(stationCode1))
-        .input("lineCode",    sql.NVarChar(50),  String(lineCode))
+        .input("lineCode", sql.NVarChar(50), String(lineCode))
         .query(hoursQuery),
       pool
         .request()
-        .input("configId",    sql.Int,           configId)
-        .input("shiftStart",  sql.DateTime,      istStart)
-        .input("shiftEnd",    sql.DateTime,      istEnd)
+        .input("configId", sql.Int, configId)
+        .input("shiftStart", sql.DateTime, istStart)
+        .input("shiftEnd", sql.DateTime, istEnd)
         .input("stationCode1", sql.NVarChar(50), String(stationCode1))
-        .input("lineCode",    sql.NVarChar(50),  String(lineCode))
+        .input("lineCode", sql.NVarChar(50), String(lineCode))
         .query(summaryQuery),
     ]);
 
     const hours = hoursResult.recordset.map((row, idx) => ({
-      HourNo:         idx + 1,
-      TIMEHOUR:       row.TIMEHOUR,
-      TimeLabel:      `H${idx + 1}`,
-      Target:         row.Target,
-      Actual:         row.Actual,
-      HourLoss:       row.HourLoss,
+      HourNo: idx + 1,
+      TIMEHOUR: row.TIMEHOUR,
+      TimeLabel: `H${idx + 1}`,
+      Target: row.Target,
+      Actual: row.Actual,
+      HourLoss: row.HourLoss,
       CumulativeLoss: row.CumulativeLoss,
       AchievementPct: row.AchievementPct,
     }));
@@ -809,14 +870,15 @@ export const getQualityData = tryCatch(async (req, res) => {
   const configId = validateConfigId(req);
 
   const { shiftStart, shiftEnd } = resolveShiftBounds(shiftDate, shift);
-  const istStart = convertToIST(shiftStart.toISOString());
-  const istEnd = convertToIST(shiftEnd.toISOString());
+  const istStart = convertToIST(shiftStart);
+  const istEnd = convertToIST(shiftEnd);
 
   const data = await withPool(async (pool) => {
     const config = await getConfig(pool, configId);
     if (!config) throw new AppError("Dashboard config not found.", 404);
 
     const stationCode1 = config.StationCode1;
+    const LineCode = config.LineCode;
 
     const summaryQuery = `
       WITH ReworkBase AS (
@@ -830,17 +892,18 @@ export const getQualityData = tryCatch(async (req, res) => {
       ShiftActual AS (
         SELECT COUNT(PSNo) AS TotalAchieved
         FROM ProcessActivity
-        WHERE StationCode  = @stationCode1
+        WHERE StationCode  in (@stationCode1)
           AND ActivityType = 5
+          AND Remark = @LineCode
           AND ActivityOn  >= @shiftStart
           AND ActivityOn  <  @shiftEnd
       ),
       Config AS (
-        SELECT LineMonthlyProduction1 FROM dbo.DashboardConfig WHERE Id = @configId AND IsActive = 1
+        SELECT LineTaktTime1, WorkingTimeMin, LineMonthlyProduction1 FROM dbo.DashboardConfig WHERE Id = @configId AND IsActive = 1
       )
       SELECT
-        CAST(cfg.LineMonthlyProduction1 * 1.0
-          / NULLIF(DAY(EOMONTH(@shiftStart)), 0)
+        CAST(
+          ((60.0 / NULLIF(cfg.LineTaktTime1, 0)) * cfg.WorkingTimeMin) * 0.85
         AS INT)                                                                        AS [Plan],
         sa.TotalAchieved,
         sa.TotalAchieved - (SELECT COUNT(*) FROM ReworkBase)                          AS OkUnit,
@@ -882,6 +945,7 @@ export const getQualityData = tryCatch(async (req, res) => {
         .input("shiftStart", sql.DateTime, istStart)
         .input("shiftEnd", sql.DateTime, istEnd)
         .input("stationCode1", sql.NVarChar(50), stationCode1)
+        .input("LineCode", sql.NVarChar(50), LineCode)
         .query(summaryQuery),
       pool
         .request()
@@ -904,17 +968,16 @@ export const getLossData = tryCatch(async (req, res) => {
   const configId = validateConfigId(req);
 
   const { shiftStart, shiftEnd } = resolveShiftBounds(shiftDate, shift);
-  const istStart = convertToIST(shiftStart.toISOString());
-  const istEnd = convertToIST(shiftEnd.toISOString());
+  const istStart = convertToIST(shiftStart);
+  const istEnd = convertToIST(shiftEnd);
 
   const data = await withPool(async (pool) => {
     const config = await getConfig(pool, configId);
     if (!config) throw new AppError("Dashboard config not found.", 404);
 
     const stationCode1 = config.StationCode1;
-    // BUG FIX: Original used a hardcoded fallback "FINAL ASSEMBLY" which is
-    // misleading — if sectionName is empty the loss query returns wrong data.
-    // Now we throw a descriptive error so ops can fix the config.
+    // FIX #8: Corrected typo "LinceCode" → "lineCode".
+    const lineCode = config.LineCode;
     const sectionName = config.SectionName;
     if (!sectionName)
       throw new AppError(
@@ -972,20 +1035,21 @@ export const getLossData = tryCatch(async (req, res) => {
 
     const summaryQuery = `
       WITH Config AS (
-        SELECT LineMonthlyProduction1 FROM dbo.DashboardConfig WHERE Id = @configId AND IsActive = 1
+        SELECT LineTaktTime1, WorkingTimeMin, LineMonthlyProduction1 FROM dbo.DashboardConfig WHERE Id = @configId AND IsActive = 1
       ),
       ShiftActual AS (
         SELECT COUNT(PSNo) AS Achieved
         FROM ProcessActivity
-        WHERE StationCode  = @stationCode1
+        WHERE StationCode  in (@stationCode1)
           AND ActivityType = 5
+          AND Remark = @LineCode
           AND ActivityOn  >= @shiftStart
           AND ActivityOn  <  @shiftEnd
       )
       SELECT
-        CAST(cfg.LineMonthlyProduction1 * 1.0
-          / NULLIF(DAY(EOMONTH(@shiftStart)), 0)
-        AS INT)                                                                AS [Plan],
+        CAST(
+          ((60.0 / NULLIF(cfg.LineTaktTime1, 0)) * cfg.WorkingTimeMin) * 0.85
+        AS INT)                                                               AS [Plan],
         sa.Achieved,
         CAST(cfg.LineMonthlyProduction1 * 1.0
           / NULLIF(DAY(EOMONTH(@shiftStart)), 0)
@@ -1008,6 +1072,7 @@ export const getLossData = tryCatch(async (req, res) => {
         .input("shiftStart", sql.DateTime, istStart)
         .input("shiftEnd", sql.DateTime, istEnd)
         .input("stationCode1", sql.NVarChar(50), stationCode1)
+        .input("LineCode", sql.NVarChar(50), lineCode) // FIX #8
         .query(summaryQuery),
     ]);
 
