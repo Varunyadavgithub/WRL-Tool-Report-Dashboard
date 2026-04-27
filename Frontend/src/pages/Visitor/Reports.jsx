@@ -1,11 +1,11 @@
 import { useState } from "react";
-import Title from "../../components/ui/Title";
 import axios from "axios";
 import toast from "react-hot-toast";
-import Button from "../../components/ui/Button";
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import { baseURL } from "../../assets/assets";
 import Loader from "../../components/ui/Loader";
+import { formatISODateString } from "../../utils/dateUtils";
+import { FaFileAlt, FaSearch, FaUsers, FaPaperPlane } from "react-icons/fa";
 
 const Reports = () => {
   const [loading, setLoading] = useState(false);
@@ -20,7 +20,7 @@ const Reports = () => {
   const formatDate = (date) => {
     const pad = (n) => (n < 10 ? "0" + n : n);
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-      date.getDate()
+      date.getDate(),
     )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
   };
 
@@ -49,7 +49,7 @@ const Reports = () => {
     fetchVisitorData(
       formatDate(yesterday8AM),
       formatDate(today8AM),
-      setYdayLoading
+      setYdayLoading,
     );
   };
 
@@ -68,12 +68,12 @@ const Reports = () => {
       1,
       8,
       0,
-      0
+      0,
     );
     fetchVisitorData(
       formatDate(startOfMonth),
       formatDate(now),
-      setMonthLoading
+      setMonthLoading,
     );
   };
 
@@ -98,12 +98,15 @@ const Reports = () => {
         return safeLower(item.email).includes(lowerTerm);
       case "company":
         return safeLower(item.company).includes(lowerTerm);
+      case "purpose":
+        return safeLower(item.purpose_of_visit).includes(lowerTerm);
       default:
         return (
           safeLower(item.visitor_name).includes(lowerTerm) ||
           safeLower(item.contact_no).includes(lowerTerm) ||
           safeLower(item.email).includes(lowerTerm) ||
-          safeLower(item.company).includes(lowerTerm)
+          safeLower(item.company).includes(lowerTerm) ||
+          safeLower(item.purpose_of_visit).includes(lowerTerm)
         );
     }
   });
@@ -124,201 +127,267 @@ const Reports = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 overflow-x-hidden max-w-full">
-      <Title title="Visitors Reports" align="center" />
+    <div className="min-h-screen bg-gray-100 p-4 max-w-full">
+      {/* Page Title */}
+      <h1 className="text-3xl font-bold text-center mb-4 text-gray-800">
+        Visitors Reports
+      </h1>
 
-      {/* Filters & Quick Actions */}
-      <div className="mt-6 bg-white p-6 rounded-xl shadow-sm flex flex-col md:flex-row gap-6 justify-between items-center">
-        <div className="flex flex-wrap gap-4 items-center w-full md:w-auto">
-          <DateTimePicker
-            label="Start Time"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-          />
-          <DateTimePicker
-            label="End Time"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-          />
-          <Button
-            onClick={fetchVisitors}
-            bgColor="bg-blue-600"
-            textColor="text-white"
-            className="px-4 py-2"
-          >
-            {loading ? <Loader /> : "Query"}
-          </Button>
-        </div>
+      {/* ==================== Filters Section ==================== */}
+      <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+        <h3 className="text-xl font-semibold mb-4 text-gray-800">
+          Filters & Quick Actions
+        </h3>
 
-        <div className="flex flex-wrap gap-2 items-center">
-          <input
-            type="text"
-            placeholder="Search visitor..."
-            className="px-3 py-2 border rounded-md"
-            value={searchParams.term}
-            onChange={(e) =>
-              setSearchParams((prev) => ({ ...prev, term: e.target.value }))
-            }
-          />
-          <select
-            className="px-3 py-2 border rounded-md"
-            value={searchParams.field}
-            onChange={(e) =>
-              setSearchParams((prev) => ({ ...prev, field: e.target.value }))
-            }
-          >
-            <option value="all">All Fields</option>
-            <option value="name">Name</option>
-            <option value="contactno">Contact No.</option>
-            <option value="email">Email</option>
-            <option value="company">Company</option>
-          </select>
-        </div>
+        <div className="flex flex-col lg:flex-row gap-6 justify-between items-start lg:items-end">
+          {/* Date Range & Query */}
+          <div className="flex flex-wrap gap-4 items-end">
+            <DateTimePicker
+              label="Start Time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+            <DateTimePicker
+              label="End Time"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+            />
+            <button
+              onClick={fetchVisitors}
+              className="px-4 py-2 bg-blue-500 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-blue-600 transition cursor-pointer flex items-center gap-2"
+            >
+              {loading ? (
+                <Loader />
+              ) : (
+                <>
+                  <FaSearch className="text-xs" /> Query
+                </>
+              )}
+            </button>
+          </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={fetchYdayVisitorData}
-            bgColor="bg-yellow-500"
-            textColor="text-black"
-          >
-            {ydayLoading ? <Loader /> : "YDAY"}
-          </Button>
-          <Button
-            onClick={fetchTdayVisitorData}
-            bgColor="bg-blue-500"
-            textColor="text-white"
-          >
-            {todayLoading ? <Loader /> : "TDAY"}
-          </Button>
-          <Button
-            onClick={fetchMTDVisitorData}
-            bgColor="bg-green-500"
-            textColor="text-white"
-          >
-            {monthLoading ? <Loader /> : "MTD"}
-          </Button>
+          {/* Search */}
+          <div className="flex flex-wrap gap-2 items-end">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Search
+              </label>
+              <input
+                type="text"
+                placeholder="Search visitor..."
+                className="w-full border border-gray-300 rounded-lg p-2 text-sm 
+                  bg-white text-gray-800
+                  placeholder-gray-400
+                  focus:outline-none focus:ring-2 focus:ring-blue-400"
+                value={searchParams.term}
+                onChange={(e) =>
+                  setSearchParams((prev) => ({
+                    ...prev,
+                    term: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Field
+              </label>
+              <select
+                className="w-full border border-gray-300 rounded-lg p-2 text-sm 
+                  bg-white text-gray-800
+                  focus:outline-none focus:ring-2 focus:ring-blue-400"
+                value={searchParams.field}
+                onChange={(e) =>
+                  setSearchParams((prev) => ({
+                    ...prev,
+                    field: e.target.value,
+                  }))
+                }
+              >
+                <option value="all">All Fields</option>
+                <option value="name">Name</option>
+                <option value="contactno">Contact No.</option>
+                <option value="email">Email</option>
+                <option value="company">Company</option>
+                <option value="purpose">Purpose</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Quick Action Buttons */}
+          <div className="flex flex-wrap gap-2 items-end">
+            <button
+              onClick={fetchYdayVisitorData}
+              className="px-4 py-2 bg-yellow-500 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-yellow-600 transition cursor-pointer"
+            >
+              {ydayLoading ? <Loader /> : "YDAY"}
+            </button>
+            <button
+              onClick={fetchTdayVisitorData}
+              className="px-4 py-2 bg-blue-500 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-blue-600 transition cursor-pointer"
+            >
+              {todayLoading ? <Loader /> : "TDAY"}
+            </button>
+            <button
+              onClick={fetchMTDVisitorData}
+              className="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-green-600 transition cursor-pointer"
+            >
+              {monthLoading ? <Loader /> : "MTD"}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Visitors Table */}
-      <div className="mt-4 bg-white p-3 rounded-lg shadow-sm overflow-x-auto">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="text-md font-semibold text-gray-700">
-            Visitors ({filteredReports.length})
-          </h3>
+      {/* ==================== Visitors Table ==================== */}
+      <div className="bg-white shadow-md rounded-lg p-6">
+        {/* Table Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-full bg-blue-500">
+              <FaUsers className="text-white text-lg" />
+            </div>
+            <div>
+              <p className="text-gray-500 text-sm">Total Results</p>
+              <h2 className="text-2xl font-bold text-gray-800">
+                {filteredReports.length}
+              </h2>
+            </div>
+          </div>
 
-          <Button
+          <button
             onClick={handleSendReport}
-            bgColor="bg-purple-600"
-            textColor="text-white"
-            className="px-3 py-1 text-sm"
+            className="px-4 py-2 bg-purple-500 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-purple-600 transition cursor-pointer flex items-center gap-2"
           >
-            Send Report
-          </Button>
+            <FaPaperPlane className="text-xs" /> Send Report
+          </button>
         </div>
 
-        <table className="min-w-full table-auto text-xs border-collapse">
-          <thead className="bg-gray-100 sticky top-0 z-10 text-xs">
-            <tr>
-              {[
-                "Sr.No.",
-                "Visitor Type",
-                "Name",
-                "Contact",
-                "Email",
-                "Company",
-                "Address",
-                "State",
-                "City",
-                "ID Type",
-                "ID No",
-                "Vehicle",
-                "Employee To Visit",
-                "Department To visit",
-                "Check In",
-                "Check Out",
-                "Visit Duration",
-                "No of Visit",
-                "Purpose Of Visit",
-                "Token",
-              ].map((header, idx) => (
-                <th
-                  key={idx}
-                  className="px-1 py-1 border text-center whitespace-nowrap"
-                >
-                  {header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-
-          <tbody>
-            {filteredReports.length ? (
-              filteredReports.map((v, i) => (
-                <tr key={i} className="hover:bg-gray-50 transition">
-                  <td className="px-1 py-1 border text-center">{i + 1}</td>
-                  <td className="px-1 py-1 border text-center whitespace-nowrap">
-                    {v.visit_type}
-                  </td>
-                  <td className="px-1 py-1 border text-center whitespace-nowrap">
-                    {v.visitor_name}
-                  </td>
-                  <td className="px-1 py-1 border text-center">
-                    {v.contact_no}
-                  </td>
-                  <td className="px-1 py-1 border text-center">{v.email}</td>
-                  <td className="px-1 py-1 border text-center">{v.company}</td>
-                  <td className="px-1 py-1 border text-center">{v.address}</td>
-                  <td className="px-1 py-1 border text-center">{v.state}</td>
-                  <td className="px-1 py-1 border text-center">{v.city}</td>
-                  <td className="px-1 py-1 border text-center">
-                    {v.identity_type}
-                  </td>
-                  <td className="px-1 py-1 border text-center">
-                    {v.identity_no}
-                  </td>
-                  <td className="px-1 py-1 border text-center">
-                    {v.vehicle_details}
-                  </td>
-                  <td className="px-1 py-1 border text-center">
-                    {v.employee_name}
-                  </td>
-                  <td className="px-1 py-1 border text-center">
-                    {v.department_name}
-                  </td>
-                  <td className="px-1 py-1 border text-center">
-                    {v.check_in_time?.replace("T", " ").replace("Z", "")}
-                  </td>
-                  <td className="px-1 py-1 border text-center">
-                    {v.check_out_time ? (
-                      v.check_out_time.replace("T", " ").replace("Z", "")
-                    ) : (
-                      <span className="text-green-600 font-bold">
-                        Currently In
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-1 py-1 border text-center">
-                    {v.visit_duration}
-                  </td>
-                  <td className="px-1 py-1 border text-center">
-                    {v.no_of_visit}
-                  </td>
-                  <td className="px-1 py-1 border text-center">
-                    {v.purpose_of_visit}
-                  </td>
-                  <td className="px-1 py-1 border text-center">{v.token}</td>
-                </tr>
-              ))
-            ) : (
+        {/* Full-Width Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full table-fixed border-collapse text-[11px]">
+            <thead className="bg-gray-100">
               <tr>
-                <td colSpan={16} className="text-center py-4 text-gray-500">
-                  No visitors found.
-                </td>
+                {[
+                  { label: "Sr.", width: "w-[3%]" },
+                  { label: "Type", width: "w-[5%]" },
+                  { label: "Name", width: "w-[7%]" },
+                  { label: "Contact", width: "w-[6%]" },
+                  { label: "Email", width: "w-[7%]" },
+                  { label: "Company", width: "w-[5%]" },
+                  { label: "Address", width: "w-[6%]" },
+                  { label: "State", width: "w-[5%]" },
+                  { label: "City", width: "w-[4%]" },
+                  { label: "ID Type", width: "w-[5%]" },
+                  { label: "ID No", width: "w-[5%]" },
+                  { label: "Vehicle", width: "w-[5%]" },
+                  { label: "Employee", width: "w-[6%]" },
+                  { label: "Dept.", width: "w-[5%]" },
+                  { label: "Check In", width: "w-[6%]" },
+                  { label: "Check Out", width: "w-[6%]" },
+                  { label: "Duration", width: "w-[4%]" },
+                  { label: "Visits", width: "w-[3%]" },
+                  { label: "Purpose", width: "w-[5%]" },
+                  { label: "Token", width: "w-[3%]" },
+                ].map((col, idx) => (
+                  <th
+                    key={idx}
+                    className={`${col.width} p-2 border-b border-gray-200 text-center font-semibold text-gray-600 wrap-break-word`}
+                  >
+                    {col.label}
+                  </th>
+                ))}
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+
+            <tbody>
+              {filteredReports.length > 0 ? (
+                filteredReports.map((v, i) => (
+                  <tr
+                    key={i}
+                    className="hover:bg-gray-50 transition border-b border-gray-100"
+                  >
+                    <td className="p-2 text-center text-gray-700">{i + 1}</td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {v.visit_type || "—"}
+                    </td>
+                    <td className="p-2 text-center font-medium text-gray-800 wrap-break-word">
+                      {v.visitor_name || "—"}
+                    </td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {v.contact_no || "—"}
+                    </td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {v.email || "—"}
+                    </td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {v.company || "—"}
+                    </td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {v.address || "—"}
+                    </td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {v.state || "—"}
+                    </td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {v.city || "—"}
+                    </td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {v.identity_type || "—"}
+                    </td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {v.identity_no || "—"}
+                    </td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {v.vehicle_details || "—"}
+                    </td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {v.employee_name || "—"}
+                    </td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {v.department_name || "—"}
+                    </td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {formatISODateString(v.check_in_time) || "—"}
+                    </td>
+                    <td className="p-2 text-center wrap-break-word">
+                      {v.check_out_time ? (
+                        <span className="text-gray-700">
+                          {formatISODateString(v.check_out_time)}
+                        </span>
+                      ) : (
+                        <span className="text-green-600 font-bold">
+                          Currently In
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {v.visit_duration || "—"}
+                    </td>
+                    <td className="p-2 text-center text-gray-700">
+                      {v.no_of_visit || "—"}
+                    </td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {v.purpose_of_visit || "—"}
+                    </td>
+                    <td className="p-2 text-center text-gray-700 wrap-break-word">
+                      {v.token || "—"}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={20} className="text-center py-12">
+                    <FaFileAlt className="text-5xl text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 text-sm">No visitors found.</p>
+                    <p className="text-gray-400 text-xs mt-1">
+                      Try adjusting your filters or date range
+                    </p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
