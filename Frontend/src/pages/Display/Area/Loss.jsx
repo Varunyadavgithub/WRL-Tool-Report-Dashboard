@@ -10,7 +10,35 @@ import { Chart } from "react-chartjs-2";
 import { PackageOpen } from "lucide-react";
 import { PageHeader, TimerBar, StatCard } from "../Monitoring";
 
-ChartJS.register(ArcElement, DoughnutController, Tooltip, Legend);
+  const donutLabelPlugin = {
+    id: "donutLabelPlugin",
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      const dataset = chart.data.datasets[0];
+      const meta = chart.getDatasetMeta(0);
+
+      ctx.save();
+      meta.data.forEach((arc, index) => {
+        const value = dataset.data[index];
+        const angle = (arc.startAngle + arc.endAngle) / 2;
+
+        const radius = (arc.innerRadius + arc.outerRadius) / 2;
+
+        const x = arc.x + Math.cos(angle) * radius;
+        const y = arc.y + Math.sin(angle) * radius;
+
+        ctx.fillStyle = index === 0 ? "#1d4ed8" : "#475569"; // colors for 90.7 & 9
+        ctx.font = "bold 14px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        ctx.fillText(`${value.toFixed(1)}`, x, y);
+      });
+      ctx.restore();
+    },
+  };
+
+ChartJS.register(ArcElement, DoughnutController, Tooltip, Legend, donutLabelPlugin);
 
 const ACCENT = "#b45309";
 
@@ -46,7 +74,9 @@ const Loss = ({ apiData = {}, progress, shift, shiftDate }) => {
   }, []);
 
   const consumedPct = Number(ls.ConsumedTimePct || 0);
-  const remaining = 100 - Math.min(Math.max(consumedPct, 0), 100);
+  const remaining = Number(
+    (100 - Math.min(Math.max(consumedPct, 0), 100)).toFixed(1),
+  );
 
   const donutData = useMemo(
     () => ({
@@ -66,6 +96,8 @@ const Loss = ({ apiData = {}, progress, shift, shiftDate }) => {
     }),
     [consumedPct, remaining],
   );
+
+
 
   const donutOptions = useMemo(
     () => ({
