@@ -140,6 +140,7 @@ export const ROUTE_CONFIG = [
     icon: Monitor,
     label: "Display",
     basePath: "/display",
+    roles: [ROLES.ADMIN],
     items: [
       {
         path: "/display/management",
