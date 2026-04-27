@@ -4,7 +4,7 @@ import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { convertToIST } from "../../utils/convertToIST.js";
 
-// ─── Pool helper ──────────────────────────────────────────────────────────────
+// --- Pool helper --------------------------------------------------------------
 const withPool = async (callback) => {
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
   try {
@@ -14,7 +14,7 @@ const withPool = async (callback) => {
   }
 };
 
-// ─── Shift boundary resolver ──────────────────────────────────────────────────
+// --- Shift boundary resolver --------------------------------------------------
 const resolveShiftBounds = (shiftDate, shift) => {
   const base = new Date(shiftDate);
   if (shift === "A") {
@@ -24,7 +24,7 @@ const resolveShiftBounds = (shiftDate, shift) => {
     end.setHours(20, 0, 0, 0);
     return { shiftStart: start, shiftEnd: end };
   }
-  // Shift B: 20:00 on shiftDate → 08:00 next day
+  // Shift B: 20:00 on shiftDate ? 08:00 next day
   const start = new Date(base);
   start.setHours(20, 0, 0, 0);
   const end = new Date(base);
@@ -33,7 +33,7 @@ const resolveShiftBounds = (shiftDate, shift) => {
   return { shiftStart: start, shiftEnd: end };
 };
 
-// ─── Shared param validator ───────────────────────────────────────────────────
+// --- Shared param validator ---------------------------------------------------
 const validateShiftParams = (req) => {
   const { shiftDate, shift = "A" } = req.query;
   if (!shiftDate)
@@ -43,7 +43,7 @@ const validateShiftParams = (req) => {
   return { shiftDate, shift };
 };
 
-// ─── configId validator ───────────────────────────────────────────────────────
+// --- configId validator -------------------------------------------------------
 const validateConfigId = (req) => {
   const { configId } = req.query;
   if (!configId)
@@ -54,7 +54,7 @@ const validateConfigId = (req) => {
   return id;
 };
 
-// ─── Config fetcher ───────────────────────────────────────────────────────────
+// --- Config fetcher -----------------------------------------------------------
 const getConfig = async (pool, configId) => {
   const result = await pool
     .request()
@@ -63,7 +63,7 @@ const getConfig = async (pool, configId) => {
   return result.recordset[0] || null;
 };
 
-// ─── Month boundaries helper ──────────────────────────────────────────────────
+// --- Month boundaries helper --------------------------------------------------
 const resolveMonthBounds = (shiftStart) => {
   const monthStart = new Date(
     shiftStart.getFullYear(),
@@ -84,7 +84,7 @@ const resolveMonthBounds = (shiftStart) => {
   return { monthStart, monthEnd };
 };
 
-// ─── Shared FG query builder ──────────────────────────────────────────────────
+// --- Shared FG query builder --------------------------------------------------
 // FIX #7: Removed unused shiftActualAlias parameter — it was accepted but never
 //         interpolated into the query template, making it dead code.
 const buildFGQuery = () => `
@@ -240,7 +240,7 @@ CROSS JOIN AvgUPH au
 WHERE dc.Id = @configId;
 `;
 
-// ─── Shared FG request binder ─────────────────────────────────────────────────
+// --- Shared FG request binder -------------------------------------------------
 // FIX #1: Added @currentTime binding — buildFGQuery uses it in 3 places but it
 //         was never bound here, causing a SQL runtime "must declare scalar variable" error.
 // FIX #2: istStart/istEnd already converted by caller; monthStart/monthEnd still need conversion.
@@ -268,7 +268,7 @@ const bindFGRequest = (
     .input("stationCode1", sql.NVarChar(50), String(stationCode1));
 };
 
-// ─── Loading query builder ────────────────────────────────────────────────────
+// --- Loading query builder ----------------------------------------------------
 // FIX #7: Removed unused shiftActualAlias parameter.
 const buildLoadingQuery = () => `
    WITH ShiftActual AS (
@@ -423,7 +423,7 @@ CROSS JOIN AvgUPH au
 WHERE dc.Id = @configId;
 `;
 
-// ─── Loading request binder ───────────────────────────────────────────────────
+// --- Loading request binder ---------------------------------------------------
 // FIX #5: stationCode2 is NVarChar(50) in the DB — was incorrectly bound as sql.Int.
 // FIX #6: lineCode is NVarChar(50) in the DB — was incorrectly bound as sql.Int.
 const bindLoadingRequest = (
@@ -439,9 +439,9 @@ const bindLoadingRequest = (
     .input("monthEnd", sql.DateTime, convertToIST(monthEnd))
     .input("stationCode2", sql.NVarChar(50), String(stationCode2)); // FIX #5
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// -------------------------------------------------------------------------------
 //  DASHBOARD CONFIG CRUD
-// ═══════════════════════════════════════════════════════════════════════════════
+// -------------------------------------------------------------------------------
 
 // GET /dashboard/configs — list all active configs
 export const getAllDashboardConfigs = tryCatch(async (req, res) => {
@@ -493,6 +493,7 @@ export const createDashboardConfig = tryCatch(async (req, res) => {
     qualityProcessCode,
     qualityLineName,
     sectionName,
+    workingTimeMin, // ? NEW FIELD
   } = req.body;
 
   if (!dashboardName?.trim())
@@ -501,6 +502,8 @@ export const createDashboardConfig = tryCatch(async (req, res) => {
     throw new AppError("Station Code 1 is required.", 400);
 
   const data = await withPool(async (pool) => {
+    // FIX: OUTPUT INSERTED.* fails on tables with triggers.
+    // Use OUTPUT INTO a temp table, then SELECT from it.
     const result = await pool
       .request()
       .input("DashboardName", sql.NVarChar(120), dashboardName)
@@ -529,18 +532,33 @@ export const createDashboardConfig = tryCatch(async (req, res) => {
         qualityProcessCode || null,
       )
       .input("QualityLineName", sql.NVarChar(100), qualityLineName || null)
-      .input("SectionName", sql.NVarChar(200), sectionName || null).query(`
+      .input("SectionName", sql.NVarChar(200), sectionName || null)
+      .input("WorkingTimeMin", sql.Int, Number(workingTimeMin) || 720) // ? NEW FIELD (default 720 = 12hr shift)
+      .query(`
+        DECLARE @tmp TABLE (
+          Id INT, DashboardName NVARCHAR(120), LineName NVARCHAR(100),
+          LineCode NVARCHAR(50), StationCode1 NVARCHAR(50), StationName1 NVARCHAR(100),
+          LineTaktTime1 INT, LineMonthlyProduction1 INT, LineTarget1 INT,
+          StationCode2 NVARCHAR(50), StationName2 NVARCHAR(100),
+          LineTaktTime2 INT, LineMonthlyProduction2 INT,
+          QualityProcessCode NVARCHAR(500), QualityLineName NVARCHAR(100),
+          SectionName NVARCHAR(200), WorkingTimeMin INT,
+          IsActive BIT, CreatedAt DATETIME
+        );
+
         INSERT INTO dbo.DashboardConfig
           (DashboardName, LineName, LineCode,
            StationCode1, StationName1, LineTaktTime1, LineMonthlyProduction1, LineTarget1,
            StationCode2, StationName2, LineTaktTime2, LineMonthlyProduction2,
-           QualityProcessCode, QualityLineName, SectionName)
-        OUTPUT INSERTED.*
+           QualityProcessCode, QualityLineName, SectionName, WorkingTimeMin)
+        OUTPUT INSERTED.* INTO @tmp
         VALUES
           (@DashboardName, @LineName, @LineCode,
            @StationCode1, @StationName1, @LineTaktTime1, @LineMonthlyProduction1, @LineTarget1,
            @StationCode2, @StationName2, @LineTaktTime2, @LineMonthlyProduction2,
-           @QualityProcessCode, @QualityLineName, @SectionName)
+           @QualityProcessCode, @QualityLineName, @SectionName, @WorkingTimeMin);
+
+        SELECT * FROM @tmp;
       `);
     return result.recordset[0];
   });
@@ -572,6 +590,7 @@ export const updateDashboardConfig = tryCatch(async (req, res) => {
     qualityProcessCode,
     qualityLineName,
     sectionName,
+    workingTimeMin, // ? NEW FIELD
   } = req.body;
 
   if (!dashboardName?.trim())
@@ -580,6 +599,8 @@ export const updateDashboardConfig = tryCatch(async (req, res) => {
     throw new AppError("Station Code 1 is required.", 400);
 
   const data = await withPool(async (pool) => {
+    // FIX: OUTPUT INSERTED.* fails on tables with triggers.
+    // Use OUTPUT INTO a temp table, then SELECT from it.
     const result = await pool
       .request()
       .input("Id", sql.Int, id)
@@ -609,7 +630,20 @@ export const updateDashboardConfig = tryCatch(async (req, res) => {
         qualityProcessCode || null,
       )
       .input("QualityLineName", sql.NVarChar(100), qualityLineName || null)
-      .input("SectionName", sql.NVarChar(200), sectionName || null).query(`
+      .input("SectionName", sql.NVarChar(200), sectionName || null)
+      .input("WorkingTimeMin", sql.Int, Number(workingTimeMin) || 720) // ? NEW FIELD
+      .query(`
+        DECLARE @tmp TABLE (
+          Id INT, DashboardName NVARCHAR(120), LineName NVARCHAR(100),
+          LineCode NVARCHAR(50), StationCode1 NVARCHAR(50), StationName1 NVARCHAR(100),
+          LineTaktTime1 INT, LineMonthlyProduction1 INT, LineTarget1 INT,
+          StationCode2 NVARCHAR(50), StationName2 NVARCHAR(100),
+          LineTaktTime2 INT, LineMonthlyProduction2 INT,
+          QualityProcessCode NVARCHAR(500), QualityLineName NVARCHAR(100),
+          SectionName NVARCHAR(200), WorkingTimeMin INT,
+          IsActive BIT, CreatedAt DATETIME
+        );
+
         UPDATE dbo.DashboardConfig SET
           DashboardName          = @DashboardName,
           LineName               = @LineName,
@@ -625,9 +659,12 @@ export const updateDashboardConfig = tryCatch(async (req, res) => {
           LineMonthlyProduction2 = @LineMonthlyProduction2,
           QualityProcessCode     = @QualityProcessCode,
           QualityLineName        = @QualityLineName,
-          SectionName            = @SectionName
-        OUTPUT INSERTED.*
-        WHERE Id = @Id AND IsActive = 1
+          SectionName            = @SectionName,
+          WorkingTimeMin         = @WorkingTimeMin
+        OUTPUT INSERTED.* INTO @tmp
+        WHERE Id = @Id AND IsActive = 1;
+
+        SELECT * FROM @tmp;
       `);
     return result.recordset[0] || null;
   });
@@ -657,11 +694,11 @@ export const deleteDashboardConfig = tryCatch(async (req, res) => {
   res.status(200).json({ success: true, message: "Dashboard config deleted." });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// -------------------------------------------------------------------------------
 //  DASHBOARD DATA ENDPOINTS
-// ═══════════════════════════════════════════════════════════════════════════════
+// -------------------------------------------------------------------------------
 
-// ─── GET /dashboard/fg-packing ───────────────────────────────────────────────
+// --- GET /dashboard/fg-packing -----------------------------------------------
 export const getFGPackingData = tryCatch(async (req, res) => {
   const { shiftDate, shift } = validateShiftParams(req);
   const configId = validateConfigId(req);
@@ -700,7 +737,7 @@ export const getFGPackingData = tryCatch(async (req, res) => {
     .json({ success: true, message: "FG Packing data retrieved.", data });
 });
 
-// ─── GET /dashboard/fg-loading ───────────────────────────────────────────────
+// --- GET /dashboard/fg-loading -----------------------------------------------
 export const getFGLoadingData = tryCatch(async (req, res) => {
   const { shiftDate, shift } = validateShiftParams(req);
   const configId = validateConfigId(req);
@@ -738,7 +775,7 @@ export const getFGLoadingData = tryCatch(async (req, res) => {
     .json({ success: true, message: "FG Loading data retrieved.", data });
 });
 
-// ─── GET /dashboard/hourly ────────────────────────────────────────────────────
+// --- GET /dashboard/hourly ----------------------------------------------------
 export const getHourlyProductionData = tryCatch(async (req, res) => {
   const { shiftDate, shift } = validateShiftParams(req);
   const configId = validateConfigId(req);
@@ -926,7 +963,7 @@ export const getHourlyProductionData = tryCatch(async (req, res) => {
   });
 });
 
-// ─── GET /dashboard/quality ───────────────────────────────────────────────────
+// --- GET /dashboard/quality ---------------------------------------------------
 export const getQualityData = tryCatch(async (req, res) => {
   const { shiftDate, shift } = validateShiftParams(req);
   const configId = validateConfigId(req);
@@ -1034,7 +1071,7 @@ export const getQualityData = tryCatch(async (req, res) => {
     .json({ success: true, message: "Quality data retrieved.", data });
 });
 
-// ─── GET /dashboard/loss ──────────────────────────────────────────────────────
+// --- GET /dashboard/loss ------------------------------------------------------
 export const getLossData = tryCatch(async (req, res) => {
   const { shiftDate, shift } = validateShiftParams(req);
   const configId = validateConfigId(req);
