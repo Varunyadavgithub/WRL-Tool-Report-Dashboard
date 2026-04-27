@@ -4,7 +4,7 @@ import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { convertToIST } from "../../utils/convertToIST.js";
 
-// --- Pool helper --------------------------------------------------------------
+// ─── Pool helper ──────────────────────────────────────────────────────────────
 const withPool = async (callback) => {
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
   try {
@@ -14,7 +14,7 @@ const withPool = async (callback) => {
   }
 };
 
-// --- Shift boundary resolver --------------------------------------------------
+// ─── Shift boundary resolver ──────────────────────────────────────────────────
 const resolveShiftBounds = (shiftDate, shift) => {
   const base = new Date(shiftDate);
   if (shift === "A") {
@@ -24,7 +24,7 @@ const resolveShiftBounds = (shiftDate, shift) => {
     end.setHours(20, 0, 0, 0);
     return { shiftStart: start, shiftEnd: end };
   }
-  // Shift B: 20:00 on shiftDate ? 08:00 next day
+  // Shift B: 20:00 on shiftDate → 08:00 next day
   const start = new Date(base);
   start.setHours(20, 0, 0, 0);
   const end = new Date(base);
@@ -33,7 +33,7 @@ const resolveShiftBounds = (shiftDate, shift) => {
   return { shiftStart: start, shiftEnd: end };
 };
 
-// --- Shared param validator ---------------------------------------------------
+// ─── Shared param validator ───────────────────────────────────────────────────
 const validateShiftParams = (req) => {
   const { shiftDate, shift = "A" } = req.query;
   if (!shiftDate)
@@ -43,7 +43,7 @@ const validateShiftParams = (req) => {
   return { shiftDate, shift };
 };
 
-// --- configId validator -------------------------------------------------------
+// ─── configId validator ───────────────────────────────────────────────────────
 const validateConfigId = (req) => {
   const { configId } = req.query;
   if (!configId)
@@ -54,7 +54,7 @@ const validateConfigId = (req) => {
   return id;
 };
 
-// --- Config fetcher -----------------------------------------------------------
+// ─── Config fetcher ───────────────────────────────────────────────────────────
 const getConfig = async (pool, configId) => {
   const result = await pool
     .request()
@@ -63,7 +63,7 @@ const getConfig = async (pool, configId) => {
   return result.recordset[0] || null;
 };
 
-// --- Month boundaries helper --------------------------------------------------
+// ─── Month boundaries helper ──────────────────────────────────────────────────
 const resolveMonthBounds = (shiftStart) => {
   const monthStart = new Date(
     shiftStart.getFullYear(),
@@ -84,7 +84,7 @@ const resolveMonthBounds = (shiftStart) => {
   return { monthStart, monthEnd };
 };
 
-// --- Shared FG query builder --------------------------------------------------
+// ─── Shared FG query builder ──────────────────────────────────────────────────
 // FIX #7: Removed unused shiftActualAlias parameter — it was accepted but never
 //         interpolated into the query template, making it dead code.
 const buildFGQuery = () => `
@@ -240,7 +240,7 @@ CROSS JOIN AvgUPH au
 WHERE dc.Id = @configId;
 `;
 
-// --- Shared FG request binder -------------------------------------------------
+// ─── Shared FG request binder ─────────────────────────────────────────────────
 // FIX #1: Added @currentTime binding — buildFGQuery uses it in 3 places but it
 //         was never bound here, causing a SQL runtime "must declare scalar variable" error.
 // FIX #2: istStart/istEnd already converted by caller; monthStart/monthEnd still need conversion.
@@ -268,7 +268,7 @@ const bindFGRequest = (
     .input("stationCode1", sql.NVarChar(50), String(stationCode1));
 };
 
-// --- Loading query builder ----------------------------------------------------
+// ─── Loading query builder ────────────────────────────────────────────────────
 // FIX #7: Removed unused shiftActualAlias parameter.
 const buildLoadingQuery = () => `
    WITH ShiftActual AS (
@@ -423,7 +423,7 @@ CROSS JOIN AvgUPH au
 WHERE dc.Id = @configId;
 `;
 
-// --- Loading request binder ---------------------------------------------------
+// ─── Loading request binder ───────────────────────────────────────────────────
 // FIX #5: stationCode2 is NVarChar(50) in the DB — was incorrectly bound as sql.Int.
 // FIX #6: lineCode is NVarChar(50) in the DB — was incorrectly bound as sql.Int.
 const bindLoadingRequest = (
@@ -439,9 +439,9 @@ const bindLoadingRequest = (
     .input("monthEnd", sql.DateTime, convertToIST(monthEnd))
     .input("stationCode2", sql.NVarChar(50), String(stationCode2)); // FIX #5
 
-// -------------------------------------------------------------------------------
+// ═══════════════════════════════════════════════════════════════════════════════
 //  DASHBOARD CONFIG CRUD
-// -------------------------------------------------------------------------------
+// ═══════════════════════════════════════════════════════════════════════════════
 
 // GET /dashboard/configs — list all active configs
 export const getAllDashboardConfigs = tryCatch(async (req, res) => {
@@ -475,7 +475,7 @@ export const getDashboardConfigById = tryCatch(async (req, res) => {
   res.status(200).json({ success: true, data });
 });
 
-// POST /dashboard/configs — create
+// PUT /dashboard/configs/:id — create
 export const createDashboardConfig = tryCatch(async (req, res) => {
   const {
     dashboardName,
@@ -493,86 +493,133 @@ export const createDashboardConfig = tryCatch(async (req, res) => {
     qualityProcessCode,
     qualityLineName,
     sectionName,
-    workingTimeMin, // ? NEW FIELD
+    workingTimeMin,
   } = req.body;
-
+ 
+  // ─── Validation ───────────────────────────────────────────────
   if (!dashboardName?.trim())
     throw new AppError("Dashboard name is required.", 400);
   if (!stationCode1?.trim())
     throw new AppError("Station Code 1 is required.", 400);
 
+  // Helper: safely parse int, returns fallback if value is not a valid number
+  const safeInt = (val, fallback = null) => {
+    if (val === undefined || val === null || val === "") return fallback;
+    const n = Number(val);
+    return Number.isFinite(n) ? Math.round(n) : fallback;
+  };
+
+  // Validate optional int fields — reject if provided but not numeric
+  const optionalIntFields = {
+    lineTaktTime2,
+    lineMonthlyProduction2,
+    workingTimeMin,
+  };
+
+  for (const [fieldName, value] of Object.entries(optionalIntFields)) {
+    if (value !== undefined && value !== null && value !== "") {
+      if (!Number.isFinite(Number(value))) {
+        throw new AppError(
+          `${fieldName} must be a valid number, received: "${value}".`,
+          400,
+        );
+      }
+    }
+  }
+
+  // ─── DB Insert ────────────────────────────────────────────────
   const data = await withPool(async (pool) => {
-    // FIX: OUTPUT INSERTED.* fails on tables with triggers.
-    // Use OUTPUT INTO a temp table, then SELECT from it.
     const result = await pool
       .request()
-      .input("DashboardName", sql.NVarChar(120), dashboardName)
-      .input("LineName", sql.NVarChar(100), lineName || "")
-      .input("LineCode", sql.NVarChar(50), lineCode || "")
-      .input("StationCode1", sql.NVarChar(50), stationCode1)
-      .input("StationName1", sql.NVarChar(100), stationName1 || "")
-      .input("LineTaktTime1", sql.Int, Number(lineTaktTime1) || 40)
+      .input("DashboardName", sql.NVarChar(120), dashboardName.trim())
+      .input("LineName", sql.NVarChar(100), lineName?.trim() || "")
+      .input("LineCode", sql.NVarChar(50), lineCode?.trim() || "")
+      .input("StationCode1", sql.NVarChar(50), stationCode1.trim())
+      .input("StationName1", sql.NVarChar(100), stationName1?.trim() || "")
+      .input("LineTaktTime1", sql.Int, safeInt(lineTaktTime1, 40))
       .input(
         "LineMonthlyProduction1",
         sql.Int,
-        Number(lineMonthlyProduction1) || 0,
+        safeInt(lineMonthlyProduction1, 0),
       )
-      .input("LineTarget1", sql.Int, Number(lineTarget1) || 0)
-      .input("StationCode2", sql.NVarChar(50), stationCode2 || null)
-      .input("StationName2", sql.NVarChar(100), stationName2 || null)
-      .input("LineTaktTime2", sql.Int, Number(lineTaktTime2) || null)
-      .input(
-        "LineMonthlyProduction2",
-        sql.Int,
-        Number(lineMonthlyProduction2) || null,
-      )
+      .input("LineTarget1", sql.Int, safeInt(lineTarget1, 0))
+      .input("StationCode2", sql.NVarChar(50), stationCode2?.trim() || null)
+      .input("StationName2", sql.NVarChar(100), stationName2?.trim() || null)
+      .input("LineTaktTime2", sql.Int, safeInt(lineTaktTime2))
+      .input("LineMonthlyProduction2", sql.Int, safeInt(lineMonthlyProduction2))
       .input(
         "QualityProcessCode",
         sql.NVarChar(500),
-        qualityProcessCode || null,
+        qualityProcessCode?.trim() || null,
       )
-      .input("QualityLineName", sql.NVarChar(100), qualityLineName || null)
-      .input("SectionName", sql.NVarChar(200), sectionName || null)
-      .input("WorkingTimeMin", sql.Int, Number(workingTimeMin) || 720) // ? NEW FIELD (default 720 = 12hr shift)
-      .query(`
+      .input(
+        "QualityLineName",
+        sql.NVarChar(100),
+        qualityLineName?.trim() || null,
+      )
+      .input("SectionName", sql.NVarChar(200), sectionName?.trim() || null)
+      .input("WorkingTimeMin", sql.Int, safeInt(workingTimeMin, 600)).query(`
         DECLARE @tmp TABLE (
-          Id INT, DashboardName NVARCHAR(120), LineName NVARCHAR(100),
-          LineCode NVARCHAR(50), StationCode1 NVARCHAR(50), StationName1 NVARCHAR(100),
-          LineTaktTime1 INT, LineMonthlyProduction1 INT, LineTarget1 INT,
-          StationCode2 NVARCHAR(50), StationName2 NVARCHAR(100),
-          LineTaktTime2 INT, LineMonthlyProduction2 INT,
-          QualityProcessCode NVARCHAR(500), QualityLineName NVARCHAR(100),
-          SectionName NVARCHAR(200), WorkingTimeMin INT,
-          IsActive BIT, CreatedAt DATETIME
+          Id                    INT,
+          DashboardName         NVARCHAR(120),
+          LineName              NVARCHAR(100),
+          LineCode              NVARCHAR(50),
+          WorkingTimeMin        INT,
+          StationCode1          NVARCHAR(50),
+          StationName1          NVARCHAR(100),
+          LineTaktTime1         INT,
+          LineMonthlyProduction1 INT,
+          LineTarget1           INT,
+          StationCode2          NVARCHAR(50),
+          StationName2          NVARCHAR(100),
+          LineTaktTime2         INT,
+          LineMonthlyProduction2 INT,
+          QualityProcessCode    NVARCHAR(500),
+          QualityLineName       NVARCHAR(100),
+          SectionName           NVARCHAR(200),
+          IsActive              BIT,
+          CreatedAt             DATETIME,
+          UpdatedAt             DATETIME,
+          CreatedBy             NVARCHAR(100),
+          UpdatedBy             NVARCHAR(100)
         );
 
-        INSERT INTO dbo.DashboardConfig
-          (DashboardName, LineName, LineCode,
-           StationCode1, StationName1, LineTaktTime1, LineMonthlyProduction1, LineTarget1,
-           StationCode2, StationName2, LineTaktTime2, LineMonthlyProduction2,
-           QualityProcessCode, QualityLineName, SectionName, WorkingTimeMin)
+        INSERT INTO dbo.DashboardConfig (
+          DashboardName, LineName, LineCode,
+          StationCode1, StationName1, LineTaktTime1, LineMonthlyProduction1, LineTarget1,
+          StationCode2, StationName2, LineTaktTime2, LineMonthlyProduction2,
+          QualityProcessCode, QualityLineName, SectionName, WorkingTimeMin,
+          IsActive, CreatedAt, UpdatedAt
+        )
         OUTPUT INSERTED.* INTO @tmp
-        VALUES
-          (@DashboardName, @LineName, @LineCode,
-           @StationCode1, @StationName1, @LineTaktTime1, @LineMonthlyProduction1, @LineTarget1,
-           @StationCode2, @StationName2, @LineTaktTime2, @LineMonthlyProduction2,
-           @QualityProcessCode, @QualityLineName, @SectionName, @WorkingTimeMin);
+        VALUES (
+          @DashboardName, @LineName, @LineCode,
+          @StationCode1, @StationName1, @LineTaktTime1, @LineMonthlyProduction1, @LineTarget1,
+          @StationCode2, @StationName2, @LineTaktTime2, @LineMonthlyProduction2,
+          @QualityProcessCode, @QualityLineName, @SectionName, @WorkingTimeMin,
+          1, GETDATE(), GETDATE()
+        );
 
         SELECT * FROM @tmp;
       `);
+
     return result.recordset[0];
   });
 
-  res
-    .status(201)
-    .json({ success: true, message: "Dashboard config created.", data });
+  res.status(201).json({
+    success: true,
+    message: "Dashboard config created.",
+    data,
+  });
 });
 
 // PUT /dashboard/configs/:id — update
 export const updateDashboardConfig = tryCatch(async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0)
+
+  if (!Number.isInteger(id) || id <= 0) {
     throw new AppError("Invalid config id.", 400);
+  }
 
   const {
     dashboardName,
@@ -590,25 +637,27 @@ export const updateDashboardConfig = tryCatch(async (req, res) => {
     qualityProcessCode,
     qualityLineName,
     sectionName,
-    workingTimeMin, // ? NEW FIELD
+    workingTimeMin,
   } = req.body;
 
-  if (!dashboardName?.trim())
+  // ✅ Safe validations
+  if (!dashboardName || !dashboardName.trim()) {
     throw new AppError("Dashboard name is required.", 400);
-  if (!stationCode1?.trim())
+  }
+
+  if (!String(stationCode1 || "").trim()) {
     throw new AppError("Station Code 1 is required.", 400);
+  }
 
   const data = await withPool(async (pool) => {
-    // FIX: OUTPUT INSERTED.* fails on tables with triggers.
-    // Use OUTPUT INTO a temp table, then SELECT from it.
     const result = await pool
       .request()
       .input("Id", sql.Int, id)
-      .input("DashboardName", sql.NVarChar(120), dashboardName)
-      .input("LineName", sql.NVarChar(100), lineName || "")
-      .input("LineCode", sql.NVarChar(50), lineCode || "")
-      .input("StationCode1", sql.NVarChar(50), stationCode1)
-      .input("StationName1", sql.NVarChar(100), stationName1 || "")
+      .input("DashboardName", sql.NVarChar(120), dashboardName.trim())
+      .input("LineName", sql.NVarChar(100), lineName?.trim() || "")
+      .input("LineCode", sql.NVarChar(50), lineCode?.trim() || "")
+      .input("StationCode1", sql.NVarChar(50), String(stationCode1).trim())
+      .input("StationName1", sql.NVarChar(100), stationName1?.trim() || "")
       .input("LineTaktTime1", sql.Int, Number(lineTaktTime1) || 40)
       .input(
         "LineMonthlyProduction1",
@@ -616,8 +665,8 @@ export const updateDashboardConfig = tryCatch(async (req, res) => {
         Number(lineMonthlyProduction1) || 0,
       )
       .input("LineTarget1", sql.Int, Number(lineTarget1) || 0)
-      .input("StationCode2", sql.NVarChar(50), stationCode2 || null)
-      .input("StationName2", sql.NVarChar(100), stationName2 || null)
+      .input("StationCode2", sql.NVarChar(50), stationCode2?.trim() || null)
+      .input("StationName2", sql.NVarChar(100), stationName2?.trim() || null)
       .input("LineTaktTime2", sql.Int, Number(lineTaktTime2) || null)
       .input(
         "LineMonthlyProduction2",
@@ -627,24 +676,40 @@ export const updateDashboardConfig = tryCatch(async (req, res) => {
       .input(
         "QualityProcessCode",
         sql.NVarChar(500),
-        qualityProcessCode || null,
+        qualityProcessCode?.trim() || null,
       )
-      .input("QualityLineName", sql.NVarChar(100), qualityLineName || null)
-      .input("SectionName", sql.NVarChar(200), sectionName || null)
-      .input("WorkingTimeMin", sql.Int, Number(workingTimeMin) || 720) // ? NEW FIELD
-      .query(`
+      .input(
+        "QualityLineName",
+        sql.NVarChar(100),
+        qualityLineName?.trim() || null,
+      )
+      .input("SectionName", sql.NVarChar(200), sectionName?.trim() || null)
+      .input("WorkingTimeMin", sql.Int, Number(workingTimeMin) || 720).query(`
         DECLARE @tmp TABLE (
-          Id INT, DashboardName NVARCHAR(120), LineName NVARCHAR(100),
-          LineCode NVARCHAR(50), StationCode1 NVARCHAR(50), StationName1 NVARCHAR(100),
-          LineTaktTime1 INT, LineMonthlyProduction1 INT, LineTarget1 INT,
-          StationCode2 NVARCHAR(50), StationName2 NVARCHAR(100),
-          LineTaktTime2 INT, LineMonthlyProduction2 INT,
-          QualityProcessCode NVARCHAR(500), QualityLineName NVARCHAR(100),
-          SectionName NVARCHAR(200), WorkingTimeMin INT,
-          IsActive BIT, CreatedAt DATETIME
+          Id INT,
+          DashboardName NVARCHAR(120),
+          LineName NVARCHAR(100),
+          LineCode NVARCHAR(50),
+          WorkingTimeMin INT,
+          StationCode1 NVARCHAR(50),
+          StationName1 NVARCHAR(100),
+          LineTaktTime1 INT,
+          LineMonthlyProduction1 INT,
+          LineTarget1 INT,
+          StationCode2 NVARCHAR(50),
+          StationName2 NVARCHAR(100),
+          LineTaktTime2 INT,
+          LineMonthlyProduction2 INT,
+          QualityProcessCode NVARCHAR(500),
+          QualityLineName NVARCHAR(100),
+          SectionName NVARCHAR(200),
+          IsActive BIT,
+          CreatedAt DATETIME,
+          UpdatedAt DATETIME
         );
 
-        UPDATE dbo.DashboardConfig SET
+        UPDATE dbo.DashboardConfig
+        SET
           DashboardName          = @DashboardName,
           LineName               = @LineName,
           LineCode               = @LineCode,
@@ -660,19 +725,47 @@ export const updateDashboardConfig = tryCatch(async (req, res) => {
           QualityProcessCode     = @QualityProcessCode,
           QualityLineName        = @QualityLineName,
           SectionName            = @SectionName,
-          WorkingTimeMin         = @WorkingTimeMin
-        OUTPUT INSERTED.* INTO @tmp
+          WorkingTimeMin         = @WorkingTimeMin,
+          UpdatedAt              = GETDATE()
+        OUTPUT 
+          INSERTED.Id,
+          INSERTED.DashboardName,
+          INSERTED.LineName,
+          INSERTED.LineCode,
+          INSERTED.WorkingTimeMin,
+          INSERTED.StationCode1,
+          INSERTED.StationName1,
+          INSERTED.LineTaktTime1,
+          INSERTED.LineMonthlyProduction1,
+          INSERTED.LineTarget1,
+          INSERTED.StationCode2,
+          INSERTED.StationName2,
+          INSERTED.LineTaktTime2,
+          INSERTED.LineMonthlyProduction2,
+          INSERTED.QualityProcessCode,
+          INSERTED.QualityLineName,
+          INSERTED.SectionName,
+          INSERTED.IsActive,
+          INSERTED.CreatedAt,
+          INSERTED.UpdatedAt
+        INTO @tmp
         WHERE Id = @Id AND IsActive = 1;
 
         SELECT * FROM @tmp;
       `);
+
     return result.recordset[0] || null;
   });
 
-  if (!data) throw new AppError("Dashboard config not found.", 404);
-  res
-    .status(200)
-    .json({ success: true, message: "Dashboard config updated.", data });
+  if (!data) {
+    throw new AppError("Dashboard config not found.", 404);
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Dashboard config updated successfully.",
+    data,
+  });
 });
 
 // DELETE /dashboard/configs/:id — soft delete
@@ -694,11 +787,11 @@ export const deleteDashboardConfig = tryCatch(async (req, res) => {
   res.status(200).json({ success: true, message: "Dashboard config deleted." });
 });
 
-// -------------------------------------------------------------------------------
+// ═══════════════════════════════════════════════════════════════════════════════
 //  DASHBOARD DATA ENDPOINTS
-// -------------------------------------------------------------------------------
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// --- GET /dashboard/fg-packing -----------------------------------------------
+// ─── GET /dashboard/fg-packing ───────────────────────────────────────────────
 export const getFGPackingData = tryCatch(async (req, res) => {
   const { shiftDate, shift } = validateShiftParams(req);
   const configId = validateConfigId(req);
@@ -737,7 +830,7 @@ export const getFGPackingData = tryCatch(async (req, res) => {
     .json({ success: true, message: "FG Packing data retrieved.", data });
 });
 
-// --- GET /dashboard/fg-loading -----------------------------------------------
+// ─── GET /dashboard/fg-loading ───────────────────────────────────────────────
 export const getFGLoadingData = tryCatch(async (req, res) => {
   const { shiftDate, shift } = validateShiftParams(req);
   const configId = validateConfigId(req);
@@ -775,7 +868,7 @@ export const getFGLoadingData = tryCatch(async (req, res) => {
     .json({ success: true, message: "FG Loading data retrieved.", data });
 });
 
-// --- GET /dashboard/hourly ----------------------------------------------------
+// ─── GET /dashboard/hourly ────────────────────────────────────────────────────
 export const getHourlyProductionData = tryCatch(async (req, res) => {
   const { shiftDate, shift } = validateShiftParams(req);
   const configId = validateConfigId(req);
@@ -807,7 +900,7 @@ export const getHourlyProductionData = tryCatch(async (req, res) => {
                 AND mb.Status     <> 99
                 AND mb.Type NOT IN (200)
                 AND c.StationCode  = @stationCode1
-                AND b.Remark       = @lineCode
+                AND Remark IN (SELECT value FROM STRING_SPLIT(@lineCode, ','))
                 AND b.ActivityType = 5
                 AND b.ActivityOn BETWEEN @shiftStart AND @shiftEnd
               GROUP BY
@@ -891,7 +984,7 @@ export const getHourlyProductionData = tryCatch(async (req, res) => {
           AND mb.Status     <> 99
           AND mb.Type NOT IN (200)
           AND c.StationCode  = @stationCode1
-          AND b.Remark       = @lineCode
+          AND Remark IN (SELECT value FROM STRING_SPLIT(@lineCode, ','))
           AND b.ActivityType = 5
           AND b.ActivityOn BETWEEN @shiftStart AND @shiftEnd
       )
@@ -963,7 +1056,7 @@ export const getHourlyProductionData = tryCatch(async (req, res) => {
   });
 });
 
-// --- GET /dashboard/quality ---------------------------------------------------
+// ─── GET /dashboard/quality ───────────────────────────────────────────────────
 export const getQualityData = tryCatch(async (req, res) => {
   const { shiftDate, shift } = validateShiftParams(req);
   const configId = validateConfigId(req);
@@ -978,6 +1071,7 @@ export const getQualityData = tryCatch(async (req, res) => {
 
     const stationCode1 = config.StationCode1;
     const LineCode = config.LineCode;
+    const qualityProcessCode = config.QualityProcessCode;
 
     const summaryQuery = `
       WITH ReworkBase AS (
@@ -993,7 +1087,7 @@ export const getQualityData = tryCatch(async (req, res) => {
         FROM ProcessActivity
         WHERE StationCode  in (@stationCode1)
           AND ActivityType = 5
-          AND Remark = @LineCode
+          AND Remark IN (SELECT value FROM STRING_SPLIT(@LineCode, ','))
           AND ActivityOn  >= @shiftStart
           AND ActivityOn  <  @shiftEnd
       ),
@@ -1032,19 +1126,25 @@ export const getQualityData = tryCatch(async (req, res) => {
     `;
 
     const defectsQuery = `
-      SELECT TOP 5
-        ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) AS SrNo,
-        dc.Name                                     AS DefectName,
-        COUNT(*)                                    AS DefectCount
-      FROM InspectionTrans it
-      INNER JOIN InspectionHeader  ih  ON it.InspectionLotNo = ih.InspectionLotNo
-      LEFT  JOIN InspectionDefect  idf ON it.ID              = idf.ID
-      LEFT  JOIN DefectCodeMaster  dc  ON idf.Defect         = dc.Code
-      WHERE it.NextAction = 1
-        AND it.InspectedOn BETWEEN @shiftStart AND @shiftEnd
-        AND dc.Name IS NOT NULL
-      GROUP BY dc.Name
-      ORDER BY COUNT(*) DESC;
+      WITH ReworkBase AS (
+          SELECT dc.Name AS DefectName
+          FROM InspectionTrans it
+          INNER JOIN InspectionHeader ih
+              ON it.InspectionLotNo = ih.InspectionLotNo
+          LEFT JOIN InspectionDefect idf
+              ON it.ID = idf.ID
+          LEFT JOIN DefectCodeMaster dc
+              ON idf.Defect = dc.Code
+          WHERE it.NextAction = 1
+            AND ih.Process IN (SELECT value FROM STRING_SPLIT(@qualityProcessCode, ','))
+            AND it.InspectedOn BETWEEN @shiftStart AND @shiftEnd
+      )
+
+      SELECT DefectName, COUNT(*) AS DefectCount
+      FROM ReworkBase
+      WHERE DefectName IS NOT NULL
+      GROUP BY DefectName
+      ORDER BY DefectCount DESC;
     `;
 
     const [summary, defects] = await Promise.all([
@@ -1060,6 +1160,7 @@ export const getQualityData = tryCatch(async (req, res) => {
         .request()
         .input("shiftStart", sql.DateTime, istStart)
         .input("shiftEnd", sql.DateTime, istEnd)
+        .input("qualityProcessCode", sql.NVarChar(50), qualityProcessCode)
         .query(defectsQuery),
     ]);
 
@@ -1071,7 +1172,7 @@ export const getQualityData = tryCatch(async (req, res) => {
     .json({ success: true, message: "Quality data retrieved.", data });
 });
 
-// --- GET /dashboard/loss ------------------------------------------------------
+// ─── GET /dashboard/loss ──────────────────────────────────────────────────────
 export const getLossData = tryCatch(async (req, res) => {
   const { shiftDate, shift } = validateShiftParams(req);
   const configId = validateConfigId(req);
@@ -1152,7 +1253,7 @@ export const getLossData = tryCatch(async (req, res) => {
         FROM ProcessActivity
         WHERE StationCode  in (@stationCode1)
           AND ActivityType = 5
-          AND Remark = @LineCode
+          AND Remark IN (SELECT value FROM STRING_SPLIT(@lineCode, ','))
           AND ActivityOn  >= @shiftStart
           AND ActivityOn  <  @shiftEnd
       )
