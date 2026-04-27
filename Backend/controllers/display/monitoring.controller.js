@@ -88,12 +88,12 @@ const resolveMonthBounds = (shiftStart) => {
 // FIX #7: Removed unused shiftActualAlias parameter — it was accepted but never
 //         interpolated into the query template, making it dead code.
 const buildFGQuery = () => `
- WITH ShiftActual AS (
+  WITH ShiftActual AS (
     SELECT COUNT(PSNo) AS ActualFG
     FROM ProcessActivity
     WHERE StationCode  in (@stationCode1)
       AND ActivityType = 5
-      AND Remark       = @lineCode
+      AND Remark IN (SELECT value FROM STRING_SPLIT(@lineCode, ','))
       AND ActivityOn  >= @shiftStart
       AND ActivityOn  <  @shiftEnd
 ),
@@ -102,114 +102,141 @@ MonthlyActual AS (
     FROM ProcessActivity
     WHERE StationCode  in (@stationCode1)
       AND ActivityType = 5
-      AND Remark       = @lineCode
+      AND Remark IN (SELECT value FROM STRING_SPLIT(@lineCode, ','))
       AND ActivityOn  >= @monthStart
       AND ActivityOn  <  @monthEnd
 ),
 HourlyProduction AS (
     SELECT 
         DATEPART(HOUR, ActivityOn) AS Hr,
-        COUNT(PSNo)                AS HourlyQty
+        COUNT(PSNo) AS HourlyQty
     FROM ProcessActivity
     WHERE StationCode  in (@stationCode1)
       AND ActivityType = 5
-      AND Remark       = @lineCode
+      AND Remark IN (SELECT value FROM STRING_SPLIT(@lineCode, ','))
       AND ActivityOn  >= @shiftStart
-      AND ActivityOn  <  @currentTime
+      AND ActivityOn  <  CASE 
+                            WHEN GETDATE() > @shiftEnd THEN @shiftEnd 
+                            ELSE GETDATE() 
+                         END
     GROUP BY DATEPART(HOUR, ActivityOn)
 ),
 AvgUPH AS (
-    SELECT AVG(CAST(HourlyQty AS FLOAT)) AS AvgUPH
+    SELECT 
+        AVG(CAST(HourlyQty AS FLOAT)) AS AvgUPH
     FROM HourlyProduction
 )
 
 SELECT
-    -- Plan / Config
-    dc.LineMonthlyProduction1                   AS MonthlyPlanQty,
+    dc.LineMonthlyProduction1 AS MonthlyPlanQty,
     dc.WorkingTimeMin,
-    dc.LineTaktTime1                            AS TactTimeSec,
+    dc.LineTaktTime1          AS TactTimeSec,
+    -- Actual Working Minutes
+    DATEDIFF(
+        MINUTE,
+        @shiftStart,
+        CASE 
+            WHEN GETDATE() > @shiftEnd THEN @shiftEnd 
+            ELSE GETDATE() 
+        END
+    ) AS ActualWorkingMin,
 
-    -- Elapsed working time (capped at shift end)
-    DATEDIFF(MINUTE, @shiftStart, @currentTime) AS ActualWorkingMin,
-
-    -- Actual Takt Time = elapsed seconds / units produced
+    -- Actual Takt Time
     CAST(
-        DATEDIFF(SECOND, @shiftStart, @currentTime) * 1.0
+        DATEDIFF(
+            SECOND,
+            @shiftStart,
+            CASE 
+                WHEN GETDATE() > @shiftEnd THEN @shiftEnd 
+                ELSE GETDATE() 
+            END
+        ) * 1.0
         / NULLIF(sa.ActualFG, 0)
-    AS DECIMAL(10,2))                           AS ActualTaktTimeSec,
+    AS DECIMAL(10,2)) AS ActualTaktTimeSec,
 
-    -- Shift Output Target = (60 / TaktTime) * WorkingMins * 85%
+    -- Shift Target
     CAST(
-        (60.0 / NULLIF(dc.LineTaktTime1, 0)) * dc.WorkingTimeMin * 0.85
-    AS INT)                                     AS ShiftOutputTarget,
+        ((60.0 / NULLIF(dc.LineTaktTime1, 0)) * dc.WorkingTimeMin) * 0.85
+    AS INT) AS ShiftOutputTarget,
 
-    dc.LineTarget1                              AS UPHTarget,
+    dc.LineTarget1 AS UPHTarget,
 
-    sa.ActualFG                                 AS ActualQty,
+    sa.ActualFG AS ActualQty,
 
-    -- Loss Time in minutes = (Daily Plan - Actual) × TaktTime(sec) ÷ 60
+    -- Loss Time
     CAST(
-        (
-            (dc.LineMonthlyProduction1 * 1.0 / NULLIF(DAY(EOMONTH(@shiftStart)), 0))
-            - sa.ActualFG
-        ) * dc.LineTaktTime1 / 60.0
-    AS INT)                                     AS LossTimeMin,
-
-    -- Loss Units = Daily Plan - Actual
-    CAST(
+      (
         (dc.LineMonthlyProduction1 * 1.0 / NULLIF(DAY(EOMONTH(@shiftStart)), 0))
         - sa.ActualFG
-    AS INT)                                     AS LossUnits,
+      ) * dc.LineTaktTime1 / 60.0
+    AS INT) AS LossTime,
 
-    -- Performance % = Actual ÷ Theoretical output so far × 100
+    -- Loss Units
     CAST(
-        sa.ActualFG * 100.0 /
-        NULLIF(
-            (60.0 / dc.LineTaktTime1) *
-            DATEDIFF(MINUTE, @shiftStart, @currentTime),
-        0)
-    AS DECIMAL(6,2))                            AS PerformancePct,
+      (dc.LineMonthlyProduction1 * 1.0 / NULLIF(DAY(EOMONTH(@shiftStart)), 0))
+      - sa.ActualFG
+    AS INT) AS LossUnits,
 
-    -- Efficiency % = Actual UPH ÷ Target UPH × 100
+    -- Balance
+    CAST(dc.LineMonthlyProduction1 * 1.0
+      / NULLIF(DAY(EOMONTH(@shiftStart)), 0)
+    AS INT) - sa.ActualFG AS BalanceQty,
+
+    -- Prorated Target
     CAST(
-        (
-            sa.ActualFG * 60.0 /
-            NULLIF(DATEDIFF(MINUTE, @shiftStart, @currentTime), 0)
-        ) * 100.0 /
-        NULLIF(dc.LineTarget1, 0)
-    AS DECIMAL(6,2))                            AS EfficiencyTillNow,
+        ((60.0 / NULLIF(dc.LineTaktTime1, 0)) * dc.WorkingTimeMin) * 0.85
+    AS INT) AS ProratedTarget,
 
-    -- Actual UPH (instantaneous)
+    -- Performance
     CAST(
-        sa.ActualFG * 60.0
-        / NULLIF(DATEDIFF(MINUTE, @shiftStart, @currentTime), 0)
-    AS DECIMAL(6,2))                            AS ActualUPH,
+      sa.ActualFG * 100.0
+      / NULLIF(
+          (dc.LineMonthlyProduction1 * 1.0 / NULLIF(DAY(EOMONTH(@shiftStart)), 0))
+          * (DATEDIFF(MINUTE, @shiftStart, GETDATE()) * 1.0
+             / NULLIF(CAST(dc.WorkingTimeMin AS FLOAT), 0))
+        , 0)
+    AS DECIMAL(6,2)) AS PerformancePct,
 
-    -- Actual UPH (hourly average)
-    CAST(au.AvgUPH AS DECIMAL(10,2))            AS ActualUPH_Avg,
-
-    sa.ActualFG                                 AS GaugeValue,
-    ma.ActualFG                                 AS MonthlyAchieved,
-    dc.LineMonthlyProduction1 - ma.ActualFG     AS MonthlyRemaining,
-
-    -- Asking Rate — use (RemainingDays + 1) to include today, avoids ÷0 on last day
+    -- Efficiency
     CAST(
-        (dc.LineMonthlyProduction1 - ma.ActualFG) * 1.0
-        / NULLIF(DAY(EOMONTH(GETDATE())) - DAY(GETDATE()) + 1, 0)
-    AS INT)                                     AS AskingRate,
+      sa.ActualFG * 100.0
+      / NULLIF(
+          (dc.LineMonthlyProduction1 * 1.0 / NULLIF(DAY(EOMONTH(@shiftStart)), 0))
+          * (DATEDIFF(MINUTE, @shiftStart, GETDATE()) * 1.0
+             / NULLIF(CAST(dc.WorkingTimeMin AS FLOAT), 0))
+        , 0)
+    AS DECIMAL(6,2)) AS EfficiencyTillNow,
 
-    -- Remaining days including today
+    -- Actual UPH
+    CAST(
+      sa.ActualFG * 60.0
+      / NULLIF(DATEDIFF(MINUTE, @shiftStart, GETDATE()), 0)
+    AS DECIMAL(6,2)) AS ActualUPH,
+
+    CAST(au.AvgUPH AS DECIMAL(10,2)) AS ActualUPH_Avg,
+
+    sa.ActualFG AS GaugeValue,
+    ma.ActualFG AS MonthlyAchieved,
+
+    dc.LineMonthlyProduction1 - ma.ActualFG AS MonthlyRemaining,
+
+    -- Asking Rate
+    CAST(
+      (dc.LineMonthlyProduction1 - ma.ActualFG) * 1.0
+      / NULLIF(DAY(EOMONTH(GETDATE())) - DAY(GETDATE()) + 1, 0)
+    AS INT) AS AskingRate,
+
     DAY(EOMONTH(GETDATE())) - DAY(GETDATE()) + 1 AS RemainingDays,
 
-    -- % of shift time consumed
+    -- Time %
     DATEDIFF(MINUTE, @shiftStart, GETDATE()) * 100.0
-        / NULLIF(DATEDIFF(MINUTE, @shiftStart, @shiftEnd), 0)
-                                                AS ConsumedTimePct
+      / NULLIF(DATEDIFF(MINUTE, @shiftStart, @shiftEnd), 0)
+      AS ConsumedTimePct
 
 FROM dbo.DashboardConfig dc
 CROSS JOIN ShiftActual   sa
 CROSS JOIN MonthlyActual ma
-CROSS JOIN AvgUPH        au
+CROSS JOIN AvgUPH au
 WHERE dc.Id = @configId;
 `;
 
@@ -244,12 +271,12 @@ const bindFGRequest = (
 // ─── Loading query builder ────────────────────────────────────────────────────
 // FIX #7: Removed unused shiftActualAlias parameter.
 const buildLoadingQuery = () => `
- WITH ShiftActual AS (
+   WITH ShiftActual AS (
     SELECT COUNT(PSNo) AS ActualFG
     FROM ProcessActivity
     WHERE StationCode  in (@stationCode2)
       AND ActivityType = 5
-      AND Remark       = @lineCode
+      AND Remark IN (SELECT value FROM STRING_SPLIT(@lineCode, ','))
       AND ActivityOn  >= @shiftStart
       AND ActivityOn  <  @shiftEnd
 ),
@@ -258,7 +285,7 @@ MonthlyActual AS (
     FROM ProcessActivity
     WHERE StationCode  in (@stationCode2)
       AND ActivityType = 5
-      AND Remark       = @lineCode
+      AND Remark IN (SELECT value FROM STRING_SPLIT(@lineCode, ','))
       AND ActivityOn  >= @monthStart
       AND ActivityOn  <  @monthEnd
 ),
@@ -269,7 +296,7 @@ HourlyProduction AS (
     FROM ProcessActivity
     WHERE StationCode  in (@stationCode2)
       AND ActivityType = 5
-      AND Remark       = @lineCode
+      AND Remark IN (SELECT value FROM STRING_SPLIT(@lineCode, ','))
       AND ActivityOn  >= @shiftStart
       AND ActivityOn  <  CASE 
                             WHEN GETDATE() > @shiftEnd THEN @shiftEnd 
