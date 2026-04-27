@@ -497,10 +497,6 @@ const GaugePanel = memo(
 
 GaugePanel.displayName = "GaugePanel";
 
-GaugePanel.displayName = "GaugePanel";
-
-GaugePanel.displayName = "GaugePanel";
-
 /* ── SidebarPanel ── */
 const SidebarPanel = ({
   pct = 0,
