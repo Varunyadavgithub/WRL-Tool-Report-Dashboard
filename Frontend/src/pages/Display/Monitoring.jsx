@@ -344,36 +344,145 @@ const MetricTable = ({ rows, accentHex }) => (
 
 /* ── GaugePanel (memoized) ── */
 const GaugePanel = memo(
-  ({
-    value,
-    maxValue = 1000,
-    label,
-    sublabel,
-    accentHex,
-    width = 280,
-    height = 170,
-  }) => {
+  ({ value, maxValue = 1000, label, sublabel, accentHex }) => {
     const clamped = Math.min(Math.max(Number(value) || 0, 0), maxValue);
+    const containerRef = useRef(null);
+    const [dims, setDims] = useState({ width: 400, height: 220 });
+
+    useEffect(() => {
+      const el = containerRef.current;
+      if (!el) return;
+
+      const measure = () => {
+        const { width, height } = el.getBoundingClientRect();
+        if (width > 0 && height > 0) {
+          // Maximize gauge: minimal padding, fill as much as possible
+          const maxW = Math.floor(width - 16);
+          const maxH = Math.floor(height - 100); // badge + label space
+          const fitByWidth = maxW;
+          const fitByHeight = maxH * 2;
+          const finalW = Math.max(200, Math.min(fitByWidth, fitByHeight));
+          const finalH = Math.floor(finalW / 2);
+
+          if (finalW > 100 && finalH > 50) {
+            setDims({ width: finalW, height: finalH });
+          }
+        }
+      };
+
+      const ro = new ResizeObserver(measure);
+      ro.observe(el);
+      measure();
+
+      return () => ro.disconnect();
+    }, []);
+
+    // Color based on value percentage
+    const pct = maxValue > 0 ? (clamped / maxValue) * 100 : 0;
+    const statusColor =
+      pct >= 80 ? "#16a34a" : pct >= 50 ? "#f59e0b" : "#dc2626";
+    const statusLabel =
+      pct >= 80 ? "On Track" : pct >= 50 ? "Warning" : "Critical";
 
     return (
-      <div className="flex flex-col items-center justify-center bg-white border-r border-slate-100 px-3 py-4 w-full">
-        <SpeedometerGauge
-          value={clamped}
-          maxValue={maxValue}
-          label={label}
-          sublabel={sublabel}
-          width={width}
-          height={height}
-          accentHex={accentHex}
-        />
+      <div
+        ref={containerRef}
+        className="flex flex-col items-center justify-center w-full h-full relative"
+      >
+        {/* Background glow */}
         <div
-          className="mt-3 px-7 py-1.5 rounded-lg text-white font-extrabold text-2xl font-mono tracking-widest"
+          className="absolute inset-0 opacity-[0.04] rounded-2xl"
           style={{
-            background: accentHex,
-            boxShadow: `0 4px 14px ${accentHex}44`,
+            background: `radial-gradient(circle at 50% 60%, ${accentHex}, transparent 70%)`,
           }}
-        >
-          {String(clamped).padStart(3, "0")}.00
+        />
+
+        {/* Top label */}
+        {(label || sublabel) && (
+          <div className="text-center mb-2 z-10">
+            {label && (
+              <p
+                className="text-lg font-extrabold uppercase tracking-[0.2em] font-mono"
+                style={{ color: accentHex }}
+              >
+                {label}
+              </p>
+            )}
+            {sublabel && (
+              <p className="text-xs text-slate-400 mt-0.5">{sublabel}</p>
+            )}
+          </div>
+        )}
+
+        {/* Speedometer */}
+        <div className="z-10">
+          <ReactSpeedometer
+            value={clamped}
+            minValue={0}
+            maxValue={maxValue}
+            width={dims.width}
+            height={dims.height}
+            segments={10}
+            segmentColors={[
+              "#dc2626",
+              "#ea580c",
+              "#f97316",
+              "#fb923c",
+              "#f59e0b",
+              "#eab308",
+              "#bef264",
+              "#86efac",
+              "#4ade80",
+              "#16a34a",
+            ]}
+            needleColor={accentHex}
+            needleTransitionDuration={2000}
+            needleTransition="easeQuadInOut"
+            currentValueText=""
+            textColor="#1e293b"
+            valueTextFontSize="0px"
+            labelFontSize="12px"
+            ringWidth={35}
+            paddingVertical={4}
+            forceRender={false}
+          />
+        </div>
+
+        {/* Big value badge */}
+        <div className="z-10 flex flex-col items-center -mt-2">
+          <div
+            className="px-10 py-3 rounded-2xl text-white font-black text-4xl font-mono tracking-[0.15em] shadow-lg"
+            style={{
+              background: `linear-gradient(135deg, ${accentHex}, ${accentHex}dd)`,
+              boxShadow: `0 8px 30px ${accentHex}40`,
+            }}
+          >
+            {String(clamped).padStart(3, "0")}
+            <span className="text-white/60 text-2xl">.00</span>
+          </div>
+
+          {/* Status pill */}
+          <div
+            className="mt-3 flex items-center gap-2 px-4 py-1.5 rounded-full border-[1.5px]"
+            style={{
+              borderColor: `${statusColor}44`,
+              background: `${statusColor}10`,
+            }}
+          >
+            <span
+              className="w-2.5 h-2.5 rounded-full animate-pulse"
+              style={{ background: statusColor }}
+            />
+            <span
+              className="text-xs font-bold uppercase tracking-wider"
+              style={{ color: statusColor }}
+            >
+              {statusLabel}
+            </span>
+            <span className="text-xs font-mono text-slate-400">
+              {pct.toFixed(1)}%
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -383,10 +492,12 @@ const GaugePanel = memo(
     prev.maxValue === next.maxValue &&
     prev.label === next.label &&
     prev.sublabel === next.sublabel &&
-    prev.accentHex === next.accentHex &&
-    prev.width === next.width &&
-    prev.height === next.height,
+    prev.accentHex === next.accentHex,
 );
+
+GaugePanel.displayName = "GaugePanel";
+
+GaugePanel.displayName = "GaugePanel";
 
 GaugePanel.displayName = "GaugePanel";
 

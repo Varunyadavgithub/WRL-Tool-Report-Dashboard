@@ -44,7 +44,6 @@ const ProductionDisplay2 = ({
       actual: d.ActualQty,
     },
     { label: "Loss Units", unit: "No's", target: null, actual: d.LossUnits },
-
     {
       label: "UPH Target",
       unit: "No's",
@@ -63,13 +62,16 @@ const ProductionDisplay2 = ({
       label: "Balance Qty",
       unit: "No's",
       target: null,
-      actual: d.ShiftOutputTarget - d.ActualQty,
+      actual:
+        d.ShiftOutputTarget != null && d.ActualQty != null
+          ? d.ShiftOutputTarget - d.ActualQty
+          : null,
     },
   ];
 
   return (
     <div className="flex flex-col w-full h-full bg-slate-50">
-      {/* ── STICKY HEADER ── */}
+      {/* ── HEADER ── */}
       <div className="sticky top-0 z-20 bg-slate-50 shrink-0">
         <PageHeader
           title="Final Area Production Performance"
@@ -80,7 +82,7 @@ const ProductionDisplay2 = ({
         <TimerBar progress={progress} accentHex={ACCENT} />
 
         {/* Hero KPI Strip */}
-        <div className="grid grid-cols-6 gap-3 px-5 py-3 bg-slate-50">
+        <div className="grid grid-cols-6 gap-2.5 px-4 py-2.5 bg-slate-50">
           <StatCard
             label="Shift Target"
             value={d.ShiftOutputTarget}
@@ -89,7 +91,7 @@ const ProductionDisplay2 = ({
           <StatCard
             label="Shift Output"
             value={d.ActualQty}
-            accentHex="#1e40af"
+            accentHex="#0f766e"
           />
           <StatCard
             label="Efficiency"
@@ -110,42 +112,54 @@ const ProductionDisplay2 = ({
           />
           <StatCard
             label="Balance Qty"
-            value={d.ShiftOutputTarget - d.ActualQty}
+            value={
+              d.ShiftOutputTarget != null && d.ActualQty != null
+                ? d.ShiftOutputTarget - d.ActualQty
+                : null
+            }
             accentHex="#b45309"
           />
         </div>
       </div>
 
-      {/* ── Main body — 50% Gauge + 50% Table ── */}
-      <div className="flex flex-1 min-h-0 px-4 py-3 gap-4">
-        {/* LEFT 50% — Gauge */}
-        <div className="w-1/2 shrink-0 flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <div className="scale-[1.35] origin-center">
-            <GaugePanel
-              value={d.GaugeValue ?? 0}
-              label={label}
-              sublabel="Units / Shift"
-              accentHex={ACCENT}
-            />
-          </div>
+      {/* ── Main body — 55% Gauge + 45% Table ── */}
+      <div className="flex flex-1 min-h-0 px-4 py-2 gap-4">
+        {/* LEFT — Gauge (wider) */}
+        <div
+          className="w-[55%] shrink-0 rounded-2xl border-2 shadow-md overflow-hidden"
+          style={{
+            borderColor: `${ACCENT}20`,
+            background: `linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)`,
+          }}
+        >
+          <GaugePanel
+            value={d.GaugeValue ?? 0}
+            maxValue={1000}
+            label={label}
+            sublabel="Units / Shift"
+            accentHex={ACCENT}
+          />
         </div>
 
-        {/* RIGHT 50% — Table */}
-        <div className="w-1/2 flex flex-col min-w-0 gap-3">
+        {/* RIGHT — Table */}
+        <div className="w-[45%] flex flex-col min-w-0">
           <div
-            className="text-white font-bold text-sm text-center py-2 rounded-t-xl tracking-wider uppercase"
-            style={{ background: ACCENT }}
+            className="text-white font-bold text-sm text-center py-2.5 rounded-t-xl tracking-wider uppercase flex items-center justify-center gap-2"
+            style={{
+              background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT}cc)`,
+            }}
           >
+            <span className="w-2 h-2 rounded-full bg-white/50" />
             {label} — Shift Metrics
           </div>
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm">
             <MetricTable rows={rows} accentHex={ACCENT} />
           </div>
         </div>
       </div>
 
       {/* ── Monthly footer ── */}
-      <div className="grid grid-cols-5 gap-3 px-5 py-3 bg-white border-t border-slate-200 shrink-0">
+      <div className="grid grid-cols-5 gap-2.5 px-4 py-2.5 bg-white border-t border-slate-200 shrink-0">
         <StatCard
           label="Monthly Plan"
           value={d.MonthlyPlanQty}
