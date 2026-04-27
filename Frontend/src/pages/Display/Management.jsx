@@ -120,7 +120,6 @@ const GROUP_CONFIG = {
 };
 
 /* -- Form sections — General section updated with workingTimeMin -- */
-
 const FORM_SECTIONS = [
   {
     group: "General",
@@ -689,13 +688,16 @@ const Management = () => {
   const handleLaunch = useCallback(
     (cfg, shiftDate, shift) => {
       setModal(null);
-      navigate("/display/monitoring", {
+      const slug = (cfg.dashboardName || "dashboard")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      navigate(`/display/${slug}`, {
         state: { config: cfg, shiftDate, shift, autoLoad: true },
       });
     },
     [navigate],
   );
-
   /* -- Derived: filtered list -- */
   // BUG FIX: Use useMemo-equivalent pattern (inline memo via useMemo import is
   // preferred, but keeping consistent with original style using computed value).

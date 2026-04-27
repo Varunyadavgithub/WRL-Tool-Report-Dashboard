@@ -142,16 +142,16 @@ export const ROUTE_CONFIG = [
     basePath: "/display",
     items: [
       {
-        path: "/display/monitoring",
-        label: "Monitoring",
-        icon: Wrench,
-        component: Monitoring,
-      },
-      {
         path: "/display/management",
         label: "Management",
         icon: Wrench,
         component: Management,
+      },
+    ],
+    hiddenItems: [
+      {
+        path: "/display/:slug",
+        component: Monitoring,
       },
     ],
   },
