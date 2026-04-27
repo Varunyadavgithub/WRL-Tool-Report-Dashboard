@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState, useCallback, useRef, memo } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
+import ReactSpeedometer from "react-d3-speedometer";
 import {
   Loader2,
   RefreshCw,
@@ -51,23 +52,6 @@ const PAGES_META = [
   { key: "loss", label: "Loss", Icon: AlertTriangle, accentHex: "#b45309" },
 ];
 
-const GAUGE_COLORS = [
-  "#dc2626",
-  "#e53e3e",
-  "#ea580c",
-  "#f97316",
-  "#fb923c",
-  "#f59e0b",
-  "#eab308",
-  "#bef264",
-  "#86efac",
-  "#4ade80",
-  "#22c55e",
-  "#16a34a",
-  "#15803d",
-  "#166534",
-];
-
 /* ── Helpers ── */
 const pad = (n) => String(n).padStart(2, "0");
 
@@ -87,200 +71,78 @@ const Spinner = ({ cls = "w-4 h-4" }) => (
   <Loader2 className={`animate-spin ${cls}`} />
 );
 
-/* ── GaugeCanvas ── */
-// Fully responsive: fills whatever container it's placed in.
-// Uses ResizeObserver to redraw at the correct resolution on every size change.
-// Light theme: white center, slate rim, blue needle with drop shadow.
-const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
-  const canvasRef = useRef(null);
-  const wrapRef = useRef(null);
-  const currentValue = useRef(value);
+/* ── Speedometer Gauge (replaces GaugeCanvas and memoized to prevent flickering) ── */
+const SpeedometerGauge = memo(
+  ({
+    value = 0,
+    maxValue = 1000,
+    label = "",
+    sublabel = "",
+    width = 300,
+    height = 180,
+    accentHex = "#1e40af",
+  }) => {
+    const clamped = Math.min(Math.max(Number(value) || 0, 0), maxValue);
 
-  const draw = useCallback(
-    (val) => {
-      const canvas = canvasRef.current;
-      const wrap = wrapRef.current;
-      if (!canvas || !wrap) return;
+    return (
+      <div className="flex flex-col items-center">
+        {(label || sublabel) && (
+          <div className="text-center mb-1">
+            {label && (
+              <p className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono">
+                {label}
+              </p>
+            )}
+            {sublabel && (
+              <p className="text-[10px] text-slate-400">{sublabel}</p>
+            )}
+          </div>
+        )}
 
-      const DPR = window.devicePixelRatio || 1;
-      const W = wrap.clientWidth;
-      const H = W / 2; // always 2:1 aspect ratio
+        <ReactSpeedometer
+          value={clamped}
+          minValue={0}
+          maxValue={maxValue}
+          width={width}
+          height={height}
+          segments={10}
+          segmentColors={[
+            "#dc2626",
+            "#ea580c",
+            "#f97316",
+            "#fb923c",
+            "#f59e0b",
+            "#eab308",
+            "#bef264",
+            "#86efac",
+            "#4ade80",
+            "#16a34a",
+          ]}
+          needleColor={accentHex}
+          needleTransitionDuration={2000}
+          needleTransition="easeQuadInOut"
+          currentValueText={`${clamped}`}
+          textColor="#1e293b"
+          valueTextFontSize="18px"
+          labelFontSize="10px"
+          ringWidth={30}
+          paddingVertical={8}
+          forceRender={false}
+        />
+      </div>
+    );
+  },
+  (prev, next) =>
+    prev.value === next.value &&
+    prev.maxValue === next.maxValue &&
+    prev.label === next.label &&
+    prev.sublabel === next.sublabel &&
+    prev.width === next.width &&
+    prev.height === next.height &&
+    prev.accentHex === next.accentHex,
+);
 
-      // Guard: skip draw if container has no size yet (avoids negative-radius arc crash)
-      if (W < 40) return;
-
-      canvas.width = W * DPR;
-      canvas.height = H * DPR;
-
-      const ctx = canvas.getContext("2d");
-      ctx.scale(DPR, DPR);
-
-      const cx = W / 2;
-      const cy = H - 10;
-      const R = Math.min(cx - 16, cy - 8);
-
-      // Secondary guard: R must be positive for arc() calls
-      if (R <= 0) return;
-
-      ctx.clearRect(0, 0, W, H);
-
-      // ── Outer rim (light slate background) ──
-      ctx.beginPath();
-      ctx.arc(cx, cy, R + 6, Math.PI, Math.PI * 2);
-      ctx.fillStyle = "#f1f5f9";
-      ctx.fill();
-
-      // ── Colored arc segments ──
-      const seg = Math.PI / GAUGE_COLORS.length;
-      GAUGE_COLORS.forEach((col, i) => {
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.arc(cx, cy, R, Math.PI + i * seg, Math.PI + (i + 1) * seg);
-        ctx.closePath();
-        ctx.fillStyle = col;
-        ctx.fill();
-      });
-
-      // ── Rim highlight ──
-      ctx.beginPath();
-      ctx.arc(cx, cy, R, Math.PI, Math.PI * 2);
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = "rgba(255,255,255,0.75)";
-      ctx.stroke();
-
-      // ── White center cutout ──
-      const cutoutR = Math.max(1, R - 28);
-      ctx.beginPath();
-      ctx.arc(cx, cy, cutoutR, 0, Math.PI * 2);
-      ctx.fillStyle = "#ffffff";
-      ctx.fill();
-
-      // ── Inner shadow ring ──
-      const shadowR = Math.max(1, R - 26);
-      ctx.beginPath();
-      ctx.arc(cx, cy, shadowR, Math.PI, Math.PI * 2);
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(0,0,0,0.06)";
-      ctx.stroke();
-
-      // ── Tick marks & numeric labels ──
-      const tickFont = Math.max(9, Math.round(R * 0.09));
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      for (let i = 0; i <= 10; i++) {
-        const angle = Math.PI + (i / 10) * Math.PI;
-        const sinA = Math.sin(angle);
-        const cosA = Math.cos(angle);
-        const isMajor = i % 2 === 0;
-
-        ctx.beginPath();
-        ctx.moveTo(
-          cx + cosA * Math.max(1, R - 26),
-          cy + sinA * Math.max(1, R - 26),
-        );
-        ctx.lineTo(
-          cx + cosA * (R - (isMajor ? 6 : 12)),
-          cy + sinA * (R - (isMajor ? 6 : 12)),
-        );
-        ctx.strokeStyle = isMajor
-          ? "rgba(255,255,255,0.95)"
-          : "rgba(255,255,255,0.55)";
-        ctx.lineWidth = isMajor ? 2.5 : 1.5;
-        ctx.stroke();
-
-        if (isMajor) {
-          ctx.fillStyle = "#475569";
-          ctx.font = `600 ${tickFont}px 'Courier New', monospace`;
-          ctx.fillText(
-            String(i * 100),
-            cx + cosA * (R - 40),
-            cy + sinA * (R - 40),
-          );
-        }
-      }
-
-      // ── Main label (e.g. metric name) ──
-      const labelFont = Math.max(10, Math.round(R * 0.1));
-      ctx.font = `700 ${labelFont}px 'Courier New', monospace`;
-      ctx.fillStyle = "#1e293b";
-      ctx.fillText(label, cx, cy - R * 0.52);
-
-      // ── Sub-label ──
-      const subFont = Math.max(9, Math.round(R * 0.085));
-      ctx.font = `400 ${subFont}px system-ui, sans-serif`;
-      ctx.fillStyle = "#94a3b8";
-      ctx.fillText(sublabel, cx, cy - R * 0.36);
-
-      // ── Needle ──
-      const clamped = Math.min(Math.max(Number(val) || 0, 0), 1000);
-      const angle = Math.PI + (clamped / 1000) * Math.PI;
-      const needleLen = Math.max(1, R - 32);
-      const needleWidth = Math.max(4, R * 0.045);
-
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(angle);
-
-      // Needle shadow
-      ctx.shadowColor = "rgba(0,0,0,0.20)";
-      ctx.shadowBlur = 8;
-      ctx.shadowOffsetY = 3;
-
-      // Needle shape (tapered)
-      ctx.beginPath();
-      ctx.moveTo(-14, 0);
-      ctx.lineTo(needleLen, -needleWidth * 0.4);
-      ctx.lineTo(needleLen + 4, 0);
-      ctx.lineTo(needleLen, needleWidth * 0.4);
-      ctx.closePath();
-      ctx.fillStyle = "#1e40af";
-      ctx.fill();
-      ctx.restore();
-
-      // ── Pivot cap (outer) ──
-      ctx.beginPath();
-      ctx.arc(cx, cy, Math.max(10, R * 0.09), 0, Math.PI * 2);
-      ctx.fillStyle = "#334155";
-      ctx.fill();
-
-      // ── Pivot cap (inner highlight) ──
-      ctx.beginPath();
-      ctx.arc(cx, cy, Math.max(5, R * 0.04), 0, Math.PI * 2);
-      ctx.fillStyle = "#f8fafc";
-      ctx.fill();
-    },
-    [label, sublabel],
-  );
-
-  // Redraw whenever value changes
-  useEffect(() => {
-    currentValue.current = value;
-    draw(value);
-  }, [value, draw]);
-
-  // Redraw whenever the container resizes (responsive)
-  useEffect(() => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    const ro = new ResizeObserver(() => draw(currentValue.current));
-    ro.observe(wrap);
-    return () => ro.disconnect();
-  }, [draw]);
-
-  return (
-    // Wrapper drives the aspect ratio; canvas fills it 100%
-    <div
-      ref={wrapRef}
-      style={{ width: "100%", aspectRatio: "2 / 1", position: "relative" }}
-    >
-      <canvas
-        ref={canvasRef}
-        style={{ width: "100%", height: "100%", display: "block" }}
-      />
-    </div>
-  );
-};
+SpeedometerGauge.displayName = "SpeedometerGauge";
 
 /* ── DonutCanvas ── */
 const DonutCanvas = ({
@@ -299,7 +161,6 @@ const DonutCanvas = ({
     const r = Math.min(cx, cy) - 12;
     ctx.clearRect(0, 0, c.width, c.height);
 
-    // Track
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.lineWidth = 12;
@@ -481,23 +342,53 @@ const MetricTable = ({ rows, accentHex }) => (
   </table>
 );
 
-/* ── GaugePanel ── */
-// Updated to remove the fixed 280px width — now fills available horizontal space.
-// The value badge sits below the gauge, centered, full-width.
-const GaugePanel = ({ value, label, sublabel, accentHex }) => (
-  <div className="flex flex-col items-center justify-center bg-white border-r border-slate-100 px-3 py-4 w-full">
-    {/* GaugeCanvas fills the panel width */}
-    <div className="w-full">
-      <GaugeCanvas value={value} label={label} sublabel={sublabel} />
-    </div>
-    <div
-      className="mt-3 px-7 py-1.5 rounded-lg text-white font-extrabold text-2xl font-mono tracking-widest"
-      style={{ background: accentHex, boxShadow: `0 4px 14px ${accentHex}44` }}
-    >
-      {String(value ?? 0).padStart(3, "0")}.00
-    </div>
-  </div>
+/* ── GaugePanel (memoized) ── */
+const GaugePanel = memo(
+  ({
+    value,
+    maxValue = 1000,
+    label,
+    sublabel,
+    accentHex,
+    width = 280,
+    height = 170,
+  }) => {
+    const clamped = Math.min(Math.max(Number(value) || 0, 0), maxValue);
+
+    return (
+      <div className="flex flex-col items-center justify-center bg-white border-r border-slate-100 px-3 py-4 w-full">
+        <SpeedometerGauge
+          value={clamped}
+          maxValue={maxValue}
+          label={label}
+          sublabel={sublabel}
+          width={width}
+          height={height}
+          accentHex={accentHex}
+        />
+        <div
+          className="mt-3 px-7 py-1.5 rounded-lg text-white font-extrabold text-2xl font-mono tracking-widest"
+          style={{
+            background: accentHex,
+            boxShadow: `0 4px 14px ${accentHex}44`,
+          }}
+        >
+          {String(clamped).padStart(3, "0")}.00
+        </div>
+      </div>
+    );
+  },
+  (prev, next) =>
+    prev.value === next.value &&
+    prev.maxValue === next.maxValue &&
+    prev.label === next.label &&
+    prev.sublabel === next.sublabel &&
+    prev.accentHex === next.accentHex &&
+    prev.width === next.width &&
+    prev.height === next.height,
 );
+
+GaugePanel.displayName = "GaugePanel";
 
 /* ── SidebarPanel ── */
 const SidebarPanel = ({
@@ -596,12 +487,21 @@ const EMPTY_DATA = {
 const Monitoring = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { slug } = useParams();
 
   const routerState = location.state || {};
   const launchedConfig = routerState.config || null;
   const launchedDate = routerState.shiftDate || todayISO();
   const launchedShift = routerState.shift || "A";
   const isLaunched = !!routerState.autoLoad;
+
+  // Redirect if no config state (direct URL access without launch)
+  useEffect(() => {
+    if (slug && !launchedConfig) {
+      toast.error("No configuration found. Redirecting to management.");
+      navigate("/display/management", { replace: true });
+    }
+  }, [slug, launchedConfig, navigate]);
 
   const [shiftDate, setShiftDate] = useState(launchedDate);
   const [shift, setShift] = useState(launchedShift);
@@ -832,7 +732,7 @@ const Monitoring = () => {
               )
             )}
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate("/display/management")}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-500 border-[1.5px] border-red-300 transition-all hover:bg-red-100"
             >
               <X className="w-3 h-3" /> Exit
@@ -889,152 +789,23 @@ const Monitoring = () => {
     );
   }
 
-  /* ── Embedded / non-kiosk mode ── */
+  /* ── Fallback: redirect to management if accessed without launch state ── */
   return (
-    <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
-      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
-        <div>
-          <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
-            Production Monitoring
-          </h1>
-          <p className="text-[11px] text-slate-400">
-            Dashboard · Shift performance overview
-          </p>
-        </div>
-        {lastFetched && (
-          <span className="text-[11px] text-slate-400">
-            Updated {lastFetched.toLocaleTimeString()}
-          </span>
-        )}
-      </div>
-
-      <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3">
-        {/* Filters */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
-          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
-            Filters
-          </p>
-          <div className="flex flex-wrap gap-4 items-end">
-            <div className="min-w-[180px]">
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                Date
-              </label>
-              <input
-                type="date"
-                value={shiftDate}
-                onChange={(e) => setShiftDate(e.target.value)}
-                className="w-full px-3 py-2 border-[1.5px] border-slate-200 rounded-lg text-[13px] text-slate-900 bg-slate-50 outline-none focus:border-blue-400 transition-colors"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                Shift
-              </label>
-              <div className="flex bg-slate-50 border-[1.5px] border-slate-200 rounded-lg overflow-hidden">
-                {["A", "B"].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setShift(s)}
-                    className={`px-5 py-2 text-[13px] font-bold transition-all border-r border-slate-200 last:border-r-0 ${
-                      shift === s
-                        ? "bg-blue-700 text-white"
-                        : "bg-transparent text-slate-400 hover:text-slate-600"
-                    }`}
-                  >
-                    Shift {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 pb-0.5">
-              <button
-                onClick={fetchAllData}
-                disabled={loading}
-                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  loading
-                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
-                }`}
-              >
-                {loading ? (
-                  <Spinner cls="w-4 h-4" />
-                ) : (
-                  <RefreshCw className="w-4 h-4" />
-                )}
-                {loading ? "Loading…" : "Load Dashboard"}
-              </button>
-              {isRunning ? (
-                <button
-                  onClick={() => setIsRunning(false)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-amber-50 text-amber-700 border-[1.5px] border-amber-300 hover:bg-amber-100 transition-all"
-                >
-                  <Pause className="w-4 h-4" /> Pause
-                </button>
-              ) : (
-                lastFetched && (
-                  <button
-                    onClick={() => setIsRunning(true)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-50 text-emerald-700 border-[1.5px] border-emerald-300 hover:bg-emerald-100 transition-all"
-                  >
-                    <Play className="w-4 h-4" /> Resume
-                  </button>
-                )
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Content area */}
-        <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-0">
-          {loading && (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3.5">
-              <Spinner cls="w-8 h-8 text-blue-600" />
-              <p className="text-sm text-slate-400">Fetching shift data…</p>
-            </div>
-          )}
-          {!loading && lastFetched && (
-            <div className="flex-1 min-h-0 flex flex-col">
-              <div className="flex-1 min-h-0 overflow-hidden">
-                {pages.map((page, i) => (
-                  <div
-                    key={i}
-                    className="h-full"
-                    style={{
-                      display: i === currentPage ? "flex" : "none",
-                      flexDirection: "column",
-                    }}
-                  >
-                    {page}
-                  </div>
-                ))}
-              </div>
-              <NavDots
-                currentPage={currentPage}
-                onGoTo={goTo}
-                onPrev={goPrev}
-                onNext={goNext}
-              />
-            </div>
-          )}
-          {!loading && !lastFetched && (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 py-4">
-              <div className="w-[72px] h-[72px] rounded-2xl bg-slate-100 flex items-center justify-center">
-                <Settings
-                  className="w-8 h-8 text-slate-300"
-                  strokeWidth={1.2}
-                />
-              </div>
-              <div className="text-center">
-                <p className="text-base font-bold text-slate-500">
-                  No data loaded
-                </p>
-                <p className="text-[13px] text-slate-400 mt-1">
-                  Select a date and click Load Dashboard to begin
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+    <div className="h-full flex flex-col items-center justify-center bg-slate-100">
+      <div className="text-center">
+        <Settings className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+        <p className="text-lg font-bold text-slate-500 mb-2">
+          No Dashboard Loaded
+        </p>
+        <p className="text-sm text-slate-400 mb-4">
+          Launch a dashboard from the Management page
+        </p>
+        <button
+          onClick={() => navigate("/display/management")}
+          className="px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors"
+        >
+          Go to Management
+        </button>
       </div>
     </div>
   );
@@ -1044,6 +815,7 @@ export {
   PageHeader,
   TimerBar,
   GaugePanel,
+  SpeedometerGauge,
   MetricTable,
   StatCard,
   SidebarPanel,
