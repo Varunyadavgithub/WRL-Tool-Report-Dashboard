@@ -34,11 +34,11 @@ const PAGE_DURATION_MS = 30_000;
 const TOTAL_PAGES = 5;
 
 const PAGES_META = [
-  { key: "fgPacking",  label: "FG Packing", Icon: Package,       accentHex: "#1e40af" },
-  { key: "fgLoading",  label: "FG Loading", Icon: Truck,          accentHex: "#0f766e" },
-  { key: "hourly",     label: "Hourly",      Icon: BarChart2,      accentHex: "#7c3aed" },
-  { key: "quality",    label: "Quality",     Icon: CheckCircle,    accentHex: "#15803d" },
-  { key: "loss",       label: "Loss",        Icon: AlertTriangle,  accentHex: "#b45309" },
+  { key: "fgPacking",  label: "Production Display 1", Icon: Package,      accentHex: "#1e40af" },
+  { key: "fgLoading",  label: "Production Display 2", Icon: Truck,         accentHex: "#0f766e" },
+  { key: "hourly",     label: "Hourly",               Icon: BarChart2,     accentHex: "#7c3aed" },
+  { key: "quality",    label: "Quality",              Icon: CheckCircle,   accentHex: "#15803d" },
+  { key: "loss",       label: "Loss",                 Icon: AlertTriangle, accentHex: "#b45309" },
 ];
 
 const GAUGE_COLORS = [
@@ -55,10 +55,8 @@ const todayISO = () => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
-// BUG FIX: Previously spread all config fields as individual params which sent
-// redundant/unused fields. Now only pass what the backend actually needs.
 const buildParams = (cfg, shiftDate, shift) => ({
-  configId:  cfg?.id,
+  configId: cfg?.id,
   shiftDate,
   shift,
 });
@@ -69,22 +67,48 @@ const Spinner = ({ cls = "w-4 h-4" }) => (
 );
 
 /* ── GaugeCanvas ── */
-// BUG FIX: Extracted draw logic into a stable function to avoid stale closure
-// issues and reduce repeated inline object creation on every render.
+// Fully responsive: fills whatever container it's placed in.
+// Uses ResizeObserver to redraw at the correct resolution on every size change.
+// Light theme: white center, slate rim, blue needle with drop shadow.
 const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
-  const ref = useRef(null);
+  const canvasRef    = useRef(null);
+  const wrapRef      = useRef(null);
+  const currentValue = useRef(value);
 
-  useEffect(() => {
-    const c = ref.current;
-    if (!c) return;
-    const ctx = c.getContext("2d");
-    const W = c.width, H = c.height;
-    const cx = W / 2, cy = H - 16;
-    const R = Math.min(cx - 12, cy - 8);
+  const draw = useCallback((val) => {
+    const canvas = canvasRef.current;
+    const wrap   = wrapRef.current;
+    if (!canvas || !wrap) return;
+
+    const DPR = window.devicePixelRatio || 1;
+    const W   = wrap.clientWidth;
+    const H   = W / 2; // always 2:1 aspect ratio
+
+    // Guard: skip draw if container has no size yet (avoids negative-radius arc crash)
+    if (W < 40) return;
+
+    canvas.width  = W * DPR;
+    canvas.height = H * DPR;
+
+    const ctx = canvas.getContext("2d");
+    ctx.scale(DPR, DPR);
+
+    const cx = W / 2;
+    const cy = H - 10;
+    const R  = Math.min(cx - 16, cy - 8);
+
+    // Secondary guard: R must be positive for arc() calls
+    if (R <= 0) return;
 
     ctx.clearRect(0, 0, W, H);
 
-    // Gauge arc segments
+    // ── Outer rim (light slate background) ──
+    ctx.beginPath();
+    ctx.arc(cx, cy, R + 6, Math.PI, Math.PI * 2);
+    ctx.fillStyle = "#f1f5f9";
+    ctx.fill();
+
+    // ── Colored arc segments ──
     const seg = Math.PI / GAUGE_COLORS.length;
     GAUGE_COLORS.forEach((col, i) => {
       ctx.beginPath();
@@ -95,74 +119,128 @@ const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
       ctx.fill();
     });
 
-    // Rim
+    // ── Rim highlight ──
     ctx.beginPath();
-    ctx.arc(cx, cy, R - 2, Math.PI, Math.PI * 2);
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.arc(cx, cy, R, Math.PI, Math.PI * 2);
+    ctx.lineWidth    = 4;
+    ctx.strokeStyle  = "rgba(255,255,255,0.75)";
     ctx.stroke();
 
-    // Center fill
+    // ── White center cutout ──
+    const cutoutR = Math.max(1, R - 28);
     ctx.beginPath();
-    ctx.arc(cx, cy, R - 22, 0, Math.PI * 2);
-    ctx.fillStyle = "#f8fafc";
+    ctx.arc(cx, cy, cutoutR, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
     ctx.fill();
 
-    ctx.textAlign = "center";
+    // ── Inner shadow ring ──
+    const shadowR = Math.max(1, R - 26);
+    ctx.beginPath();
+    ctx.arc(cx, cy, shadowR, Math.PI, Math.PI * 2);
+    ctx.lineWidth   = 3;
+    ctx.strokeStyle = "rgba(0,0,0,0.06)";
+    ctx.stroke();
+
+    // ── Tick marks & numeric labels ──
+    const tickFont = Math.max(9, Math.round(R * 0.09));
+    ctx.textAlign    = "center";
     ctx.textBaseline = "middle";
 
-    // Tick marks + labels
     for (let i = 0; i <= 10; i++) {
-      const angle = Math.PI + (i / 10) * Math.PI;
-      const sin = Math.sin(angle), cos = Math.cos(angle);
+      const angle   = Math.PI + (i / 10) * Math.PI;
+      const sinA    = Math.sin(angle);
+      const cosA    = Math.cos(angle);
+      const isMajor = i % 2 === 0;
+
       ctx.beginPath();
-      ctx.moveTo(cx + cos * (R - 22), cy + sin * (R - 22));
-      ctx.lineTo(cx + cos * (R - 5),  cy + sin * (R - 5));
-      ctx.strokeStyle = "rgba(255,255,255,0.8)";
-      ctx.lineWidth = 2;
+      ctx.moveTo(cx + cosA * Math.max(1, R - 26), cy + sinA * Math.max(1, R - 26));
+      ctx.lineTo(cx + cosA * (R - (isMajor ? 6 : 12)), cy + sinA * (R - (isMajor ? 6 : 12)));
+      ctx.strokeStyle = isMajor ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.55)";
+      ctx.lineWidth   = isMajor ? 2.5 : 1.5;
       ctx.stroke();
-      if (i % 2 === 0) {
-        ctx.fillStyle = "#64748b";
-        ctx.font = "bold 9px 'Courier New', monospace";
-        ctx.fillText(String(i * 100), cx + cos * (R - 34), cy + sin * (R - 34));
+
+      if (isMajor) {
+        ctx.fillStyle = "#475569";
+        ctx.font      = `600 ${tickFont}px 'Courier New', monospace`;
+        ctx.fillText(String(i * 100), cx + cosA * (R - 40), cy + sinA * (R - 40));
       }
     }
 
-    // Labels
-    ctx.font = "bold 11px 'Courier New', monospace";
+    // ── Main label (e.g. metric name) ──
+    const labelFont = Math.max(10, Math.round(R * 0.1));
+    ctx.font      = `700 ${labelFont}px 'Courier New', monospace`;
     ctx.fillStyle = "#1e293b";
-    ctx.fillText(label, cx, cy - 48);
-    ctx.font = "9px system-ui";
-    ctx.fillStyle = "#64748b";
-    ctx.fillText(sublabel, cx, cy - 32);
+    ctx.fillText(label,    cx, cy - R * 0.52);
 
-    // Needle — BUG FIX: clamped to [0, 1000] range
-    const clamped = Math.min(Math.max(Number(value) || 0, 0), 1000);
-    const angle = Math.PI + (clamped / 1000) * Math.PI;
+    // ── Sub-label ──
+    const subFont = Math.max(9, Math.round(R * 0.085));
+    ctx.font      = `400 ${subFont}px system-ui, sans-serif`;
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillText(sublabel, cx, cy - R * 0.36);
+
+    // ── Needle ──
+    const clamped     = Math.min(Math.max(Number(val) || 0, 0), 1000);
+    const angle       = Math.PI + (clamped / 1000) * Math.PI;
+    const needleLen   = Math.max(1, R - 32);
+    const needleWidth = Math.max(4, R * 0.045);
+
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(angle);
+
+    // Needle shadow
+    ctx.shadowColor   = "rgba(0,0,0,0.20)";
+    ctx.shadowBlur    = 8;
+    ctx.shadowOffsetY = 3;
+
+    // Needle shape (tapered)
     ctx.beginPath();
-    ctx.moveTo(-(R - 26), 0);
-    ctx.lineTo(10, -5);
-    ctx.lineTo(10, 5);
+    ctx.moveTo(-14, 0);
+    ctx.lineTo(needleLen,     -needleWidth * 0.4);
+    ctx.lineTo(needleLen + 4,  0);
+    ctx.lineTo(needleLen,      needleWidth * 0.4);
     ctx.closePath();
     ctx.fillStyle = "#1e40af";
     ctx.fill();
     ctx.restore();
 
-    // Pivot
+    // ── Pivot cap (outer) ──
     ctx.beginPath();
-    ctx.arc(cx, cy, 12, 0, Math.PI * 2);
-    ctx.fillStyle = "#475569";
+    ctx.arc(cx, cy, Math.max(10, R * 0.09), 0, Math.PI * 2);
+    ctx.fillStyle = "#334155";
     ctx.fill();
-    ctx.beginPath();
-    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-    ctx.fillStyle = "#f1f5f9";
-    ctx.fill();
-  }, [value, label, sublabel]);
 
-  return <canvas ref={ref} width={280} height={160} className="block max-w-full" />;
+    // ── Pivot cap (inner highlight) ──
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.max(5, R * 0.04), 0, Math.PI * 2);
+    ctx.fillStyle = "#f8fafc";
+    ctx.fill();
+  }, [label, sublabel]);
+
+  // Redraw whenever value changes
+  useEffect(() => {
+    currentValue.current = value;
+    draw(value);
+  }, [value, draw]);
+
+  // Redraw whenever the container resizes (responsive)
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const ro = new ResizeObserver(() => draw(currentValue.current));
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, [draw]);
+
+  return (
+    // Wrapper drives the aspect ratio; canvas fills it 100%
+    <div ref={wrapRef} style={{ width: "100%", aspectRatio: "2 / 1", position: "relative" }}>
+      <canvas
+        ref={canvasRef}
+        style={{ width: "100%", height: "100%", display: "block" }}
+      />
+    </div>
+  );
 };
 
 /* ── DonutCanvas ── */
@@ -184,17 +262,16 @@ const DonutCanvas = ({
     // Track
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.lineWidth = 12;
+    ctx.lineWidth   = 12;
     ctx.strokeStyle = trackColor;
     ctx.stroke();
 
-    // BUG FIX: Guard against pct <= 0 to avoid drawing a full circle artifact
     if (pct > 0) {
       ctx.beginPath();
       ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + (Math.min(pct, 100) / 100) * Math.PI * 2);
-      ctx.lineWidth = 12;
+      ctx.lineWidth   = 12;
       ctx.strokeStyle = fillColor;
-      ctx.lineCap = "round";
+      ctx.lineCap     = "round";
       ctx.stroke();
     }
   }, [pct, fillColor, trackColor]);
@@ -204,7 +281,7 @@ const DonutCanvas = ({
 
 /* ── LiveClock ── */
 const LiveClock = ({ shift, shiftDate, accentHex }) => {
-  const [tick, setTick] = useState(() => new Date()); // BUG FIX: lazy init avoids stale first render
+  const [tick, setTick] = useState(() => new Date());
 
   useEffect(() => {
     const id = setInterval(() => setTick(new Date()), 1000);
@@ -277,7 +354,6 @@ const StatCard = ({ label, value, accentHex = "#1e40af", sub }) => (
 );
 
 /* ── MetricTable ── */
-/* ── MetricTable ── */
 const MetricTable = ({ rows, accentHex }) => (
   <table className="w-full border-separate border-spacing-0 text-xs">
     <thead>
@@ -302,7 +378,7 @@ const MetricTable = ({ rows, accentHex }) => (
       {rows.map((r, i) => {
         const actualColor =
           r.highlight === "yellow" ? "#f59e0b" : r.green ? "#15803d" : "#0f172a";
-        const mergeColumns = r.target == null; // ← merge when no target
+        const mergeColumns = r.target == null;
 
         return (
           <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}>
@@ -314,7 +390,6 @@ const MetricTable = ({ rows, accentHex }) => (
             </td>
 
             {mergeColumns ? (
-              // Merged Target + Actual cell — spans 2 columns, shows only actual
               <td
                 colSpan={2}
                 className="px-2.5 py-1.5 border border-slate-100 font-extrabold text-center"
@@ -346,14 +421,18 @@ const MetricTable = ({ rows, accentHex }) => (
 );
 
 /* ── GaugePanel ── */
+// Updated to remove the fixed 280px width — now fills available horizontal space.
+// The value badge sits below the gauge, centered, full-width.
 const GaugePanel = ({ value, label, sublabel, accentHex }) => (
-  <div className="w-[280px] shrink-0 flex flex-col items-center justify-center bg-white border-r border-slate-100 px-3 py-4">
-    <GaugeCanvas value={value} label={label} sublabel={sublabel} />
+  <div className="flex flex-col items-center justify-center bg-white border-r border-slate-100 px-3 py-4 w-full">
+    {/* GaugeCanvas fills the panel width */}
+    <div className="w-full">
+      <GaugeCanvas value={value} label={label} sublabel={sublabel} />
+    </div>
     <div
       className="mt-3 px-7 py-1.5 rounded-lg text-white font-extrabold text-2xl font-mono tracking-widest"
       style={{ background: accentHex, boxShadow: `0 4px 14px ${accentHex}44` }}
     >
-      {/* BUG FIX: guard against null/undefined value before String() */}
       {String(value ?? 0).padStart(3, "0")}.00
     </div>
   </div>
@@ -375,7 +454,6 @@ const SidebarPanel = ({
         <DonutCanvas pct={pct} size={130} fillColor={fillColor} />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
           <div className="text-[22px] font-extrabold text-slate-900">
-            {/* BUG FIX: coerce pct to number before toFixed, avoids "pct.toFixed is not a function" */}
             {Number(pct || 0).toFixed(0)}%
           </div>
         </div>
@@ -464,18 +542,15 @@ const Monitoring = () => {
   const launchedShift  = routerState.shift     || "A";
   const isLaunched     = !!routerState.autoLoad;
 
-  const [shiftDate,    setShiftDate]   = useState(launchedDate);
-  const [shift,        setShift]       = useState(launchedShift);
-  const [allData,      setAllData]     = useState(EMPTY_DATA);
-  const [currentPage,  setCurrentPage] = useState(0);
-  const [progress,     setProgress]    = useState(0);
-  const [lastFetched,  setLastFetched] = useState(null);
-  const [isRunning,    setIsRunning]   = useState(false);
-  const [loading,      setLoading]     = useState(false);
+  const [shiftDate,   setShiftDate]  = useState(launchedDate);
+  const [shift,       setShift]      = useState(launchedShift);
+  const [allData,     setAllData]    = useState(EMPTY_DATA);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [progress,    setProgress]   = useState(0);
+  const [lastFetched, setLastFetched] = useState(null);
+  const [isRunning,   setIsRunning]  = useState(false);
+  const [loading,     setLoading]    = useState(false);
 
-  // BUG FIX: Use a ref for the interval so stopping it on page change doesn't
-  // create a dependency loop. Previously the effect re-registered on every
-  // currentPage change AND on isRunning change, causing double-ticking.
   const intervalRef = useRef(null);
 
   useEffect(() => {
@@ -501,8 +576,6 @@ const Monitoring = () => {
     };
   }, [isRunning, currentPage]);
 
-  // BUG FIX: Accept cfg as parameter so this is safe to call both on mount
-  // (with launchedConfig) and later with possibly-changed state.
   const fetchData = useCallback(async (dateParam, shiftParam, cfg) => {
     if (!dateParam) {
       toast.error("Please select a shift date.");
@@ -515,8 +588,6 @@ const Monitoring = () => {
 
     setLoading(true);
     setIsRunning(false);
-    // BUG FIX: Reset to a stable reference rather than inline object so React
-    // can bail out of re-renders early.
     setAllData(EMPTY_DATA);
 
     const params = buildParams(cfg, dateParam, shiftParam);
@@ -551,8 +622,6 @@ const Monitoring = () => {
         if (failed > 0) toast(`${failed} endpoint(s) had errors.`, { icon: "⚠️" });
         else toast.success("Dashboard loaded successfully.");
 
-        // BUG FIX: spread EMPTY_DATA first so keys missing from API response
-        // still exist in state (prevents child components reading undefined).
         setAllData({ ...EMPTY_DATA, ...merged });
         setLastFetched(new Date());
         setCurrentPage(0);
@@ -563,16 +632,13 @@ const Monitoring = () => {
     } finally {
       setLoading(false);
     }
-  }, []); // no dependencies — all values are passed as args
+  }, []);
 
-  // BUG FIX: Only run auto-load once on mount.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isLaunched) fetchData(launchedDate, launchedShift, launchedConfig);
   }, []);
 
-  // BUG FIX: Memoize with correct deps — shiftDate/shift state can differ from
-  // what was launched if the user changed them in the top bar.
   const fetchAllData = useCallback(
     () => fetchData(shiftDate, shift, launchedConfig),
     [fetchData, shiftDate, shift, launchedConfig]
@@ -582,7 +648,6 @@ const Monitoring = () => {
   const goPrev = useCallback(() => { setCurrentPage((p) => (p - 1 + TOTAL_PAGES) % TOTAL_PAGES); setProgress(0); }, []);
   const goNext = useCallback(() => { setCurrentPage((p) => (p + 1) % TOTAL_PAGES); setProgress(0); }, []);
 
-  // Shift-B date logic: if before 08:00, use yesterday as the shift date.
   const handleShiftSwitch = useCallback((s, cfg) => {
     let dt;
     if (s === "B") {
@@ -599,8 +664,6 @@ const Monitoring = () => {
 
   const commonProps = { progress, shift, shiftDate, config: launchedConfig };
 
-  // BUG FIX: Render all pages but hide non-active ones with CSS instead of
-  // conditionally mounting/unmounting — avoids canvas re-init on every switch.
   const pages = [
     <FgPacking key="fgPacking" apiData={allData.fgPacking} {...commonProps} />,
     <FgLoading key="fgLoading" apiData={allData.fgLoading} {...commonProps} />,
@@ -623,7 +686,6 @@ const Monitoring = () => {
           )}
           <div className="w-px h-5 bg-slate-100" />
 
-          {/* Shift switcher */}
           {["A", "B"].map((s) => (
             <button
               key={s}
@@ -704,8 +766,6 @@ const Monitoring = () => {
         {!loading && lastFetched && (
           <div className="flex-1 min-h-0 flex flex-col">
             <div className="flex-1 min-h-0 overflow-hidden">
-              {/* BUG FIX: Use visibility toggling instead of index access to
-                  prevent canvas teardown on each page transition */}
               {pages.map((page, i) => (
                 <div
                   key={i}
@@ -725,7 +785,7 @@ const Monitoring = () => {
           </div>
         )}
 
-        {/* No data yet (initial load in progress) */}
+        {/* No data yet */}
         {!loading && !lastFetched && (
           <div className="flex-1 flex flex-col items-center justify-center bg-white gap-4">
             <div className="w-[72px] h-[72px] rounded-2xl bg-slate-100 flex items-center justify-center">

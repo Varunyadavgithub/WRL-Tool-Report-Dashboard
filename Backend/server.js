@@ -10,7 +10,7 @@ import {
   dbConfig1,
   dbConfig2,
   dbConfig3,
-  dbConfig4,
+  //dbConfig4,
 } from "./config/db.config.js";
 import { startCalibrationCron } from "./cron/calibrationEscalation.js";
 import { startManpowerCron } from "../Backend/cron/manpower.cron.js";
@@ -38,7 +38,7 @@ app.use("/uploads", express.static(path.resolve("uploads"))); // Static files
     global.pool1 = await connectToDB(dbConfig1);
     global.pool2 = await connectToDB(dbConfig2);
     global.pool3 = await connectToDB(dbConfig3);
-    global.pool3 = await connectToDB(dbConfig4);
+    //global.pool3 = await connectToDB(dbConfig4);
     console.log("Successfully connected to all databases.");
   } catch (error) {
     console.error("Database connection failed:", error);
