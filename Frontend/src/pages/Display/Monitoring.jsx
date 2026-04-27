@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, memo } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -22,15 +22,17 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { baseURL } from "../../assets/assets";
+import { Doughnut } from "react-chartjs-2";
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 
-/* ── Page imports ── */
+ChartJS.register(ArcElement, Tooltip, Legend);
+
 import ProductionDisplay1 from "./Area/ProductionDisplay1";
 import ProductionDisplay2 from "./Area/ProductionDisplay2";
 import Hourly from "./Area/Hourly";
 import Quality from "./Area/Quality";
 import Loss from "./Area/Loss";
 
-/* ── Constants ── */
 const PAGE_DURATION_MS = 30_000;
 const TOTAL_PAGES = 5;
 
@@ -52,7 +54,6 @@ const PAGES_META = [
   { key: "loss", label: "Loss", Icon: AlertTriangle, accentHex: "#b45309" },
 ];
 
-/* ── Helpers ── */
 const pad = (n) => String(n).padStart(2, "0");
 
 const todayISO = () => {
@@ -66,83 +67,9 @@ const buildParams = (cfg, shiftDate, shift) => ({
   shift,
 });
 
-/* ── Spinner ── */
 const Spinner = ({ cls = "w-4 h-4" }) => (
   <Loader2 className={`animate-spin ${cls}`} />
 );
-
-/* ── Speedometer Gauge (replaces GaugeCanvas and memoized to prevent flickering) ── */
-const SpeedometerGauge = memo(
-  ({
-    value = 0,
-    maxValue = 1000,
-    label = "",
-    sublabel = "",
-    width = 300,
-    height = 180,
-    accentHex = "#1e40af",
-  }) => {
-    const clamped = Math.min(Math.max(Number(value) || 0, 0), maxValue);
-
-    return (
-      <div className="flex flex-col items-center">
-        {(label || sublabel) && (
-          <div className="text-center mb-1">
-            {label && (
-              <p className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono">
-                {label}
-              </p>
-            )}
-            {sublabel && (
-              <p className="text-[10px] text-slate-400">{sublabel}</p>
-            )}
-          </div>
-        )}
-
-        <ReactSpeedometer
-          value={clamped}
-          minValue={0}
-          maxValue={maxValue}
-          width={width}
-          height={height}
-          segments={10}
-          segmentColors={[
-            "#dc2626",
-            "#ea580c",
-            "#f97316",
-            "#fb923c",
-            "#f59e0b",
-            "#eab308",
-            "#bef264",
-            "#86efac",
-            "#4ade80",
-            "#16a34a",
-          ]}
-          needleColor={accentHex}
-          needleTransitionDuration={2000}
-          needleTransition="easeQuadInOut"
-          currentValueText={`${clamped}`}
-          textColor="#1e293b"
-          valueTextFontSize="18px"
-          labelFontSize="10px"
-          ringWidth={30}
-          paddingVertical={8}
-          forceRender={false}
-        />
-      </div>
-    );
-  },
-  (prev, next) =>
-    prev.value === next.value &&
-    prev.maxValue === next.maxValue &&
-    prev.label === next.label &&
-    prev.sublabel === next.sublabel &&
-    prev.width === next.width &&
-    prev.height === next.height &&
-    prev.accentHex === next.accentHex,
-);
-
-SpeedometerGauge.displayName = "SpeedometerGauge";
 
 /* ── DonutCanvas ── */
 const DonutCanvas = ({
@@ -151,39 +78,52 @@ const DonutCanvas = ({
   fillColor = "#22c55e",
   trackColor = "#e2e8f0",
 }) => {
-  const ref = useRef(null);
-  useEffect(() => {
-    const c = ref.current;
-    if (!c) return;
-    const ctx = c.getContext("2d");
-    const cx = c.width / 2,
-      cy = c.height / 2;
-    const r = Math.min(cx, cy) - 12;
-    ctx.clearRect(0, 0, c.width, c.height);
+  const clamped = Math.min(Math.max(Number(pct) || 0, 0), 100);
+  const remaining = 100 - clamped;
 
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.lineWidth = 12;
-    ctx.strokeStyle = trackColor;
-    ctx.stroke();
+  const data = useMemo(
+    () => ({
+      datasets: [
+        {
+          data: [clamped, remaining],
+          backgroundColor: [fillColor, trackColor],
+          hoverBackgroundColor: [fillColor, trackColor],
+          borderWidth: 0,
+          cutout: "75%",
+          borderRadius: clamped > 0 && clamped < 100 ? 8 : 0,
+          spacing: 2,
+        },
+      ],
+    }),
+    [clamped, remaining, fillColor, trackColor],
+  );
 
-    if (pct > 0) {
-      ctx.beginPath();
-      ctx.arc(
-        cx,
-        cy,
-        r,
-        -Math.PI / 2,
-        -Math.PI / 2 + (Math.min(pct, 100) / 100) * Math.PI * 2,
-      );
-      ctx.lineWidth = 12;
-      ctx.strokeStyle = fillColor;
-      ctx.lineCap = "round";
-      ctx.stroke();
-    }
-  }, [pct, fillColor, trackColor]);
+  const options = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 1,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      animation: {
+        animateRotate: true,
+        duration: 1400,
+        easing: "easeInOutQuart",
+      },
+      hover: { mode: null },
+      rotation: -90,
+      circumference: 360,
+    }),
+    [],
+  );
 
-  return <canvas ref={ref} width={size} height={size} />;
+  return (
+    <div
+      className="relative w-full flex items-center justify-center"
+      style={{ maxWidth: size, maxHeight: size }}
+    >
+      <Doughnut data={data} options={options} />
+    </div>
+  );
 };
 
 /* ── LiveClock ── */
@@ -301,7 +241,6 @@ const MetricTable = ({ rows, accentHex }) => (
               ? "#15803d"
               : "#0f172a";
         const mergeColumns = r.target == null;
-
         return (
           <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}>
             <td className="px-2.5 py-1.5 border border-slate-100 text-slate-700 font-semibold">
@@ -310,7 +249,6 @@ const MetricTable = ({ rows, accentHex }) => (
             <td className="px-2.5 py-1.5 border border-slate-100 text-slate-400 text-center text-[11px]">
               {r.unit}
             </td>
-
             {mergeColumns ? (
               <td
                 colSpan={2}
@@ -342,7 +280,7 @@ const MetricTable = ({ rows, accentHex }) => (
   </table>
 );
 
-/* ── GaugePanel (memoized) ── */
+/* ── GaugePanel ── */
 const GaugePanel = memo(
   ({ value, maxValue = 1000, label, sublabel, accentHex }) => {
     const clamped = Math.min(Math.max(Number(value) || 0, 0), maxValue);
@@ -352,32 +290,23 @@ const GaugePanel = memo(
     useEffect(() => {
       const el = containerRef.current;
       if (!el) return;
-
       const measure = () => {
         const { width, height } = el.getBoundingClientRect();
         if (width > 0 && height > 0) {
-          // Maximize gauge: minimal padding, fill as much as possible
           const maxW = Math.floor(width - 16);
-          const maxH = Math.floor(height - 100); // badge + label space
-          const fitByWidth = maxW;
-          const fitByHeight = maxH * 2;
-          const finalW = Math.max(200, Math.min(fitByWidth, fitByHeight));
+          const maxH = Math.floor(height - 100);
+          const finalW = Math.max(200, Math.min(maxW, maxH * 2));
           const finalH = Math.floor(finalW / 2);
-
-          if (finalW > 100 && finalH > 50) {
+          if (finalW > 100 && finalH > 50)
             setDims({ width: finalW, height: finalH });
-          }
         }
       };
-
       const ro = new ResizeObserver(measure);
       ro.observe(el);
       measure();
-
       return () => ro.disconnect();
     }, []);
 
-    // Color based on value percentage
     const pct = maxValue > 0 ? (clamped / maxValue) * 100 : 0;
     const statusColor =
       pct >= 80 ? "#16a34a" : pct >= 50 ? "#f59e0b" : "#dc2626";
@@ -389,15 +318,12 @@ const GaugePanel = memo(
         ref={containerRef}
         className="flex flex-col items-center justify-center w-full h-full relative"
       >
-        {/* Background glow */}
         <div
           className="absolute inset-0 opacity-[0.04] rounded-2xl"
           style={{
             background: `radial-gradient(circle at 50% 60%, ${accentHex}, transparent 70%)`,
           }}
         />
-
-        {/* Top label */}
         {(label || sublabel) && (
           <div className="text-center mb-2 z-10">
             {label && (
@@ -413,8 +339,6 @@ const GaugePanel = memo(
             )}
           </div>
         )}
-
-        {/* Speedometer */}
         <div className="z-10">
           <ReactSpeedometer
             value={clamped}
@@ -447,8 +371,6 @@ const GaugePanel = memo(
             forceRender={false}
           />
         </div>
-
-        {/* Big value badge */}
         <div className="z-10 flex flex-col items-center -mt-2">
           <div
             className="px-10 py-3 rounded-2xl text-white font-black text-4xl font-mono tracking-[0.15em] shadow-lg"
@@ -460,8 +382,6 @@ const GaugePanel = memo(
             {String(clamped).padStart(3, "0")}
             <span className="text-white/60 text-2xl">.00</span>
           </div>
-
-          {/* Status pill */}
           <div
             className="mt-3 flex items-center gap-2 px-4 py-1.5 rounded-full border-[1.5px]"
             style={{
@@ -494,47 +414,7 @@ const GaugePanel = memo(
     prev.sublabel === next.sublabel &&
     prev.accentHex === next.accentHex,
 );
-
 GaugePanel.displayName = "GaugePanel";
-
-/* ── SidebarPanel ── */
-const SidebarPanel = ({
-  pct = 0,
-  fillColor,
-  infoRows = [],
-  label = "Consumed Time",
-}) => (
-  <div className="w-[190px] shrink-0 flex flex-col gap-3 px-3 py-3.5 bg-slate-50 border-r border-slate-100 justify-center">
-    <div>
-      <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-2 text-center">
-        {label}
-      </p>
-      <div className="relative flex justify-center">
-        <DonutCanvas pct={pct} size={130} fillColor={fillColor} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-          <div className="text-[22px] font-extrabold text-slate-900">
-            {Number(pct || 0).toFixed(0)}%
-          </div>
-        </div>
-      </div>
-    </div>
-    <div className="bg-white border border-slate-100 rounded-lg px-3 py-2.5">
-      {infoRows.map(([k, v], i) => (
-        <div
-          key={i}
-          className={`flex justify-between py-1 text-[11px] text-slate-400 ${
-            i < infoRows.length - 1 ? "border-b border-slate-50" : ""
-          }`}
-        >
-          <span>{k}</span>
-          <strong className="text-slate-900">
-            {v != null ? (typeof v === "number" ? v.toLocaleString() : v) : "—"}
-          </strong>
-        </div>
-      ))}
-    </div>
-  </div>
-);
 
 /* ── NavDots ── */
 const NavDots = ({ currentPage, onGoTo, onPrev, onNext }) => (
@@ -556,9 +436,7 @@ const NavDots = ({ currentPage, onGoTo, onPrev, onNext }) => (
           className="flex flex-col items-center gap-0.5"
         >
           <div
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full border-[1.5px] transition-all ${
-              active ? "border-current" : "border-transparent"
-            }`}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full border-[1.5px] transition-all ${active ? "border-current" : "border-transparent"}`}
             style={{
               background: active ? `${accentHex}15` : "transparent",
               color: active ? accentHex : "#cbd5e1",
@@ -580,9 +458,11 @@ const NavDots = ({ currentPage, onGoTo, onPrev, onNext }) => (
   </div>
 );
 
-/* ════════════════════════════════════════════════════════════════════════════════
-   MAIN COMPONENT
-════════════════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   MAIN COMPONENT — No standalone UI.
+   Always redirects to management if not launched.
+   Only renders fullscreen kiosk when launched.
+══════════════════════════════════════════════ */
 const EMPTY_DATA = {
   productionDisplay1: {},
   productionDisplay2: {},
@@ -602,13 +482,12 @@ const Monitoring = () => {
   const launchedShift = routerState.shift || "A";
   const isLaunched = !!routerState.autoLoad;
 
-  // Redirect if no config state (direct URL access without launch)
+  /* Redirect immediately if not launched properly */
   useEffect(() => {
-    if (slug && !launchedConfig) {
-      toast.error("No configuration found. Redirecting to management.");
+    if (!isLaunched || !launchedConfig) {
       navigate("/display/management", { replace: true });
     }
-  }, [slug, launchedConfig, navigate]);
+  }, [isLaunched, launchedConfig, navigate]);
 
   const [shiftDate, setShiftDate] = useState(launchedDate);
   const [shift, setShift] = useState(launchedShift);
@@ -618,16 +497,13 @@ const Monitoring = () => {
   const [lastFetched, setLastFetched] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
   const [loading, setLoading] = useState(false);
-
   const intervalRef = useRef(null);
 
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (!isRunning) return;
-
     let elapsed = 0;
     setProgress(0);
-
     intervalRef.current = setInterval(() => {
       elapsed += 50;
       setProgress(Math.min((elapsed / PAGE_DURATION_MS) * 100, 100));
@@ -637,7 +513,6 @@ const Monitoring = () => {
         setCurrentPage((p) => (p + 1) % TOTAL_PAGES);
       }
     }, 50);
-
     return () => {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -653,13 +528,10 @@ const Monitoring = () => {
       toast.error("No dashboard configuration selected.");
       return;
     }
-
     setLoading(true);
     setIsRunning(false);
     setAllData(EMPTY_DATA);
-
     const params = buildParams(cfg, dateParam, shiftParam);
-
     const endpoints = {
       productionDisplay1: `${baseURL}dashboard/production-display-1`,
       productionDisplay2: `${baseURL}dashboard/production-display-2`,
@@ -667,7 +539,6 @@ const Monitoring = () => {
       quality: `${baseURL}dashboard/quality`,
       loss: `${baseURL}dashboard/loss`,
     };
-
     try {
       const results = await Promise.allSettled(
         Object.entries(endpoints).map(([key, url]) =>
@@ -676,21 +547,17 @@ const Monitoring = () => {
             .then((res) => ({ key, data: res.data?.data ?? res.data })),
         ),
       );
-
       const merged = {};
       results.forEach((r) => {
         if (r.status === "fulfilled") merged[r.value.key] = r.value.data;
       });
-
       const failed = results.filter((r) => r.status === "rejected").length;
-
       if (failed === TOTAL_PAGES) {
         toast.error("All endpoints failed. Check server connection.");
       } else {
         if (failed > 0)
           toast(`${failed} endpoint(s) had errors.`, { icon: "⚠️" });
         else toast.success("Dashboard loaded successfully.");
-
         setAllData({ ...EMPTY_DATA, ...merged });
         setLastFetched(new Date());
         setCurrentPage(0);
@@ -703,9 +570,10 @@ const Monitoring = () => {
     }
   }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (isLaunched) fetchData(launchedDate, launchedShift, launchedConfig);
+    if (isLaunched && launchedConfig)
+      fetchData(launchedDate, launchedShift, launchedConfig);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAllData = useCallback(
@@ -743,16 +611,19 @@ const Monitoring = () => {
     [fetchData],
   );
 
+  /* If not launched, render nothing (redirect handles it) */
+  if (!isLaunched || !launchedConfig) return null;
+
   const commonProps = { progress, shift, shiftDate, config: launchedConfig };
 
   const pages = [
     <ProductionDisplay1
-      key="productionDisplay1"
+      key="pd1"
       apiData={allData.productionDisplay1}
       {...commonProps}
     />,
     <ProductionDisplay2
-      key="productionDisplay2"
+      key="pd2"
       apiData={allData.productionDisplay2}
       {...commonProps}
     />,
@@ -761,159 +632,115 @@ const Monitoring = () => {
     <Loss key="loss" apiData={allData.loss} {...commonProps} />,
   ];
 
-  /* ── Launched (fullscreen kiosk) mode ── */
-  if (isLaunched) {
-    return (
-      <div className="fixed inset-0 z-[9999] flex flex-col bg-slate-50 overflow-hidden font-sans">
-        {/* Top bar */}
-        <div className="flex items-center gap-2.5 px-4 py-1.5 bg-white border-b border-slate-100 shrink-0 shadow-sm">
-          {launchedConfig && (
-            <span className="font-extrabold text-[13px] text-slate-900 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-              {launchedConfig.dashboardName}
+  return (
+    <div className="fixed inset-0 z-[9999] flex flex-col bg-slate-50 overflow-hidden font-sans">
+      {/* Top bar */}
+      <div className="flex items-center gap-2.5 px-4 py-1.5 bg-white border-b border-slate-100 shrink-0 shadow-sm">
+        <span className="font-extrabold text-[13px] text-slate-900 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+          {launchedConfig.dashboardName}
+        </span>
+        <div className="w-px h-5 bg-slate-100" />
+        {["A", "B"].map((s) => (
+          <button
+            key={s}
+            onClick={() => handleShiftSwitch(s, launchedConfig)}
+            className={`px-3 py-1 rounded-lg text-xs font-bold border-[1.5px] transition-all ${shift === s ? (s === "A" ? "bg-blue-50 text-blue-700 border-blue-300" : "bg-amber-50 text-amber-700 border-amber-300") : "bg-slate-50 text-slate-400 border-slate-100"}`}
+          >
+            Shift {s}
+          </button>
+        ))}
+        <input
+          type="date"
+          value={shiftDate}
+          onChange={(e) => setShiftDate(e.target.value)}
+          className="px-2.5 py-1 border-[1.5px] border-slate-100 rounded-lg text-xs text-slate-900 bg-slate-50 outline-none"
+        />
+        <button
+          onClick={fetchAllData}
+          disabled={loading}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-blue-700 hover:bg-blue-800 text-white shadow-sm shadow-blue-200"}`}
+        >
+          {loading ? (
+            <Spinner cls="w-3 h-3" />
+          ) : (
+            <RefreshCw className="w-3 h-3" />
+          )}
+          {loading ? "Loading…" : "Refresh"}
+        </button>
+        <div className="ml-auto flex gap-2 items-center">
+          {lastFetched && (
+            <span className="text-[11px] text-slate-400">
+              Updated {lastFetched.toLocaleTimeString()}
             </span>
           )}
-          <div className="w-px h-5 bg-slate-100" />
-
-          {["A", "B"].map((s) => (
+          {isRunning ? (
             <button
-              key={s}
-              onClick={() => handleShiftSwitch(s, launchedConfig)}
-              className={`px-3 py-1 rounded-lg text-xs font-bold border-[1.5px] transition-all ${
-                shift === s
-                  ? s === "A"
-                    ? "bg-blue-50 text-blue-700 border-blue-300"
-                    : "bg-amber-50 text-amber-700 border-amber-300"
-                  : "bg-slate-50 text-slate-400 border-slate-100"
-              }`}
+              onClick={() => setIsRunning(false)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border-[1.5px] border-amber-300 transition-all hover:bg-amber-100"
             >
-              Shift {s}
+              <Pause className="w-3 h-3" /> Pause
             </button>
-          ))}
-
-          <input
-            type="date"
-            value={shiftDate}
-            onChange={(e) => setShiftDate(e.target.value)}
-            className="px-2.5 py-1 border-[1.5px] border-slate-100 rounded-lg text-xs text-slate-900 bg-slate-50 outline-none"
-          />
-
-          <button
-            onClick={fetchAllData}
-            disabled={loading}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              loading
-                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                : "bg-blue-700 hover:bg-blue-800 text-white shadow-sm shadow-blue-200"
-            }`}
-          >
-            {loading ? (
-              <Spinner cls="w-3 h-3" />
-            ) : (
-              <RefreshCw className="w-3 h-3" />
-            )}
-            {loading ? "Loading…" : "Refresh"}
-          </button>
-
-          <div className="ml-auto flex gap-2 items-center">
-            {lastFetched && (
-              <span className="text-[11px] text-slate-400">
-                Updated {lastFetched.toLocaleTimeString()}
-              </span>
-            )}
-            {isRunning ? (
+          ) : (
+            lastFetched && (
               <button
-                onClick={() => setIsRunning(false)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border-[1.5px] border-amber-300 transition-all hover:bg-amber-100"
+                onClick={() => setIsRunning(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border-[1.5px] border-emerald-300 transition-all hover:bg-emerald-100"
               >
-                <Pause className="w-3 h-3" /> Pause
+                <Play className="w-3 h-3" /> Resume
               </button>
-            ) : (
-              lastFetched && (
-                <button
-                  onClick={() => setIsRunning(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border-[1.5px] border-emerald-300 transition-all hover:bg-emerald-100"
-                >
-                  <Play className="w-3 h-3" /> Resume
-                </button>
-              )
-            )}
-            <button
-              onClick={() => navigate("/display/management")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-500 border-[1.5px] border-red-300 transition-all hover:bg-red-100"
-            >
-              <X className="w-3 h-3" /> Exit
-            </button>
-          </div>
+            )
+          )}
+          <button
+            onClick={() => navigate("/display/management")}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-500 border-[1.5px] border-red-300 transition-all hover:bg-red-100"
+          >
+            <X className="w-3 h-3" /> Exit
+          </button>
         </div>
-
-        {/* Loading state */}
-        {loading && (
-          <div className="flex-1 flex flex-col items-center justify-center bg-white gap-3.5">
-            <Spinner cls="w-8 h-8 text-indigo-500" />
-            <p className="text-sm text-slate-400">Fetching shift data…</p>
-          </div>
-        )}
-
-        {/* Dashboard pages */}
-        {!loading && lastFetched && (
-          <div className="flex-1 min-h-0 flex flex-col">
-            <div className="flex-1 min-h-0 overflow-hidden">
-              {pages.map((page, i) => (
-                <div
-                  key={i}
-                  className="h-full"
-                  style={{
-                    display: i === currentPage ? "flex" : "none",
-                    flexDirection: "column",
-                  }}
-                >
-                  {page}
-                </div>
-              ))}
-            </div>
-            <NavDots
-              currentPage={currentPage}
-              onGoTo={goTo}
-              onPrev={goPrev}
-              onNext={goNext}
-            />
-          </div>
-        )}
-
-        {/* No data yet */}
-        {!loading && !lastFetched && (
-          <div className="flex-1 flex flex-col items-center justify-center bg-white gap-4">
-            <div className="w-[72px] h-[72px] rounded-2xl bg-slate-100 flex items-center justify-center">
-              <Settings className="w-8 h-8 text-slate-300" />
-            </div>
-            <p className="text-base font-bold text-slate-500">
-              Loading dashboard data…
-            </p>
-          </div>
-        )}
       </div>
-    );
-  }
 
-  /* ── Fallback: redirect to management if accessed without launch state ── */
-  return (
-    <div className="h-full flex flex-col items-center justify-center bg-slate-100">
-      <div className="text-center">
-        <Settings className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-        <p className="text-lg font-bold text-slate-500 mb-2">
-          No Dashboard Loaded
-        </p>
-        <p className="text-sm text-slate-400 mb-4">
-          Launch a dashboard from the Management page
-        </p>
-        <button
-          onClick={() => navigate("/display/management")}
-          className="px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors"
-        >
-          Go to Management
-        </button>
-      </div>
+      {/* Loading */}
+      {loading && (
+        <div className="flex-1 flex flex-col items-center justify-center bg-white gap-3.5">
+          <Spinner cls="w-8 h-8 text-indigo-500" />
+          <p className="text-sm text-slate-400">Fetching shift data...!!!</p>
+        </div>
+      )}
+
+      {/* Dashboard pages */}
+      {!loading && lastFetched && (
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {pages.map((page, i) => (
+              <div
+                key={i}
+                className="h-full"
+                style={{
+                  display: i === currentPage ? "flex" : "none",
+                  flexDirection: "column",
+                }}
+              >
+                {page}
+              </div>
+            ))}
+          </div>
+          <NavDots
+            currentPage={currentPage}
+            onGoTo={goTo}
+            onPrev={goPrev}
+            onNext={goNext}
+          />
+        </div>
+      )}
+
+      {/* Waiting for first fetch */}
+      {!loading && !lastFetched && (
+        <div className="flex-1 flex flex-col items-center justify-center bg-white gap-3.5">
+          <Spinner cls="w-8 h-8 text-indigo-500" />
+          <p className="text-sm text-slate-400">Initializing dashboard…</p>
+        </div>
+      )}
     </div>
   );
 };
@@ -922,13 +749,9 @@ export {
   PageHeader,
   TimerBar,
   GaugePanel,
-  SpeedometerGauge,
   MetricTable,
   StatCard,
-  SidebarPanel,
   DonutCanvas,
-  NavDots,
   Spinner,
 };
-
 export default Monitoring;

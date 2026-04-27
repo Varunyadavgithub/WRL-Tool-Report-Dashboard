@@ -17,6 +17,10 @@ const ProductionDisplay1 = ({
 }) => {
   const d = apiData;
   const label = config?.stationName1 || "FG PACKING";
+  const balance =
+    d.ShiftOutputTarget != null && d.ActualQty != null
+      ? d.ShiftOutputTarget - d.ActualQty
+      : null;
 
   const rows = [
     {
@@ -58,20 +62,11 @@ const ProductionDisplay1 = ({
       highlight: "yellow",
     },
     { label: "Performance", unit: "%", target: null, actual: d.PerformancePct },
-    {
-      label: "Balance Qty",
-      unit: "No's",
-      target: null,
-      actual:
-        d.ShiftOutputTarget != null && d.ActualQty != null
-          ? d.ShiftOutputTarget - d.ActualQty
-          : null,
-    },
+    { label: "Balance Qty", unit: "No's", target: null, actual: balance },
   ];
 
   return (
     <div className="flex flex-col w-full h-full bg-slate-50">
-      {/* ── HEADER ── */}
       <div className="sticky top-0 z-20 bg-slate-50 shrink-0">
         <PageHeader
           title="Final Area Production Performance"
@@ -80,8 +75,6 @@ const ProductionDisplay1 = ({
           accentHex={ACCENT}
         />
         <TimerBar progress={progress} accentHex={ACCENT} />
-
-        {/* Hero KPI Strip */}
         <div className="grid grid-cols-6 gap-2.5 px-4 py-2.5 bg-slate-50">
           <StatCard
             label="Shift Target"
@@ -110,21 +103,11 @@ const ProductionDisplay1 = ({
             value={d.LossUnits}
             accentHex="#ef4444"
           />
-          <StatCard
-            label="Balance Qty"
-            value={
-              d.ShiftOutputTarget != null && d.ActualQty != null
-                ? d.ShiftOutputTarget - d.ActualQty
-                : null
-            }
-            accentHex="#b45309"
-          />
+          <StatCard label="Balance Qty" value={balance} accentHex="#b45309" />
         </div>
       </div>
 
-      {/* ── Main body — 55% Gauge + 45% Table ── */}
       <div className="flex flex-1 min-h-0 px-4 py-2 gap-4">
-        {/* LEFT — Gauge (wider) */}
         <div
           className="w-[55%] shrink-0 rounded-2xl border-2 shadow-md overflow-hidden"
           style={{
@@ -140,8 +123,6 @@ const ProductionDisplay1 = ({
             accentHex={ACCENT}
           />
         </div>
-
-        {/* RIGHT — Table */}
         <div className="w-[45%] flex flex-col min-w-0">
           <div
             className="text-white font-bold text-sm text-center py-2.5 rounded-t-xl tracking-wider uppercase flex items-center justify-center gap-2"
@@ -149,8 +130,8 @@ const ProductionDisplay1 = ({
               background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT}cc)`,
             }}
           >
-            <span className="w-2 h-2 rounded-full bg-white/50" />
-            {label} — Shift Metrics
+            <span className="w-2 h-2 rounded-full bg-white/50" /> {label} —
+            Shift Metrics
           </div>
           <div className="flex-1 overflow-auto bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm">
             <MetricTable rows={rows} accentHex={ACCENT} />
@@ -158,7 +139,6 @@ const ProductionDisplay1 = ({
         </div>
       </div>
 
-      {/* ── Monthly footer ── */}
       <div className="grid grid-cols-5 gap-2.5 px-4 py-2.5 bg-white border-t border-slate-200 shrink-0">
         <StatCard
           label="Monthly Plan"

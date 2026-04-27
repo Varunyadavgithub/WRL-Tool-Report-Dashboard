@@ -14,7 +14,6 @@ import {
   X,
   Save,
   Calendar,
-  Activity,
   Settings,
   Layers,
   Zap,
@@ -27,15 +26,12 @@ import {
 } from "lucide-react";
 import { baseURL } from "../../assets/assets";
 
-/* -- API base -- */
 const API = `${baseURL}dashboard/configs`;
 
-/* -- Spinner -- */
 const Spinner = ({ cls = "w-4 h-4" }) => (
   <Loader2 className={`animate-spin ${cls}`} />
 );
 
-/* -- Empty form -- */
 const EMPTY_FORM = {
   id: null,
   dashboardName: "",
@@ -56,12 +52,11 @@ const EMPTY_FORM = {
   sectionName: "",
 };
 
-/* -- Column definitions -- */
 const COLUMNS = [
   { key: "dashboardName", label: "Dashboard", group: "General" },
   { key: "lineName", label: "Line Name", group: "General" },
   { key: "lineCode", label: "Line Code", group: "General" },
-  { key: "workingTimeMin", label: "Working Min", group: "General" }, // ? NEW
+  { key: "workingTimeMin", label: "Working Min", group: "General" },
   { key: "stationCode1", label: "Station", group: "Display 1" },
   { key: "stationName1", label: "Name", group: "Display 1" },
   { key: "lineTaktTime1", label: "Takt (s)", group: "Display 1" },
@@ -119,7 +114,6 @@ const GROUP_CONFIG = {
   },
 };
 
-/* -- Form sections — General section updated with workingTimeMin -- */
 const FORM_SECTIONS = [
   {
     group: "General",
@@ -136,7 +130,7 @@ const FORM_SECTIONS = [
         key: "workingTimeMin",
         label: "Working Time (min)",
         placeholder: "e.g. 720",
-      }, // ? NEW (720 = 12-hr shift)
+      },
     ],
   },
   {
@@ -211,8 +205,6 @@ const FORM_SECTIONS = [
   },
 ];
 
-/* -- Pre-compute group header spans -- */
-// BUG FIX: Moved outside component to avoid recomputing on every render.
 const GROUP_SPANS = (() => {
   const spans = [];
   let i = 0;
@@ -227,23 +219,21 @@ const GROUP_SPANS = (() => {
   return spans;
 })();
 
-/* -- NUM_KEYS — include workingTimeMin since it's numeric -- */
 const NUM_KEYS = new Set([
   "lineTaktTime1",
   "lineMonthlyProduction1",
   "lineTarget1",
   "lineTaktTime2",
   "lineMonthlyProduction2",
-  "workingTimeMin", // ? NEW
+  "workingTimeMin",
 ]);
 
-/* -- DB row ? form state mapper -- */
 const dbToForm = (row) => ({
   id: row.Id,
   dashboardName: row.DashboardName ?? "",
   lineName: row.LineName ?? "",
   lineCode: row.LineCode ?? "",
-  workingTimeMin: String(row.WorkingTimeMin ?? ""), // ? NEW
+  workingTimeMin: String(row.WorkingTimeMin ?? ""),
   stationCode1: row.StationCode1 ?? "",
   stationName1: row.StationName1 ?? "",
   lineTaktTime1: String(row.LineTaktTime1 ?? ""),
@@ -264,14 +254,10 @@ const todayISO = () => {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 };
 
-/* --------------------------------------------
-   Config Form Modal
--------------------------------------------- */
+/* ── Config Form Modal ── */
 const ConfigModal = ({ config, saving, onClose, onSave }) => {
-  const [form, setForm] = useState(() => ({ ...config })); // BUG FIX: lazy init
+  const [form, setForm] = useState(() => ({ ...config }));
   const [activeSection, setActiveSection] = useState(0);
-
-  // BUG FIX: Stable setter — avoids re-creating a new function per keystroke.
   const set = useCallback((k, v) => setForm((f) => ({ ...f, [k]: v })), []);
 
   const isEdit = !!config.id;
@@ -282,7 +268,6 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
   return (
     <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl w-full max-w-[780px] max-h-[92vh] overflow-hidden flex flex-col shadow-2xl">
-        {/* Header */}
         <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3.5">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center">
@@ -306,7 +291,6 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
           </button>
         </div>
 
-        {/* Section Tabs */}
         <div className="flex px-7 py-3 gap-2 bg-slate-50 border-b border-slate-100 shrink-0 overflow-x-auto">
           {FORM_SECTIONS.map((s, i) => {
             const cfg = GROUP_CONFIG[s.group];
@@ -329,9 +313,7 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
           })}
         </div>
 
-        {/* Body */}
         <div className="overflow-y-auto px-7 py-6 flex-1">
-          {/* Section banner */}
           <div
             className={`flex items-center gap-2.5 mb-5 px-4 py-3.5 rounded-lg ${gcfg.light} border`}
             style={{ borderColor: `${gcfg.hex}33` }}
@@ -345,7 +327,6 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
             </span>
           </div>
 
-          {/* Fields grid */}
           <div className="grid grid-cols-2 gap-4">
             {sec.fields.map((f) => (
               <div key={f.key} className={f.full ? "col-span-2" : ""}>
@@ -357,32 +338,23 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
                   onChange={(e) => set(f.key, e.target.value)}
                   placeholder={f.placeholder}
                   disabled={saving}
-                  className={`w-full px-3.5 py-2.5 rounded-lg bg-slate-50 border-[1.5px] border-slate-200 text-slate-900 text-[13px] font-mono outline-none transition-all focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 ${
-                    saving ? "opacity-60" : ""
-                  }`}
+                  className={`w-full px-3.5 py-2.5 rounded-lg bg-slate-50 border-[1.5px] border-slate-200 text-slate-900 text-[13px] font-mono outline-none transition-all focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 ${saving ? "opacity-60" : ""}`}
                 />
               </div>
             ))}
           </div>
         </div>
 
-        {/* Footer */}
         <div className="flex justify-between items-center px-7 py-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
-          {/* Step dots */}
           <div className="flex gap-1.5">
             {FORM_SECTIONS.map((_, i) => (
               <div
                 key={i}
                 onClick={() => setActiveSection(i)}
-                className={`h-2 rounded-full cursor-pointer transition-all ${
-                  i === activeSection
-                    ? "w-6 bg-indigo-500"
-                    : "w-2 bg-slate-200 hover:bg-slate-300"
-                }`}
+                className={`h-2 rounded-full cursor-pointer transition-all ${i === activeSection ? "w-6 bg-indigo-500" : "w-2 bg-slate-200 hover:bg-slate-300"}`}
               />
             ))}
           </div>
-
           <div className="flex gap-2.5">
             {activeSection > 0 && (
               <button
@@ -405,11 +377,7 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
               <button
                 onClick={() => onSave(form)}
                 disabled={saving}
-                className={`flex items-center gap-2 px-7 py-2.5 rounded-lg font-bold text-[13px] transition-all ${
-                  saving
-                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                    : "bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-sm shadow-indigo-200 hover:shadow-md"
-                }`}
+                className={`flex items-center gap-2 px-7 py-2.5 rounded-lg font-bold text-[13px] transition-all ${saving ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-sm shadow-indigo-200 hover:shadow-md"}`}
               >
                 {saving ? (
                   <>
@@ -430,9 +398,7 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
   );
 };
 
-/* --------------------------------------------
-   Launch Modal
--------------------------------------------- */
+/* ── Launch Modal ── */
 const LaunchModal = ({ config, onClose, onLaunch }) => {
   const [shiftDate, setShiftDate] = useState(todayISO);
   const [shift, setShift] = useState("A");
@@ -440,7 +406,6 @@ const LaunchModal = ({ config, onClose, onLaunch }) => {
   return (
     <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl w-[480px] overflow-hidden shadow-2xl">
-        {/* Header */}
         <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 px-6 py-5 flex items-center gap-3">
           <div className="w-[42px] h-[42px] rounded-lg bg-white/20 flex items-center justify-center">
             <Play className="w-5 h-5 text-white" />
@@ -456,7 +421,6 @@ const LaunchModal = ({ config, onClose, onLaunch }) => {
         </div>
 
         <div className="px-6 py-6">
-          {/* Date */}
           <div className="mb-4">
             <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">
               <Calendar className="w-3 h-3" /> Shift Date
@@ -469,7 +433,6 @@ const LaunchModal = ({ config, onClose, onLaunch }) => {
             />
           </div>
 
-          {/* Shift */}
           <div className="mb-5">
             <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">
               Shift
@@ -490,11 +453,7 @@ const LaunchModal = ({ config, onClose, onLaunch }) => {
                 <button
                   key={s}
                   onClick={() => setShift(s)}
-                  className={`py-3.5 rounded-lg border-2 font-bold transition-all ${
-                    shift === s
-                      ? active
-                      : "border-slate-200 bg-slate-50 text-slate-400"
-                  }`}
+                  className={`py-3.5 rounded-lg border-2 font-bold transition-all ${shift === s ? active : "border-slate-200 bg-slate-50 text-slate-400"}`}
                 >
                   <div className="text-lg">Shift {s}</div>
                   <div className="text-[11px] font-normal mt-1 opacity-75">
@@ -505,7 +464,6 @@ const LaunchModal = ({ config, onClose, onLaunch }) => {
             </div>
           </div>
 
-          {/* Config summary */}
           <div className="bg-slate-50 rounded-lg px-3.5 py-3 mb-5 border border-slate-200">
             {[
               ["Line", `${config.lineName || "—"} · ${config.lineCode || "—"}`],
@@ -529,7 +487,6 @@ const LaunchModal = ({ config, onClose, onLaunch }) => {
             ))}
           </div>
 
-          {/* Actions */}
           <div className="grid grid-cols-3 gap-2.5">
             <button
               onClick={onClose}
@@ -550,9 +507,7 @@ const LaunchModal = ({ config, onClose, onLaunch }) => {
   );
 };
 
-/* --------------------------------------------
-   Delete Modal
--------------------------------------------- */
+/* ── Delete Modal ── */
 const DeleteModal = ({ name, saving, onClose, onConfirm }) => (
   <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6">
     <div className="bg-white rounded-2xl w-[400px] p-8 shadow-2xl text-center">
@@ -570,20 +525,14 @@ const DeleteModal = ({ name, saving, onClose, onConfirm }) => (
         <button
           onClick={onClose}
           disabled={saving}
-          className={`py-3 rounded-lg bg-slate-100 border border-slate-200 text-slate-500 font-semibold transition-colors ${
-            saving ? "opacity-50" : "hover:bg-slate-200"
-          }`}
+          className={`py-3 rounded-lg bg-slate-100 border border-slate-200 text-slate-500 font-semibold transition-colors ${saving ? "opacity-50" : "hover:bg-slate-200"}`}
         >
           Keep It
         </button>
         <button
           onClick={onConfirm}
           disabled={saving}
-          className={`py-3 rounded-lg font-bold text-white flex items-center justify-center gap-1.5 transition-all ${
-            saving
-              ? "bg-red-300 cursor-not-allowed"
-              : "bg-red-500 hover:bg-red-600"
-          }`}
+          className={`py-3 rounded-lg font-bold text-white flex items-center justify-center gap-1.5 transition-all ${saving ? "bg-red-300 cursor-not-allowed" : "bg-red-500 hover:bg-red-600"}`}
         >
           {saving ? (
             <>
@@ -600,12 +549,9 @@ const DeleteModal = ({ name, saving, onClose, onConfirm }) => (
   </div>
 );
 
-/* --------------------------------------------------------------------------------
-   MAIN COMPONENT
--------------------------------------------------------------------------------- */
+/* ── MAIN COMPONENT ── */
 const Management = () => {
   const navigate = useNavigate();
-
   const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -613,13 +559,11 @@ const Management = () => {
   const [modal, setModal] = useState(null);
   const [search, setSearch] = useState("");
 
-  /* -- Fetch configs -- */
   const fetchConfigs = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await axios.get(API);
-      // BUG FIX: Defensive fallback — API might return {data: [...]} or plain []
       const raw = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
       setConfigs(raw.map(dbToForm));
     } catch (err) {
@@ -633,7 +577,6 @@ const Management = () => {
     fetchConfigs();
   }, [fetchConfigs]);
 
-  /* -- Save (POST / PUT) -- */
   const handleSave = useCallback(async (form) => {
     if (!form.dashboardName?.trim()) {
       toast.error("Dashboard name is required.");
@@ -643,7 +586,6 @@ const Management = () => {
       toast.error("Station Code 1 is required.");
       return;
     }
-
     setSaving(true);
     try {
       if (form.id) {
@@ -654,8 +596,6 @@ const Management = () => {
       } else {
         const res = await axios.post(API, form);
         const created = dbToForm(res.data.data);
-        // BUG FIX: Prepend rather than append so new entry is visible at top
-        // without needing to scroll, matching the ORDER BY CreatedAt DESC on the backend.
         setConfigs((c) => [created, ...c]);
         toast.success("New configuration saved.");
       }
@@ -669,7 +609,6 @@ const Management = () => {
     }
   }, []);
 
-  /* -- Delete -- */
   const handleDelete = useCallback(async (id) => {
     setSaving(true);
     try {
@@ -684,7 +623,6 @@ const Management = () => {
     }
   }, []);
 
-  /* -- Launch -- */
   const handleLaunch = useCallback(
     (cfg, shiftDate, shift) => {
       setModal(null);
@@ -698,9 +636,7 @@ const Management = () => {
     },
     [navigate],
   );
-  /* -- Derived: filtered list -- */
-  // BUG FIX: Use useMemo-equivalent pattern (inline memo via useMemo import is
-  // preferred, but keeping consistent with original style using computed value).
+
   const filtered = configs.filter((c) =>
     [
       c.dashboardName,
@@ -711,7 +647,6 @@ const Management = () => {
     ].some((v) => (v || "").toLowerCase().includes(search.toLowerCase())),
   );
 
-  /* -- Stats -- */
   const stats = [
     {
       label: "Total Configs",
@@ -739,17 +674,12 @@ const Management = () => {
     },
   ];
 
-  /* -- Close modal guard -- */
   const closeModal = useCallback(() => {
     if (!saving) setModal(null);
   }, [saving]);
 
-  /* --------------------------------------------
-     RENDER
-  -------------------------------------------- */
   return (
     <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
-      {/* -- Sub-header -- */}
       <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
         <div>
           <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
@@ -759,9 +689,7 @@ const Management = () => {
             Manage production line configurations · Launch shift dashboards
           </p>
         </div>
-
         <div className="flex items-center gap-2">
-          {/* Search */}
           <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
             <Search className="w-3.5 h-3.5 text-slate-400" />
             <input
@@ -779,43 +707,29 @@ const Management = () => {
               </button>
             )}
           </div>
-
-          {/* Refresh */}
           <button
             onClick={fetchConfigs}
             disabled={loading}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 font-semibold text-[13px] transition-all ${
-              loading
-                ? "opacity-60 cursor-not-allowed"
-                : "bg-white hover:bg-slate-50"
-            }`}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 font-semibold text-[13px] transition-all ${loading ? "opacity-60 cursor-not-allowed" : "bg-white hover:bg-slate-50"}`}
           >
             {loading ? (
               <Spinner cls="w-3.5 h-3.5" />
             ) : (
               <RefreshCw className="w-3.5 h-3.5" />
-            )}
+            )}{" "}
             Refresh
           </button>
-
-          {/* New Config */}
           <button
             onClick={() => setModal({ type: "add", config: { ...EMPTY_FORM } })}
             disabled={loading}
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-              loading
-                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
-            }`}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"}`}
           >
             <Plus className="w-4 h-4" /> New Config
           </button>
         </div>
       </div>
 
-      {/* -- Body -- */}
       <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3">
-        {/* Error banner */}
         {error && (
           <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-600 text-[13px] shrink-0">
             <span className="flex items-center gap-2">
@@ -830,7 +744,6 @@ const Management = () => {
           </div>
         )}
 
-        {/* Stats row */}
         <div className="grid grid-cols-4 gap-3 shrink-0">
           {stats.map((s) => (
             <div
@@ -852,12 +765,10 @@ const Management = () => {
           ))}
         </div>
 
-        {/* -- Table card -- */}
         <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-0">
           <div className="flex-1 overflow-auto">
             <table className="min-w-[1400px] w-full text-xs text-left border-separate border-spacing-0">
               <thead className="sticky top-0 z-10">
-                {/* Group header row */}
                 <tr className="bg-slate-50">
                   <th className="px-4 py-2.5 font-bold text-slate-400 text-[11px] border-b border-slate-200 whitespace-nowrap">
                     Actions
@@ -879,7 +790,6 @@ const Management = () => {
                     );
                   })}
                 </tr>
-                {/* Column header row */}
                 <tr className="bg-slate-50">
                   <th className="px-4 py-2 border-b border-slate-200" />
                   {COLUMNS.map((col) => (
@@ -892,9 +802,7 @@ const Management = () => {
                   ))}
                 </tr>
               </thead>
-
               <tbody>
-                {/* Loading */}
                 {loading && (
                   <tr>
                     <td
@@ -908,8 +816,6 @@ const Management = () => {
                     </td>
                   </tr>
                 )}
-
-                {/* Empty */}
                 {!loading && filtered.length === 0 && (
                   <tr>
                     <td
@@ -935,15 +841,12 @@ const Management = () => {
                     </td>
                   </tr>
                 )}
-
-                {/* Data rows */}
                 {!loading &&
                   filtered.map((cfg) => (
                     <tr
                       key={cfg.id}
                       className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
                     >
-                      {/* Actions */}
                       <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
                         <div className="flex gap-1 items-center">
                           <button
@@ -975,20 +878,14 @@ const Management = () => {
                           </button>
                         </div>
                       </td>
-
-                      {/* Data cells */}
                       {COLUMNS.map((col) => {
                         const v = cfg[col.key];
                         const isDash = col.key === "dashboardName";
-                        const isNum = NUM_KEYS.has(col.key); // BUG FIX: O(1) Set lookup vs O(n) Array.includes
+                        const isNum = NUM_KEYS.has(col.key);
                         return (
                           <td
                             key={col.key}
-                            className={`px-2.5 py-2 border-b border-slate-100 border-l whitespace-nowrap ${
-                              isDash
-                                ? "font-bold text-slate-800 text-xs"
-                                : "text-slate-600 text-[11px]"
-                            } ${isNum ? "text-center" : "text-left"}`}
+                            className={`px-2.5 py-2 border-b border-slate-100 border-l whitespace-nowrap ${isDash ? "font-bold text-slate-800 text-xs" : "text-slate-600 text-[11px]"} ${isNum ? "text-center" : "text-left"}`}
                           >
                             {v ? (
                               isDash ? (
@@ -1013,7 +910,6 @@ const Management = () => {
         </div>
       </div>
 
-      {/* -- Modals -- */}
       {(modal?.type === "add" || modal?.type === "edit") && (
         <ConfigModal
           config={modal.config}

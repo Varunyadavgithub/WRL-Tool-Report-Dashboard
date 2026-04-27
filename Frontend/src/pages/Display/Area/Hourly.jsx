@@ -101,7 +101,7 @@ const Hourly = ({ apiData = {}, progress, shift, shiftDate }) => {
           color: (ctx) => {
             if (ctx.dataset.label === "Target") return "#1e40af";
             if (ctx.dataset.label === "Actual") return "#d97706";
-            return "#ef4444"; // Loss
+            return "#ef4444";
           },
           font: { size: 10, weight: "bold" },
           formatter: (value) => (value != null && value !== 0 ? value : ""),
@@ -155,7 +155,6 @@ const Hourly = ({ apiData = {}, progress, shift, shiftDate }) => {
 
   return (
     <div className="flex flex-col w-full h-full bg-slate-50">
-      {/* ── STICKY HEADER ── */}
       <div className="sticky top-0 z-20 bg-slate-50 shrink-0">
         <PageHeader
           title="Hourly Production Performance"
@@ -164,8 +163,6 @@ const Hourly = ({ apiData = {}, progress, shift, shiftDate }) => {
           accentHex={ACCENT}
         />
         <TimerBar progress={progress} accentHex={ACCENT} />
-
-        {/* Hero KPI Strip */}
         <div className="grid grid-cols-4 gap-3 px-5 py-3 bg-slate-50">
           <StatCard
             label="Shift Plan"
@@ -195,10 +192,8 @@ const Hourly = ({ apiData = {}, progress, shift, shiftDate }) => {
         </div>
       </div>
 
-      {/* ── Main body — original layout (table + chart stacked) ── */}
       <div className="flex flex-1 min-h-0 px-4 py-3 gap-4">
         <div className="flex-1 flex flex-col min-w-0 gap-3">
-          {/* Compact table */}
           <div className="overflow-x-auto shrink-0">
             <table className="min-w-full border-separate border-spacing-0 text-[11px]">
               <thead>
@@ -249,7 +244,6 @@ const Hourly = ({ apiData = {}, progress, shift, shiftDate }) => {
             </table>
           </div>
 
-          {/* Large chart */}
           <div className="flex-1 bg-white border border-slate-100 rounded-xl px-4 pt-3 pb-2 min-h-[200px] flex flex-col shadow-sm">
             <div className="flex gap-5 justify-center mb-2 text-xs">
               {[

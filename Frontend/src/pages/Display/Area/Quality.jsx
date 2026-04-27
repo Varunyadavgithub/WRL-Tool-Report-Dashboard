@@ -27,16 +27,13 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
 
   const externalTooltipHandler = useCallback((context) => {
     const { tooltip: tt } = context;
-
     if (tt.opacity === 0) {
       setTooltip((prev) => (prev.show ? { ...prev, show: false } : prev));
       return;
     }
-
     const { caretX, caretY } = tt;
     const dataPoint = tt.dataPoints?.[0];
     if (!dataPoint) return;
-
     setTooltip({
       show: true,
       x: caretX,
@@ -74,11 +71,13 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
       cutout: "68%",
       rotation: -90,
       plugins: {
-        legend: { display: false },
-        tooltip: {
-          enabled: false,
-          external: externalTooltipHandler,
+        legend: {
+          display: true,
+          labels: {
+            color: "#000",
+          },
         },
+        tooltip: { enabled: false, external: externalTooltipHandler },
       },
       animation: {
         animateRotate: true,
@@ -92,15 +91,13 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
 
   const okPct = qs.OkPct ?? 0;
   const defPct = qs.DefectPct ?? 0;
-
-  const pct = okPct;
-  const statusColor = pct >= 90 ? "#16a34a" : pct >= 70 ? "#f59e0b" : "#dc2626";
+  const statusColor =
+    okPct >= 90 ? "#16a34a" : okPct >= 70 ? "#f59e0b" : "#dc2626";
   const statusLabel =
-    pct >= 90 ? "On Track" : pct >= 70 ? "Warning" : "Critical";
+    okPct >= 90 ? "On Track" : okPct >= 70 ? "Warning" : "Critical";
 
   return (
     <div className="flex flex-col w-full h-full bg-slate-50">
-      {/* ── STICKY HEADER ── */}
       <div className="sticky top-0 z-20 bg-slate-50 shrink-0">
         <PageHeader
           title="Quality Performance"
@@ -109,8 +106,6 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
           accentHex={ACCENT}
         />
         <TimerBar progress={progress} accentHex={ACCENT} />
-
-        {/* Hero KPI Strip */}
         <div className="grid grid-cols-7 gap-2.5 px-4 py-2.5 bg-slate-50">
           <StatCard label="Plan" value={qs.Plan} accentHex="#7c3aed" />
           <StatCard
@@ -139,9 +134,7 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
         </div>
       </div>
 
-      {/* ── Main body — 55% Doughnut + 45% Table ── */}
       <div className="flex flex-1 min-h-0 px-4 py-2 gap-4">
-        {/* LEFT — Doughnut */}
         <div
           className="w-[55%] shrink-0 rounded-2xl border-2 shadow-md overflow-hidden flex flex-col items-center justify-center relative"
           style={{
@@ -149,15 +142,12 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
             background: `linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)`,
           }}
         >
-          {/* Background glow */}
           <div
             className="absolute inset-0 opacity-[0.04] rounded-2xl"
             style={{
               background: `radial-gradient(circle at 50% 60%, ${ACCENT}, transparent 70%)`,
             }}
           />
-
-          {/* Top label */}
           <div className="text-center mb-3 z-10">
             <p
               className="text-lg font-extrabold uppercase tracking-[0.2em] font-mono"
@@ -170,7 +160,6 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
             </p>
           </div>
 
-          {/* Responsive donut */}
           <div className="relative w-full max-w-[260px] aspect-square z-10">
             <Chart
               ref={chartRef}
@@ -179,8 +168,6 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
               data={pieData}
               options={pieOptions}
             />
-
-            {/* Center overlay — behind tooltip */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
               <span className="text-4xl md:text-5xl font-black text-black leading-none drop-shadow-sm">
                 {qs.TotalAchieved ?? 0}
@@ -189,8 +176,6 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
                 Total Units
               </span>
             </div>
-
-            {/* Custom HTML tooltip — on top of everything */}
             {tooltip.show && (
               <div
                 className="absolute z-50 pointer-events-none"
@@ -200,7 +185,7 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
                   transform: "translate(-50%, -120%)",
                 }}
               >
-                <div className="bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl border border-white/10 whitespace-nowrap">
+                <div className="bg-white text-black px-4 py-2.5 rounded-xl shadow-xl border border-slate-200 whitespace-nowrap">
                   <div className="flex items-center gap-2">
                     <span
                       className="w-3 h-3 rounded-full shrink-0"
@@ -212,15 +197,13 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
                     {Number(tooltip.value).toLocaleString()}
                   </div>
                 </div>
-                {/* Arrow */}
                 <div className="flex justify-center">
-                  <div className="w-3 h-3 bg-slate-900 rotate-45 -mt-1.5" />
+                  <div className="w-3 h-3 bg-white rotate-45 -mt-1.5 border border-slate-200" />
                 </div>
               </div>
             )}
           </div>
 
-          {/* Big value badge */}
           <div className="z-10 flex flex-col items-center mt-3">
             <div
               className="px-10 py-3 rounded-2xl text-white font-black text-4xl font-mono tracking-[0.15em] shadow-lg"
@@ -232,8 +215,6 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
               {String(qs.OkUnit ?? 0).padStart(3, "0")}
               <span className="text-white/60 text-lg ml-1">OK</span>
             </div>
-
-            {/* Status pill */}
             <div
               className="mt-3 flex items-center gap-2 px-4 py-1.5 rounded-full border-[1.5px]"
               style={{
@@ -257,7 +238,6 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
             </div>
           </div>
 
-          {/* Legend pills */}
           <div className="flex flex-wrap justify-center gap-3 mt-4 z-10">
             <div className="flex items-center gap-2 px-4 py-2 bg-green-50 rounded-xl border border-green-200">
               <span className="w-3.5 h-3.5 bg-green-700 rounded-md shrink-0" />
@@ -290,7 +270,6 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
           </div>
         </div>
 
-        {/* RIGHT — Defects table */}
         <div className="w-[45%] flex flex-col min-w-0">
           <div
             className="text-white font-bold text-sm text-center py-2.5 rounded-t-xl tracking-wider uppercase flex items-center justify-center gap-2"
@@ -298,8 +277,8 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
               background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT}cc)`,
             }}
           >
-            <span className="w-2 h-2 rounded-full bg-white/50" />
-            Top Defects Today
+            <span className="w-2 h-2 rounded-full bg-white/50" /> Top Defects
+            Today
           </div>
           <div className="flex-1 overflow-auto bg-white rounded-b-xl border border-t-0 border-slate-200 shadow-sm">
             <table className="w-full border-separate border-spacing-0 text-sm">
@@ -308,9 +287,7 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
                   {["Sr.", "Defect Description", "Count"].map((h, i) => (
                     <th
                       key={h}
-                      className={`px-3 py-2.5 text-white font-bold border border-white/20 text-sm uppercase tracking-wider ${
-                        i === 1 ? "text-left" : "text-center"
-                      }`}
+                      className={`px-3 py-2.5 text-white font-bold border border-white/20 text-sm uppercase tracking-wider ${i === 1 ? "text-left" : "text-center"}`}
                       style={{ background: ACCENT }}
                     >
                       {h}
@@ -340,11 +317,7 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
                         </td>
                         <td className="px-3 py-2.5 border-b border-slate-100 text-center w-24">
                           <span
-                            className={`inline-block font-black text-lg px-3 py-0.5 rounded-lg border ${
-                              isTop
-                                ? "bg-red-50 text-red-600 border-red-200"
-                                : "bg-amber-50 text-amber-600 border-amber-200"
-                            }`}
+                            className={`inline-block font-black text-lg px-3 py-0.5 rounded-lg border ${isTop ? "bg-red-50 text-red-600 border-red-200" : "bg-amber-50 text-amber-600 border-amber-200"}`}
                           >
                             {df.DefectCount}
                           </span>
