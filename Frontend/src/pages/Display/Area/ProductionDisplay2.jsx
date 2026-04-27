@@ -6,11 +6,17 @@ import {
   StatCard,
 } from "../Monitoring";
 
-const ACCENT = "#1e40af";
+const ACCENT = "#0f766e";
 
-const FgPacking = ({ apiData = {}, progress, shift, shiftDate, config }) => {
+const ProductionDisplay2 = ({
+  apiData = {},
+  progress,
+  shift,
+  shiftDate,
+  config,
+}) => {
   const d = apiData;
-  const label = config?.stationName1 || "FG PACKING";
+  const label = config?.stationName2 || "FG LOADING";
 
   const rows = [
     {
@@ -143,7 +149,7 @@ const FgPacking = ({ apiData = {}, progress, shift, shiftDate, config }) => {
         <StatCard
           label="Monthly Plan"
           value={d.MonthlyPlanQty}
-          accentHex="#1e40af"
+          accentHex={ACCENT}
         />
         <StatCard
           label="Monthly Achievement"
@@ -171,4 +177,4 @@ const FgPacking = ({ apiData = {}, progress, shift, shiftDate, config }) => {
   );
 };
 
-export default FgPacking;
+export default ProductionDisplay2;

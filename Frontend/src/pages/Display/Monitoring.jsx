@@ -23,8 +23,8 @@ import {
 import { baseURL } from "../../assets/assets";
 
 /* ── Page imports ── */
-import FgPacking from "./Area/FgPacking";
-import FgLoading from "./Area/FgLoading";
+import ProductionDisplay1 from "./Area/ProductionDisplay1";
+import ProductionDisplay2 from "./Area/ProductionDisplay2";
 import Hourly from "./Area/Hourly";
 import Quality from "./Area/Quality";
 import Loss from "./Area/Loss";
@@ -34,17 +34,38 @@ const PAGE_DURATION_MS = 30_000;
 const TOTAL_PAGES = 5;
 
 const PAGES_META = [
-  { key: "fgPacking",  label: "Production Display 1", Icon: Package,      accentHex: "#1e40af" },
-  { key: "fgLoading",  label: "Production Display 2", Icon: Truck,         accentHex: "#0f766e" },
-  { key: "hourly",     label: "Hourly",               Icon: BarChart2,     accentHex: "#7c3aed" },
-  { key: "quality",    label: "Quality",              Icon: CheckCircle,   accentHex: "#15803d" },
-  { key: "loss",       label: "Loss",                 Icon: AlertTriangle, accentHex: "#b45309" },
+  {
+    key: "productionDisplay1",
+    label: "Production Display 1",
+    Icon: Package,
+    accentHex: "#1e40af",
+  },
+  {
+    key: "productionDisplay2",
+    label: "Production Display 2",
+    Icon: Truck,
+    accentHex: "#0f766e",
+  },
+  { key: "hourly", label: "Hourly", Icon: BarChart2, accentHex: "#7c3aed" },
+  { key: "quality", label: "Quality", Icon: CheckCircle, accentHex: "#15803d" },
+  { key: "loss", label: "Loss", Icon: AlertTriangle, accentHex: "#b45309" },
 ];
 
 const GAUGE_COLORS = [
-  "#dc2626","#e53e3e","#ea580c","#f97316","#fb923c",
-  "#f59e0b","#eab308","#bef264","#86efac","#4ade80",
-  "#22c55e","#16a34a","#15803d","#166534",
+  "#dc2626",
+  "#e53e3e",
+  "#ea580c",
+  "#f97316",
+  "#fb923c",
+  "#f59e0b",
+  "#eab308",
+  "#bef264",
+  "#86efac",
+  "#4ade80",
+  "#22c55e",
+  "#16a34a",
+  "#15803d",
+  "#166534",
 ];
 
 /* ── Helpers ── */
@@ -71,151 +92,166 @@ const Spinner = ({ cls = "w-4 h-4" }) => (
 // Uses ResizeObserver to redraw at the correct resolution on every size change.
 // Light theme: white center, slate rim, blue needle with drop shadow.
 const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
-  const canvasRef    = useRef(null);
-  const wrapRef      = useRef(null);
+  const canvasRef = useRef(null);
+  const wrapRef = useRef(null);
   const currentValue = useRef(value);
 
-  const draw = useCallback((val) => {
-    const canvas = canvasRef.current;
-    const wrap   = wrapRef.current;
-    if (!canvas || !wrap) return;
+  const draw = useCallback(
+    (val) => {
+      const canvas = canvasRef.current;
+      const wrap = wrapRef.current;
+      if (!canvas || !wrap) return;
 
-    const DPR = window.devicePixelRatio || 1;
-    const W   = wrap.clientWidth;
-    const H   = W / 2; // always 2:1 aspect ratio
+      const DPR = window.devicePixelRatio || 1;
+      const W = wrap.clientWidth;
+      const H = W / 2; // always 2:1 aspect ratio
 
-    // Guard: skip draw if container has no size yet (avoids negative-radius arc crash)
-    if (W < 40) return;
+      // Guard: skip draw if container has no size yet (avoids negative-radius arc crash)
+      if (W < 40) return;
 
-    canvas.width  = W * DPR;
-    canvas.height = H * DPR;
+      canvas.width = W * DPR;
+      canvas.height = H * DPR;
 
-    const ctx = canvas.getContext("2d");
-    ctx.scale(DPR, DPR);
+      const ctx = canvas.getContext("2d");
+      ctx.scale(DPR, DPR);
 
-    const cx = W / 2;
-    const cy = H - 10;
-    const R  = Math.min(cx - 16, cy - 8);
+      const cx = W / 2;
+      const cy = H - 10;
+      const R = Math.min(cx - 16, cy - 8);
 
-    // Secondary guard: R must be positive for arc() calls
-    if (R <= 0) return;
+      // Secondary guard: R must be positive for arc() calls
+      if (R <= 0) return;
 
-    ctx.clearRect(0, 0, W, H);
+      ctx.clearRect(0, 0, W, H);
 
-    // ── Outer rim (light slate background) ──
-    ctx.beginPath();
-    ctx.arc(cx, cy, R + 6, Math.PI, Math.PI * 2);
-    ctx.fillStyle = "#f1f5f9";
-    ctx.fill();
-
-    // ── Colored arc segments ──
-    const seg = Math.PI / GAUGE_COLORS.length;
-    GAUGE_COLORS.forEach((col, i) => {
+      // ── Outer rim (light slate background) ──
       ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, R, Math.PI + i * seg, Math.PI + (i + 1) * seg);
-      ctx.closePath();
-      ctx.fillStyle = col;
+      ctx.arc(cx, cy, R + 6, Math.PI, Math.PI * 2);
+      ctx.fillStyle = "#f1f5f9";
       ctx.fill();
-    });
 
-    // ── Rim highlight ──
-    ctx.beginPath();
-    ctx.arc(cx, cy, R, Math.PI, Math.PI * 2);
-    ctx.lineWidth    = 4;
-    ctx.strokeStyle  = "rgba(255,255,255,0.75)";
-    ctx.stroke();
+      // ── Colored arc segments ──
+      const seg = Math.PI / GAUGE_COLORS.length;
+      GAUGE_COLORS.forEach((col, i) => {
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, R, Math.PI + i * seg, Math.PI + (i + 1) * seg);
+        ctx.closePath();
+        ctx.fillStyle = col;
+        ctx.fill();
+      });
 
-    // ── White center cutout ──
-    const cutoutR = Math.max(1, R - 28);
-    ctx.beginPath();
-    ctx.arc(cx, cy, cutoutR, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-
-    // ── Inner shadow ring ──
-    const shadowR = Math.max(1, R - 26);
-    ctx.beginPath();
-    ctx.arc(cx, cy, shadowR, Math.PI, Math.PI * 2);
-    ctx.lineWidth   = 3;
-    ctx.strokeStyle = "rgba(0,0,0,0.06)";
-    ctx.stroke();
-
-    // ── Tick marks & numeric labels ──
-    const tickFont = Math.max(9, Math.round(R * 0.09));
-    ctx.textAlign    = "center";
-    ctx.textBaseline = "middle";
-
-    for (let i = 0; i <= 10; i++) {
-      const angle   = Math.PI + (i / 10) * Math.PI;
-      const sinA    = Math.sin(angle);
-      const cosA    = Math.cos(angle);
-      const isMajor = i % 2 === 0;
-
+      // ── Rim highlight ──
       ctx.beginPath();
-      ctx.moveTo(cx + cosA * Math.max(1, R - 26), cy + sinA * Math.max(1, R - 26));
-      ctx.lineTo(cx + cosA * (R - (isMajor ? 6 : 12)), cy + sinA * (R - (isMajor ? 6 : 12)));
-      ctx.strokeStyle = isMajor ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.55)";
-      ctx.lineWidth   = isMajor ? 2.5 : 1.5;
+      ctx.arc(cx, cy, R, Math.PI, Math.PI * 2);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(255,255,255,0.75)";
       ctx.stroke();
 
-      if (isMajor) {
-        ctx.fillStyle = "#475569";
-        ctx.font      = `600 ${tickFont}px 'Courier New', monospace`;
-        ctx.fillText(String(i * 100), cx + cosA * (R - 40), cy + sinA * (R - 40));
+      // ── White center cutout ──
+      const cutoutR = Math.max(1, R - 28);
+      ctx.beginPath();
+      ctx.arc(cx, cy, cutoutR, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+
+      // ── Inner shadow ring ──
+      const shadowR = Math.max(1, R - 26);
+      ctx.beginPath();
+      ctx.arc(cx, cy, shadowR, Math.PI, Math.PI * 2);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(0,0,0,0.06)";
+      ctx.stroke();
+
+      // ── Tick marks & numeric labels ──
+      const tickFont = Math.max(9, Math.round(R * 0.09));
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      for (let i = 0; i <= 10; i++) {
+        const angle = Math.PI + (i / 10) * Math.PI;
+        const sinA = Math.sin(angle);
+        const cosA = Math.cos(angle);
+        const isMajor = i % 2 === 0;
+
+        ctx.beginPath();
+        ctx.moveTo(
+          cx + cosA * Math.max(1, R - 26),
+          cy + sinA * Math.max(1, R - 26),
+        );
+        ctx.lineTo(
+          cx + cosA * (R - (isMajor ? 6 : 12)),
+          cy + sinA * (R - (isMajor ? 6 : 12)),
+        );
+        ctx.strokeStyle = isMajor
+          ? "rgba(255,255,255,0.95)"
+          : "rgba(255,255,255,0.55)";
+        ctx.lineWidth = isMajor ? 2.5 : 1.5;
+        ctx.stroke();
+
+        if (isMajor) {
+          ctx.fillStyle = "#475569";
+          ctx.font = `600 ${tickFont}px 'Courier New', monospace`;
+          ctx.fillText(
+            String(i * 100),
+            cx + cosA * (R - 40),
+            cy + sinA * (R - 40),
+          );
+        }
       }
-    }
 
-    // ── Main label (e.g. metric name) ──
-    const labelFont = Math.max(10, Math.round(R * 0.1));
-    ctx.font      = `700 ${labelFont}px 'Courier New', monospace`;
-    ctx.fillStyle = "#1e293b";
-    ctx.fillText(label,    cx, cy - R * 0.52);
+      // ── Main label (e.g. metric name) ──
+      const labelFont = Math.max(10, Math.round(R * 0.1));
+      ctx.font = `700 ${labelFont}px 'Courier New', monospace`;
+      ctx.fillStyle = "#1e293b";
+      ctx.fillText(label, cx, cy - R * 0.52);
 
-    // ── Sub-label ──
-    const subFont = Math.max(9, Math.round(R * 0.085));
-    ctx.font      = `400 ${subFont}px system-ui, sans-serif`;
-    ctx.fillStyle = "#94a3b8";
-    ctx.fillText(sublabel, cx, cy - R * 0.36);
+      // ── Sub-label ──
+      const subFont = Math.max(9, Math.round(R * 0.085));
+      ctx.font = `400 ${subFont}px system-ui, sans-serif`;
+      ctx.fillStyle = "#94a3b8";
+      ctx.fillText(sublabel, cx, cy - R * 0.36);
 
-    // ── Needle ──
-    const clamped     = Math.min(Math.max(Number(val) || 0, 0), 1000);
-    const angle       = Math.PI + (clamped / 1000) * Math.PI;
-    const needleLen   = Math.max(1, R - 32);
-    const needleWidth = Math.max(4, R * 0.045);
+      // ── Needle ──
+      const clamped = Math.min(Math.max(Number(val) || 0, 0), 1000);
+      const angle = Math.PI + (clamped / 1000) * Math.PI;
+      const needleLen = Math.max(1, R - 32);
+      const needleWidth = Math.max(4, R * 0.045);
 
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(angle);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
 
-    // Needle shadow
-    ctx.shadowColor   = "rgba(0,0,0,0.20)";
-    ctx.shadowBlur    = 8;
-    ctx.shadowOffsetY = 3;
+      // Needle shadow
+      ctx.shadowColor = "rgba(0,0,0,0.20)";
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 3;
 
-    // Needle shape (tapered)
-    ctx.beginPath();
-    ctx.moveTo(-14, 0);
-    ctx.lineTo(needleLen,     -needleWidth * 0.4);
-    ctx.lineTo(needleLen + 4,  0);
-    ctx.lineTo(needleLen,      needleWidth * 0.4);
-    ctx.closePath();
-    ctx.fillStyle = "#1e40af";
-    ctx.fill();
-    ctx.restore();
+      // Needle shape (tapered)
+      ctx.beginPath();
+      ctx.moveTo(-14, 0);
+      ctx.lineTo(needleLen, -needleWidth * 0.4);
+      ctx.lineTo(needleLen + 4, 0);
+      ctx.lineTo(needleLen, needleWidth * 0.4);
+      ctx.closePath();
+      ctx.fillStyle = "#1e40af";
+      ctx.fill();
+      ctx.restore();
 
-    // ── Pivot cap (outer) ──
-    ctx.beginPath();
-    ctx.arc(cx, cy, Math.max(10, R * 0.09), 0, Math.PI * 2);
-    ctx.fillStyle = "#334155";
-    ctx.fill();
+      // ── Pivot cap (outer) ──
+      ctx.beginPath();
+      ctx.arc(cx, cy, Math.max(10, R * 0.09), 0, Math.PI * 2);
+      ctx.fillStyle = "#334155";
+      ctx.fill();
 
-    // ── Pivot cap (inner highlight) ──
-    ctx.beginPath();
-    ctx.arc(cx, cy, Math.max(5, R * 0.04), 0, Math.PI * 2);
-    ctx.fillStyle = "#f8fafc";
-    ctx.fill();
-  }, [label, sublabel]);
+      // ── Pivot cap (inner highlight) ──
+      ctx.beginPath();
+      ctx.arc(cx, cy, Math.max(5, R * 0.04), 0, Math.PI * 2);
+      ctx.fillStyle = "#f8fafc";
+      ctx.fill();
+    },
+    [label, sublabel],
+  );
 
   // Redraw whenever value changes
   useEffect(() => {
@@ -234,7 +270,10 @@ const GaugeCanvas = ({ value = 0, label = "", sublabel = "" }) => {
 
   return (
     // Wrapper drives the aspect ratio; canvas fills it 100%
-    <div ref={wrapRef} style={{ width: "100%", aspectRatio: "2 / 1", position: "relative" }}>
+    <div
+      ref={wrapRef}
+      style={{ width: "100%", aspectRatio: "2 / 1", position: "relative" }}
+    >
       <canvas
         ref={canvasRef}
         style={{ width: "100%", height: "100%", display: "block" }}
@@ -255,23 +294,30 @@ const DonutCanvas = ({
     const c = ref.current;
     if (!c) return;
     const ctx = c.getContext("2d");
-    const cx = c.width / 2, cy = c.height / 2;
+    const cx = c.width / 2,
+      cy = c.height / 2;
     const r = Math.min(cx, cy) - 12;
     ctx.clearRect(0, 0, c.width, c.height);
 
     // Track
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.lineWidth   = 12;
+    ctx.lineWidth = 12;
     ctx.strokeStyle = trackColor;
     ctx.stroke();
 
     if (pct > 0) {
       ctx.beginPath();
-      ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + (Math.min(pct, 100) / 100) * Math.PI * 2);
-      ctx.lineWidth   = 12;
+      ctx.arc(
+        cx,
+        cy,
+        r,
+        -Math.PI / 2,
+        -Math.PI / 2 + (Math.min(pct, 100) / 100) * Math.PI * 2,
+      );
+      ctx.lineWidth = 12;
       ctx.strokeStyle = fillColor;
-      ctx.lineCap     = "round";
+      ctx.lineCap = "round";
       ctx.stroke();
     }
   }, [pct, fillColor, trackColor]);
@@ -317,7 +363,10 @@ const LiveClock = ({ shift, shiftDate, accentHex }) => {
 /* ── PageHeader ── */
 const PageHeader = ({ title, shift, shiftDate, accentHex }) => (
   <div className="shrink-0">
-    <div className="flex items-center gap-3 px-4 py-2.5" style={{ background: accentHex }}>
+    <div
+      className="flex items-center gap-3 px-4 py-2.5"
+      style={{ background: accentHex }}
+    >
       <span className="flex-1 text-center font-extrabold text-[15px] text-white tracking-widest uppercase font-mono">
         {title}
       </span>
@@ -329,7 +378,10 @@ const PageHeader = ({ title, shift, shiftDate, accentHex }) => (
 /* ── TimerBar ── */
 const TimerBar = ({ progress, accentHex }) => (
   <div className="h-[3px] bg-slate-100 shrink-0">
-    <div className="h-full" style={{ width: `${progress}%`, background: accentHex }} />
+    <div
+      className="h-full"
+      style={{ width: `${progress}%`, background: accentHex }}
+    />
   </div>
 );
 
@@ -360,14 +412,19 @@ const MetricTable = ({ rows, accentHex }) => (
       <tr>
         {[
           ["45%", "Metric", "left"],
-          ["10%", "Unit",   "center"],
+          ["10%", "Unit", "center"],
           ["22%", "Target", "center"],
           ["23%", "Actual", "center"],
         ].map(([w, lbl, align]) => (
           <th
             key={lbl}
             className="px-2.5 py-2 text-white font-bold border border-white/20"
-            style={{ background: accentHex, textAlign: align, width: w, fontSize: 11 }}
+            style={{
+              background: accentHex,
+              textAlign: align,
+              width: w,
+              fontSize: 11,
+            }}
           >
             {lbl}
           </th>
@@ -377,7 +434,11 @@ const MetricTable = ({ rows, accentHex }) => (
     <tbody>
       {rows.map((r, i) => {
         const actualColor =
-          r.highlight === "yellow" ? "#f59e0b" : r.green ? "#15803d" : "#0f172a";
+          r.highlight === "yellow"
+            ? "#f59e0b"
+            : r.green
+              ? "#15803d"
+              : "#0f172a";
         const mergeColumns = r.target == null;
 
         return (
@@ -525,31 +586,31 @@ const NavDots = ({ currentPage, onGoTo, onPrev, onNext }) => (
    MAIN COMPONENT
 ════════════════════════════════════════════════════════════════════════════════ */
 const EMPTY_DATA = {
-  fgPacking: {},
-  fgLoading: {},
-  hourly:    {},
-  quality:   {},
-  loss:      {},
+  productionDisplay1: {},
+  productionDisplay2: {},
+  hourly: {},
+  quality: {},
+  loss: {},
 };
 
 const Monitoring = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const routerState    = location.state || {};
-  const launchedConfig = routerState.config    || null;
-  const launchedDate   = routerState.shiftDate || todayISO();
-  const launchedShift  = routerState.shift     || "A";
-  const isLaunched     = !!routerState.autoLoad;
+  const routerState = location.state || {};
+  const launchedConfig = routerState.config || null;
+  const launchedDate = routerState.shiftDate || todayISO();
+  const launchedShift = routerState.shift || "A";
+  const isLaunched = !!routerState.autoLoad;
 
-  const [shiftDate,   setShiftDate]  = useState(launchedDate);
-  const [shift,       setShift]      = useState(launchedShift);
-  const [allData,     setAllData]    = useState(EMPTY_DATA);
+  const [shiftDate, setShiftDate] = useState(launchedDate);
+  const [shift, setShift] = useState(launchedShift);
+  const [allData, setAllData] = useState(EMPTY_DATA);
   const [currentPage, setCurrentPage] = useState(0);
-  const [progress,    setProgress]   = useState(0);
+  const [progress, setProgress] = useState(0);
   const [lastFetched, setLastFetched] = useState(null);
-  const [isRunning,   setIsRunning]  = useState(false);
-  const [loading,     setLoading]    = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const intervalRef = useRef(null);
 
@@ -593,11 +654,11 @@ const Monitoring = () => {
     const params = buildParams(cfg, dateParam, shiftParam);
 
     const endpoints = {
-      fgPacking: `${baseURL}dashboard/fg-packing`,
-      fgLoading: `${baseURL}dashboard/fg-loading`,
-      hourly:    `${baseURL}dashboard/hourly`,
-      quality:   `${baseURL}dashboard/quality`,
-      loss:      `${baseURL}dashboard/loss`,
+      productionDisplay1: `${baseURL}dashboard/production-display-1`,
+      productionDisplay2: `${baseURL}dashboard/production-display-2`,
+      hourly: `${baseURL}dashboard/hourly`,
+      quality: `${baseURL}dashboard/quality`,
+      loss: `${baseURL}dashboard/loss`,
     };
 
     try {
@@ -605,8 +666,8 @@ const Monitoring = () => {
         Object.entries(endpoints).map(([key, url]) =>
           axios
             .get(url, { params })
-            .then((res) => ({ key, data: res.data?.data ?? res.data }))
-        )
+            .then((res) => ({ key, data: res.data?.data ?? res.data })),
+        ),
       );
 
       const merged = {};
@@ -619,7 +680,8 @@ const Monitoring = () => {
       if (failed === TOTAL_PAGES) {
         toast.error("All endpoints failed. Check server connection.");
       } else {
-        if (failed > 0) toast(`${failed} endpoint(s) had errors.`, { icon: "⚠️" });
+        if (failed > 0)
+          toast(`${failed} endpoint(s) had errors.`, { icon: "⚠️" });
         else toast.success("Dashboard loaded successfully.");
 
         setAllData({ ...EMPTY_DATA, ...merged });
@@ -641,35 +703,55 @@ const Monitoring = () => {
 
   const fetchAllData = useCallback(
     () => fetchData(shiftDate, shift, launchedConfig),
-    [fetchData, shiftDate, shift, launchedConfig]
+    [fetchData, shiftDate, shift, launchedConfig],
   );
 
-  const goTo   = useCallback((i) => { setCurrentPage(i); setProgress(0); }, []);
-  const goPrev = useCallback(() => { setCurrentPage((p) => (p - 1 + TOTAL_PAGES) % TOTAL_PAGES); setProgress(0); }, []);
-  const goNext = useCallback(() => { setCurrentPage((p) => (p + 1) % TOTAL_PAGES); setProgress(0); }, []);
+  const goTo = useCallback((i) => {
+    setCurrentPage(i);
+    setProgress(0);
+  }, []);
+  const goPrev = useCallback(() => {
+    setCurrentPage((p) => (p - 1 + TOTAL_PAGES) % TOTAL_PAGES);
+    setProgress(0);
+  }, []);
+  const goNext = useCallback(() => {
+    setCurrentPage((p) => (p + 1) % TOTAL_PAGES);
+    setProgress(0);
+  }, []);
 
-  const handleShiftSwitch = useCallback((s, cfg) => {
-    let dt;
-    if (s === "B") {
-      const d = new Date();
-      if (d.getHours() < 8) d.setDate(d.getDate() - 1);
-      dt = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    } else {
-      dt = todayISO();
-    }
-    setShift(s);
-    setShiftDate(dt);
-    fetchData(dt, s, cfg);
-  }, [fetchData]);
+  const handleShiftSwitch = useCallback(
+    (s, cfg) => {
+      let dt;
+      if (s === "B") {
+        const d = new Date();
+        if (d.getHours() < 8) d.setDate(d.getDate() - 1);
+        dt = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      } else {
+        dt = todayISO();
+      }
+      setShift(s);
+      setShiftDate(dt);
+      fetchData(dt, s, cfg);
+    },
+    [fetchData],
+  );
 
   const commonProps = { progress, shift, shiftDate, config: launchedConfig };
 
   const pages = [
-    <FgPacking key="fgPacking" apiData={allData.fgPacking} {...commonProps} />,
-    <FgLoading key="fgLoading" apiData={allData.fgLoading} {...commonProps} />,
-    <Hourly    key="hourly"    apiData={allData.hourly}    {...commonProps} />,
-    <Quality   key="quality"   apiData={allData.quality}   {...commonProps} />,
-    <Loss      key="loss"      apiData={allData.loss}      {...commonProps} />,
+    <ProductionDisplay1
+      key="productionDisplay1"
+      apiData={allData.productionDisplay1}
+      {...commonProps}
+    />,
+    <ProductionDisplay2
+      key="productionDisplay2"
+      apiData={allData.productionDisplay2}
+      {...commonProps}
+    />,
+    <Hourly key="hourly" apiData={allData.hourly} {...commonProps} />,
+    <Quality key="quality" apiData={allData.quality} {...commonProps} />,
+    <Loss key="loss" apiData={allData.loss} {...commonProps} />,
   ];
 
   /* ── Launched (fullscreen kiosk) mode ── */
@@ -718,7 +800,11 @@ const Monitoring = () => {
                 : "bg-blue-700 hover:bg-blue-800 text-white shadow-sm shadow-blue-200"
             }`}
           >
-            {loading ? <Spinner cls="w-3 h-3" /> : <RefreshCw className="w-3 h-3" />}
+            {loading ? (
+              <Spinner cls="w-3 h-3" />
+            ) : (
+              <RefreshCw className="w-3 h-3" />
+            )}
             {loading ? "Loading…" : "Refresh"}
           </button>
 
@@ -770,7 +856,10 @@ const Monitoring = () => {
                 <div
                   key={i}
                   className="h-full"
-                  style={{ display: i === currentPage ? "flex" : "none", flexDirection: "column" }}
+                  style={{
+                    display: i === currentPage ? "flex" : "none",
+                    flexDirection: "column",
+                  }}
                 >
                   {page}
                 </div>
@@ -808,7 +897,9 @@ const Monitoring = () => {
           <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
             Production Monitoring
           </h1>
-          <p className="text-[11px] text-slate-400">Dashboard · Shift performance overview</p>
+          <p className="text-[11px] text-slate-400">
+            Dashboard · Shift performance overview
+          </p>
         </div>
         {lastFetched && (
           <span className="text-[11px] text-slate-400">
@@ -865,7 +956,11 @@ const Monitoring = () => {
                     : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
                 }`}
               >
-                {loading ? <Spinner cls="w-4 h-4" /> : <RefreshCw className="w-4 h-4" />}
+                {loading ? (
+                  <Spinner cls="w-4 h-4" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
                 {loading ? "Loading…" : "Load Dashboard"}
               </button>
               {isRunning ? (
@@ -904,7 +999,10 @@ const Monitoring = () => {
                   <div
                     key={i}
                     className="h-full"
-                    style={{ display: i === currentPage ? "flex" : "none", flexDirection: "column" }}
+                    style={{
+                      display: i === currentPage ? "flex" : "none",
+                      flexDirection: "column",
+                    }}
                   >
                     {page}
                   </div>
@@ -921,10 +1019,15 @@ const Monitoring = () => {
           {!loading && !lastFetched && (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 py-4">
               <div className="w-[72px] h-[72px] rounded-2xl bg-slate-100 flex items-center justify-center">
-                <Settings className="w-8 h-8 text-slate-300" strokeWidth={1.2} />
+                <Settings
+                  className="w-8 h-8 text-slate-300"
+                  strokeWidth={1.2}
+                />
               </div>
               <div className="text-center">
-                <p className="text-base font-bold text-slate-500">No data loaded</p>
+                <p className="text-base font-bold text-slate-500">
+                  No data loaded
+                </p>
                 <p className="text-[13px] text-slate-400 mt-1">
                   Select a date and click Load Dashboard to begin
                 </p>
