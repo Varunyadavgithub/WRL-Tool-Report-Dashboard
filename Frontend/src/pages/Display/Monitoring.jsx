@@ -379,8 +379,7 @@ const GaugePanel = memo(
               boxShadow: `0 8px 30px ${accentHex}40`,
             }}
           >
-            {String(clamped).padStart(3, "0")}
-            <span className="text-white/60 text-2xl">.00</span>
+            {Number(clamped)}
           </div>
           <div
             className="mt-3 flex items-center gap-2 px-4 py-1.5 rounded-full border-[1.5px]"
