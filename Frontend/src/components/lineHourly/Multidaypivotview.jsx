@@ -173,8 +173,8 @@ const VIEWS = [
 const FIXED_TARGETS = {
   "Freezer Line": { "FG Label": 87 },
   "Chocolate Line": { "FG Label": 40 },
-    "SUS Line": { "FG Label": 15 },
   "SUS Line": { "FG Label": 15 },
+  "VISI Line": { "FG Label": 75 },
 };
 const LOADING_STAGE_KEYS = [
   "MFT",

@@ -824,9 +824,9 @@ const Monitoring = () => {
 export {
   PageHeader,
   TimerBar,
+  StatCard,
   GaugePanel,
   MetricTable,
-  StatCard,
   DonutCanvas,
   Spinner,
 };

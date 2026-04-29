@@ -1,96 +1,258 @@
-import { useMemo, useState, useCallback, useRef } from "react";
-import {
-  Chart as ChartJS,
-  ArcElement,
-  DoughnutController,
-  Tooltip,
-  Legend,
-} from "chart.js";
-import { Chart } from "react-chartjs-2";
+import { useMemo, useState } from "react";
 import { PageHeader, TimerBar, StatCard } from "../Monitoring";
-
-ChartJS.register(ArcElement, DoughnutController, Tooltip, Legend);
 
 const ACCENT = "#15803d";
 
-const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
-  const { summary: qs = {}, defects = [] } = apiData;
-  const chartRef = useRef(null);
-  const [tooltip, setTooltip] = useState({
-    show: false,
-    x: 0,
-    y: 0,
-    label: "",
-    value: "",
-    color: "",
+/* ════════════════════════════════════════════════════════════
+   Pure SVG Doughnut — 3 segments: OK / Defect / Rework
+═══════════════════════════════════════════════════════════ */
+const SvgDoughnut = ({ ok = 0, defect = 0, rework = 0, total = 0 }) => {
+  const [hover, setHover] = useState(null);
+
+  const size = 260;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 95;
+  const strokeW = 46;
+  const circumference = 2 * Math.PI * r;
+
+  const sum = ok + defect + rework;
+
+  // Build segments dynamically (skip 0-value ones)
+  const segments = [
+    {
+      key: "ok",
+      value: ok,
+      color: "#15803d",
+      hoverColor: "rgba(21,128,61,0.5)",
+      label: "OK Units",
+    },
+    {
+      key: "defect",
+      value: defect,
+      color: "#dc2626",
+      hoverColor: "rgba(220,38,38,0.5)",
+      label: "Defect Units",
+    },
+    {
+      key: "rework",
+      value: rework,
+      color: "#f59e0b",
+      hoverColor: "rgba(245,158,11,0.5)",
+      label: "Rework Done",
+    },
+  ].filter((s) => s.value > 0);
+
+  // Visual gap between segments
+  const visibleCount = segments.length;
+  const gap = visibleCount > 1 ? 4 : 0;
+
+  const polarToXY = (angleDeg, radius) => {
+    const rad = (angleDeg - 90) * (Math.PI / 180);
+    return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
+  };
+
+  // Compute angles + arc lengths progressively
+  let cumulativeAngle = 0;
+  const segmentData = segments.map((seg) => {
+    const frac = seg.value / sum;
+    const arcLen = frac * circumference;
+    const startAngle = cumulativeAngle;
+    const endAngle = cumulativeAngle + frac * 360;
+    const midAngle = (startAngle + endAngle) / 2;
+    const labelPos = polarToXY(midAngle, r);
+    const pct = ((seg.value / sum) * 100).toFixed(1);
+    cumulativeAngle = endAngle;
+    return {
+      ...seg,
+      frac,
+      arcLen,
+      startOffset: -((startAngle / 360) * circumference),
+      labelPos,
+      pct,
+    };
   });
 
-  const externalTooltipHandler = useCallback((context) => {
-    const { tooltip: tt } = context;
-    if (tt.opacity === 0) {
-      setTooltip((prev) => (prev.show ? { ...prev, show: false } : prev));
-      return;
-    }
-    const { caretX, caretY } = tt;
-    const dataPoint = tt.dataPoints?.[0];
-    if (!dataPoint) return;
-    setTooltip({
-      show: true,
-      x: caretX,
-      y: caretY,
-      label: dataPoint.label || "",
-      value: dataPoint.raw ?? "",
-      color: dataPoint.dataset.backgroundColor[dataPoint.dataIndex] || "#000",
-    });
-  }, []);
+  // Empty state
+  if (sum === 0) {
+    return (
+      <div
+        className="relative flex items-center justify-center"
+        style={{ width: size, height: size }}
+      >
+        <svg width={size} height={size}>
+          <circle
+            cx={cx}
+            cy={cy}
+            r={r}
+            fill="none"
+            stroke="#e2e8f0"
+            strokeWidth={strokeW}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <span className="text-3xl font-black text-slate-300 leading-none">
+            0
+          </span>
+          <span className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-wider">
+            No Data
+          </span>
+        </div>
+      </div>
+    );
+  }
 
-  const pieData = useMemo(
-    () => ({
-      labels: ["OK Units", "Defect Units"],
-      datasets: [
-        {
-          type: "doughnut",
-          data: [qs.OkUnit || 0, qs.DefectUnit || 0],
-          backgroundColor: ["rgba(21,128,61,0.85)", "rgba(220,38,38,0.85)"],
-          borderColor: ["#15803d", "#b91c1c"],
-          borderWidth: 3,
-          borderRadius: 6,
-          spacing: 2,
-          hoverOffset: 8,
-        },
-      ],
-    }),
-    [qs],
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} style={{ overflow: "visible" }}>
+        {/* Background track */}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke="#f1f5f9"
+          strokeWidth={strokeW}
+        />
+
+        {/* Segments */}
+        {segmentData.map((seg) => (
+          <circle
+            key={seg.key}
+            cx={cx}
+            cy={cy}
+            r={r}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth={hover === seg.key ? strokeW + 4 : strokeW}
+            strokeDasharray={`${Math.max(seg.arcLen - gap, 0)} ${circumference}`}
+            strokeDashoffset={seg.startOffset}
+            strokeLinecap="butt"
+            transform={`rotate(-90 ${cx} ${cy})`}
+            style={{
+              transition: "stroke-width 0.2s, stroke-dasharray 1s ease",
+              cursor: "pointer",
+              filter:
+                hover === seg.key
+                  ? `drop-shadow(0 4px 12px ${seg.hoverColor})`
+                  : "none",
+            }}
+            onMouseEnter={() => setHover(seg.key)}
+            onMouseLeave={() => setHover(null)}
+          />
+        ))}
+
+        {/* Segment labels — only if segment >= 10% */}
+        {segmentData
+          .filter((seg) => seg.frac >= 0.1)
+          .map((seg) => (
+            <g key={`lbl-${seg.key}`} pointerEvents="none">
+              <text
+                x={seg.labelPos.x}
+                y={seg.labelPos.y - 7}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill="#ffffff"
+                fontSize="16"
+                fontWeight="800"
+                fontFamily="'JetBrains Mono', monospace"
+                style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.4))" }}
+              >
+                {seg.value.toLocaleString()}
+              </text>
+              <text
+                x={seg.labelPos.x}
+                y={seg.labelPos.y + 10}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill="#ffffff"
+                fontSize="11"
+                fontWeight="700"
+                fontFamily="'JetBrains Mono', monospace"
+                opacity="0.95"
+                style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.4))" }}
+              >
+                {seg.pct}%
+              </text>
+            </g>
+          ))}
+      </svg>
+
+      {/* Center label */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        <span className="text-4xl font-black text-slate-900 leading-none drop-shadow-sm font-mono">
+          {total.toLocaleString()}
+        </span>
+        <span className="text-[10px] text-slate-500 font-bold mt-1 uppercase tracking-wider">
+          Total Units
+        </span>
+      </div>
+
+      {/* Hover tooltip */}
+      {hover &&
+        (() => {
+          const seg = segmentData.find((s) => s.key === hover);
+          if (!seg) return null;
+          return (
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                left: "50%",
+                top: -12,
+                transform: "translate(-50%, -100%)",
+              }}
+            >
+              <div
+                className="bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl whitespace-nowrap"
+                style={{ border: `2px solid ${seg.color}` }}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-3 h-3 rounded-full"
+                    style={{ background: seg.color }}
+                  />
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    {seg.label}
+                  </span>
+                </div>
+                <div className="text-2xl font-black font-mono mt-1 text-center">
+                  {seg.value.toLocaleString()}
+                  <span className="text-sm font-bold ml-2 opacity-70">
+                    {seg.pct}%
+                  </span>
+                </div>
+              </div>
+              <div
+                className="w-3 h-3 bg-slate-900 rotate-45 mx-auto -mt-1.5"
+                style={{
+                  borderRight: `2px solid ${seg.color}`,
+                  borderBottom: `2px solid ${seg.color}`,
+                }}
+              />
+            </div>
+          );
+        })()}
+    </div>
   );
+};
 
-  const pieOptions = useMemo(
-    () => ({
-      responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 1,
-      cutout: "68%",
-      rotation: -90,
-      plugins: {
-        legend: {
-          display: true,
-          labels: {
-            color: "#000",
-          },
-        },
-        tooltip: { enabled: false, external: externalTooltipHandler },
-      },
-      animation: {
-        animateRotate: true,
-        duration: 1400,
-        easing: "easeInOutQuart",
-      },
-      hover: { mode: "nearest" },
-    }),
-    [externalTooltipHandler],
-  );
+/* ════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+═══════════════════════════════════════════════════════════ */
+const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
+  const { summary: qs = {}, defects = [] } = apiData;
 
-  const okPct = qs.OkPct ?? 0;
-  const defPct = qs.DefectPct ?? 0;
+  const ok = Number(qs.OkUnit) || 0;
+  const defect = Number(qs.DefectUnit) || 0;
+  const rework = Number(qs.ReworkDone) || 0;
+  const total = Number(qs.TotalAchieved) || ok + defect + rework;
+
+  // Compute consistent percentages — denominator = TotalAchieved (matches cards)
+  const okPct = qs.OkPct ?? (total > 0 ? ((ok / total) * 100).toFixed(1) : 0);
+  const defPct =
+    qs.DefectPct ?? (total > 0 ? ((defect / total) * 100).toFixed(1) : 0);
+  const reworkPct = total > 0 ? ((rework / total) * 100).toFixed(1) : 0;
+
   const statusColor =
     okPct >= 90 ? "#16a34a" : okPct >= 70 ? "#f59e0b" : "#dc2626";
   const statusLabel =
@@ -135,8 +297,9 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
       </div>
 
       <div className="flex flex-1 min-h-0 px-4 py-2 gap-4">
+        {/* LEFT — Doughnut */}
         <div
-          className="w-[55%] shrink-0 rounded-2xl border-2 shadow-md overflow-hidden flex flex-col items-center justify-center relative"
+          className="w-[55%] shrink-0 rounded-2xl border-2 shadow-md overflow-hidden flex flex-col items-center justify-center relative px-4 py-4"
           style={{
             borderColor: `${ACCENT}20`,
             background: `linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)`,
@@ -148,6 +311,7 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
               background: `radial-gradient(circle at 50% 60%, ${ACCENT}, transparent 70%)`,
             }}
           />
+
           <div className="text-center mb-3 z-10">
             <p
               className="text-lg font-extrabold uppercase tracking-[0.2em] font-mono"
@@ -156,55 +320,20 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
               Quality Overview
             </p>
             <p className="text-xs text-slate-400 mt-0.5">
-              OK vs Defect Distribution
+              OK · Defect · Rework Distribution
             </p>
           </div>
 
-          <div className="relative w-full max-w-[260px] aspect-square z-10">
-            <Chart
-              ref={chartRef}
-              key={`q-${qs.OkUnit}-${qs.DefectUnit}`}
-              type="doughnut"
-              data={pieData}
-              options={pieOptions}
+          <div className="z-10">
+            <SvgDoughnut
+              ok={ok}
+              defect={defect}
+              rework={rework}
+              total={total}
             />
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
-              <span className="text-4xl md:text-5xl font-black text-black leading-none drop-shadow-sm">
-                {qs.TotalAchieved ?? 0}
-              </span>
-              <span className="text-xs text-black font-bold mt-1 uppercase tracking-wider">
-                Total Units
-              </span>
-            </div>
-            {tooltip.show && (
-              <div
-                className="absolute z-50 pointer-events-none"
-                style={{
-                  left: tooltip.x,
-                  top: tooltip.y,
-                  transform: "translate(-50%, -120%)",
-                }}
-              >
-                <div className="bg-white text-black px-4 py-2.5 rounded-xl shadow-xl border border-slate-200 whitespace-nowrap">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ background: tooltip.color }}
-                    />
-                    <span className="text-sm font-bold">{tooltip.label}</span>
-                  </div>
-                  <div className="text-2xl font-black font-mono mt-0.5 text-center">
-                    {Number(tooltip.value).toLocaleString()}
-                  </div>
-                </div>
-                <div className="flex justify-center">
-                  <div className="w-3 h-3 bg-white rotate-45 -mt-1.5 border border-slate-200" />
-                </div>
-              </div>
-            )}
           </div>
 
-          <div className="z-10 flex flex-col items-center mt-3">
+          <div className="z-10 flex flex-col items-center mt-4">
             <div
               className="px-10 py-3 rounded-2xl text-white font-black text-4xl font-mono tracking-[0.15em] shadow-lg"
               style={{
@@ -212,7 +341,7 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
                 boxShadow: `0 8px 30px ${ACCENT}40`,
               }}
             >
-              {String(qs.OkUnit ?? 0).padStart(3, "0")}
+              {String(ok).padStart(3, "0")}
               <span className="text-white/60 text-lg ml-1">OK</span>
             </div>
             <div
@@ -238,38 +367,54 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
             </div>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-3 mt-4 z-10">
-            <div className="flex items-center gap-2 px-4 py-2 bg-green-50 rounded-xl border border-green-200">
+          {/* 3-chip legend — matches doughnut */}
+          <div className="flex flex-wrap justify-center gap-2 mt-4 z-10">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-xl border border-green-200">
               <span className="w-3.5 h-3.5 bg-green-700 rounded-md shrink-0" />
               <div className="flex flex-col">
                 <span className="text-[9px] text-green-600 font-bold uppercase tracking-wider">
-                  OK Units
+                  OK
                 </span>
-                <span className="text-base font-black text-green-800 font-mono leading-tight">
-                  {qs.OkUnit ?? 0}
+                <span className="text-sm font-black text-green-800 font-mono leading-tight">
+                  {ok.toLocaleString()}
                 </span>
               </div>
               <span className="ml-1 text-[10px] font-bold text-green-500 bg-green-100 px-2 py-0.5 rounded-full">
                 {okPct}%
               </span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 bg-red-50 rounded-xl border border-red-200">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 rounded-xl border border-red-200">
               <span className="w-3.5 h-3.5 bg-red-600 rounded-md shrink-0" />
               <div className="flex flex-col">
                 <span className="text-[9px] text-red-500 font-bold uppercase tracking-wider">
                   Defects
                 </span>
-                <span className="text-base font-black text-red-700 font-mono leading-tight">
-                  {qs.DefectUnit ?? 0}
+                <span className="text-sm font-black text-red-700 font-mono leading-tight">
+                  {defect.toLocaleString()}
                 </span>
               </div>
               <span className="ml-1 text-[10px] font-bold text-red-500 bg-red-100 px-2 py-0.5 rounded-full">
                 {defPct}%
               </span>
             </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 rounded-xl border border-amber-200">
+              <span className="w-3.5 h-3.5 bg-amber-500 rounded-md shrink-0" />
+              <div className="flex flex-col">
+                <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider">
+                  Rework
+                </span>
+                <span className="text-sm font-black text-amber-700 font-mono leading-tight">
+                  {rework.toLocaleString()}
+                </span>
+              </div>
+              <span className="ml-1 text-[10px] font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">
+                {reworkPct}%
+              </span>
+            </div>
           </div>
         </div>
 
+        {/* RIGHT — Defects table */}
         <div className="w-[45%] flex flex-col min-w-0">
           <div
             className="text-white font-bold text-sm text-center py-2.5 rounded-t-xl tracking-wider uppercase flex items-center justify-center gap-2"
@@ -287,7 +432,9 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
                   {["Sr.", "Defect Description", "Count"].map((h, i) => (
                     <th
                       key={h}
-                      className={`px-3 py-2.5 text-white font-bold border border-white/20 text-sm uppercase tracking-wider ${i === 1 ? "text-left" : "text-center"}`}
+                      className={`px-3 py-2.5 text-white font-bold border border-white/20 text-sm uppercase tracking-wider ${
+                        i === 1 ? "text-left" : "text-center"
+                      }`}
                       style={{ background: ACCENT }}
                     >
                       {h}
@@ -299,13 +446,22 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
                 {defects.length > 0 ? (
                   defects.map((df, i) => {
                     const isTop = i < 3;
+                    const srNo = df.SrNo ?? i + 1;
                     return (
                       <tr
                         key={i}
                         className={i % 2 === 0 ? "bg-white" : "bg-slate-50/40"}
                       >
-                        <td className="px-3 py-2.5 border-b border-slate-100 text-center text-slate-400 font-mono text-sm w-14">
-                          {df.SrNo}
+                        <td className="px-3 py-2.5 border-b border-slate-100 text-center w-14">
+                          <span
+                            className={`inline-flex items-center justify-center w-7 h-7 rounded-full font-black font-mono text-xs ${
+                              isTop
+                                ? "bg-red-100 text-red-700 border border-red-200"
+                                : "bg-slate-100 text-slate-600 border border-slate-200"
+                            }`}
+                          >
+                            {srNo}
+                          </span>
                         </td>
                         <td className="px-3 py-2.5 border-b border-slate-100 text-slate-700 font-semibold text-sm">
                           <div className="flex items-center gap-2">
@@ -317,7 +473,11 @@ const Quality = ({ apiData = {}, progress, shift, shiftDate }) => {
                         </td>
                         <td className="px-3 py-2.5 border-b border-slate-100 text-center w-24">
                           <span
-                            className={`inline-block font-black text-lg px-3 py-0.5 rounded-lg border ${isTop ? "bg-red-50 text-red-600 border-red-200" : "bg-amber-50 text-amber-600 border-amber-200"}`}
+                            className={`inline-block font-black text-lg px-3 py-0.5 rounded-lg border ${
+                              isTop
+                                ? "bg-red-50 text-red-600 border-red-200"
+                                : "bg-amber-50 text-amber-600 border-amber-200"
+                            }`}
                           >
                             {df.DefectCount}
                           </span>
