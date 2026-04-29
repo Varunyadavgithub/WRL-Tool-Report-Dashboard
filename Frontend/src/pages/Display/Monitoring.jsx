@@ -34,25 +34,57 @@ import Quality from "./Area/Quality";
 import Loss from "./Area/Loss";
 
 const PAGE_DURATION_MS = 30_000;
-const TOTAL_PAGES = 5;
 
-const PAGES_META = [
+// All possible pages — keyed by visibility flag
+const ALL_PAGES_META = [
   {
     key: "productionDisplay1",
+    visibilityKey: "showDisplay1",
     label: "Production Display 1",
     Icon: Package,
     accentHex: "#1e40af",
   },
   {
     key: "productionDisplay2",
+    visibilityKey: "showDisplay2",
     label: "Production Display 2",
     Icon: Truck,
     accentHex: "#0f766e",
   },
-  { key: "hourly", label: "Hourly", Icon: BarChart2, accentHex: "#7c3aed" },
-  { key: "quality", label: "Quality", Icon: CheckCircle, accentHex: "#15803d" },
-  { key: "loss", label: "Loss", Icon: AlertTriangle, accentHex: "#b45309" },
+  {
+    key: "hourly",
+    visibilityKey: "showHourly",
+    label: "Hourly",
+    Icon: BarChart2,
+    accentHex: "#7c3aed",
+  },
+  {
+    key: "quality",
+    visibilityKey: "showQuality",
+    label: "Quality",
+    Icon: CheckCircle,
+    accentHex: "#15803d",
+  },
+  {
+    key: "loss",
+    visibilityKey: "showLoss",
+    label: "Loss",
+    Icon: AlertTriangle,
+    accentHex: "#b45309",
+  },
 ];
+
+// Map DB column → camelCase used in router state
+const isPageVisible = (cfg, visibilityKey) => {
+  if (!cfg) return true;
+  // Accept both forms: showDisplay1 (camelCase) OR ShowDisplay1 (DB)
+  const camel = cfg[visibilityKey];
+  const pascal =
+    cfg[visibilityKey.charAt(0).toUpperCase() + visibilityKey.slice(1)];
+  const v = camel ?? pascal;
+  // Default: visible if not explicitly false/0
+  return v !== false && v !== 0;
+};
 
 const pad = (n) => String(n).padStart(2, "0");
 
@@ -416,7 +448,7 @@ const GaugePanel = memo(
 GaugePanel.displayName = "GaugePanel";
 
 /* ── NavDots ── */
-const NavDots = ({ currentPage, onGoTo, onPrev, onNext }) => (
+const NavDots = ({ pagesMeta, currentPage, onGoTo, onPrev, onNext }) => (
   <div className="shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 bg-white border-t border-slate-100 relative">
     <button
       onClick={onPrev}
@@ -425,7 +457,7 @@ const NavDots = ({ currentPage, onGoTo, onPrev, onNext }) => (
     >
       <ArrowLeft className="w-3.5 h-3.5" />
     </button>
-    {PAGES_META.map(({ label, Icon, accentHex }, i) => {
+    {pagesMeta.map(({ label, Icon, accentHex }, i) => {
       const active = i === currentPage;
       return (
         <button
@@ -481,12 +513,21 @@ const Monitoring = () => {
   const launchedShift = routerState.shift || "A";
   const isLaunched = !!routerState.autoLoad;
 
-  /* Redirect immediately if not launched properly */
   useEffect(() => {
     if (!isLaunched || !launchedConfig) {
       navigate("/display/management", { replace: true });
     }
   }, [isLaunched, launchedConfig, navigate]);
+
+  // Compute visible pages from config flags
+  const visiblePagesMeta = useMemo(
+    () =>
+      ALL_PAGES_META.filter((p) =>
+        isPageVisible(launchedConfig, p.visibilityKey),
+      ),
+    [launchedConfig],
+  );
+  const totalPages = visiblePagesMeta.length;
 
   const [shiftDate, setShiftDate] = useState(launchedDate);
   const [shift, setShift] = useState(launchedShift);
@@ -498,9 +539,10 @@ const Monitoring = () => {
   const [loading, setLoading] = useState(false);
   const intervalRef = useRef(null);
 
+  // Auto-rotate only across visible pages
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    if (!isRunning) return;
+    if (!isRunning || totalPages <= 1) return;
     let elapsed = 0;
     setProgress(0);
     intervalRef.current = setInterval(() => {
@@ -509,65 +551,80 @@ const Monitoring = () => {
       if (elapsed >= PAGE_DURATION_MS) {
         elapsed = 0;
         setProgress(0);
-        setCurrentPage((p) => (p + 1) % TOTAL_PAGES);
+        setCurrentPage((p) => (p + 1) % totalPages);
       }
     }, 50);
     return () => {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     };
-  }, [isRunning, currentPage]);
+  }, [isRunning, currentPage, totalPages]);
 
-  const fetchData = useCallback(async (dateParam, shiftParam, cfg) => {
-    if (!dateParam) {
-      toast.error("Please select a shift date.");
-      return;
-    }
-    if (!cfg?.id) {
-      toast.error("No dashboard configuration selected.");
-      return;
-    }
-    setLoading(true);
-    setIsRunning(false);
-    setAllData(EMPTY_DATA);
-    const params = buildParams(cfg, dateParam, shiftParam);
-    const endpoints = {
-      productionDisplay1: `${baseURL}dashboard/production-display-1`,
-      productionDisplay2: `${baseURL}dashboard/production-display-2`,
-      hourly: `${baseURL}dashboard/hourly`,
-      quality: `${baseURL}dashboard/quality`,
-      loss: `${baseURL}dashboard/loss`,
-    };
-    try {
-      const results = await Promise.allSettled(
-        Object.entries(endpoints).map(([key, url]) =>
-          axios
-            .get(url, { params })
-            .then((res) => ({ key, data: res.data?.data ?? res.data })),
-        ),
-      );
-      const merged = {};
-      results.forEach((r) => {
-        if (r.status === "fulfilled") merged[r.value.key] = r.value.data;
-      });
-      const failed = results.filter((r) => r.status === "rejected").length;
-      if (failed === TOTAL_PAGES) {
-        toast.error("All endpoints failed. Check server connection.");
-      } else {
-        if (failed > 0)
-          toast(`${failed} endpoint(s) had errors.`, { icon: "⚠️" });
-        else toast.success("Dashboard loaded successfully.");
-        setAllData({ ...EMPTY_DATA, ...merged });
-        setLastFetched(new Date());
-        setCurrentPage(0);
-        setIsRunning(true);
+  // Only fetch endpoints for visible pages
+  const fetchData = useCallback(
+    async (dateParam, shiftParam, cfg) => {
+      if (!dateParam) {
+        toast.error("Please select a shift date.");
+        return;
       }
-    } catch {
-      toast.error("Failed to fetch dashboard data.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      if (!cfg?.id) {
+        toast.error("No dashboard configuration selected.");
+        return;
+      }
+      setLoading(true);
+      setIsRunning(false);
+      setAllData(EMPTY_DATA);
+      const params = buildParams(cfg, dateParam, shiftParam);
+
+      const ALL_ENDPOINTS = {
+        productionDisplay1: `${baseURL}dashboard/production-display-1`,
+        productionDisplay2: `${baseURL}dashboard/production-display-2`,
+        hourly: `${baseURL}dashboard/hourly`,
+        quality: `${baseURL}dashboard/quality`,
+        loss: `${baseURL}dashboard/loss`,
+      };
+      // Only request endpoints for visible pages
+      const visibleKeys = visiblePagesMeta.map((p) => p.key);
+      const endpoints = Object.fromEntries(
+        Object.entries(ALL_ENDPOINTS).filter(([k]) => visibleKeys.includes(k)),
+      );
+
+      try {
+        const results = await Promise.allSettled(
+          Object.entries(endpoints).map(([key, url]) =>
+            axios
+              .get(url, { params })
+              .then((res) => ({ key, data: res.data?.data ?? res.data })),
+          ),
+        );
+        const merged = {};
+        results.forEach((r) => {
+          if (r.status === "fulfilled") merged[r.value.key] = r.value.data;
+        });
+        const failed = results.filter((r) => r.status === "rejected").length;
+        const total = Object.keys(endpoints).length;
+
+        if (total === 0) {
+          toast.error("No pages enabled for this configuration.");
+        } else if (failed === total) {
+          toast.error("All endpoints failed. Check server connection.");
+        } else {
+          if (failed > 0)
+            toast(`${failed} endpoint(s) had errors.`, { icon: "⚠️" });
+          else toast.success("Dashboard loaded successfully.");
+          setAllData({ ...EMPTY_DATA, ...merged });
+          setLastFetched(new Date());
+          setCurrentPage(0);
+          setIsRunning(true);
+        }
+      } catch {
+        toast.error("Failed to fetch dashboard data.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [visiblePagesMeta],
+  );
 
   useEffect(() => {
     if (isLaunched && launchedConfig)
@@ -580,18 +637,19 @@ const Monitoring = () => {
     [fetchData, shiftDate, shift, launchedConfig],
   );
 
+  // Wrap navigation around totalPages (not constant 5)
   const goTo = useCallback((i) => {
     setCurrentPage(i);
     setProgress(0);
   }, []);
   const goPrev = useCallback(() => {
-    setCurrentPage((p) => (p - 1 + TOTAL_PAGES) % TOTAL_PAGES);
+    setCurrentPage((p) => (p - 1 + totalPages) % totalPages);
     setProgress(0);
-  }, []);
+  }, [totalPages]);
   const goNext = useCallback(() => {
-    setCurrentPage((p) => (p + 1) % TOTAL_PAGES);
+    setCurrentPage((p) => (p + 1) % totalPages);
     setProgress(0);
-  }, []);
+  }, [totalPages]);
 
   const handleShiftSwitch = useCallback(
     (s, cfg) => {
@@ -610,30 +668,55 @@ const Monitoring = () => {
     [fetchData],
   );
 
-  /* If not launched, render nothing (redirect handles it) */
   if (!isLaunched || !launchedConfig) return null;
 
   const commonProps = { progress, shift, shiftDate, config: launchedConfig };
 
-  const pages = [
-    <ProductionDisplay1
-      key="pd1"
-      apiData={allData.productionDisplay1}
-      {...commonProps}
-    />,
-    <ProductionDisplay2
-      key="pd2"
-      apiData={allData.productionDisplay2}
-      {...commonProps}
-    />,
-    <Hourly key="hourly" apiData={allData.hourly} {...commonProps} />,
-    <Quality key="quality" apiData={allData.quality} {...commonProps} />,
-    <Loss key="loss" apiData={allData.loss} {...commonProps} />,
-  ];
+  // Build pages dynamically — only visible ones
+  const PAGE_COMPONENTS = {
+    productionDisplay1: (
+      <ProductionDisplay1
+        apiData={allData.productionDisplay1}
+        {...commonProps}
+      />
+    ),
+    productionDisplay2: (
+      <ProductionDisplay2
+        apiData={allData.productionDisplay2}
+        {...commonProps}
+      />
+    ),
+    hourly: <Hourly apiData={allData.hourly} {...commonProps} />,
+    quality: <Quality apiData={allData.quality} {...commonProps} />,
+    loss: <Loss apiData={allData.loss} {...commonProps} />,
+  };
+  const pages = visiblePagesMeta.map((meta) => PAGE_COMPONENTS[meta.key]);
+
+  // Edge case: no pages enabled
+  if (totalPages === 0) {
+    return (
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-50">
+        <AlertTriangle className="w-12 h-12 text-amber-500 mb-3" />
+        <p className="text-slate-700 font-bold text-lg">
+          No pages enabled for this configuration
+        </p>
+        <p className="text-slate-400 text-sm mt-1 mb-4">
+          Please edit this configuration in Management and enable at least one
+          page.
+        </p>
+        <button
+          onClick={() => navigate("/display/management")}
+          className="px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-700 transition-colors"
+        >
+          Back to Management
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col bg-slate-50 overflow-hidden font-sans">
-      {/* Top bar */}
+      {/* Top bar — UNCHANGED */}
       <div className="flex items-center gap-2.5 px-4 py-1.5 bg-white border-b border-slate-100 shrink-0 shadow-sm">
         <span className="font-extrabold text-[13px] text-slate-900 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
@@ -667,6 +750,10 @@ const Monitoring = () => {
           )}
           {loading ? "Loading…" : "Refresh"}
         </button>
+        {/* ⭐ Show visible page count */}
+        <span className="text-[11px] text-slate-400 font-mono">
+          {totalPages} page{totalPages > 1 ? "s" : ""}
+        </span>
         <div className="ml-auto flex gap-2 items-center">
           {lastFetched && (
             <span className="text-[11px] text-slate-400">
@@ -681,7 +768,8 @@ const Monitoring = () => {
               <Pause className="w-3 h-3" /> Pause
             </button>
           ) : (
-            lastFetched && (
+            lastFetched &&
+            totalPages > 1 && (
               <button
                 onClick={() => setIsRunning(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border-[1.5px] border-emerald-300 transition-all hover:bg-emerald-100"
@@ -699,7 +787,6 @@ const Monitoring = () => {
         </div>
       </div>
 
-      {/* Loading */}
       {loading && (
         <div className="flex-1 flex flex-col items-center justify-center bg-white gap-3.5">
           <Spinner cls="w-8 h-8 text-indigo-500" />
@@ -707,13 +794,12 @@ const Monitoring = () => {
         </div>
       )}
 
-      {/* Dashboard pages */}
       {!loading && lastFetched && (
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex-1 min-h-0 overflow-hidden">
             {pages.map((page, i) => (
               <div
-                key={i}
+                key={visiblePagesMeta[i].key}
                 className="h-full"
                 style={{
                   display: i === currentPage ? "flex" : "none",
@@ -724,16 +810,19 @@ const Monitoring = () => {
               </div>
             ))}
           </div>
-          <NavDots
-            currentPage={currentPage}
-            onGoTo={goTo}
-            onPrev={goPrev}
-            onNext={goNext}
-          />
+          {/* ⭐ Only render NavDots if more than 1 page */}
+          {totalPages > 1 && (
+            <NavDots
+              pagesMeta={visiblePagesMeta}
+              currentPage={currentPage}
+              onGoTo={goTo}
+              onPrev={goPrev}
+              onNext={goNext}
+            />
+          )}
         </div>
       )}
 
-      {/* Waiting for first fetch */}
       {!loading && !lastFetched && (
         <div className="flex-1 flex flex-col items-center justify-center bg-white gap-3.5">
           <Spinner cls="w-8 h-8 text-indigo-500" />

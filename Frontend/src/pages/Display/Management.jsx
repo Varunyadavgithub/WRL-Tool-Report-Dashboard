@@ -66,50 +66,74 @@ const EMPTY_FORM = {
 
 /* ── Column definitions ── */
 const COLUMNS = [
-  { key: "dashboardName",          label: "Dashboard",    group: "General"    },
-  { key: "lineName",               label: "Line Name",    group: "General"    },
-  { key: "lineCode",               label: "Line Code",    group: "General"    },
-  { key: "workingTimeMin",         label: "Working Min",  group: "General"    },
-  { key: "stationCode1",           label: "Station",      group: "Display 1"  },
-  { key: "stationName1",           label: "Name",         group: "Display 1"  },
-  { key: "lineTaktTime1",          label: "Takt (s)",     group: "Display 1"  },
-  { key: "lineMonthlyProduction1", label: "Monthly",      group: "Display 1"  },
-  { key: "lineTarget1",            label: "UPH",          group: "Display 1"  },
-  { key: "stationCode2",           label: "Station",      group: "Display 2"  },
-  { key: "stationName2",           label: "Name",         group: "Display 2"  },
-  { key: "lineTaktTime2",          label: "Takt (s)",     group: "Display 2"  },
-  { key: "lineMonthlyProduction2", label: "Monthly",      group: "Display 2"  },
-  { key: "qualityProcessCode",     label: "Process Code", group: "Quality"    },
-  { key: "qualityLineName",        label: "Line Name",    group: "Quality"    },
-  { key: "sectionName",            label: "Section",      group: "Loss"       },
+  { key: "dashboardName", label: "Dashboard", group: "General" },
+  { key: "lineName", label: "Line Name", group: "General" },
+  { key: "lineCode", label: "Line Code", group: "General" },
+  { key: "workingTimeMin", label: "Working Min", group: "General" },
+  { key: "stationCode1", label: "Station", group: "Display 1" },
+  { key: "stationName1", label: "Name", group: "Display 1" },
+  { key: "lineTaktTime1", label: "Takt (s)", group: "Display 1" },
+  { key: "lineMonthlyProduction1", label: "Monthly", group: "Display 1" },
+  { key: "lineTarget1", label: "UPH", group: "Display 1" },
+  { key: "stationCode2", label: "Station", group: "Display 2" },
+  { key: "stationName2", label: "Name", group: "Display 2" },
+  { key: "lineTaktTime2", label: "Takt (s)", group: "Display 2" },
+  { key: "lineMonthlyProduction2", label: "Monthly", group: "Display 2" },
+  { key: "qualityProcessCode", label: "Process Code", group: "Quality" },
+  { key: "qualityLineName", label: "Line Name", group: "Quality" },
+  { key: "sectionName", label: "Section", group: "Loss" },
   // Visibility summary column
-  { key: "_visibility",            label: "Pages",        group: "Visibility" },
+  { key: "_visibility", label: "Pages", group: "Visibility" },
 ];
 
 const GROUP_CONFIG = {
   General: {
-    hex: "#6366f1", light: "bg-indigo-50", border: "border-indigo-200",
-    text: "text-indigo-600", Icon: Cpu, label: "General Info",
+    hex: "#6366f1",
+    light: "bg-indigo-50",
+    border: "border-indigo-200",
+    text: "text-indigo-600",
+    Icon: Cpu,
+    label: "General Info",
   },
   "Display 1": {
-    hex: "#0ea5e9", light: "bg-sky-50", border: "border-sky-200",
-    text: "text-sky-600", Icon: Layers, label: "Main Display 1",
+    hex: "#0ea5e9",
+    light: "bg-sky-50",
+    border: "border-sky-200",
+    text: "text-sky-600",
+    Icon: Layers,
+    label: "Main Display 1",
   },
   "Display 2": {
-    hex: "#f59e0b", light: "bg-amber-50", border: "border-amber-200",
-    text: "text-amber-600", Icon: Zap, label: "Main Display 2",
+    hex: "#f59e0b",
+    light: "bg-amber-50",
+    border: "border-amber-200",
+    text: "text-amber-600",
+    Icon: Zap,
+    label: "Main Display 2",
   },
   Quality: {
-    hex: "#8b5cf6", light: "bg-violet-50", border: "border-violet-200",
-    text: "text-violet-600", Icon: Shield, label: "Quality",
+    hex: "#8b5cf6",
+    light: "bg-violet-50",
+    border: "border-violet-200",
+    text: "text-violet-600",
+    Icon: Shield,
+    label: "Quality",
   },
   Loss: {
-    hex: "#ef4444", light: "bg-red-50", border: "border-red-200",
-    text: "text-red-600", Icon: BarChart2, label: "Loss Analysis",
+    hex: "#ef4444",
+    light: "bg-red-50",
+    border: "border-red-200",
+    text: "text-red-600",
+    Icon: BarChart2,
+    label: "Loss Analysis",
   },
   Visibility: {
-    hex: "#10b981", light: "bg-emerald-50", border: "border-emerald-200",
-    text: "text-emerald-600", Icon: Eye, label: "Page Visibility",
+    hex: "#10b981",
+    light: "bg-emerald-50",
+    border: "border-emerald-200",
+    text: "text-emerald-600",
+    Icon: Eye,
+    label: "Page Visibility",
   },
 };
 
@@ -117,9 +141,9 @@ const GROUP_CONFIG = {
 const VISIBILITY_FIELDS = [
   { key: "showDisplay1", label: "Production Display 1", color: "#0ea5e9" },
   { key: "showDisplay2", label: "Production Display 2", color: "#f59e0b" },
-  { key: "showHourly",   label: "Hourly Production",    color: "#8b5cf6" },
-  { key: "showQuality",  label: "Quality",              color: "#10b981" },
-  { key: "showLoss",     label: "Loss Analysis",        color: "#ef4444" },
+  { key: "showHourly", label: "Hourly Production", color: "#8b5cf6" },
+  { key: "showQuality", label: "Quality", color: "#10b981" },
+  { key: "showLoss", label: "Loss Analysis", color: "#ef4444" },
 ];
 
 /* ── Form sections ── */
@@ -127,42 +151,89 @@ const FORM_SECTIONS = [
   {
     group: "General",
     fields: [
-      { key: "dashboardName",  label: "Dashboard Name",      placeholder: "e.g. FREEZER FG PACKING", full: true },
-      { key: "lineName",       label: "Line Name",           placeholder: "e.g. FREEZER" },
-      { key: "lineCode",       label: "Line Code",           placeholder: "e.g. 12501" },
-      { key: "workingTimeMin", label: "Working Time (min)",  placeholder: "e.g. 720" },
+      {
+        key: "dashboardName",
+        label: "Dashboard Name",
+        placeholder: "e.g. FREEZER FG PACKING",
+        full: true,
+      },
+      { key: "lineName", label: "Line Name", placeholder: "e.g. FREEZER" },
+      { key: "lineCode", label: "Line Code", placeholder: "e.g. 12501" },
+      {
+        key: "workingTimeMin",
+        label: "Working Time (min)",
+        placeholder: "e.g. 720",
+      },
     ],
   },
   {
     group: "Display 1",
     fields: [
-      { key: "stationCode1",           label: "Station Code",       placeholder: "e.g. 1220010" },
-      { key: "stationName1",           label: "Station Name",       placeholder: "e.g. FG PACKING" },
-      { key: "lineTaktTime1",          label: "Takt Time (s)",      placeholder: "e.g. 40" },
-      { key: "lineMonthlyProduction1", label: "Monthly Production", placeholder: "e.g. 27000" },
-      { key: "lineTarget1",            label: "Target UPH",         placeholder: "e.g. 85" },
+      {
+        key: "stationCode1",
+        label: "Station Code",
+        placeholder: "e.g. 1220010",
+      },
+      {
+        key: "stationName1",
+        label: "Station Name",
+        placeholder: "e.g. FG PACKING",
+      },
+      { key: "lineTaktTime1", label: "Takt Time (s)", placeholder: "e.g. 40" },
+      {
+        key: "lineMonthlyProduction1",
+        label: "Monthly Production",
+        placeholder: "e.g. 27000",
+      },
+      { key: "lineTarget1", label: "Target UPH", placeholder: "e.g. 85" },
     ],
   },
   {
     group: "Display 2",
     fields: [
-      { key: "stationCode2",           label: "Station Code",       placeholder: "e.g. 1220005" },
-      { key: "stationName2",           label: "Station Name",       placeholder: "e.g. FG LOADING" },
-      { key: "lineTaktTime2",          label: "Takt Time (s)",      placeholder: "e.g. 40" },
-      { key: "lineMonthlyProduction2", label: "Monthly Production", placeholder: "e.g. 27000" },
+      {
+        key: "stationCode2",
+        label: "Station Code",
+        placeholder: "e.g. 1220005",
+      },
+      {
+        key: "stationName2",
+        label: "Station Name",
+        placeholder: "e.g. FG LOADING",
+      },
+      { key: "lineTaktTime2", label: "Takt Time (s)", placeholder: "e.g. 40" },
+      {
+        key: "lineMonthlyProduction2",
+        label: "Monthly Production",
+        placeholder: "e.g. 27000",
+      },
     ],
   },
   {
     group: "Quality",
     fields: [
-      { key: "qualityProcessCode", label: "Quality Process Code (comma-separated)", placeholder: "e.g. 12210, 12206", full: true },
-      { key: "qualityLineName",    label: "Line Name",                              placeholder: "e.g. Freezer" },
+      {
+        key: "qualityProcessCode",
+        label: "Quality Process Code (comma-separated)",
+        placeholder: "e.g. 12210, 12206",
+        full: true,
+      },
+      {
+        key: "qualityLineName",
+        label: "Line Name",
+        placeholder: "e.g. Freezer",
+      },
     ],
   },
   {
     group: "Loss",
     fields: [
-      { key: "sectionName", label: "Section Name (EMGMaster.Location)", placeholder: "e.g. FINAL ASSEMBLY", full: true },
+      {
+        key: "sectionName",
+        label: "Section Name (EMGMaster.Location)",
+        placeholder: "e.g. FINAL ASSEMBLY",
+        full: true,
+      },
     ],
   },
   // ── NEW: Visibility section ──
@@ -180,7 +251,8 @@ const GROUP_SPANS = (() => {
   while (i < COLUMNS.length) {
     const g = COLUMNS[i].group;
     let count = 0;
-    while (i + count < COLUMNS.length && COLUMNS[i + count].group === g) count++;
+    while (i + count < COLUMNS.length && COLUMNS[i + count].group === g)
+      count++;
     spans.push({ group: g, count });
     i += count;
   }
@@ -188,36 +260,39 @@ const GROUP_SPANS = (() => {
 })();
 
 const NUM_KEYS = new Set([
-  "lineTaktTime1", "lineMonthlyProduction1", "lineTarget1",
-  "lineTaktTime2", "lineMonthlyProduction2",
+  "lineTaktTime1",
+  "lineMonthlyProduction1",
+  "lineTarget1",
+  "lineTaktTime2",
+  "lineMonthlyProduction2",
   "workingTimeMin",
 ]);
 
 /* ── DB row → form state mapper ── */
 const dbToForm = (row) => ({
-  id:                     row.Id,
-  dashboardName:          row.DashboardName          ?? "",
-  lineName:               row.LineName               ?? "",
-  lineCode:               row.LineCode               ?? "",
-  workingTimeMin:         String(row.WorkingTimeMin         ?? ""),
-  stationCode1:           row.StationCode1           ?? "",
-  stationName1:           row.StationName1           ?? "",
-  lineTaktTime1:          String(row.LineTaktTime1          ?? ""),
+  id: row.Id,
+  dashboardName: row.DashboardName ?? "",
+  lineName: row.LineName ?? "",
+  lineCode: row.LineCode ?? "",
+  workingTimeMin: String(row.WorkingTimeMin ?? ""),
+  stationCode1: row.StationCode1 ?? "",
+  stationName1: row.StationName1 ?? "",
+  lineTaktTime1: String(row.LineTaktTime1 ?? ""),
   lineMonthlyProduction1: String(row.LineMonthlyProduction1 ?? ""),
-  lineTarget1:            String(row.LineTarget1            ?? ""),
-  stationCode2:           row.StationCode2           ?? "",
-  stationName2:           row.StationName2           ?? "",
-  lineTaktTime2:          String(row.LineTaktTime2          ?? ""),
+  lineTarget1: String(row.LineTarget1 ?? ""),
+  stationCode2: row.StationCode2 ?? "",
+  stationName2: row.StationName2 ?? "",
+  lineTaktTime2: String(row.LineTaktTime2 ?? ""),
   lineMonthlyProduction2: String(row.LineMonthlyProduction2 ?? ""),
-  qualityProcessCode:     row.QualityProcessCode     ?? "",
-  qualityLineName:        row.QualityLineName        ?? "",
-  sectionName:            row.SectionName            ?? "",
+  qualityProcessCode: row.QualityProcessCode ?? "",
+  qualityLineName: row.QualityLineName ?? "",
+  sectionName: row.SectionName ?? "",
   // Visibility — default true if column doesn't exist yet in DB
   showDisplay1: row.ShowDisplay1 ?? true,
   showDisplay2: row.ShowDisplay2 ?? true,
-  showHourly:   row.ShowHourly   ?? true,
-  showQuality:  row.ShowQuality  ?? true,
-  showLoss:     row.ShowLoss     ?? true,
+  showHourly: row.ShowHourly ?? true,
+  showQuality: row.ShowQuality ?? true,
+  showLoss: row.ShowLoss ?? true,
 });
 
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -285,11 +360,13 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
   const set = useCallback((k, v) => setForm((f) => ({ ...f, [k]: v })), []);
 
   const isEdit = !!config.id;
-  const sec  = FORM_SECTIONS[activeSection];
+  const sec = FORM_SECTIONS[activeSection];
   const gcfg = GROUP_CONFIG[sec.group];
   const GIcon = gcfg.Icon;
 
-  const enabledCount = VISIBILITY_FIELDS.filter((f) => form[f.key] !== false).length;
+  const enabledCount = VISIBILITY_FIELDS.filter(
+    (f) => form[f.key] !== false,
+  ).length;
 
   return (
     <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6">
@@ -321,7 +398,7 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
         {/* Section Tabs */}
         <div className="flex px-7 py-3 gap-2 bg-slate-50 border-b border-slate-100 shrink-0 overflow-x-auto">
           {FORM_SECTIONS.map((s, i) => {
-            const cfg   = GROUP_CONFIG[s.group];
+            const cfg = GROUP_CONFIG[s.group];
             const SIcon = cfg.Icon;
             const active = activeSection === i;
             return (
@@ -340,7 +417,9 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
                 {s.isVisibilitySection && (
                   <span
                     className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black ${
-                      active ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-500"
+                      active
+                        ? "bg-emerald-600 text-white"
+                        : "bg-slate-200 text-slate-500"
                     }`}
                   >
                     {enabledCount}/5
@@ -367,7 +446,9 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
                 {enabledCount} of {VISIBILITY_FIELDS.length} pages enabled
               </span>
             ) : (
-              <span className="text-xs text-slate-400 ml-auto">{sec.fields.length} fields</span>
+              <span className="text-xs text-slate-400 ml-auto">
+                {sec.fields.length} fields
+              </span>
             )}
           </div>
 
@@ -375,8 +456,8 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
           {sec.isVisibilitySection ? (
             <div className="space-y-3">
               <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                Choose which dashboard pages are shown when this configuration is launched.
-                Hidden pages are skipped during auto-rotation.
+                Choose which dashboard pages are shown when this configuration
+                is launched. Hidden pages are skipped during auto-rotation.
               </p>
               {VISIBILITY_FIELDS.map((f) => (
                 <VisibilityToggle
@@ -390,7 +471,8 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
               {enabledCount === 0 && (
                 <div className="mt-3 flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-xs font-semibold">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  At least one page must be enabled for the dashboard to display anything.
+                  At least one page must be enabled for the dashboard to display
+                  anything.
                 </div>
               )}
             </div>
@@ -426,7 +508,9 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
                 key={i}
                 onClick={() => setActiveSection(i)}
                 className={`h-2 rounded-full cursor-pointer transition-all ${
-                  i === activeSection ? "w-6 bg-indigo-500" : "w-2 bg-slate-200 hover:bg-slate-300"
+                  i === activeSection
+                    ? "w-6 bg-indigo-500"
+                    : "w-2 bg-slate-200 hover:bg-slate-300"
                 }`}
               />
             ))}
@@ -461,9 +545,14 @@ const ConfigModal = ({ config, saving, onClose, onSave }) => {
                 }`}
               >
                 {saving ? (
-                  <><Spinner cls="w-3.5 h-3.5" /> Saving…</>
+                  <>
+                    <Spinner cls="w-3.5 h-3.5" /> Saving…
+                  </>
                 ) : (
-                  <><Save className="w-3.5 h-3.5" />{isEdit ? "Update Config" : "Save Config"}</>
+                  <>
+                    <Save className="w-3.5 h-3.5" />
+                    {isEdit ? "Update Config" : "Save Config"}
+                  </>
                 )}
               </button>
             )}
@@ -492,8 +581,12 @@ const LaunchModal = ({ config, onClose, onLaunch }) => {
             <Play className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h2 className="text-white font-extrabold text-base">Launch Dashboard</h2>
-            <p className="text-white/75 text-xs mt-0.5">{config.dashboardName}</p>
+            <h2 className="text-white font-extrabold text-base">
+              Launch Dashboard
+            </h2>
+            <p className="text-white/75 text-xs mt-0.5">
+              {config.dashboardName}
+            </p>
           </div>
         </div>
 
@@ -518,18 +611,30 @@ const LaunchModal = ({ config, onClose, onLaunch }) => {
             </label>
             <div className="grid grid-cols-2 gap-2.5">
               {[
-                { s: "A", lbl: "08:00 – 20:00", active: "bg-emerald-50 text-emerald-700 border-emerald-400" },
-                { s: "B", lbl: "20:00 – 08:00", active: "bg-amber-50 text-amber-700 border-amber-400" },
+                {
+                  s: "A",
+                  lbl: "08:00 – 20:00",
+                  active: "bg-emerald-50 text-emerald-700 border-emerald-400",
+                },
+                {
+                  s: "B",
+                  lbl: "20:00 – 08:00",
+                  active: "bg-amber-50 text-amber-700 border-amber-400",
+                },
               ].map(({ s, lbl, active }) => (
                 <button
                   key={s}
                   onClick={() => setShift(s)}
                   className={`py-3.5 rounded-lg border-2 font-bold transition-all ${
-                    shift === s ? active : "border-slate-200 bg-slate-50 text-slate-400"
+                    shift === s
+                      ? active
+                      : "border-slate-200 bg-slate-50 text-slate-400"
                   }`}
                 >
                   <div className="text-lg">Shift {s}</div>
-                  <div className="text-[11px] font-normal mt-1 opacity-75">{lbl}</div>
+                  <div className="text-[11px] font-normal mt-1 opacity-75">
+                    {lbl}
+                  </div>
                 </button>
               ))}
             </div>
@@ -547,9 +652,19 @@ const LaunchModal = ({ config, onClose, onLaunch }) => {
                   <span
                     key={f.key}
                     className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
-                      on ? "border-current" : "border-slate-100 text-slate-300 bg-slate-50"
+                      on
+                        ? "border-current"
+                        : "border-slate-100 text-slate-300 bg-slate-50"
                     }`}
-                    style={on ? { color: f.color, background: `${f.color}12`, borderColor: `${f.color}44` } : {}}
+                    style={
+                      on
+                        ? {
+                            color: f.color,
+                            background: `${f.color}12`,
+                            borderColor: `${f.color}44`,
+                          }
+                        : {}
+                    }
                   >
                     {on ? "✓" : "✕"} {f.label}
                   </span>
@@ -561,11 +676,19 @@ const LaunchModal = ({ config, onClose, onLaunch }) => {
           {/* Config summary */}
           <div className="bg-slate-50 rounded-lg px-3.5 py-3 mb-5 border border-slate-200">
             {[
-              ["Line",      `${config.lineName || "—"} · ${config.lineCode || "—"}`],
-              ["Station 1", `${config.stationCode1 || "—"} — ${config.stationName1 || "—"}`],
-              ["Station 2", config.stationCode2 ? `${config.stationCode2} — ${config.stationName2}` : "Not configured"],
-              ["Quality",   config.qualityProcessCode || "Not configured"],
-              ["Section",   config.sectionName || "Not configured"],
+              ["Line", `${config.lineName || "—"} · ${config.lineCode || "—"}`],
+              [
+                "Station 1",
+                `${config.stationCode1 || "—"} — ${config.stationName1 || "—"}`,
+              ],
+              [
+                "Station 2",
+                config.stationCode2
+                  ? `${config.stationCode2} — ${config.stationName2}`
+                  : "Not configured",
+              ],
+              ["Quality", config.qualityProcessCode || "Not configured"],
+              ["Section", config.sectionName || "Not configured"],
             ].map(([k, v]) => (
               <div key={k} className="flex gap-2.5 py-1 text-xs">
                 <span className="text-slate-400 min-w-[68px]">{k}</span>
@@ -604,9 +727,12 @@ const DeleteModal = ({ name, saving, onClose, onConfirm }) => (
       <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
         <Trash2 className="w-7 h-7 text-red-500" />
       </div>
-      <h2 className="font-extrabold text-lg text-slate-900 mb-2">Delete Configuration?</h2>
+      <h2 className="font-extrabold text-lg text-slate-900 mb-2">
+        Delete Configuration?
+      </h2>
       <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-        <strong className="text-red-500">{name}</strong> will be permanently removed.
+        <strong className="text-red-500">{name}</strong> will be permanently
+        removed.
       </p>
       <div className="grid grid-cols-2 gap-2.5">
         <button
@@ -622,13 +748,19 @@ const DeleteModal = ({ name, saving, onClose, onConfirm }) => (
           onClick={onConfirm}
           disabled={saving}
           className={`py-3 rounded-lg font-bold text-white flex items-center justify-center gap-1.5 transition-all ${
-            saving ? "bg-red-300 cursor-not-allowed" : "bg-red-500 hover:bg-red-600"
+            saving
+              ? "bg-red-300 cursor-not-allowed"
+              : "bg-red-500 hover:bg-red-600"
           }`}
         >
           {saving ? (
-            <><Spinner cls="w-3.5 h-3.5" /> Deleting…</>
+            <>
+              <Spinner cls="w-3.5 h-3.5" /> Deleting…
+            </>
           ) : (
-            <><Trash2 className="w-3.5 h-3.5" /> Delete</>
+            <>
+              <Trash2 className="w-3.5 h-3.5" /> Delete
+            </>
           )}
         </button>
       </div>
@@ -642,12 +774,12 @@ const DeleteModal = ({ name, saving, onClose, onConfirm }) => (
 const Management = () => {
   const navigate = useNavigate();
 
-  const [configs,  setConfigs]  = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [saving,   setSaving]   = useState(false);
-  const [error,    setError]    = useState(null);
-  const [modal,    setModal]    = useState(null);
-  const [search,   setSearch]   = useState("");
+  const [configs, setConfigs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [modal, setModal] = useState(null);
+  const [search, setSearch] = useState("");
 
   /* ── Fetch configs ── */
   const fetchConfigs = useCallback(async () => {
@@ -664,14 +796,27 @@ const Management = () => {
     }
   }, []);
 
-  useEffect(() => { fetchConfigs(); }, [fetchConfigs]);
+  useEffect(() => {
+    fetchConfigs();
+  }, [fetchConfigs]);
 
   /* ── Save (POST / PUT) ── */
   const handleSave = useCallback(async (form) => {
-    if (!form.dashboardName?.trim()) { toast.error("Dashboard name is required."); return; }
-    if (!form.stationCode1?.trim())  { toast.error("Station Code 1 is required."); return; }
-    const enabledCount = VISIBILITY_FIELDS.filter((f) => form[f.key] !== false).length;
-    if (enabledCount === 0) { toast.error("At least one page must be enabled."); return; }
+    if (!form.dashboardName?.trim()) {
+      toast.error("Dashboard name is required.");
+      return;
+    }
+    if (!form.stationCode1?.trim()) {
+      toast.error("Station Code 1 is required.");
+      return;
+    }
+    const enabledCount = VISIBILITY_FIELDS.filter(
+      (f) => form[f.key] !== false,
+    ).length;
+    if (enabledCount === 0) {
+      toast.error("At least one page must be enabled.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -688,7 +833,9 @@ const Management = () => {
       }
       setModal(null);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to save configuration.");
+      toast.error(
+        err.response?.data?.message || "Failed to save configuration.",
+      );
     } finally {
       setSaving(false);
     }
@@ -726,20 +873,47 @@ const Management = () => {
 
   /* ── Derived: filtered list ── */
   const filtered = configs.filter((c) =>
-    [c.dashboardName, c.lineName, c.sectionName, c.stationName1, c.stationName2]
-      .some((v) => (v || "").toLowerCase().includes(search.toLowerCase()))
+    [
+      c.dashboardName,
+      c.lineName,
+      c.sectionName,
+      c.stationName1,
+      c.stationName2,
+    ].some((v) => (v || "").toLowerCase().includes(search.toLowerCase())),
   );
 
   /* ── Stats ── */
   const stats = [
-    { label: "Total Configs", value: configs.length,                                                        Icon: Settings, cls: "text-indigo-600 bg-indigo-50" },
-    { label: "Active Lines",  value: new Set(configs.map((c) => c.lineName).filter(Boolean)).size,          Icon: Layers,   cls: "text-sky-600 bg-sky-50"       },
-    { label: "Sections",      value: new Set(configs.map((c) => c.sectionName).filter(Boolean)).size,       Icon: BarChart2,cls: "text-amber-600 bg-amber-50"   },
-    { label: "Dual Displays", value: configs.filter((c) => c.stationCode2?.trim()).length,                  Icon: Zap,      cls: "text-emerald-600 bg-emerald-50"},
+    {
+      label: "Total Configs",
+      value: configs.length,
+      Icon: Settings,
+      cls: "text-indigo-600 bg-indigo-50",
+    },
+    {
+      label: "Active Lines",
+      value: new Set(configs.map((c) => c.lineName).filter(Boolean)).size,
+      Icon: Layers,
+      cls: "text-sky-600 bg-sky-50",
+    },
+    {
+      label: "Sections",
+      value: new Set(configs.map((c) => c.sectionName).filter(Boolean)).size,
+      Icon: BarChart2,
+      cls: "text-amber-600 bg-amber-50",
+    },
+    {
+      label: "Dual Displays",
+      value: configs.filter((c) => c.stationCode2?.trim()).length,
+      Icon: Zap,
+      cls: "text-emerald-600 bg-emerald-50",
+    },
   ];
 
   /* ── Close modal guard ── */
-  const closeModal = useCallback(() => { if (!saving) setModal(null); }, [saving]);
+  const closeModal = useCallback(() => {
+    if (!saving) setModal(null);
+  }, [saving]);
 
   /* ════════════════════════════════════════════
      RENDER
@@ -768,7 +942,10 @@ const Management = () => {
               className="bg-transparent border-none outline-none text-slate-900 text-[13px] w-[200px] placeholder:text-slate-400"
             />
             {search && (
-              <button onClick={() => setSearch("")} className="text-slate-400 hover:text-slate-600 transition-colors">
+              <button
+                onClick={() => setSearch("")}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -779,10 +956,16 @@ const Management = () => {
             onClick={fetchConfigs}
             disabled={loading}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 font-semibold text-[13px] transition-all ${
-              loading ? "opacity-60 cursor-not-allowed" : "bg-white hover:bg-slate-50"
+              loading
+                ? "opacity-60 cursor-not-allowed"
+                : "bg-white hover:bg-slate-50"
             }`}
           >
-            {loading ? <Spinner cls="w-3.5 h-3.5" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            {loading ? (
+              <Spinner cls="w-3.5 h-3.5" />
+            ) : (
+              <RefreshCw className="w-3.5 h-3.5" />
+            )}
             Refresh
           </button>
 
@@ -821,12 +1004,19 @@ const Management = () => {
         {/* Stats row */}
         <div className="grid grid-cols-4 gap-3 shrink-0">
           {stats.map((s) => (
-            <div key={s.label} className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${s.cls}`}>
+            <div
+              key={s.label}
+              className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 flex items-center gap-4"
+            >
+              <div
+                className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${s.cls}`}
+              >
                 <s.Icon className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-[28px] font-extrabold leading-none text-slate-900">{s.value}</div>
+                <div className="text-[28px] font-extrabold leading-none text-slate-900">
+                  {s.value}
+                </div>
                 <div className="text-xs text-slate-400 mt-1">{s.label}</div>
               </div>
             </div>
@@ -844,7 +1034,7 @@ const Management = () => {
                     Actions
                   </th>
                   {GROUP_SPANS.map(({ group, count }) => {
-                    const cfg   = GROUP_CONFIG[group];
+                    const cfg = GROUP_CONFIG[group];
                     const GIcon = cfg.Icon;
                     return (
                       <th
@@ -878,7 +1068,10 @@ const Management = () => {
                 {/* Loading */}
                 {loading && (
                   <tr>
-                    <td colSpan={COLUMNS.length + 1} className="py-16 text-center">
+                    <td
+                      colSpan={COLUMNS.length + 1}
+                      className="py-16 text-center"
+                    >
                       <div className="flex flex-col items-center gap-3 text-slate-400">
                         <Spinner cls="w-7 h-7 text-indigo-500" />
                         <p className="text-sm">Loading configurations…</p>
@@ -890,11 +1083,19 @@ const Management = () => {
                 {/* Empty */}
                 {!loading && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={COLUMNS.length + 1} className="py-16 text-center">
+                    <td
+                      colSpan={COLUMNS.length + 1}
+                      className="py-16 text-center"
+                    >
                       <div className="flex flex-col items-center gap-3 text-slate-400">
-                        <PackageOpen className="w-12 h-12 opacity-20" strokeWidth={1.2} />
+                        <PackageOpen
+                          className="w-12 h-12 opacity-20"
+                          strokeWidth={1.2}
+                        />
                         <p className="text-sm font-bold text-slate-500">
-                          {search ? "No results found" : "No configurations yet"}
+                          {search
+                            ? "No results found"
+                            : "No configurations yet"}
                         </p>
                         <p className="text-xs text-slate-400">
                           {search
@@ -909,26 +1110,35 @@ const Management = () => {
                 {/* Data rows */}
                 {!loading &&
                   filtered.map((cfg) => (
-                    <tr key={cfg.id} className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40">
+                    <tr
+                      key={cfg.id}
+                      className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
+                    >
                       {/* Actions */}
                       <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
                         <div className="flex gap-1 items-center">
                           <button
-                            onClick={() => setModal({ type: "launch", config: cfg })}
+                            onClick={() =>
+                              setModal({ type: "launch", config: cfg })
+                            }
                             title="Launch Dashboard"
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-emerald-50 text-emerald-600 text-[11px] font-bold hover:bg-emerald-100 transition-colors"
                           >
                             <Play className="w-3 h-3" /> Launch
                           </button>
                           <button
-                            onClick={() => setModal({ type: "edit", config: { ...cfg } })}
+                            onClick={() =>
+                              setModal({ type: "edit", config: { ...cfg } })
+                            }
                             title="Edit"
                             className="w-7 h-7 rounded-md bg-indigo-50 text-indigo-500 flex items-center justify-center hover:bg-indigo-100 transition-colors"
                           >
                             <Pencil className="w-3 h-3" />
                           </button>
                           <button
-                            onClick={() => setModal({ type: "delete", config: cfg })}
+                            onClick={() =>
+                              setModal({ type: "delete", config: cfg })
+                            }
                             title="Delete"
                             className="w-7 h-7 rounded-md bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-colors"
                           >
@@ -942,7 +1152,10 @@ const Management = () => {
                         // ── Special: visibility summary cell ──
                         if (col.key === "_visibility") {
                           return (
-                            <td key="_visibility" className="px-2.5 py-2 border-b border-slate-100 border-l border-slate-50">
+                            <td
+                              key="_visibility"
+                              className="px-2.5 py-2 border-b border-slate-100 border-l border-slate-50"
+                            >
                               <div className="flex gap-0.5 flex-wrap justify-center">
                                 {VISIBILITY_FIELDS.map((f) => {
                                   const on = cfg[f.key] !== false;
@@ -951,11 +1164,17 @@ const Management = () => {
                                       key={f.key}
                                       title={`${f.label}: ${on ? "Shown" : "Hidden"}`}
                                       className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-black ${
-                                        on ? "text-white" : "bg-slate-100 text-slate-300"
+                                        on
+                                          ? "text-white"
+                                          : "bg-slate-100 text-slate-300"
                                       }`}
                                       style={on ? { background: f.color } : {}}
                                     >
-                                      {on ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
+                                      {on ? (
+                                        <Eye className="w-2.5 h-2.5" />
+                                      ) : (
+                                        <EyeOff className="w-2.5 h-2.5" />
+                                      )}
                                     </span>
                                   );
                                 })}
@@ -964,14 +1183,16 @@ const Management = () => {
                           );
                         }
 
-                        const v      = cfg[col.key];
+                        const v = cfg[col.key];
                         const isDash = col.key === "dashboardName";
-                        const isNum  = NUM_KEYS.has(col.key);
+                        const isNum = NUM_KEYS.has(col.key);
                         return (
                           <td
                             key={col.key}
                             className={`px-2.5 py-2 border-b border-slate-100 border-l border-slate-50 whitespace-nowrap ${
-                              isDash ? "font-bold text-slate-800 text-xs" : "text-slate-600 text-[11px]"
+                              isDash
+                                ? "font-bold text-slate-800 text-xs"
+                                : "text-slate-600 text-[11px]"
                             } ${isNum ? "text-center" : "text-left"}`}
                           >
                             {v ? (
@@ -980,7 +1201,9 @@ const Management = () => {
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 inline-block" />
                                   {v}
                                 </span>
-                              ) : v
+                              ) : (
+                                v
+                              )
                             ) : (
                               <span className="text-slate-300">—</span>
                             )}
@@ -991,28 +1214,6 @@ const Management = () => {
                   ))}
               </tbody>
             </table>
-          </div>
-
-          {/* Table footer */}
-          <div className="flex items-center justify-between px-5 py-2.5 bg-slate-50 border-t border-slate-100 text-xs text-slate-400 shrink-0">
-            <span className="flex items-center gap-1.5">
-              <Activity className="w-3 h-3 text-indigo-500" />
-              Showing{" "}
-              <strong className="text-slate-900 mx-0.5">{filtered.length}</strong>
-              {" "}of{" "}
-              <strong className="text-slate-900 mx-0.5">{configs.length}</strong>
-              {" "}configurations
-            </span>
-            <div className="flex gap-3.5">
-              {Object.entries(GROUP_CONFIG).map(([g, c]) => {
-                const GIcon = c.Icon;
-                return (
-                  <span key={g} className={`flex items-center gap-1 text-[11px] ${c.text}`}>
-                    <GIcon className="w-2.5 h-2.5" /> {g}
-                  </span>
-                );
-              })}
-            </div>
           </div>
         </div>
       </div>
@@ -1027,7 +1228,11 @@ const Management = () => {
         />
       )}
       {modal?.type === "launch" && (
-        <LaunchModal config={modal.config} onClose={closeModal} onLaunch={handleLaunch} />
+        <LaunchModal
+          config={modal.config}
+          onClose={closeModal}
+          onLaunch={handleLaunch}
+        />
       )}
       {modal?.type === "delete" && (
         <DeleteModal

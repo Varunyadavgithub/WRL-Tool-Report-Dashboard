@@ -494,28 +494,52 @@ export const createDashboardConfig = tryCatch(async (req, res) => {
     qualityLineName,
     sectionName,
     workingTimeMin,
+    // ── NEW: visibility flags ──
+    showDisplay1,
+    showDisplay2,
+    showHourly,
+    showQuality,
+    showLoss,
   } = req.body;
- 
-  // ─── Validation ───────────────────────────────────────────────
+
   if (!dashboardName?.trim())
     throw new AppError("Dashboard name is required.", 400);
   if (!stationCode1?.trim())
     throw new AppError("Station Code 1 is required.", 400);
 
-  // Helper: safely parse int, returns fallback if value is not a valid number
   const safeInt = (val, fallback = null) => {
     if (val === undefined || val === null || val === "") return fallback;
     const n = Number(val);
     return Number.isFinite(n) ? Math.round(n) : fallback;
   };
 
-  // Validate optional int fields — reject if provided but not numeric
+  // Bool helper — defaults to true if missing/undefined
+  const safeBool = (v, fallback = true) => {
+    if (v === undefined || v === null) return fallback;
+    if (typeof v === "boolean") return v;
+    if (typeof v === "number") return v !== 0;
+    if (typeof v === "string")
+      return !["false", "0", ""].includes(v.toLowerCase());
+    return fallback;
+  };
+
+  // Validate at least one page is enabled
+  const visibility = {
+    ShowDisplay1: safeBool(showDisplay1),
+    ShowDisplay2: safeBool(showDisplay2),
+    ShowHourly: safeBool(showHourly),
+    ShowQuality: safeBool(showQuality),
+    ShowLoss: safeBool(showLoss),
+  };
+  if (!Object.values(visibility).some(Boolean)) {
+    throw new AppError("At least one dashboard page must be enabled.", 400);
+  }
+
   const optionalIntFields = {
     lineTaktTime2,
     lineMonthlyProduction2,
     workingTimeMin,
   };
-
   for (const [fieldName, value] of Object.entries(optionalIntFields)) {
     if (value !== undefined && value !== null && value !== "") {
       if (!Number.isFinite(Number(value))) {
@@ -527,7 +551,6 @@ export const createDashboardConfig = tryCatch(async (req, res) => {
     }
   }
 
-  // ─── DB Insert ────────────────────────────────────────────────
   const data = await withPool(async (pool) => {
     const result = await pool
       .request()
@@ -558,49 +581,30 @@ export const createDashboardConfig = tryCatch(async (req, res) => {
         qualityLineName?.trim() || null,
       )
       .input("SectionName", sql.NVarChar(200), sectionName?.trim() || null)
-      .input("WorkingTimeMin", sql.Int, safeInt(workingTimeMin, 600)).query(`
-        DECLARE @tmp TABLE (
-          Id                    INT,
-          DashboardName         NVARCHAR(120),
-          LineName              NVARCHAR(100),
-          LineCode              NVARCHAR(50),
-          WorkingTimeMin        INT,
-          StationCode1          NVARCHAR(50),
-          StationName1          NVARCHAR(100),
-          LineTaktTime1         INT,
-          LineMonthlyProduction1 INT,
-          LineTarget1           INT,
-          StationCode2          NVARCHAR(50),
-          StationName2          NVARCHAR(100),
-          LineTaktTime2         INT,
-          LineMonthlyProduction2 INT,
-          QualityProcessCode    NVARCHAR(500),
-          QualityLineName       NVARCHAR(100),
-          SectionName           NVARCHAR(200),
-          IsActive              BIT,
-          CreatedAt             DATETIME,
-          UpdatedAt             DATETIME,
-          CreatedBy             NVARCHAR(100),
-          UpdatedBy             NVARCHAR(100)
-        );
-
+      .input("WorkingTimeMin", sql.Int, safeInt(workingTimeMin, 600))
+      // ── NEW: bind visibility flags ──
+      .input("ShowDisplay1", sql.Bit, visibility.ShowDisplay1)
+      .input("ShowDisplay2", sql.Bit, visibility.ShowDisplay2)
+      .input("ShowHourly", sql.Bit, visibility.ShowHourly)
+      .input("ShowQuality", sql.Bit, visibility.ShowQuality)
+      .input("ShowLoss", sql.Bit, visibility.ShowLoss).query(`
         INSERT INTO dbo.DashboardConfig (
           DashboardName, LineName, LineCode,
           StationCode1, StationName1, LineTaktTime1, LineMonthlyProduction1, LineTarget1,
           StationCode2, StationName2, LineTaktTime2, LineMonthlyProduction2,
           QualityProcessCode, QualityLineName, SectionName, WorkingTimeMin,
+          ShowDisplay1, ShowDisplay2, ShowHourly, ShowQuality, ShowLoss,
           IsActive, CreatedAt, UpdatedAt
         )
-        OUTPUT INSERTED.* INTO @tmp
+        OUTPUT INSERTED.*
         VALUES (
           @DashboardName, @LineName, @LineCode,
           @StationCode1, @StationName1, @LineTaktTime1, @LineMonthlyProduction1, @LineTarget1,
           @StationCode2, @StationName2, @LineTaktTime2, @LineMonthlyProduction2,
           @QualityProcessCode, @QualityLineName, @SectionName, @WorkingTimeMin,
+          @ShowDisplay1, @ShowDisplay2, @ShowHourly, @ShowQuality, @ShowLoss,
           1, GETDATE(), GETDATE()
         );
-
-        SELECT * FROM @tmp;
       `);
 
     return result.recordset[0];
@@ -616,10 +620,8 @@ export const createDashboardConfig = tryCatch(async (req, res) => {
 // PUT /dashboard/configs/:id — update
 export const updateDashboardConfig = tryCatch(async (req, res) => {
   const id = Number(req.params.id);
-
-  if (!Number.isInteger(id) || id <= 0) {
+  if (!Number.isInteger(id) || id <= 0)
     throw new AppError("Invalid config id.", 400);
-  }
 
   const {
     dashboardName,
@@ -638,15 +640,37 @@ export const updateDashboardConfig = tryCatch(async (req, res) => {
     qualityLineName,
     sectionName,
     workingTimeMin,
+    // ── NEW: visibility flags ──
+    showDisplay1,
+    showDisplay2,
+    showHourly,
+    showQuality,
+    showLoss,
   } = req.body;
 
-  // ✅ Safe validations
-  if (!dashboardName || !dashboardName.trim()) {
+  if (!dashboardName || !dashboardName.trim())
     throw new AppError("Dashboard name is required.", 400);
-  }
-
-  if (!String(stationCode1 || "").trim()) {
+  if (!String(stationCode1 || "").trim())
     throw new AppError("Station Code 1 is required.", 400);
+
+  const safeBool = (v, fallback = true) => {
+    if (v === undefined || v === null) return fallback;
+    if (typeof v === "boolean") return v;
+    if (typeof v === "number") return v !== 0;
+    if (typeof v === "string")
+      return !["false", "0", ""].includes(v.toLowerCase());
+    return fallback;
+  };
+
+  const visibility = {
+    ShowDisplay1: safeBool(showDisplay1),
+    ShowDisplay2: safeBool(showDisplay2),
+    ShowHourly: safeBool(showHourly),
+    ShowQuality: safeBool(showQuality),
+    ShowLoss: safeBool(showLoss),
+  };
+  if (!Object.values(visibility).some(Boolean)) {
+    throw new AppError("At least one dashboard page must be enabled.", 400);
   }
 
   const data = await withPool(async (pool) => {
@@ -684,30 +708,13 @@ export const updateDashboardConfig = tryCatch(async (req, res) => {
         qualityLineName?.trim() || null,
       )
       .input("SectionName", sql.NVarChar(200), sectionName?.trim() || null)
-      .input("WorkingTimeMin", sql.Int, Number(workingTimeMin) || 720).query(`
-        DECLARE @tmp TABLE (
-          Id INT,
-          DashboardName NVARCHAR(120),
-          LineName NVARCHAR(100),
-          LineCode NVARCHAR(50),
-          WorkingTimeMin INT,
-          StationCode1 NVARCHAR(50),
-          StationName1 NVARCHAR(100),
-          LineTaktTime1 INT,
-          LineMonthlyProduction1 INT,
-          LineTarget1 INT,
-          StationCode2 NVARCHAR(50),
-          StationName2 NVARCHAR(100),
-          LineTaktTime2 INT,
-          LineMonthlyProduction2 INT,
-          QualityProcessCode NVARCHAR(500),
-          QualityLineName NVARCHAR(100),
-          SectionName NVARCHAR(200),
-          IsActive BIT,
-          CreatedAt DATETIME,
-          UpdatedAt DATETIME
-        );
-
+      .input("WorkingTimeMin", sql.Int, Number(workingTimeMin) || 720)
+      // ── NEW: bind visibility flags ──
+      .input("ShowDisplay1", sql.Bit, visibility.ShowDisplay1)
+      .input("ShowDisplay2", sql.Bit, visibility.ShowDisplay2)
+      .input("ShowHourly", sql.Bit, visibility.ShowHourly)
+      .input("ShowQuality", sql.Bit, visibility.ShowQuality)
+      .input("ShowLoss", sql.Bit, visibility.ShowLoss).query(`
         UPDATE dbo.DashboardConfig
         SET
           DashboardName          = @DashboardName,
@@ -726,40 +733,20 @@ export const updateDashboardConfig = tryCatch(async (req, res) => {
           QualityLineName        = @QualityLineName,
           SectionName            = @SectionName,
           WorkingTimeMin         = @WorkingTimeMin,
+          ShowDisplay1           = @ShowDisplay1,
+          ShowDisplay2           = @ShowDisplay2,
+          ShowHourly             = @ShowHourly,
+          ShowQuality            = @ShowQuality,
+          ShowLoss               = @ShowLoss,
           UpdatedAt              = GETDATE()
-        OUTPUT 
-          INSERTED.Id,
-          INSERTED.DashboardName,
-          INSERTED.LineName,
-          INSERTED.LineCode,
-          INSERTED.WorkingTimeMin,
-          INSERTED.StationCode1,
-          INSERTED.StationName1,
-          INSERTED.LineTaktTime1,
-          INSERTED.LineMonthlyProduction1,
-          INSERTED.LineTarget1,
-          INSERTED.StationCode2,
-          INSERTED.StationName2,
-          INSERTED.LineTaktTime2,
-          INSERTED.LineMonthlyProduction2,
-          INSERTED.QualityProcessCode,
-          INSERTED.QualityLineName,
-          INSERTED.SectionName,
-          INSERTED.IsActive,
-          INSERTED.CreatedAt,
-          INSERTED.UpdatedAt
-        INTO @tmp
+        OUTPUT INSERTED.*
         WHERE Id = @Id AND IsActive = 1;
-
-        SELECT * FROM @tmp;
       `);
 
     return result.recordset[0] || null;
   });
 
-  if (!data) {
-    throw new AppError("Dashboard config not found.", 404);
-  }
+  if (!data) throw new AppError("Dashboard config not found.", 404);
 
   res.status(200).json({
     success: true,
