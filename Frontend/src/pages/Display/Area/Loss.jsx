@@ -1,124 +1,215 @@
-import { useMemo, useState, useCallback, useRef } from "react";
-import {
-  Chart as ChartJS,
-  ArcElement,
-  DoughnutController,
-  Tooltip,
-  Legend,
-} from "chart.js";
-import { Chart } from "react-chartjs-2";
+import { useMemo, useState } from "react";
 import { PackageOpen } from "lucide-react";
 import { PageHeader, TimerBar, StatCard } from "../Monitoring";
 
-  const donutLabelPlugin = {
-    id: "donutLabelPlugin",
-    afterDatasetsDraw(chart) {
-      const { ctx } = chart;
-      const dataset = chart.data.datasets[0];
-      const meta = chart.getDatasetMeta(0);
-
-      ctx.save();
-      meta.data.forEach((arc, index) => {
-        const value = dataset.data[index];
-        const angle = (arc.startAngle + arc.endAngle) / 2;
-
-        const radius = (arc.innerRadius + arc.outerRadius) / 2;
-
-        const x = arc.x + Math.cos(angle) * radius;
-        const y = arc.y + Math.sin(angle) * radius;
-
-        ctx.fillStyle = index === 0 ? "#1d4ed8" : "#475569"; // colors for 90.7 & 9
-        ctx.font = "bold 14px monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-
-        ctx.fillText(`${value.toFixed(1)}`, x, y);
-      });
-      ctx.restore();
-    },
-  };
-
-ChartJS.register(ArcElement, DoughnutController, Tooltip, Legend, donutLabelPlugin);
-
 const ACCENT = "#b45309";
 
-const Loss = ({ apiData = {}, progress, shift, shiftDate }) => {
-  const { stations = [], summary: ls = {} } = apiData;
-  const chartRef = useRef(null);
-  const [tooltip, setTooltip] = useState({
-    show: false,
-    x: 0,
-    y: 0,
-    label: "",
-    value: "",
-    color: "",
+/* ════════════════════════════════════════════════════════════
+   Pure SVG Doughnut — Consumed vs Remaining time
+═══════════════════════════════════════════════════════════ */
+const SvgTimeDoughnut = ({ consumedPct = 0 }) => {
+  const [hover, setHover] = useState(null); // "consumed" | "remaining" | null
+
+  const size = 260;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 95;
+  const strokeW = 46;
+  const circumference = 2 * Math.PI * r;
+
+  const consumed = Math.min(Math.max(consumedPct, 0), 100);
+  const remaining = Number((100 - consumed).toFixed(1));
+
+  const segments = [
+    {
+      key: "consumed",
+      value: consumed,
+      color: "#f59e0b",
+      hoverColor: "rgba(245,158,11,0.5)",
+      label: "Consumed",
+    },
+    {
+      key: "remaining",
+      value: remaining,
+      color: "#e2e8f0",
+      hoverColor: "rgba(148,163,184,0.4)",
+      label: "Remaining",
+    },
+  ].filter((s) => s.value > 0);
+
+  const visibleCount = segments.length;
+  const gap = visibleCount > 1 ? 4 : 0;
+
+  const polarToXY = (angleDeg, radius) => {
+    const rad = (angleDeg - 90) * (Math.PI / 180);
+    return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
+  };
+
+  let cumulativeAngle = 0;
+  const segmentData = segments.map((seg) => {
+    const frac = seg.value / 100;
+    const arcLen = frac * circumference;
+    const startAngle = cumulativeAngle;
+    const endAngle = cumulativeAngle + frac * 360;
+    const midAngle = (startAngle + endAngle) / 2;
+    const labelPos = polarToXY(midAngle, r);
+    cumulativeAngle = endAngle;
+    return {
+      ...seg,
+      frac,
+      arcLen,
+      startOffset: -((startAngle / 360) * circumference),
+      labelPos,
+      pct: seg.value.toFixed(1),
+    };
   });
 
-  const externalTooltipHandler = useCallback((context) => {
-    const { tooltip: tt } = context;
-    if (tt.opacity === 0) {
-      setTooltip((prev) => (prev.show ? { ...prev, show: false } : prev));
-      return;
-    }
-    const { caretX, caretY } = tt;
-    const dataPoint = tt.dataPoints?.[0];
-    if (!dataPoint) return;
-    setTooltip({
-      show: true,
-      x: caretX,
-      y: caretY,
-      label: dataPoint.label || "",
-      value: dataPoint.raw ?? "",
-      color: dataPoint.dataset.backgroundColor[dataPoint.dataIndex] || "#000",
-    });
-  }, []);
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} style={{ overflow: "visible" }}>
+        {/* Background track */}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke="#f1f5f9"
+          strokeWidth={strokeW}
+        />
+
+        {/* Segments */}
+        {segmentData.map((seg) => (
+          <circle
+            key={seg.key}
+            cx={cx}
+            cy={cy}
+            r={r}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth={hover === seg.key ? strokeW + 4 : strokeW}
+            strokeDasharray={`${Math.max(seg.arcLen - gap, 0)} ${circumference}`}
+            strokeDashoffset={seg.startOffset}
+            strokeLinecap="butt"
+            transform={`rotate(-90 ${cx} ${cy})`}
+            style={{
+              transition: "stroke-width 0.2s, stroke-dasharray 1s ease",
+              cursor: "pointer",
+              filter:
+                hover === seg.key
+                  ? `drop-shadow(0 4px 12px ${seg.hoverColor})`
+                  : "none",
+            }}
+            onMouseEnter={() => setHover(seg.key)}
+            onMouseLeave={() => setHover(null)}
+          />
+        ))}
+
+        {/* Segment labels — only if segment >= 12% */}
+        {segmentData
+          .filter((seg) => seg.frac >= 0.12)
+          .map((seg) => {
+            const isLight = seg.key === "remaining"; // dark text on light track
+            const textColor = isLight ? "#475569" : "#ffffff";
+            const shadow = isLight
+              ? "drop-shadow(0 1px 2px rgba(255,255,255,0.8))"
+              : "drop-shadow(0 1px 2px rgba(0,0,0,0.4))";
+            return (
+              <g key={`lbl-${seg.key}`} pointerEvents="none">
+                <text
+                  x={seg.labelPos.x}
+                  y={seg.labelPos.y - 2}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fill={textColor}
+                  fontSize="15"
+                  fontWeight="800"
+                  fontFamily="'JetBrains Mono', monospace"
+                  style={{ filter: shadow }}
+                >
+                  {seg.pct}%
+                </text>
+                <text
+                  x={seg.labelPos.x}
+                  y={seg.labelPos.y + 13}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fill={textColor}
+                  fontSize="9"
+                  fontWeight="700"
+                  fontFamily="'JetBrains Mono', monospace"
+                  opacity="0.85"
+                  letterSpacing="1"
+                  style={{ filter: shadow }}
+                >
+                  {seg.label.toUpperCase()}
+                </text>
+              </g>
+            );
+          })}
+      </svg>
+
+      {/* Center label */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        <span className="text-4xl font-black text-slate-900 leading-none drop-shadow-sm font-mono">
+          {consumed.toFixed(0)}%
+        </span>
+        <span className="text-[10px] text-slate-500 font-bold mt-1 uppercase tracking-wider">
+          Elapsed
+        </span>
+      </div>
+
+      {/* Hover tooltip */}
+      {hover &&
+        (() => {
+          const seg = segmentData.find((s) => s.key === hover);
+          if (!seg) return null;
+          return (
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                left: "50%",
+                top: -12,
+                transform: "translate(-50%, -100%)",
+              }}
+            >
+              <div
+                className="bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl whitespace-nowrap"
+                style={{ border: `2px solid ${seg.color}` }}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-3 h-3 rounded-full"
+                    style={{ background: seg.color }}
+                  />
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    {seg.label} Time
+                  </span>
+                </div>
+                <div className="text-2xl font-black font-mono mt-1 text-center">
+                  {seg.pct}%
+                </div>
+              </div>
+              <div
+                className="w-3 h-3 bg-slate-900 rotate-45 mx-auto -mt-1.5"
+                style={{
+                  borderRight: `2px solid ${seg.color}`,
+                  borderBottom: `2px solid ${seg.color}`,
+                }}
+              />
+            </div>
+          );
+        })()}
+    </div>
+  );
+};
+
+/* ════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+═══════════════════════════════════════════════════════════ */
+const Loss = ({ apiData = {}, progress, shift, shiftDate }) => {
+  const { stations = [], summary: ls = {} } = apiData;
 
   const consumedPct = Number(ls.ConsumedTimePct || 0);
-  const remaining = Number(
-    (100 - Math.min(Math.max(consumedPct, 0), 100)).toFixed(1),
-  );
-
-  const donutData = useMemo(
-    () => ({
-      labels: ["Consumed", "Remaining"],
-      datasets: [
-        {
-          type: "doughnut",
-          data: [Math.min(Math.max(consumedPct, 0), 100), remaining],
-          backgroundColor: ["rgba(245,158,11,0.85)", "rgba(241,245,249,0.9)"],
-          borderColor: ["#f59e0b", "#e2e8f0"],
-          borderWidth: 3,
-          borderRadius: consumedPct > 0 && consumedPct < 100 ? 6 : 0,
-          spacing: 2,
-          hoverOffset: 8,
-        },
-      ],
-    }),
-    [consumedPct, remaining],
-  );
-
-
-
-  const donutOptions = useMemo(
-    () => ({
-      responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 1,
-      cutout: "68%",
-      rotation: -90,
-      plugins: {
-        legend: { display: false },
-        tooltip: { enabled: false, external: externalTooltipHandler },
-      },
-      animation: {
-        animateRotate: true,
-        duration: 1400,
-        easing: "easeInOutQuart",
-      },
-      hover: { mode: "nearest" },
-    }),
-    [externalTooltipHandler],
-  );
 
   const sorted = useMemo(
     () =>
@@ -127,6 +218,7 @@ const Loss = ({ apiData = {}, progress, shift, shiftDate }) => {
       ),
     [stations],
   );
+
   const totalStopCount = useMemo(
     () => stations.reduce((sum, s) => sum + (s.TotalStopCount ?? 0), 0),
     [stations],
@@ -167,7 +259,7 @@ const Loss = ({ apiData = {}, progress, shift, shiftDate }) => {
       <div className="flex flex-1 min-h-0 px-4 py-2 gap-4">
         {/* LEFT — Donut */}
         <div
-          className="w-[55%] shrink-0 rounded-2xl border-2 shadow-md overflow-hidden flex flex-col items-center justify-center relative"
+          className="w-[55%] shrink-0 rounded-2xl border-2 shadow-md overflow-hidden flex flex-col items-center justify-center relative px-4 py-4"
           style={{
             borderColor: `${ACCENT}20`,
             background: `linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)`,
@@ -191,51 +283,11 @@ const Loss = ({ apiData = {}, progress, shift, shiftDate }) => {
             </p>
           </div>
 
-          <div className="relative w-full max-w-[260px] aspect-square z-10">
-            <Chart
-              ref={chartRef}
-              key={`loss-${consumedPct}`}
-              type="doughnut"
-              data={donutData}
-              options={donutOptions}
-            />
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
-              <span className="text-4xl md:text-5xl font-black text-black leading-none drop-shadow-sm">
-                {consumedPct.toFixed(0)}%
-              </span>
-              <span className="text-xs text-black font-bold mt-1 uppercase tracking-wider">
-                Elapsed
-              </span>
-            </div>
-            {tooltip.show && (
-              <div
-                className="absolute z-50 pointer-events-none"
-                style={{
-                  left: tooltip.x,
-                  top: tooltip.y,
-                  transform: "translate(-50%, -120%)",
-                }}
-              >
-                <div className="bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl border border-white/10 whitespace-nowrap">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ background: tooltip.color }}
-                    />
-                    <span className="text-sm font-bold">{tooltip.label}</span>
-                  </div>
-                  <div className="text-2xl font-black font-mono mt-0.5 text-center">
-                    {Number(tooltip.value).toFixed(1)}%
-                  </div>
-                </div>
-                <div className="flex justify-center">
-                  <div className="w-3 h-3 bg-slate-900 rotate-45 -mt-1.5" />
-                </div>
-              </div>
-            )}
+          <div className="z-10">
+            <SvgTimeDoughnut consumedPct={consumedPct} />
           </div>
 
-          <div className="z-10 flex flex-col items-center mt-3">
+          <div className="z-10 flex flex-col items-center mt-4">
             <div
               className="px-10 py-3 rounded-2xl text-white font-black text-4xl font-mono tracking-[0.15em] shadow-lg"
               style={{
@@ -297,7 +349,7 @@ const Loss = ({ apiData = {}, progress, shift, shiftDate }) => {
           )}
         </div>
 
-        {/* RIGHT — Table (only Station Name & Stop Count) */}
+        {/* RIGHT — Table (Sr / Station Name / Stop Count) */}
         <div className="w-[45%] flex flex-col min-w-0">
           <div
             className="text-white font-bold text-sm text-center py-2.5 rounded-t-xl tracking-wider uppercase flex items-center justify-center gap-2"
@@ -312,10 +364,12 @@ const Loss = ({ apiData = {}, progress, shift, shiftDate }) => {
             <table className="w-full border-separate border-spacing-0 text-sm">
               <thead className="sticky top-0 z-10">
                 <tr>
-                  {["Station Name", "Stop Count"].map((h, i) => (
+                  {["Sr.", "Station Name", "Stop Count"].map((h, i) => (
                     <th
                       key={i}
-                      className={`px-3 py-2.5 text-white font-bold border border-white/20 text-sm uppercase tracking-wider ${i === 0 ? "text-left" : "text-center"}`}
+                      className={`px-3 py-2.5 text-white font-bold border border-white/20 text-sm uppercase tracking-wider ${
+                        i === 1 ? "text-left" : "text-center"
+                      }`}
                       style={{ background: ACCENT }}
                     >
                       {h}
@@ -333,6 +387,17 @@ const Loss = ({ apiData = {}, progress, shift, shiftDate }) => {
                       : "#f8fafc";
                   return (
                     <tr key={i} style={{ background: rowBg }}>
+                      <td className="px-3 py-2.5 border-b border-slate-100 text-center w-14">
+                        <span
+                          className={`inline-flex items-center justify-center w-7 h-7 rounded-full font-black font-mono text-xs ${
+                            isHigh
+                              ? "bg-red-100 text-red-700 border border-red-200"
+                              : "bg-slate-100 text-slate-600 border border-slate-200"
+                          }`}
+                        >
+                          {i + 1}
+                        </span>
+                      </td>
                       <td className="px-3 py-2.5 border-b border-slate-100 text-slate-700 font-bold text-sm">
                         <div className="flex items-center gap-2">
                           {isHigh && (
@@ -341,10 +406,16 @@ const Loss = ({ apiData = {}, progress, shift, shiftDate }) => {
                           <span className="truncate">{s.StationName}</span>
                         </div>
                       </td>
-                      <td
-                        className={`px-3 py-2.5 border-b border-slate-100 text-center font-bold font-mono text-sm ${isHigh ? "text-red-500" : "text-slate-700"}`}
-                      >
-                        {s.TotalStopCount}
+                      <td className="px-3 py-2.5 border-b border-slate-100 text-center w-24">
+                        <span
+                          className={`inline-block font-black text-lg px-3 py-0.5 rounded-lg border ${
+                            isHigh
+                              ? "bg-red-50 text-red-600 border-red-200"
+                              : "bg-amber-50 text-amber-600 border-amber-200"
+                          }`}
+                        >
+                          {s.TotalStopCount}
+                        </span>
                       </td>
                     </tr>
                   );
@@ -352,7 +423,7 @@ const Loss = ({ apiData = {}, progress, shift, shiftDate }) => {
                 {stations.length === 0 && (
                   <tr>
                     <td
-                      colSpan={2}
+                      colSpan={3}
                       className="py-16 text-center text-slate-400 border border-slate-100"
                     >
                       <div className="flex flex-col items-center gap-3">
