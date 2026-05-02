@@ -87,6 +87,37 @@ const buildParams = (cfg, shiftDate, shift) => ({
   shift,
 });
 
+const dbToForm = (row) => ({
+  id: row.Id,
+  dashboardName: row.DashboardName ?? "",
+  lineName: row.LineName ?? "",
+  lineCode: row.LineCode ?? "",
+  workingTimeMin: String(row.WorkingTimeMin ?? ""),
+  stationCode1: row.StationCode1 ?? "",
+  stationName1: row.StationName1 ?? "",
+  lineTaktTime1: String(row.LineTaktTime1 ?? ""),
+  lineMonthlyProduction1: String(row.LineMonthlyProduction1 ?? ""),
+  lineTarget1: String(row.LineTarget1 ?? ""),
+  stationCode2: row.StationCode2 ?? "",
+  stationName2: row.StationName2 ?? "",
+  lineTaktTime2: String(row.LineTaktTime2 ?? ""),
+  lineMonthlyProduction2: String(row.LineMonthlyProduction2 ?? ""),
+  qualityProcessCode: row.QualityProcessCode ?? "",
+  qualityLineName: row.QualityLineName ?? "",
+  sectionName: row.SectionName ?? "",
+  showDisplay1: row.ShowDisplay1 ?? true,
+  showDisplay2: row.ShowDisplay2 ?? true,
+  showHourly: row.ShowHourly ?? true,
+  showQuality: row.ShowQuality ?? true,
+  showLoss: row.ShowLoss ?? true,
+});
+
+const nameToSlug = (name) =>
+  (name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
 const Spinner = ({ cls = "w-4 h-4" }) => (
   <Loader2 className={`animate-spin ${cls}`} />
 );
@@ -498,12 +529,51 @@ const Monitoring = () => {
   const navigate = useNavigate();
   const { slug } = useParams();
 
-  // -- Add this after the routerState destructuring --
   const routerState = location.state || {};
-  const launchedConfig = routerState.config || null;
-  const launchedDate = routerState.shiftDate || todayISO();
-  const launchedShift = routerState.shift || "A";
   const isLaunched = !!routerState.autoLoad;
+
+  const [resolvedConfig, setResolvedConfig] = useState(
+    routerState.config || null,
+  );
+  const [resolvedDate, setResolvedDate] = useState(
+    routerState.shiftDate || todayISO(),
+  );
+  const [resolvedShift, setResolvedShift] = useState(routerState.shift || "A");
+  const [configLoading, setConfigLoading] = useState(!isLaunched);
+
+  useEffect(() => {
+    if (isLaunched || !slug) return;
+
+    const fetchConfigBySlug = async () => {
+      setConfigLoading(true);
+      try {
+        const res = await axios.get(`${baseURL}dashboard/configs`);
+        const raw = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
+        const configs = raw.map(dbToForm);
+        const matched = configs.find(
+          (c) => nameToSlug(c.dashboardName) === slug,
+        );
+        if (matched) {
+          setResolvedConfig(matched);
+        } else {
+          toast.error("Dashboard configuration not found.");
+          navigate("/display/management", { replace: true });
+        }
+      } catch {
+        toast.error("Failed to load configuration.");
+        navigate("/display/management", { replace: true });
+      } finally {
+        setConfigLoading(false);
+      }
+    };
+
+    fetchConfigBySlug();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, isLaunched]);
+
+  const launchedConfig = resolvedConfig;
+  const launchedDate = resolvedDate;
+  const launchedShift = resolvedShift;
 
   //NEW: filter PAGES_META by visibility flags from config
   const activeMeta = launchedConfig
@@ -516,13 +586,6 @@ const Monitoring = () => {
   useEffect(() => {
     activeMetaRef.current = activeMeta;
   }, [activeMeta]);
-
-  /* Redirect immediately if not launched properly */
-  useEffect(() => {
-    if (!isLaunched || !launchedConfig) {
-      navigate("/display/management", { replace: true });
-    }
-  }, [isLaunched, launchedConfig, navigate]);
 
   const [shiftDate, setShiftDate] = useState(launchedDate);
   const [shift, setShift] = useState(launchedShift);
@@ -626,12 +689,13 @@ const Monitoring = () => {
 
   // ? Replace the auto-load useEffect
   useEffect(() => {
-    if (isLaunched && launchedConfig && !hasFetchedRef.current) {
-      hasFetchedRef.current = true;
-      fetchData(launchedDate, launchedShift, launchedConfig, activeMeta);
-    }
+    if (!launchedConfig || hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+    setShiftDate(launchedDate);
+    setShift(launchedShift);
+    fetchData(launchedDate, launchedShift, launchedConfig, activeMeta);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [launchedConfig]);
 
   // fetchAllData
   const fetchAllData = useCallback(
@@ -675,7 +739,18 @@ const Monitoring = () => {
   );
 
   /* If not launched, render nothing (redirect handles it) */
-  if (!isLaunched || !launchedConfig) return null;
+  if (configLoading) {
+    return (
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white gap-3.5">
+        <Spinner cls="w-8 h-8 text-indigo-500" />
+        <p className="text-sm text-slate-400">
+          Loading dashboard configuration…
+        </p>
+      </div>
+    );
+  }
+
+  if (!launchedConfig) return null;
 
   const commonProps = { progress, shift, shiftDate, config: launchedConfig };
 

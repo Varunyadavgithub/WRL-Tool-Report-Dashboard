@@ -3,19 +3,17 @@ import { Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useRoleAccess } from "./hooks/useRoleAccess.js";
 
-// Lazy loaded components
-const Layout = lazy(() => import("./components/Layout"));
-const Login = lazy(() => import("./pages/Auth/Login"));
-const Home = lazy(() => import("./pages/Home"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+const Layout    = lazy(() => import("./components/Layout"));
+const Login     = lazy(() => import("./pages/Auth/Login"));
+const Home      = lazy(() => import("./pages/Home"));
+const NotFound  = lazy(() => import("./pages/NotFound"));
+const Monitoring = lazy(() => import("./pages/Display/Monitoring")); // ADD
 
 function App() {
   const [isSidebarExpanded, setSidebarExpanded] = useState(false);
   const { accessibleRoutes } = useRoleAccess();
 
-  const toggleSidebar = () => {
-    setSidebarExpanded((prev) => !prev);
-  };
+  const toggleSidebar = () => setSidebarExpanded((prev) => !prev);
 
   return (
     <Suspense
@@ -28,6 +26,7 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
+        <Route path="/display/:slug" element={<Monitoring />} /> {/* ADD */}
 
         {/* Protected Layout Route */}
         <Route element={<ProtectedRoute />}>
@@ -40,8 +39,6 @@ function App() {
             }
           >
             <Route path="/" index element={<Home />} />
-
-            {/* Dynamic routes based on user role */}
             {accessibleRoutes.map((route) => (
               <Route
                 key={route.path}
@@ -49,8 +46,6 @@ function App() {
                 element={<route.component />}
               />
             ))}
-
-            {/* Catch All */}
             <Route path="*" element={<NotFound />} />
           </Route>
         </Route>
