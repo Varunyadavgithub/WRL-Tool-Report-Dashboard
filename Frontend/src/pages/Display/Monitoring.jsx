@@ -18,8 +18,8 @@ import {
   Activity,
   ArrowLeft,
   ArrowRight,
+  RefreshCw,
 } from "lucide-react";
-// ✅ RefreshCw removed — Refresh button is gone
 import { baseURL } from "../../assets/assets";
 import { Doughnut } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
@@ -721,7 +721,9 @@ const Monitoring = () => {
           toast.error("All endpoints failed. Check server connection.");
         } else {
           if (failed > 0)
-            toast(`${failed} endpoint(s) had errors.`, { icon: "⚠️" });
+            toast(`${failed} endpoint(s) had errors.`, {
+              icon: <AlertTriangle className="w-4 h-4 text-amber-500" />,
+            });
           else toast.success("Dashboard loaded successfully.");
           setAllData({ ...EMPTY_DATA, ...merged });
           setLastFetched(new Date());
@@ -803,7 +805,7 @@ const Monitoring = () => {
       // Only trigger a full reload when the shift actually changes
       if (newShift !== prevShift || newDate !== prevDate) {
         toast(`Shift changed to Shift ${newShift} — reloading data.`, {
-          icon: "🔄",
+          icon: <RefreshCw className="w-4 h-4 text-blue-500" />,
           duration: 4000,
         });
         setShift(newShift);
@@ -930,8 +932,9 @@ const Monitoring = () => {
         ))}
 
         {/* Date — read only */}
-        <span className="px-2.5 py-1 border-[1.5px] border-slate-100 rounded-lg text-xs text-slate-600 bg-slate-50 font-mono">
-          📅 {shiftDate}
+        <span className="flex items-center gap-1.5 px-2.5 py-1 border-[1.5px] border-slate-100 rounded-lg text-xs text-slate-600 bg-slate-50 font-mono">
+          <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+          {shiftDate}
         </span>
 
         {/* ✅ Refresh button REMOVED */}
