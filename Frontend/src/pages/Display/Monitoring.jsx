@@ -5,7 +5,6 @@ import toast from "react-hot-toast";
 import ReactSpeedometer from "react-d3-speedometer";
 import {
   Loader2,
-  RefreshCw,
   Play,
   Pause,
   X,
@@ -17,10 +16,10 @@ import {
   Truck,
   BarChart2,
   Activity,
-  Settings,
   ArrowLeft,
   ArrowRight,
 } from "lucide-react";
+// ✅ RefreshCw removed — Refresh button is gone
 import { baseURL } from "../../assets/assets";
 import { Doughnut } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
@@ -35,7 +34,21 @@ import Loss from "./Area/Loss";
 
 const PAGE_DURATION_MS = 30_000;
 
-// Add visibility flag mapping to PAGES_META
+// ✅ FIX 1: Only current page API is called every 30s — not all 5
+const AUTO_REFRESH_MS = 30_000;
+
+// ✅ FIX 2: Shift boundary check every 60s for auto-switch
+const SHIFT_CHECK_MS = 60_000;
+
+// Stable reference outside component
+const ALL_ENDPOINTS = {
+  productionDisplay1: `${baseURL}dashboard/production-display-1`,
+  productionDisplay2: `${baseURL}dashboard/production-display-2`,
+  hourly: `${baseURL}dashboard/hourly`,
+  quality: `${baseURL}dashboard/quality`,
+  loss: `${baseURL}dashboard/loss`,
+};
+
 const PAGES_META = [
   {
     key: "productionDisplay1",
@@ -81,6 +94,23 @@ const todayISO = () => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
+// ✅ FIX 2: Auto-detects current shift from system clock
+// Shift A → 08:00 – 20:00  (shiftDate = today)
+// Shift B → 20:00 – 08:00  (shiftDate = the evening's date, yesterday if past midnight)
+const detectCurrentShift = () => {
+  const now = new Date();
+  const hour = now.getHours();
+  if (hour >= 8 && hour < 20) {
+    return { shift: "A", shiftDate: todayISO() };
+  }
+  const d = new Date();
+  if (hour < 8) d.setDate(d.getDate() - 1); // 00:00–07:59 → date belongs to yesterday's B shift
+  return {
+    shift: "B",
+    shiftDate: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+  };
+};
+
 const buildParams = (cfg, shiftDate, shift) => ({
   configId: cfg?.id,
   shiftDate,
@@ -118,11 +148,12 @@ const nameToSlug = (name) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
+/* ── Spinner ── */
 const Spinner = ({ cls = "w-4 h-4" }) => (
   <Loader2 className={`animate-spin ${cls}`} />
 );
 
-/* -- DonutCanvas -- */
+/* ── DonutCanvas ── */
 const DonutCanvas = ({
   pct = 0,
   size = 120,
@@ -177,7 +208,7 @@ const DonutCanvas = ({
   );
 };
 
-/* -- LiveClock -- */
+/* ── LiveClock ── */
 const LiveClock = ({ shift, shiftDate, accentHex }) => {
   const [tick, setTick] = useState(() => new Date());
 
@@ -212,7 +243,7 @@ const LiveClock = ({ shift, shiftDate, accentHex }) => {
   );
 };
 
-/* -- PageHeader -- */
+/* ── PageHeader ── */
 const PageHeader = ({ title, shift, shiftDate, accentHex }) => (
   <div className="shrink-0">
     <div
@@ -227,17 +258,17 @@ const PageHeader = ({ title, shift, shiftDate, accentHex }) => (
   </div>
 );
 
-/* -- TimerBar -- */
+/* ── TimerBar ── */
 const TimerBar = ({ progress, accentHex }) => (
   <div className="h-[3px] bg-slate-100 shrink-0">
     <div
-      className="h-full"
+      className="h-full transition-all"
       style={{ width: `${progress}%`, background: accentHex }}
     />
   </div>
 );
 
-/* -- StatCard -- */
+/* ── StatCard ── */
 const StatCard = ({ label, value, accentHex = "#1e40af", sub }) => (
   <div
     className="relative bg-white rounded-xl p-4 shadow-sm border border-slate-100 overflow-hidden"
@@ -257,7 +288,7 @@ const StatCard = ({ label, value, accentHex = "#1e40af", sub }) => (
   </div>
 );
 
-/* -- MetricTable -- */
+/* ── MetricTable ── */
 const MetricTable = ({ rows, accentHex }) => (
   <table className="w-full border-separate border-spacing-0 text-xs">
     <thead>
@@ -331,7 +362,7 @@ const MetricTable = ({ rows, accentHex }) => (
   </table>
 );
 
-/* -- GaugePanel -- */
+/* ── GaugePanel ── */
 const GaugePanel = memo(
   ({ value, maxValue = 1000, label, sublabel, accentHex }) => {
     const clamped = Math.min(Math.max(Number(value) || 0, 0), maxValue);
@@ -466,8 +497,7 @@ const GaugePanel = memo(
 );
 GaugePanel.displayName = "GaugePanel";
 
-/* -- NavDots -- */
-// -- Update NavDots component signature --
+/* ── NavDots ── */
 const NavDots = ({ currentPage, activeMeta, onGoTo, onPrev, onNext }) => (
   <div className="shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 bg-white border-t border-slate-100 relative">
     <button
@@ -478,7 +508,6 @@ const NavDots = ({ currentPage, activeMeta, onGoTo, onPrev, onNext }) => (
       <ArrowLeft className="w-3.5 h-3.5" />
     </button>
 
-    {/* ? Use activeMeta instead of hardcoded PAGES_META */}
     {activeMeta.map(({ label, Icon, accentHex }, i) => {
       const active = i === currentPage;
       return (
@@ -489,7 +518,9 @@ const NavDots = ({ currentPage, activeMeta, onGoTo, onPrev, onNext }) => (
           className="flex flex-col items-center gap-0.5"
         >
           <div
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full border-[1.5px] transition-all ${active ? "border-current" : "border-transparent"}`}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full border-[1.5px] transition-all ${
+              active ? "border-current" : "border-transparent"
+            }`}
             style={{
               background: active ? `${accentHex}15` : "transparent",
               color: active ? accentHex : "#cbd5e1",
@@ -511,11 +542,10 @@ const NavDots = ({ currentPage, activeMeta, onGoTo, onPrev, onNext }) => (
     </button>
   </div>
 );
-/* ----------------------------------------------
-   MAIN COMPONENT — No standalone UI.
-   Always redirects to management if not launched.
-   Only renders fullscreen kiosk when launched.
----------------------------------------------- */
+
+/* ─────────────────────────────────────────────────────────────
+   EMPTY DATA
+───────────────────────────────────────────────────────────── */
 const EMPTY_DATA = {
   productionDisplay1: {},
   productionDisplay2: {},
@@ -524,6 +554,9 @@ const EMPTY_DATA = {
   loss: {},
 };
 
+/* ═════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+═════════════════════════════════════════════════════════════ */
 const Monitoring = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -532,18 +565,23 @@ const Monitoring = () => {
   const routerState = location.state || {};
   const isLaunched = !!routerState.autoLoad;
 
+  // ✅ FIX: Use auto-detected shift as default instead of hardcoding "A"
+  const autoDetected = detectCurrentShift();
+
   const [resolvedConfig, setResolvedConfig] = useState(
     routerState.config || null,
   );
   const [resolvedDate, setResolvedDate] = useState(
-    routerState.shiftDate || todayISO(),
+    routerState.shiftDate || autoDetected.shiftDate,
   );
-  const [resolvedShift, setResolvedShift] = useState(routerState.shift || "A");
+  const [resolvedShift, setResolvedShift] = useState(
+    routerState.shift || autoDetected.shift,
+  );
   const [configLoading, setConfigLoading] = useState(!isLaunched);
 
+  /* ── Slug-based config resolution ─────────────────────────── */
   useEffect(() => {
     if (isLaunched || !slug) return;
-
     const fetchConfigBySlug = async () => {
       setConfigLoading(true);
       try {
@@ -566,7 +604,6 @@ const Monitoring = () => {
         setConfigLoading(false);
       }
     };
-
     fetchConfigBySlug();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, isLaunched]);
@@ -575,7 +612,7 @@ const Monitoring = () => {
   const launchedDate = resolvedDate;
   const launchedShift = resolvedShift;
 
-  //NEW: filter PAGES_META by visibility flags from config
+  /* ── Active pages filtered by visibility flags ─────────────── */
   const activeMeta = launchedConfig
     ? PAGES_META.filter(
         (p) => launchedConfig[p.flag] !== false && launchedConfig[p.flag] !== 0,
@@ -587,6 +624,7 @@ const Monitoring = () => {
     activeMetaRef.current = activeMeta;
   }, [activeMeta]);
 
+  /* ── Core state ────────────────────────────────────────────── */
   const [shiftDate, setShiftDate] = useState(launchedDate);
   const [shift, setShift] = useState(launchedShift);
   const [allData, setAllData] = useState(EMPTY_DATA);
@@ -595,8 +633,35 @@ const Monitoring = () => {
   const [lastFetched, setLastFetched] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
   const [loading, setLoading] = useState(false);
-  const intervalRef = useRef(null);
 
+  /* ── Refs so intervals always read latest values ───────────── */
+  const shiftDateRef = useRef(shiftDate);
+  const shiftRef = useRef(shift);
+  const configRef = useRef(launchedConfig);
+  const currentPageRef = useRef(currentPage); // ✅ FIX 1: track current page
+  const activeMetaRef2 = useRef(activeMeta);
+
+  useEffect(() => {
+    shiftDateRef.current = shiftDate;
+  }, [shiftDate]);
+  useEffect(() => {
+    shiftRef.current = shift;
+  }, [shift]);
+  useEffect(() => {
+    configRef.current = launchedConfig;
+  }, [launchedConfig]);
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
+  useEffect(() => {
+    activeMetaRef2.current = activeMeta;
+  }, [activeMeta]);
+
+  const intervalRef = useRef(null);
+  const autoRefreshRef = useRef(null);
+  const shiftCheckRef = useRef(null); // ✅ FIX 2: shift boundary checker
+
+  /* ── Page-rotation timer ───────────────────────────────────── */
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (!isRunning) return;
@@ -617,15 +682,7 @@ const Monitoring = () => {
     };
   }, [isRunning, currentPage]);
 
-  // -- Place this just above the Monitoring component, after EMPTY_DATA --
-  const ALL_ENDPOINTS = {
-    productionDisplay1: `${baseURL}dashboard/production-display-1`,
-    productionDisplay2: `${baseURL}dashboard/production-display-2`,
-    hourly: `${baseURL}dashboard/hourly`,
-    quality: `${baseURL}dashboard/quality`,
-    loss: `${baseURL}dashboard/loss`,
-  };
-
+  /* ── Full (loading-spinner) fetch — ALL active pages ──────── */
   const fetchData = useCallback(
     async (dateParam, shiftParam, cfg, metaList) => {
       if (!dateParam) {
@@ -640,16 +697,12 @@ const Monitoring = () => {
       setLoading(true);
       setIsRunning(false);
       setAllData(EMPTY_DATA);
-      console.log(
-        "fetchData called with pages:",
-        (metaList ?? PAGES_META).map((p) => p.key),
-      );
+
       const params = buildParams(cfg, dateParam, shiftParam);
       const activeKeys = new Set((metaList ?? PAGES_META).map((p) => p.key));
       const endpoints = Object.fromEntries(
         Object.entries(ALL_ENDPOINTS).filter(([key]) => activeKeys.has(key)),
       );
-      console.log("endpoints being fetched:", Object.keys(endpoints));
 
       try {
         const results = await Promise.allSettled(
@@ -668,7 +721,7 @@ const Monitoring = () => {
           toast.error("All endpoints failed. Check server connection.");
         } else {
           if (failed > 0)
-            toast(`${failed} endpoint(s) had errors.`, { icon: "??" });
+            toast(`${failed} endpoint(s) had errors.`, { icon: "⚠️" });
           else toast.success("Dashboard loaded successfully.");
           setAllData({ ...EMPTY_DATA, ...merged });
           setLastFetched(new Date());
@@ -684,10 +737,89 @@ const Monitoring = () => {
     [],
   );
 
-  // ? Add this ref near the other refs
-  const hasFetchedRef = useRef(false);
+  /* ── ✅ FIX 1: silentFetch — ONLY fetches the CURRENT visible page ──
+     Instead of calling all 5 APIs every 30s, we only call the ONE
+     endpoint that the user is currently looking at. This reduces
+     server load by 80%.
+  ─────────────────────────────────────────────────────────────────── */
+  const silentFetch = useCallback(async () => {
+    const cfg = configRef.current;
+    const date = shiftDateRef.current;
+    const sh = shiftRef.current;
+    const metaList = activeMetaRef2.current;
+    const pageIdx = currentPageRef.current;
 
-  // ? Replace the auto-load useEffect
+    if (!cfg?.id || !date) return;
+
+    // Get only the currently visible page's key
+    const currentPageKey = metaList[pageIdx]?.key;
+    if (!currentPageKey) return;
+
+    const url = ALL_ENDPOINTS[currentPageKey];
+    const params = buildParams(cfg, date, sh);
+
+    try {
+      const res = await axios.get(url, { params });
+      const data = res.data?.data ?? res.data;
+      if (data) {
+        // ✅ Only update the one page that is currently visible — no flicker
+        setAllData((prev) => ({ ...prev, [currentPageKey]: data }));
+        setLastFetched(new Date());
+      }
+    } catch {
+      // Silent fail — no toast spam on background errors
+    }
+  }, []);
+
+  /* ── ✅ FIX 2: Auto-refresh interval (current page only) ────── */
+  useEffect(() => {
+    if (!lastFetched) return;
+    if (autoRefreshRef.current) clearInterval(autoRefreshRef.current);
+
+    autoRefreshRef.current = setInterval(() => {
+      silentFetch();
+    }, AUTO_REFRESH_MS);
+
+    return () => {
+      clearInterval(autoRefreshRef.current);
+      autoRefreshRef.current = null;
+    };
+  }, [lastFetched, silentFetch]);
+
+  /* ── ✅ FIX 2: Shift auto-switch every 60s ─────────────────────
+     Checks the clock every minute. If the shift has changed
+     (e.g. it is now 20:00 so Shift B starts), it automatically
+     re-fetches all data with the new shift + date.
+  ─────────────────────────────────────────────────────────────── */
+  useEffect(() => {
+    if (!lastFetched) return;
+    if (shiftCheckRef.current) clearInterval(shiftCheckRef.current);
+
+    shiftCheckRef.current = setInterval(() => {
+      const { shift: newShift, shiftDate: newDate } = detectCurrentShift();
+      const prevShift = shiftRef.current;
+      const prevDate = shiftDateRef.current;
+
+      // Only trigger a full reload when the shift actually changes
+      if (newShift !== prevShift || newDate !== prevDate) {
+        toast(`Shift changed to Shift ${newShift} — reloading data.`, {
+          icon: "🔄",
+          duration: 4000,
+        });
+        setShift(newShift);
+        setShiftDate(newDate);
+        fetchData(newDate, newShift, configRef.current, activeMetaRef2.current);
+      }
+    }, SHIFT_CHECK_MS);
+
+    return () => {
+      clearInterval(shiftCheckRef.current);
+      shiftCheckRef.current = null;
+    };
+  }, [lastFetched, fetchData]);
+
+  /* ── One-shot auto-load on mount ───────────────────────────── */
+  const hasFetchedRef = useRef(false);
   useEffect(() => {
     if (!launchedConfig || hasFetchedRef.current) return;
     hasFetchedRef.current = true;
@@ -697,17 +829,11 @@ const Monitoring = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [launchedConfig]);
 
-  // fetchAllData
-  const fetchAllData = useCallback(
-    () => fetchData(shiftDate, shift, launchedConfig, activeMeta),
-    [fetchData, shiftDate, shift, launchedConfig, activeMeta],
-  );
-
+  /* ── Navigation helpers ────────────────────────────────────── */
   const goTo = useCallback((i) => {
     setCurrentPage(i);
     setProgress(0);
   }, []);
-
   const goPrev = useCallback(() => {
     setCurrentPage(
       (p) =>
@@ -715,30 +841,12 @@ const Monitoring = () => {
     );
     setProgress(0);
   }, []);
-
   const goNext = useCallback(() => {
     setCurrentPage((p) => (p + 1) % activeMetaRef.current.length);
     setProgress(0);
   }, []);
 
-  const handleShiftSwitch = useCallback(
-    (s, cfg) => {
-      let dt;
-      if (s === "B") {
-        const d = new Date();
-        if (d.getHours() < 8) d.setDate(d.getDate() - 1);
-        dt = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-      } else {
-        dt = todayISO();
-      }
-      setShift(s);
-      setShiftDate(dt);
-      fetchData(dt, s, cfg, activeMetaRef.current); // ? use ref so it's always fresh
-    },
-    [fetchData],
-  );
-
-  /* If not launched, render nothing (redirect handles it) */
+  /* ── Guards ────────────────────────────────────────────────── */
   if (configLoading) {
     return (
       <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white gap-3.5">
@@ -749,9 +857,9 @@ const Monitoring = () => {
       </div>
     );
   }
-
   if (!launchedConfig) return null;
 
+  /* ── Page map ──────────────────────────────────────────────── */
   const commonProps = { progress, shift, shiftDate, config: launchedConfig };
 
   const PAGE_COMPONENTS = {
@@ -782,48 +890,60 @@ const Monitoring = () => {
     PAGE_COMPONENTS[meta.key](commonProps),
   );
 
+  /* ── Render ────────────────────────────────────────────────── */
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col bg-slate-50 overflow-hidden font-sans">
-      {/* Top bar */}
+      {/* ── Top bar ── */}
       <div className="flex items-center gap-2.5 px-4 py-1.5 bg-white border-b border-slate-100 shrink-0 shadow-sm">
+        {/* Dashboard name */}
         <span className="font-extrabold text-[13px] text-slate-900 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
           {launchedConfig.dashboardName}
         </span>
+
         <div className="w-px h-5 bg-slate-100" />
+
+        {/* ✅ LIVE badge — shows current page is being refreshed */}
+        {lastFetched && (
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            LIVE · every {AUTO_REFRESH_MS / 1000}s
+          </span>
+        )}
+
+        <div className="w-px h-5 bg-slate-100" />
+
+        {/* ✅ Shift badges — read-only, show current auto-detected shift */}
         {["A", "B"].map((s) => (
-          <button
+          <span
             key={s}
-            onClick={() => handleShiftSwitch(s, launchedConfig)}
-            className={`px-3 py-1 rounded-lg text-xs font-bold border-[1.5px] transition-all ${shift === s ? (s === "A" ? "bg-blue-50 text-blue-700 border-blue-300" : "bg-amber-50 text-amber-700 border-amber-300") : "bg-slate-50 text-slate-400 border-slate-100"}`}
+            className={`px-3 py-1 rounded-lg text-xs font-bold border-[1.5px] transition-all ${
+              shift === s
+                ? s === "A"
+                  ? "bg-blue-50 text-blue-700 border-blue-300"
+                  : "bg-amber-50 text-amber-700 border-amber-300"
+                : "bg-slate-50 text-slate-300 border-slate-100"
+            }`}
           >
             Shift {s}
-          </button>
+          </span>
         ))}
-        <input
-          type="date"
-          value={shiftDate}
-          onChange={(e) => setShiftDate(e.target.value)}
-          className="px-2.5 py-1 border-[1.5px] border-slate-100 rounded-lg text-xs text-slate-900 bg-slate-50 outline-none"
-        />
-        <button
-          onClick={fetchAllData}
-          disabled={loading}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-blue-700 hover:bg-blue-800 text-white shadow-sm shadow-blue-200"}`}
-        >
-          {loading ? (
-            <Spinner cls="w-3 h-3" />
-          ) : (
-            <RefreshCw className="w-3 h-3" />
-          )}
-          {loading ? "Loading…" : "Refresh"}
-        </button>
+
+        {/* Date — read only */}
+        <span className="px-2.5 py-1 border-[1.5px] border-slate-100 rounded-lg text-xs text-slate-600 bg-slate-50 font-mono">
+          📅 {shiftDate}
+        </span>
+
+        {/* ✅ Refresh button REMOVED */}
+
         <div className="ml-auto flex gap-2 items-center">
           {lastFetched && (
             <span className="text-[11px] text-slate-400">
               Updated {lastFetched.toLocaleTimeString()}
             </span>
           )}
+
+          {/* Pause / Resume page rotation */}
           {isRunning ? (
             <button
               onClick={() => setIsRunning(false)}
@@ -841,6 +961,8 @@ const Monitoring = () => {
               </button>
             )
           )}
+
+          {/* Exit */}
           <button
             onClick={() => navigate("/display/management")}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-500 border-[1.5px] border-red-300 transition-all hover:bg-red-100"
@@ -850,15 +972,15 @@ const Monitoring = () => {
         </div>
       </div>
 
-      {/* Loading */}
+      {/* ── Loading overlay ── */}
       {loading && (
         <div className="flex-1 flex flex-col items-center justify-center bg-white gap-3.5">
           <Spinner cls="w-8 h-8 text-indigo-500" />
-          <p className="text-sm text-slate-400">Fetching shift data...!!!</p>
+          <p className="text-sm text-slate-400">Fetching shift data...</p>
         </div>
       )}
 
-      {/* Dashboard pages */}
+      {/* ── Dashboard pages ── */}
       {!loading && lastFetched && (
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex-1 min-h-0 overflow-hidden">
@@ -885,7 +1007,7 @@ const Monitoring = () => {
         </div>
       )}
 
-      {/* Waiting for first fetch */}
+      {/* ── Waiting for first fetch ── */}
       {!loading && !lastFetched && (
         <div className="flex-1 flex flex-col items-center justify-center bg-white gap-3.5">
           <Spinner cls="w-8 h-8 text-indigo-500" />
