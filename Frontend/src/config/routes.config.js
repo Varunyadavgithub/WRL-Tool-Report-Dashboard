@@ -114,8 +114,9 @@ const ManpowerApproval = lazy(() => import("../pages/Forms/ManpowerApproval"));
 const SecurityManpowerList = lazy(
   () => import("../pages/Forms/SecurityManpowerList"),
 );
-import Monitoring from "../pages/Display/Monitoring";
-import Management from "../pages/Display/Management";
+const Monitoring = lazy(() => import("../pages/Display/Monitoring"));
+const Management = lazy(() => import("../pages/Display/Management"));
+const WIPCapture = lazy(() => import("../pages/Production/WIPCapture"));
 
 // Role constants for consistency
 export const ROLES = {
@@ -233,6 +234,11 @@ export const ROUTE_CONFIG = [
         component: ManpowerReport,
         roles: [ROLES.ADMIN],
       },
+      {
+        path: "/production/wip-capture",
+        label: "WIP Capture",
+        component: WIPCapture,
+      },
     ],
   },
   {
@@ -251,13 +257,13 @@ export const ROUTE_CONFIG = [
         path: "/quality/gas-charging-report",
         label: "Gas Charging Report",
         component: GasChargingReport,
-        roles: [ROLES.ADMIN],
+        roles: [ROLES.ADMIN,ROLES.QUALITY_MANAGER,ROLES.LINE_QUALITY_ENGINEER],
       },
       {
         path: "/quality/est-report",
         label: "EST Report",
         component: ESTReport,
-        roles: [ROLES.ADMIN],
+        roles: [ROLES.ADMIN,ROLES.QUALITY_MANAGER,ROLES.LINE_QUALITY_ENGINEER],
       },
       {
         path: "/quality/cpt-report",

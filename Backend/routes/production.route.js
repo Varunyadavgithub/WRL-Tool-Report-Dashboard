@@ -85,6 +85,10 @@ import {
 } from "../controllers/production/stopLoss.controller.js";
 //import { getManpower, getManpowerHourly } from "../controllers/production/manpower.controller.js";
 //import { getManpowerReport } from "../controllers/production/getManPowerReport.controller.js";
+import {
+  captureWIP,
+  getLatestWIPCaptures,
+} from "../controllers/production/wipcapture.controller.js";
 
 const router = express.Router();
 
@@ -163,33 +167,37 @@ router.get("/stop-loss/summary", getStopLossSummary);
 router.get("/stop-loss/detail", getStopLossDetail);
 router.get("/stop-loss/locations", getStopLossLocations);
 // Final Loading — model breakdown
-router.get("/final-loading-model",           getFinalLoadingModelBreakdown);
-router.get("/final-loading-hp-frz-model",    getFinalLoadingHPFrzModelBreakdown);
-router.get("/final-loading-hp-choc-model",   getFinalLoadingHPChocModelBreakdown);
-router.get("/final-loading-hp-visi-model",   getFinalLoadingHPVISIModelBreakdown);
-router.get("/final-loading-hp-sus-model",    getFinalLoadingHPSUSModelBreakdown);
- 
+router.get("/final-loading-model", getFinalLoadingModelBreakdown);
+router.get("/final-loading-hp-frz-model", getFinalLoadingHPFrzModelBreakdown);
+router.get("/final-loading-hp-choc-model", getFinalLoadingHPChocModelBreakdown);
+router.get("/final-loading-hp-visi-model", getFinalLoadingHPVISIModelBreakdown);
+router.get("/final-loading-hp-sus-model", getFinalLoadingHPSUSModelBreakdown);
+
 // Final Line — model breakdown
-router.get("/final-hp-frz-model",            getFinalHPFrzModelBreakdown);
-router.get("/final-hp-choc-model",           getFinalHPChocModelBreakdown);
-router.get("/visi-final-hp-model",           getFinalHPVISIModelBreakdown);
-router.get("/final-hp-sus-model",            getFinalHPSUSModelBreakdown);
- 
+router.get("/final-hp-frz-model", getFinalHPFrzModelBreakdown);
+router.get("/final-hp-choc-model", getFinalHPChocModelBreakdown);
+router.get("/visi-final-hp-model", getFinalHPVISIModelBreakdown);
+router.get("/final-hp-sus-model", getFinalHPSUSModelBreakdown);
+
 // Post Foaming — model breakdown
-router.get("/post-Grp-A-model",             getPostHPGrpAModelBreakdown);
-router.get("/post-Grp-B-model",             getPostHPGrpBModelBreakdown);
-router.get("/post-Choc-model",             getChocPostHPModelBreakdown);
-router.get("/post-FOW-model",             getFOWPostHPModelBreakdown);
-router.get("/visi-post-hp-model",            getPostHPVISIModelBreakdown);
-router.get("/post-hp-sus-model",             getPostHPSUSModelBreakdown);
- 
+router.get("/post-Grp-A-model", getPostHPGrpAModelBreakdown);
+router.get("/post-Grp-B-model", getPostHPGrpBModelBreakdown);
+router.get("/post-Choc-model", getChocPostHPModelBreakdown);
+router.get("/post-FOW-model", getFOWPostHPModelBreakdown);
+router.get("/visi-post-hp-model", getPostHPVISIModelBreakdown);
+router.get("/post-hp-sus-model", getPostHPSUSModelBreakdown);
+
 // Foaming — model breakdown
-router.get("/Foaming-hp-fom-a-model",        getFoamingHpFomAModelBreakdown);
-router.get("/Foaming-hp-fom-b-model",        getFoamingHpFomBModelBreakdown);
+router.get("/Foaming-hp-fom-a-model", getFoamingHpFomAModelBreakdown);
+router.get("/Foaming-hp-fom-b-model", getFoamingHpFomBModelBreakdown);
 
 //router.get("/manpower", getManpower);
 
 // manpower
 //router.get("/manpower-report", getManpowerReport);
+
+// WIP Capture
+router.post("/wip-capture", captureWIP);
+router.get("/wip-latest", getLatestWIPCaptures);
 
 export default router;
