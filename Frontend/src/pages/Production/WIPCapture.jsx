@@ -172,6 +172,7 @@ const WIPCapture = () => {
      Save WIP Entry
   ────────────────────────────────────────── */
   const saveWIPCapture = async () => {
+    if (loading) return;
     if (!selectedWorkCenter) {
       toast.error("Please select a work center.");
       return;
@@ -217,9 +218,9 @@ const WIPCapture = () => {
 
         setSerialNumber("");
 
-        setTimeout(() => {
+        requestAnimationFrame(() => {
           inputRef.current?.focus();
-        }, 100);
+        });
 
         await fetchCaptures(); // ✅ refresh table from backend
       }
@@ -229,6 +230,16 @@ const WIPCapture = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (serialNumber.length === 15) {
+      const timeout = setTimeout(() => {
+        saveWIPCapture();
+      }, 100); // small delay for scanner completion
+
+      return () => clearTimeout(timeout);
+    }
+  }, [serialNumber]);
 
   /* ──────────────────────────────────────────
      Scanner Enter Key
