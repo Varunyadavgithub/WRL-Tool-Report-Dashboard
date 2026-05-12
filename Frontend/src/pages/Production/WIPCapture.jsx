@@ -504,7 +504,7 @@ const WIPCapture = () => {
                       </td>
 
                       <td className="px-4 py-3 border-b border-slate-100 text-slate-500 whitespace-nowrap">
-                        {new Date(item.createdAt).toLocaleString()}
+                        {item.createdAt?.replace("T", " ").replace("Z", "")}
                       </td>
                     </tr>
                   ))}

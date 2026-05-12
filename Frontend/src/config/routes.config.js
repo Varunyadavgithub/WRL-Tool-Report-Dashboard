@@ -132,6 +132,7 @@ export const ROLES = {
   PLANNING_TEAM: "planning team",
   SECURITY: "security",
   HR: "hr",
+  SUS_LINE_USER: "sus line user",
 };
 
 // Centralized route configuration
@@ -141,7 +142,7 @@ export const ROUTE_CONFIG = [
     icon: Monitor,
     label: "Display",
     basePath: "/display",
-    roles: [ROLES.ADMIN],
+    roles: [ROLES.ADMIN, ROLES.PLANNING_TEAM],
     items: [
       {
         path: "/display/management",
@@ -238,6 +239,7 @@ export const ROUTE_CONFIG = [
         path: "/production/wip-capture",
         label: "WIP Capture",
         component: WIPCapture,
+        roles: [ROLES.ADMIN, ROLES.LOGISTIC],
       },
     ],
   },
@@ -257,13 +259,21 @@ export const ROUTE_CONFIG = [
         path: "/quality/gas-charging-report",
         label: "Gas Charging Report",
         component: GasChargingReport,
-        roles: [ROLES.ADMIN,ROLES.QUALITY_MANAGER,ROLES.LINE_QUALITY_ENGINEER],
+        roles: [
+          ROLES.ADMIN,
+          ROLES.QUALITY_MANAGER,
+          ROLES.LINE_QUALITY_ENGINEER,
+        ],
       },
       {
         path: "/quality/est-report",
         label: "EST Report",
         component: ESTReport,
-        roles: [ROLES.ADMIN,ROLES.QUALITY_MANAGER,ROLES.LINE_QUALITY_ENGINEER],
+        roles: [
+          ROLES.ADMIN,
+          ROLES.QUALITY_MANAGER,
+          ROLES.LINE_QUALITY_ENGINEER,
+        ],
       },
       {
         path: "/quality/cpt-report",

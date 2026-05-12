@@ -7,7 +7,7 @@ const Home = () => {
     <div className="flex items-center justify-center p-6 bg-gray-100 min-h-screen rounded-lg">
       <Title
         title={`Welcome to the Dashboard, ${user.name}!`}
-        subTitle="We're glad to have you back. Here you can track your progress, manage your tasks, and explore insights tailored just for you."
+        subTitle="A centralized industrial platform providing secure, role-based access to manufacturing operations, reports, workflows, and real-time insights."
         align="center"
       />
     </div>
