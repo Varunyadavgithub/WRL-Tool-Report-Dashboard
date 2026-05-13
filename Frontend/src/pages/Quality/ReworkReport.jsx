@@ -1,9 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+} from "recharts";
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import SelectField from "../../components/ui/SelectField";
 import axios from "axios";
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import Loader from "../../components/ui/Loader";
-import ExportButton from "../../components/ui/ExportButton";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets";
 import { useGetModelVariantsQuery } from "../../redux/api/commonApi.js";
@@ -20,7 +35,87 @@ import {
   ChevronDown,
   Loader2,
   PackageOpen,
+  Tag,
+  Zap,
+  FileDown,
+  FileText,
+  FileSpreadsheet,
 } from "lucide-react";
+
+// ── Category Mappings ──────────────────────────────────────────────────────────
+export const CATEGORY_MAPPINGS = {
+  COOLER: "Freezer",
+  "Choc Cooler": "Choc Cooler",
+  "FOW MODELS": "FOW",
+  "ICE LINED REFRIGERATOR": "Freezer",
+  "COOLER AND FREEZER": "Freezer",
+  "CHEST COOLER": "Freezer",
+  MEDICAL: "Freezer",
+  EUTECTIC: "Freezer",
+  ILR: "Freezer",
+  "VACCINE FREEZER": "Freezer",
+  DUAL: "Freezer",
+  "EUTECTIC FOW FREEZER": "FOW",
+  FREEZER: "Freezer",
+  "2 GLASS DOOR UNDERCOUNTER REFRIGERATOR": "SUS",
+  "1 DOOR UNDERCOUNTER REFRIGERATOR": "SUS",
+  "2 DOOR UNDERCOUNTER REFRIGERATOR": "SUS",
+  "3 DOOR UNDERCOUNTER REFRIGERATOR": "SUS",
+  "STORAGE WATER COOLER": "SWC",
+  "VISI COOLER": "VISI COOLER",
+};
+
+const CATEGORY_OPTIONS = [...new Set(Object.values(CATEGORY_MAPPINGS))].sort();
+
+const SORTED_MAPPING_KEYS = Object.keys(CATEGORY_MAPPINGS).sort(
+  (a, b) => b.length - a.length,
+);
+
+const _categoryCache = new Map();
+const getCategoryForModel = (modelName) => {
+  if (!modelName) return null;
+  const upper = modelName.toUpperCase().trim();
+  if (_categoryCache.has(upper)) return _categoryCache.get(upper);
+  let result = null;
+  for (const key of SORTED_MAPPING_KEYS) {
+    if (upper.includes(key.toUpperCase())) {
+      result = CATEGORY_MAPPINGS[key];
+      break;
+    }
+  }
+  _categoryCache.set(upper, result);
+  return result;
+};
+
+const buildCategoryLookup = (rows) => {
+  const map = new Map();
+  for (const row of rows) {
+    const name = row.Model_Name;
+    if (!name || map.has(name)) continue;
+    let uiCat = null;
+    if (row.Category) {
+      uiCat = CATEGORY_MAPPINGS[row.Category];
+      if (!uiCat) {
+        const upperCat = row.Category.toUpperCase();
+        const matchedKey = Object.keys(CATEGORY_MAPPINGS).find(
+          (k) => k.toUpperCase() === upperCat,
+        );
+        if (matchedKey) uiCat = CATEGORY_MAPPINGS[matchedKey];
+      }
+      if (!uiCat && CATEGORY_OPTIONS.includes(row.Category)) {
+        uiCat = row.Category;
+      }
+    }
+    if (!uiCat) uiCat = getCategoryForModel(name);
+    map.set(name, uiCat);
+  }
+  return map;
+};
+
+// ── Date helpers ───────────────────────────────────────────────────────────────
+const pad = (n) => String(n).padStart(2, "0");
+const fmtDate = (d) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 // ── Spinner ────────────────────────────────────────────────────────────────────
 const Spinner = ({ cls = "w-4 h-4" }) => (
@@ -29,7 +124,7 @@ const Spinner = ({ cls = "w-4 h-4" }) => (
 
 // ── Status classifier ──────────────────────────────────────────────────────────
 const classifyStatus = (status) => {
-  const s = (status || "").toLowerCase().trim();
+  const s = (status ?? "").toLowerCase().trim();
   if (!s || s === "not logged in") return "unknown";
   if (
     s.includes("close") ||
@@ -52,7 +147,7 @@ const classifyStatus = (status) => {
 
 // ── Defect severity ────────────────────────────────────────────────────────────
 const ratioLevel = (pct) => {
-  if (pct === null || pct === undefined)
+  if (pct == null)
     return {
       color: "text-slate-400",
       bg: "bg-slate-50",
@@ -117,11 +212,11 @@ const StatusBadge = ({ status }) => {
 };
 
 // ── QuickBtn ───────────────────────────────────────────────────────────────────
-const QuickBtn = ({ label, sublabel, loading, onClick, colorClass }) => (
+const QuickBtn = ({ label, sublabel, loading, onClick, colorClass, categoryCount }) => (
   <button
     disabled={loading}
     onClick={onClick}
-    className={`w-full flex flex-col items-center justify-center gap-0.5 px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-150 ${
+    className={`w-full flex flex-col items-center justify-center gap-0.5 px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-150 relative ${
       loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : colorClass
     }`}
   >
@@ -135,6 +230,11 @@ const QuickBtn = ({ label, sublabel, loading, onClick, colorClass }) => (
         {sublabel && (
           <span className="text-[10px] opacity-75 font-normal">{sublabel}</span>
         )}
+        {categoryCount > 0 && (
+          <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-white/30 text-[9px] font-black flex items-center justify-center">
+            {categoryCount}
+          </span>
+        )}
       </>
     )}
   </button>
@@ -147,186 +247,364 @@ const SortIcon = ({ active, dir }) => (
       className={`w-2.5 h-2.5 -mb-0.5 ${active && dir === "asc" ? "text-blue-500" : "text-slate-400"}`}
     />
     <ChevronDown
-      className={`w-2.5 h-2.5          ${active && dir === "desc" ? "text-blue-500" : "text-slate-400"}`}
+      className={`w-2.5 h-2.5 ${active && dir === "desc" ? "text-blue-500" : "text-slate-400"}`}
     />
   </span>
 );
 
-// ── Donut Chart ────────────────────────────────────────────────────────────────
+// ── Category Multi-Select ──────────────────────────────────────────────────────
+const CategoryMultiSelect = ({ selected, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggle = (cat) =>
+    onChange(
+      selected.includes(cat)
+        ? selected.filter((c) => c !== cat)
+        : [...selected, cat],
+    );
+  const clearAll = () => onChange([]);
+
+  return (
+    <div className="relative min-w-[190px] flex-1" ref={ref}>
+      <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase tracking-wide">
+        Category
+      </label>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`w-full flex items-center justify-between gap-2 px-3 py-[7px] rounded-lg border bg-white text-xs font-mono text-slate-700 hover:border-blue-300 transition-all shadow-sm ${
+          selected.length > 0
+            ? "border-blue-400 ring-1 ring-blue-100"
+            : "border-slate-200"
+        }`}
+      >
+        <span className="flex items-center gap-1.5 truncate">
+          {selected.length > 0 && (
+            <Tag className="w-3 h-3 text-blue-500 shrink-0" />
+          )}
+          <span className="truncate">
+            {selected.length === 0
+              ? "All categories"
+              : selected.length === 1
+                ? selected[0]
+                : `${selected.length} selected`}
+          </span>
+        </span>
+        <span className="flex items-center gap-1 shrink-0">
+          {selected.length > 0 && (
+            <span
+              role="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                clearAll();
+              }}
+              className="w-4 h-4 rounded-full bg-slate-200 hover:bg-red-100 text-slate-500 hover:text-red-600 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <X className="w-2.5 h-2.5" />
+            </span>
+          )}
+          <ChevronDown
+            className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-150 ${open ? "rotate-180" : ""}`}
+          />
+        </span>
+      </button>
+
+      {open && (
+        <div className="absolute top-full mt-1 left-0 z-50 w-56 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+          <div className="px-3 py-2 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Filter by category
+            </span>
+            {selected.length > 0 && (
+              <button
+                onClick={clearAll}
+                className="text-[10px] text-blue-600 hover:underline font-semibold"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+          <div className="px-3 py-1.5 border-b border-slate-100 bg-slate-50/50">
+            <button
+              type="button"
+              onClick={() =>
+                selected.length === CATEGORY_OPTIONS.length
+                  ? clearAll()
+                  : onChange([...CATEGORY_OPTIONS])
+              }
+              className="text-[10px] font-semibold text-blue-600 hover:underline transition-colors"
+            >
+              {selected.length === CATEGORY_OPTIONS.length
+                ? "Deselect all"
+                : "Select all"}
+            </button>
+          </div>
+          <div className="py-1 max-h-52 overflow-auto">
+            {CATEGORY_OPTIONS.map((cat) => {
+              const active = selected.includes(cat);
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => toggle(cat)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-mono text-left transition-colors ${
+                    active
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <span
+                    className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                      active
+                        ? "bg-blue-600 border-blue-600"
+                        : "border-slate-300 bg-white"
+                    }`}
+                  >
+                    {active && (
+                      <CheckCircle className="w-3 h-3 text-white" strokeWidth={3} />
+                    )}
+                  </span>
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+          {selected.length > 0 && (
+            <div className="px-3 py-2 border-t border-slate-100 bg-slate-50">
+              <div className="flex flex-wrap gap-1">
+                {selected.map((c) => (
+                  <span
+                    key={c}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold font-mono border border-blue-200"
+                  >
+                    {c}
+                    <button
+                      onClick={() => toggle(c)}
+                      className="hover:text-blue-900 transition-colors"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Recharts DonutChart ────────────────────────────────────────────────────────
 const DonutChart = ({ open, closed }) => {
   const total = (Number(open) || 0) + (Number(closed) || 0);
-  const r = 44,
-    cx = 58,
-    cy = 58,
-    circ = 2 * Math.PI * r;
-  const cArc = total ? (closed / total) * circ : 0;
-  const oArc = total ? (open / total) * circ : 0;
   const pct = total > 0 ? Math.round((closed / total) * 100) : 0;
+  const data = [
+    { name: "Closed", value: Number(closed) || 0 },
+    { name: "Open", value: Number(open) || 0 },
+  ];
   return (
-    <div className="relative w-[116px] h-[116px]">
-      <svg viewBox="0 0 116 116">
-        <circle
-          cx={cx}
-          cy={cy}
-          r={r}
-          fill="none"
-          stroke="#e2e8f0"
-          strokeWidth={13}
-        />
-        <circle
-          cx={cx}
-          cy={cy}
-          r={r}
-          fill="none"
-          stroke="#22c55e"
-          strokeWidth={13}
-          strokeDasharray={`${cArc} ${circ}`}
-          style={{
-            transform: `rotate(-90deg)`,
-            transformOrigin: `${cx}px ${cy}px`,
+    <div className="relative w-[120px] h-[120px] shrink-0">
+      <PieChart width={120} height={120}>
+        <Pie
+          data={data}
+          cx={60}
+          cy={60}
+          innerRadius={35}
+          outerRadius={47}
+          dataKey="value"
+          startAngle={90}
+          endAngle={-270}
+          strokeWidth={0}
+        >
+          <Cell fill="#22c55e" />
+          <Cell fill="#ef4444" />
+        </Pie>
+        <Tooltip
+          formatter={(value, name) => [value.toLocaleString(), name]}
+          contentStyle={{
+            fontSize: 11,
+            fontFamily: "monospace",
+            border: "1px solid #e2e8f0",
+            borderRadius: 8,
           }}
         />
-        <circle
-          cx={cx}
-          cy={cy}
-          r={r}
-          fill="none"
-          stroke="#ef4444"
-          strokeWidth={13}
-          strokeDasharray={`${oArc} ${circ}`}
-          strokeDashoffset={-cArc}
-          style={{
-            transform: `rotate(-90deg)`,
-            transformOrigin: `${cx}px ${cy}px`,
-          }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center text-sm font-black text-slate-800 font-mono">
+      </PieChart>
+      <div className="absolute inset-0 flex items-center justify-center text-sm font-black text-slate-800 font-mono pointer-events-none">
         {pct}%
       </div>
     </div>
   );
 };
 
-// ── Rework Bar Chart ───────────────────────────────────────────────────────────
-const ReworkBarChart = ({ data }) => {
-  const max = Math.max(...data.map((d) => d.total), 1);
+// ── Recharts ReworkBarChart ────────────────────────────────────────────────────
+const ReworkTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  const total = payload.reduce((s, p) => s + (p.value || 0), 0);
   return (
-    <div className="flex flex-col gap-3">
-      {data.map((row, i) => (
-        <div key={i}>
-          <div className="flex justify-between items-center mb-1.5">
-            <span className="text-xs font-mono font-semibold text-slate-600 truncate max-w-[220px]">
-              {row.Model_Name}
-            </span>
-            <div className="flex gap-3 shrink-0">
-              <span className="text-[11px] font-bold font-mono text-red-600">
-                ↑ {row.open}
-              </span>
-              <span className="text-[11px] font-bold font-mono text-emerald-600">
-                ✓ {row.closed}
-              </span>
-              <span className="text-[11px] font-bold font-mono text-blue-600">
-                {row.total}
-              </span>
-            </div>
-          </div>
-          <div className="h-2 rounded-full bg-slate-100 overflow-hidden flex border border-slate-200">
-            <div
-              className="h-full bg-emerald-400 transition-all duration-700"
-              style={{
-                width: `${(row.closed / max) * 100}%`,
-                borderRadius: row.open === 0 ? "9999px" : "9999px 0 0 9999px",
-              }}
-            />
-            <div
-              className="h-full bg-red-400 transition-all duration-700"
-              style={{ width: `${(row.open / max) * 100}%` }}
-            />
-          </div>
+    <div className="bg-white border border-slate-200 shadow-xl rounded-lg p-3 text-xs font-mono max-w-[220px]">
+      <p className="font-bold text-slate-800 mb-2 text-[11px] leading-tight">{label}</p>
+      {payload.map((p) => (
+        <div key={p.name} className="flex items-center gap-2 mb-0.5">
+          <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: p.fill }} />
+          <span className="text-slate-600">{p.name}:</span>
+          <span className="font-bold" style={{ color: p.fill }}>
+            {p.value}
+          </span>
         </div>
       ))}
-      <div className="flex gap-4 mt-1">
-        {[
-          { c: "bg-emerald-400", l: "Closed" },
-          { c: "bg-red-400", l: "Open" },
-        ].map((x) => (
-          <div key={x.l} className="flex items-center gap-1.5">
-            <div className={`w-2.5 h-2.5 rounded-sm ${x.c}`} />
-            <span className="text-[11px] text-slate-500 font-mono">{x.l}</span>
-          </div>
-        ))}
+      <div className="mt-1.5 pt-1.5 border-t border-slate-100 text-slate-500">
+        Total: <b className="text-blue-600">{total}</b>
       </div>
     </div>
   );
 };
 
-// ── Defect Ratio Bars ──────────────────────────────────────────────────────────
-const DefectRatioBars = ({ data }) => {
-  const maxRatio = Math.max(...data.map((d) => d.defectRatio ?? 0), 0.01);
+const ReworkBarChart = ({ data, chartRef }) => {
+  const chartData = data.map((d) => ({
+    name:
+      d.Model_Name.length > 30
+        ? d.Model_Name.slice(0, 28) + "…"
+        : d.Model_Name,
+    Closed: d.closed,
+    Open: d.open,
+  }));
+  const h = Math.max(180, chartData.length * 40 + 50);
+
   return (
-    <div className="flex flex-col gap-3">
-      {data.map((row, i) => {
-        const rl = ratioLevel(row.defectRatio);
-        const barPct =
-          row.defectRatio !== null
-            ? (row.defectRatio / Math.max(maxRatio, 10)) * 100
-            : 0;
-        return (
-          <div key={i}>
-            <div className="flex justify-between items-center mb-1.5">
-              <span className="text-xs font-mono font-semibold text-slate-600 truncate max-w-[210px]">
-                {row.Model_Name}
-              </span>
-              <div className="flex items-center gap-3 shrink-0">
-                <span className="text-[11px] font-mono text-slate-500">
-                  Prod:{" "}
-                  <b className="text-blue-600">
-                    {(row.production || 0).toLocaleString()}
-                  </b>
-                </span>
-                <span className="text-[11px] font-mono text-slate-500">
-                  RW: <b className="text-red-600">{row.reworkTotal}</b>
-                </span>
-                <span
-                  className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold font-mono border ${rl.bg} ${rl.color} ${rl.border}`}
-                >
-                  {row.defectRatio !== null
-                    ? `${row.defectRatio.toFixed(2)}%`
-                    : "N/A"}
-                </span>
-              </div>
-            </div>
-            <div className="h-2 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${barPct}%`, backgroundColor: rl.hex }}
-              />
-            </div>
-          </div>
-        );
-      })}
-      <div className="flex gap-4 mt-1 flex-wrap">
-        {[
-          { hex: "#16a34a", l: "Good (<15%)" },
-          { hex: "#ea580c", l: "Moderate (15-25%)" },
-          { hex: "#d97706", l: "High (25-35%)" },
-          { hex: "#dc2626", l: "Critical (≥35%)" },
-        ].map((l) => (
-          <div key={l.l} className="flex items-center gap-1.5">
-            <div
-              className="w-2.5 h-2.5 rounded-sm"
-              style={{ background: l.hex }}
-            />
-            <span className="text-[11px] text-slate-500 font-mono">{l.l}</span>
-          </div>
-        ))}
+    <div ref={chartRef} style={{ height: h }}>
+      <ResponsiveContainer width="100%" height={h}>
+        <BarChart
+          data={chartData}
+          layout="vertical"
+          margin={{ top: 4, right: 50, left: 8, bottom: 4 }}
+          barSize={16}
+        >
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+          <XAxis
+            type="number"
+            tick={{ fontSize: 10, fill: "#94a3b8", fontFamily: "monospace" }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={210}
+            tick={{ fontSize: 10, fill: "#475569", fontFamily: "monospace" }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <Tooltip content={<ReworkTooltip />} />
+          <Legend
+            iconType="square"
+            iconSize={10}
+            wrapperStyle={{ fontSize: 11, fontFamily: "monospace", paddingTop: 8 }}
+          />
+          <Bar dataKey="Closed" stackId="a" fill="#22c55e" radius={[0, 0, 0, 0]} />
+          <Bar dataKey="Open" stackId="a" fill="#ef4444" radius={[0, 3, 3, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
+// ── Recharts DefectRatioBars ───────────────────────────────────────────────────
+const DefectTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  const val = payload[0]?.value;
+  const rl = ratioLevel(val);
+  const prod = payload[0]?.payload?.production;
+  const rework = payload[0]?.payload?.rework;
+  return (
+    <div className="bg-white border border-slate-200 shadow-xl rounded-lg p-3 text-xs font-mono max-w-[230px]">
+      <p className="font-bold text-slate-800 mb-2 text-[11px] leading-tight">{label}</p>
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-slate-500">Defect Ratio:</span>
+        <span className={`font-bold ${rl.color}`}>{val != null ? `${val}%` : "N/A"}</span>
+        {val != null && (
+          <span
+            className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${rl.bg} ${rl.color} ${rl.border}`}
+          >
+            {rl.label}
+          </span>
+        )}
+      </div>
+      <div className="text-slate-400 mt-1">
+        <span>
+          Production:{" "}
+          <b className="text-blue-600">{(prod || 0).toLocaleString()}</b>
+        </span>
+        {" · "}
+        <span>
+          Rework: <b className="text-red-600">{rework}</b>
+        </span>
       </div>
     </div>
   );
 };
 
-// ── Defect Ratio Table ─────────────────────────────────────────────────────────
+const DefectRatioBars = ({ data, chartRef }) => {
+  const withRatio = data.filter((d) => d.defectRatio != null);
+  const chartData = withRatio.map((d) => ({
+    name:
+      d.Model_Name.length > 30
+        ? d.Model_Name.slice(0, 28) + "…"
+        : d.Model_Name,
+    "Defect Ratio": Number(d.defectRatio.toFixed(2)),
+    production: d.production,
+    rework: d.reworkTotal,
+    color: ratioLevel(d.defectRatio).hex,
+  }));
+  const h = Math.max(180, chartData.length * 40 + 50);
+
+  return (
+    <div ref={chartRef} style={{ height: h }}>
+      <ResponsiveContainer width="100%" height={h}>
+        <BarChart
+          data={chartData}
+          layout="vertical"
+          margin={{ top: 4, right: 60, left: 8, bottom: 4 }}
+          barSize={16}
+        >
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+          <XAxis
+            type="number"
+            tick={{ fontSize: 10, fill: "#94a3b8", fontFamily: "monospace" }}
+            tickFormatter={(v) => `${v}%`}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={210}
+            tick={{ fontSize: 10, fill: "#475569", fontFamily: "monospace" }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <Tooltip content={<DefectTooltip />} />
+          <Bar dataKey="Defect Ratio" radius={[0, 3, 3, 0]}>
+            {chartData.map((entry, index) => (
+              <Cell key={index} fill={entry.color} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
+// ── DefectRatioTable ───────────────────────────────────────────────────────────
 const DefectRatioTable = ({ data }) => {
   const [sortCol, setSortCol] = useState("defectRatio");
   const [sortDir, setSortDir] = useState("desc");
@@ -339,18 +617,27 @@ const DefectRatioTable = ({ data }) => {
     }
   };
 
-  const sorted = [...data].sort((a, b) => {
-    const av = a[sortCol] ?? -1,
-      bv = b[sortCol] ?? -1;
-    return sortDir === "asc" ? av - bv : bv - av;
-  });
+  const sorted = useMemo(
+    () =>
+      [...data].sort((a, b) => {
+        const av = a[sortCol],
+          bv = b[sortCol];
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        return sortDir === "asc" ? av - bv : bv - av;
+      }),
+    [data, sortCol, sortDir],
+  );
 
-  const hasProd = data.some((r) => r.production !== null);
-
+  const hasProd = data.some((r) => r.production != null && r.production > 0);
   const totProd = sorted.reduce((s, r) => s + (r.production ?? 0), 0);
   const totRW = sorted.reduce((s, r) => s + r.reworkTotal, 0);
   const totRatio = totProd > 0 ? (totRW / totProd) * 100 : null;
   const totRl = ratioLevel(totRatio);
+
+  const SORT_COLS = ["Production", "Rework", "Defect Ratio"];
+  const SORT_KEYS = ["production", "reworkTotal", "defectRatio"];
 
   return (
     <div className="overflow-auto">
@@ -379,26 +666,19 @@ const DefectRatioTable = ({ data }) => {
               <th
                 key={h}
                 onClick={() =>
-                  ["Production", "Rework", "Defect Ratio"].includes(h)
-                    ? handleSort(
-                        ["production", "reworkTotal", "defectRatio"][
-                          ["Production", "Rework", "Defect Ratio"].indexOf(h)
-                        ],
-                      )
+                  SORT_COLS.includes(h)
+                    ? handleSort(SORT_KEYS[SORT_COLS.indexOf(h)])
                     : null
                 }
-                className={`px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap text-center ${i === 1 ? "text-left" : ""} ${["Production", "Rework", "Defect Ratio"].includes(h) ? "cursor-pointer hover:bg-slate-200" : ""}`}
+                className={`px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap text-center
+                  ${i === 1 ? "text-left" : ""}
+                  ${SORT_COLS.includes(h) ? "cursor-pointer hover:bg-slate-200" : ""}`}
               >
                 <span className="flex items-center justify-center gap-1">
                   {h}
-                  {["Production", "Rework", "Defect Ratio"].includes(h) && (
+                  {SORT_COLS.includes(h) && (
                     <SortIcon
-                      active={
-                        sortCol ===
-                        ["production", "reworkTotal", "defectRatio"][
-                          ["Production", "Rework", "Defect Ratio"].indexOf(h)
-                        ]
-                      }
+                      active={sortCol === SORT_KEYS[SORT_COLS.indexOf(h)]}
                       dir={sortDir}
                     />
                   )}
@@ -422,7 +702,7 @@ const DefectRatioTable = ({ data }) => {
                   {row.Model_Name}
                 </td>
                 <td className="px-3 py-2 border-b border-slate-100 text-center font-bold font-mono text-blue-700">
-                  {row.production !== null ? (
+                  {row.production != null ? (
                     row.production.toLocaleString()
                   ) : (
                     <span className="text-slate-300">—</span>
@@ -434,7 +714,7 @@ const DefectRatioTable = ({ data }) => {
                   </span>
                 </td>
                 <td className="px-3 py-2 border-b border-slate-100 text-center">
-                  {row.defectRatio !== null ? (
+                  {row.defectRatio != null ? (
                     <div className="flex items-center justify-center gap-2">
                       <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                         <div
@@ -445,9 +725,7 @@ const DefectRatioTable = ({ data }) => {
                           }}
                         />
                       </div>
-                      <span
-                        className={`font-bold font-mono text-sm ${rl.color}`}
-                      >
+                      <span className={`font-bold font-mono text-sm ${rl.color}`}>
                         {row.defectRatio.toFixed(2)}%
                       </span>
                     </div>
@@ -459,11 +737,11 @@ const DefectRatioTable = ({ data }) => {
                   <span
                     className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border font-mono ${rl.bg} ${rl.color} ${rl.border}`}
                   >
-                    {row.defectRatio !== null ? rl.label : "No Data"}
+                    {row.defectRatio != null ? rl.label : "No Data"}
                   </span>
                 </td>
                 <td className="px-3 py-2 border-b border-slate-100 text-center">
-                  {row.defectRatio !== null && (
+                  {row.defectRatio != null && (
                     <div className="flex justify-center gap-1">
                       {[2, 5, 10].map((thresh, ti) => (
                         <div
@@ -483,7 +761,6 @@ const DefectRatioTable = ({ data }) => {
               </tr>
             );
           })}
-          {/* Totals row */}
           {sorted.length > 0 && (
             <tr className="bg-slate-800 text-white">
               <td className="px-3 py-3" />
@@ -497,7 +774,7 @@ const DefectRatioTable = ({ data }) => {
                 {totRW.toLocaleString()}
               </td>
               <td className="px-3 py-3 text-center">
-                {totRatio !== null && (
+                {totRatio != null && (
                   <span
                     className="font-bold font-mono text-sm"
                     style={{ color: totRl.hex }}
@@ -507,7 +784,7 @@ const DefectRatioTable = ({ data }) => {
                 )}
               </td>
               <td className="px-3 py-3 text-center">
-                {totRatio !== null && (
+                {totRatio != null && (
                   <span
                     className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border font-mono ${totRl.bg} ${totRl.color} ${totRl.border}`}
                   >
@@ -526,13 +803,17 @@ const DefectRatioTable = ({ data }) => {
 
 // ── Breakdown Table ────────────────────────────────────────────────────────────
 const BreakdownTable = ({ data, selectedModel, onModelClick }) => {
-  const totals = data.reduce(
-    (a, r) => ({
-      total: a.total + r.total,
-      open: a.open + r.open,
-      closed: a.closed + r.closed,
-    }),
-    { total: 0, open: 0, closed: 0 },
+  const totals = useMemo(
+    () =>
+      data.reduce(
+        (a, r) => ({
+          total: a.total + r.total,
+          open: a.open + r.open,
+          closed: a.closed + r.closed,
+        }),
+        { total: 0, open: 0, closed: 0 },
+      ),
+    [data],
   );
   const totRate =
     totals.total > 0 ? Math.round((totals.closed / totals.total) * 100) : 0;
@@ -546,7 +827,9 @@ const BreakdownTable = ({ data, selectedModel, onModelClick }) => {
               (h, i) => (
                 <th
                   key={h}
-                  className={`px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap ${i <= 1 ? "text-left" : "text-center"}`}
+                  className={`px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap ${
+                    i <= 1 ? "text-left" : "text-center"
+                  }`}
                 >
                   {h}
                 </th>
@@ -559,25 +842,31 @@ const BreakdownTable = ({ data, selectedModel, onModelClick }) => {
             const rate =
               row.total > 0 ? Math.round((row.closed / row.total) * 100) : 0;
             const isAct = selectedModel === row.Model_Name;
+            const rcHex =
+              rate >= 70 ? "#16a34a" : rate >= 40 ? "#d97706" : "#dc2626";
             const rc =
               rate >= 70
                 ? "text-emerald-600"
                 : rate >= 40
                   ? "text-amber-600"
                   : "text-red-600";
-            const rcHex =
-              rate >= 70 ? "#16a34a" : rate >= 40 ? "#d97706" : "#dc2626";
             return (
               <tr
                 key={i}
                 onClick={() => onModelClick(row.Model_Name)}
-                className={`cursor-pointer transition-colors ${isAct ? "bg-blue-50 border-l-2 border-blue-500" : "hover:bg-blue-50/60 even:bg-slate-50/40"}`}
+                className={`cursor-pointer transition-colors ${
+                  isAct
+                    ? "bg-blue-50 border-l-2 border-blue-500"
+                    : "hover:bg-blue-50/60 even:bg-slate-50/40"
+                }`}
               >
                 <td className="px-3 py-2.5 border-b border-slate-100 text-slate-400 font-mono">
                   {i + 1}
                 </td>
                 <td
-                  className={`px-3 py-2.5 border-b border-slate-100 font-semibold font-mono ${isAct ? "text-blue-700" : "text-slate-800"}`}
+                  className={`px-3 py-2.5 border-b border-slate-100 font-semibold font-mono ${
+                    isAct ? "text-blue-700" : "text-slate-800"
+                  }`}
                 >
                   {row.Model_Name}
                 </td>
@@ -602,9 +891,7 @@ const BreakdownTable = ({ data, selectedModel, onModelClick }) => {
                         style={{ width: `${rate}%`, backgroundColor: rcHex }}
                       />
                     </div>
-                    <span
-                      className={`text-[11px] font-mono font-bold min-w-[34px] ${rc}`}
-                    >
+                    <span className={`text-[11px] font-mono font-bold min-w-[34px] ${rc}`}>
                       {rate}%
                     </span>
                   </div>
@@ -627,7 +914,6 @@ const BreakdownTable = ({ data, selectedModel, onModelClick }) => {
               </tr>
             );
           })}
-          {/* Totals */}
           {data.length > 0 && (
             <tr className="bg-slate-800 text-white">
               <td className="px-3 py-3" />
@@ -669,26 +955,18 @@ const BreakdownTable = ({ data, selectedModel, onModelClick }) => {
 const KpiCard = ({
   label,
   value,
-  sub,
   badge,
   colorClass = "bg-blue-50 border-blue-100",
   textClass = "text-blue-700",
   subClass = "text-blue-500",
 }) => (
   <div
-    className={`flex flex-col items-center px-4 py-2 rounded-lg border min-w-[100px] ${colorClass}`}
+    className={`flex flex-col items-center px-4 py-2 rounded-lg border min-w-[90px] ${colorClass}`}
   >
     <span className={`text-xl font-bold font-mono ${textClass}`}>{value}</span>
-    <span
-      className={`text-[10px] font-medium uppercase tracking-wide ${subClass}`}
-    >
+    <span className={`text-[10px] font-medium uppercase tracking-wide ${subClass}`}>
       {label}
     </span>
-    {sub && (
-      <span className="text-[10px] text-slate-400 mt-0.5 text-center">
-        {sub}
-      </span>
-    )}
     {badge && (
       <span
         className={`mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border font-mono ${badge.bg} ${badge.color} ${badge.border}`}
@@ -699,13 +977,116 @@ const KpiCard = ({
   </div>
 );
 
+// ── Detail columns ─────────────────────────────────────────────────────────────
+const DETAIL_COLUMNS = [
+  "Model_Name",
+  "Category",
+  "Station",
+  "Process_Code",
+  "Assembly_Sr_No",
+  "Rework_IN",
+  "Rework_Out",
+  "UserName",
+  "Rework_Status",
+  "Duration",
+  "Defect_Category",
+  "Defect",
+  "Root_Cause",
+  "Counter_Action",
+  "Remark",
+];
+
+// ── Active Filter Banner ───────────────────────────────────────────────────────
+const ActiveFilterBanner = ({ categories, onClear, onRemove, recordCount, totalCount }) => {
+  if (categories.length === 0) return null;
+  return (
+    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-blue-600">
+        <Tag className="w-3 h-3" /> Category filter active:
+      </span>
+      {categories.map((c) => (
+        <span
+          key={c}
+          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold font-mono border border-blue-200"
+        >
+          {c}
+          <button
+            onClick={() => onRemove(c)}
+            className="hover:text-blue-900 transition-colors"
+          >
+            <X className="w-2.5 h-2.5" />
+          </button>
+        </span>
+      ))}
+      <button
+        onClick={onClear}
+        className="text-[10px] text-slate-400 hover:text-red-500 font-semibold transition-colors ml-1"
+      >
+        Clear all
+      </button>
+      {totalCount > 0 && (
+        <span className="ml-auto text-[10px] font-mono text-slate-400">
+          Showing{" "}
+          <b className="text-blue-600">{recordCount.toLocaleString()}</b> of{" "}
+          <b className="text-slate-600">{totalCount.toLocaleString()}</b>{" "}
+          records
+        </span>
+      )}
+    </div>
+  );
+};
+
+// ── SVG → PNG data URL (no external lib needed) ────────────────────────────────
+const svgToDataURL = (containerEl) =>
+  new Promise((resolve) => {
+    if (!containerEl) return resolve(null);
+    const svgEl = containerEl.querySelector("svg");
+    if (!svgEl) return resolve(null);
+
+    const bbox = svgEl.getBoundingClientRect();
+    const w = Math.max(bbox.width || 600, 400);
+    const h = Math.max(bbox.height || 300, 150);
+
+    const serializer = new XMLSerializer();
+    let svgStr = serializer.serializeToString(svgEl);
+    if (!svgStr.includes("xmlns=")) {
+      svgStr = svgStr.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+    }
+    // Ensure white background in the captured image
+    svgStr = svgStr.replace(
+      "<svg",
+      '<svg style="background:#ffffff;font-family:monospace,sans-serif;"',
+    );
+
+    const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const scale = 2;
+      const canvas = document.createElement("canvas");
+      canvas.width = w * scale;
+      canvas.height = h * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve({ dataURL: canvas.toDataURL("image/png"), w, h });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    img.src = url;
+  });
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 const ReworkReport = () => {
-  const [loading, setLoading] = useState(false);
-  const [ydayLoading, setYdayLoading] = useState(false);
-  const [todayLoading, setTodayLoading] = useState(false);
-  const [monthLoading, setMonthLoading] = useState(false);
+  const [loadingKey, setLoadingKey] = useState(null);
   const [activeTab, setActiveTab] = useState("summary");
+  const [exporting, setExporting] = useState(null); // 'excel' | 'pdf'
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   const [selectedModelVariant, setSelectedModelVariant] = useState(null);
   const [startTime, setStartTime] = useState("");
@@ -716,56 +1097,80 @@ const ReworkReport = () => {
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [selectedModel, setSelectedModel] = useState(null);
+  const [selectedCategories, setSelectedCategories] = useState([]);
 
   const [productionMap, setProductionMap] = useState({});
   const [totalProduction, setTotalProduction] = useState(0);
-  const [prodLoading, setProdLoading] = useState(false);
 
-  const observer = useRef();
+  // Chart refs for PDF capture
+  const summaryChartRef = useRef(null);
+  const defectChartRef = useRef(null);
+  const exportMenuRef = useRef(null);
+
+  const abortRef = useRef(null);
+  const observerRef = useRef(null);
+  const fetchParamsRef = useRef({});
 
   const {
     data: variants = [],
     isLoading: variantsLoading,
     error: variantsError,
   } = useGetModelVariantsQuery();
+
   useEffect(() => {
     if (variantsError) toast.error("Failed to load model variants");
   }, [variantsError]);
 
-  const pad = (n) => (n < 10 ? `0${n}` : n);
-  const fmt = (d) =>
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  const buildParams = (extra = {}) => ({
-    model: selectedModelVariant?.value || null,
-    ...extra,
-  });
+  // Close export menu on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) {
+        setExportMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
-  const lastRowRef = useCallback(
-    (node) => {
-      if (loading) return;
-      if (observer.current) observer.current.disconnect();
-      observer.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && hasMore) setPage((p) => p + 1);
-      });
-      if (node) observer.current.observe(node);
-    },
-    [loading, hasMore],
+  // ── Build API params ────────────────────────────────────────────────────────
+  const buildParams = useCallback(
+    (extra = {}) => ({
+      model: selectedModelVariant?.value || null,
+      categories:
+        selectedCategories.length > 0 ? selectedCategories.join(",") : null,
+      ...extra,
+    }),
+    [selectedModelVariant, selectedCategories],
   );
 
-  const fetchProductionData = async (st, et) => {
+  // ── Infinite-scroll sentinel ────────────────────────────────────────────────
+  const lastRowRef = useCallback(
+    (node) => {
+      if (loadingKey) return;
+      if (observerRef.current) observerRef.current.disconnect();
+      observerRef.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasMore) setPage((p) => p + 1);
+      });
+      if (node) observerRef.current.observe(node);
+    },
+    [loadingKey, hasMore],
+  );
+
+  // ── Production fetch ────────────────────────────────────────────────────────
+  const fetchProductionData = useCallback(async (st, et, modelVal, cats) => {
     try {
-      setProdLoading(true);
+      setLoadingKey("prod");
       const res = await axios.get(`${baseURL}quality/production-report`, {
         params: {
           startTime: st,
           endTime: et,
-          model: selectedModelVariant?.value || null,
+          model: modelVal || null,
+          categories: cats.length > 0 ? cats.join(",") : null,
         },
       });
       if (res?.data?.success) {
-        const rows = res.data.data || [];
         const map = {};
-        rows.forEach((r) => {
+        (res.data.data || []).forEach((r) => {
           map[r.Model_Name] = Number(r.production_count) || 0;
         });
         setProductionMap(map);
@@ -775,84 +1180,140 @@ const ReworkReport = () => {
       setProductionMap({});
       setTotalProduction(0);
     } finally {
-      setProdLoading(false);
+      setLoadingKey((k) => (k === "prod" ? null : k));
     }
-  };
+  }, []);
 
-  const fetchReworkData = async (pageNumber = 1) => {
+  // ── Paginated rework fetch ──────────────────────────────────────────────────
+  const fetchReworkPage = useCallback(
+    async ({ pageNumber, st, et, modelVal, cats }) => {
+      try {
+        setLoadingKey("query");
+        const res = await axios.get(`${baseURL}quality/rework-report`, {
+          params: {
+            startTime: st,
+            endTime: et,
+            model: modelVal || null,
+            categories: cats.length > 0 ? cats.join(",") : null,
+            page: pageNumber,
+            limit,
+          },
+        });
+        if (res?.data?.success) {
+          const nd = res.data.data || [];
+          setReworkData((prev) => (pageNumber === 1 ? nd : [...prev, ...nd]));
+          if (pageNumber === 1) {
+            setTotalCount(res.data.totalCount || 0);
+            fetchProductionData(st, et, modelVal, cats);
+          }
+          setHasMore(nd.length === limit);
+        }
+      } catch {
+        toast.error("Failed to fetch rework data.");
+      } finally {
+        setLoadingKey((k) => (k === "query" ? null : k));
+      }
+    },
+    [limit, fetchProductionData],
+  );
+
+  const handleQuery = useCallback(() => {
     if (!startTime || !endTime) {
       toast.error("Please select a Time Range.");
       return;
     }
-    try {
-      setLoading(true);
-      const res = await axios.get(`${baseURL}quality/rework-report`, {
-        params: buildParams({ startTime, endTime, page: pageNumber, limit }),
-      });
-      if (res?.data?.success) {
-        const nd = res.data.data || [];
-        setReworkData((prev) => (pageNumber === 1 ? nd : [...prev, ...nd]));
-        if (pageNumber === 1) {
+    const cats = selectedCategories;
+    const modelVal = selectedModelVariant?.value || null;
+    fetchParamsRef.current = { st: startTime, et: endTime, modelVal, cats };
+    setPage(1);
+    setReworkData([]);
+    setSelectedModel(null);
+    setProductionMap({});
+    setTotalProduction(0);
+    fetchReworkPage({ pageNumber: 1, st: startTime, et: endTime, modelVal, cats });
+  }, [startTime, endTime, selectedCategories, selectedModelVariant, fetchReworkPage]);
+
+  useEffect(() => {
+    if (page > 1) {
+      const { st, et, modelVal, cats } = fetchParamsRef.current;
+      fetchReworkPage({ pageNumber: page, st, et, modelVal, cats });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  // ── Quick fetch ─────────────────────────────────────────────────────────────
+  const fetchQuickData = useCallback(
+    async (start, end, loaderKey) => {
+      if (abortRef.current) abortRef.current.abort();
+      abortRef.current = new AbortController();
+
+      const catsSnapshot = selectedCategories.slice();
+      const modelVal = selectedModelVariant?.value || null;
+
+      try {
+        setLoadingKey(loaderKey);
+        setReworkData([]);
+        setTotalCount(0);
+        setSelectedModel(null);
+        setProductionMap({});
+        setTotalProduction(0);
+        setStartTime(start);
+        setEndTime(end);
+
+        const res = await axios.get(`${baseURL}quality/rework-report-quick`, {
+          params: {
+            startTime: start,
+            endTime: end,
+            model: modelVal,
+            categories: catsSnapshot.length > 0 ? catsSnapshot.join(",") : null,
+          },
+          signal: abortRef.current.signal,
+        });
+
+        if (res?.data?.success) {
+          const nd = res.data.data || [];
+          setReworkData(nd);
           setTotalCount(res.data.totalCount || 0);
-          fetchProductionData(startTime, endTime);
+          setHasMore(false);
+          fetchParamsRef.current = { st: start, et: end, modelVal, cats: catsSnapshot };
+          fetchProductionData(start, end, modelVal, catsSnapshot);
         }
-        setHasMore(nd.length === limit);
+      } catch (err) {
+        if (!axios.isCancel(err)) toast.error("Failed to fetch quick data.");
+      } finally {
+        setLoadingKey((k) => (k === loaderKey ? null : k));
       }
-    } catch {
-      toast.error("Failed to fetch rework data.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [selectedModelVariant, selectedCategories, fetchProductionData],
+  );
 
-  const fetchQuickData = async (start, end, setLoader) => {
-    try {
-      setLoader(true);
-      setReworkData([]);
-      setTotalCount(0);
-      setSelectedModel(null);
-      setProductionMap({});
-      setTotalProduction(0);
-      const res = await axios.get(`${baseURL}quality/rework-report-quick`, {
-        params: buildParams({ startTime: start, endTime: end }),
-      });
-      if (res?.data?.success) {
-        setReworkData(res.data.data || []);
-        setTotalCount(res.data.totalCount || 0);
-        setHasMore(false);
-        fetchProductionData(start, end);
-      }
-    } catch {
-      toast.error("Failed to fetch quick data.");
-    } finally {
-      setLoader(false);
-    }
-  };
-
-  const fetchYesterdayData = () => {
-    const now = new Date(),
-      t8 = new Date(now.setHours(8, 0, 0, 0)),
-      y8 = new Date(t8);
+  const fetchYesterdayData = useCallback(() => {
+    const now = new Date();
+    const t8 = new Date(now);
+    t8.setHours(8, 0, 0, 0);
+    const y8 = new Date(t8);
     y8.setDate(t8.getDate() - 1);
-    fetchQuickData(fmt(y8), fmt(t8), setYdayLoading);
-  };
+    fetchQuickData(fmtDate(y8), fmtDate(t8), "yesterday");
+  }, [fetchQuickData]);
 
-  const fetchTodayData = () => {
-    const now = new Date(),
-      t8 = new Date(now.setHours(8, 0, 0, 0));
-    fetchQuickData(fmt(t8), fmt(new Date()), setTodayLoading);
-  };
+  const fetchTodayData = useCallback(() => {
+    const now = new Date();
+    const t8 = new Date(now);
+    t8.setHours(8, 0, 0, 0);
+    fetchQuickData(fmtDate(t8), fmtDate(new Date()), "today");
+  }, [fetchQuickData]);
 
-  const fetchMTDData = () => {
+  const fetchMTDData = useCallback(() => {
     const now = new Date();
     fetchQuickData(
-      fmt(new Date(now.getFullYear(), now.getMonth(), 1, 8, 0, 0)),
-      fmt(now),
-      setMonthLoading,
+      fmtDate(new Date(now.getFullYear(), now.getMonth(), 1, 8, 0, 0)),
+      fmtDate(now),
+      "mtd",
     );
-  };
+  }, [fetchQuickData]);
 
-  const fetchExportData = async () => {
+  // ── Individual export helpers ───────────────────────────────────────────────
+  const fetchDetailExport = async () => {
     if (!startTime || !endTime) {
       toast.error("Please select a Time Range.");
       return [];
@@ -863,18 +1324,69 @@ const ReworkReport = () => {
       });
       return res?.data?.success ? res.data.data : [];
     } catch {
-      toast.error("Export failed.");
+      toast.error("Detail export failed.");
       return [];
     }
   };
 
-  const normalizeModel = (name) =>
-    name ? name.trim().replace(/\s*S$/i, "").trim() : "Not Logged In";
+  const fetchSummaryExport = async () => {
+    if (!startTime || !endTime) {
+      toast.error("Please select a Time Range.");
+      return [];
+    }
+    try {
+      const res = await axios.get(`${baseURL}quality/rework-summary-export`, {
+        params: buildParams({ startTime, endTime }),
+      });
+      return res?.data?.success ? res.data.data : [];
+    } catch {
+      toast.error("Summary export failed.");
+      return [];
+    }
+  };
 
-  const aggregateReworkData = () => {
+  const fetchDefectExport = async () => {
+    if (!startTime || !endTime) {
+      toast.error("Please select a Time Range.");
+      return [];
+    }
+    try {
+      const res = await axios.get(`${baseURL}quality/rework-defect-export`, {
+        params: buildParams({ startTime, endTime }),
+      });
+      return res?.data?.success ? res.data.data : [];
+    } catch {
+      toast.error("Defect ratio export failed.");
+      return [];
+    }
+  };
+
+  // ── Derived data ────────────────────────────────────────────────────────────
+  const categoryLookup = useMemo(() => buildCategoryLookup(reworkData), [reworkData]);
+
+  const modelFilteredData = useMemo(
+    () =>
+      selectedModel
+        ? reworkData.filter((x) => x.Model_Name === selectedModel)
+        : reworkData,
+    [reworkData, selectedModel],
+  );
+
+  const categoryFilteredData = useMemo(
+    () =>
+      selectedCategories.length === 0
+        ? modelFilteredData
+        : modelFilteredData.filter((item) => {
+            const cat = categoryLookup.get(item.Model_Name);
+            return cat != null && selectedCategories.includes(cat);
+          }),
+    [modelFilteredData, selectedCategories, categoryLookup],
+  );
+
+  const aggregated = useMemo(() => {
     const map = {};
-    reworkData.forEach((item) => {
-      const model = normalizeModel(item.Model_Name);
+    categoryFilteredData.forEach((item) => {
+      const model = item.Model_Name?.trim() || "Not Logged In";
       if (!map[model]) map[model] = { total: 0, open: 0, closed: 0 };
       map[model].total++;
       classifyStatus(item.Rework_Status) === "closed"
@@ -884,49 +1396,391 @@ const ReworkReport = () => {
     return Object.entries(map)
       .map(([k, v]) => ({ Model_Name: k, ...v, reworkTotal: v.total }))
       .sort((a, b) => b.total - a.total);
-  };
+  }, [categoryFilteredData]);
 
-  useEffect(() => {
-    if (page > 1) fetchReworkData(page);
-  }, [page]);
+  const { totalOpen, totalClosed } = useMemo(
+    () =>
+      aggregated.reduce(
+        (a, r) => ({
+          totalOpen: a.totalOpen + r.open,
+          totalClosed: a.totalClosed + r.closed,
+        }),
+        { totalOpen: 0, totalClosed: 0 },
+      ),
+    [aggregated],
+  );
 
-  const handleQuery = () => {
-    setPage(1);
-    setReworkData([]);
-    setSelectedModel(null);
-    setProductionMap({});
-    setTotalProduction(0);
-    fetchReworkData(1);
-  };
+  const hasProd = totalProduction > 0;
+  const overallRatio = hasProd
+    ? (categoryFilteredData.length / totalProduction) * 100
+    : null;
+  const overallRl = ratioLevel(overallRatio);
+
+  const ratioData = useMemo(
+    () =>
+      aggregated
+        .map((row) => {
+          const prod = productionMap[row.Model_Name] ?? null;
+          const ratio = prod ? (row.reworkTotal / prod) * 100 : null;
+          return { ...row, production: prod, defectRatio: ratio };
+        })
+        .sort((a, b) => {
+          if (a.defectRatio == null && b.defectRatio == null) return 0;
+          if (a.defectRatio == null) return 1;
+          if (b.defectRatio == null) return -1;
+          return b.defectRatio - a.defectRatio;
+        }),
+    [aggregated, productionMap],
+  );
+
+  const hasData = reworkData.length > 0;
+  const isLoading = loadingKey === "query";
+  const isProd = loadingKey === "prod";
+  // Total shown in KPIs reflects the currently-filtered view
+  const filteredTotal = categoryFilteredData.length;
 
   const handleModelClick = (model) => {
     setSelectedModel((prev) => (prev === model ? null : model));
     setActiveTab("detail");
   };
 
-  const filteredData = selectedModel
-    ? reworkData.filter((x) => x.Model_Name === selectedModel)
-    : reworkData;
+  // ── Multi-sheet Excel export ────────────────────────────────────────────────
+  const exportAllExcel = async () => {
+    if (!hasData) { toast.error("No data to export."); return; }
+    setExporting("excel");
+    setExportMenuOpen(false);
 
-  const aggregated = aggregateReworkData();
-  const totalOpen = aggregated.reduce((s, r) => s + r.open, 0);
-  const totalClosed = aggregated.reduce((s, r) => s + r.closed, 0);
+    try {
+      const [summaryData, defectData, detailData] = await Promise.all([
+        fetchSummaryExport(),
+        fetchDefectExport(),
+        fetchDetailExport(),
+      ]);
 
-  
-  const hasProd = totalProduction > 0;
-  const overallRatio = hasProd ? (totalCount / totalProduction) * 100 : null;
-  const overallRl = ratioLevel(overallRatio);
+      const wb = XLSX.utils.book_new();
 
-  const ratioData = aggregated
-    .map((row) => {
-      const prod = productionMap[row.Model_Name] ?? null;
-      const ratio = prod ? (row.reworkTotal / prod) * 100 : null;
-      return { ...row, production: prod, defectRatio: ratio };
-    })
-    .sort((a, b) => (b.defectRatio ?? -1) - (a.defectRatio ?? -1));
+      // Sheet 1 – Summary
+      const summaryRows = aggregated.map((r, i) => ({
+        "Sr. No.": i + 1,
+        Model: r.Model_Name,
+        Total: r.total,
+        Open: r.open,
+        Closed: r.closed,
+        "Close Rate %":
+          r.total > 0 ? Number(((r.closed / r.total) * 100).toFixed(2)) : 0,
+      }));
+      const ws1 = XLSX.utils.json_to_sheet(summaryRows);
+      ws1["!cols"] = [
+        { wch: 8 }, { wch: 35 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 13 },
+      ];
+      XLSX.utils.book_append_sheet(wb, ws1, "Summary");
 
-  const hasData = reworkData.length > 0;
-  const columns = Object.keys(filteredData[0] || {});
+      // Sheet 2 – Defect Ratio (from API for per-model production accuracy)
+      const defectRows = (defectData.length > 0 ? defectData : ratioData.map((r, i) => ({
+        "Sr. No.": i + 1,
+        Model: r.Model_Name,
+        Production: r.production ?? 0,
+        Rework_Total: r.reworkTotal,
+        Open: r.open,
+        Closed: r.closed,
+        "Defect Ratio %": r.defectRatio != null ? Number(r.defectRatio.toFixed(2)) : null,
+        Severity: r.defectRatio != null ? ratioLevel(r.defectRatio).label : "No Data",
+      })));
+      const ws2 = XLSX.utils.json_to_sheet(defectRows.length ? defectRows : [{ note: "No data" }]);
+      ws2["!cols"] = [
+        { wch: 8 }, { wch: 35 }, { wch: 12 }, { wch: 10 }, { wch: 8 },
+        { wch: 8 }, { wch: 14 }, { wch: 12 },
+      ];
+      XLSX.utils.book_append_sheet(wb, ws2, "Defect Ratio");
+
+      // Sheet 3 – Detail Records
+      const ws3 = XLSX.utils.json_to_sheet(
+        detailData.length > 0 ? detailData : [{ note: "No data" }],
+      );
+      XLSX.utils.book_append_sheet(wb, ws3, "Detail Records");
+
+      const dateStr = new Date().toISOString().split("T")[0];
+      XLSX.writeFile(wb, `Rework_Report_All_${dateStr}.xlsx`);
+      toast.success("Excel report (3 sheets) downloaded!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Excel export failed.");
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  // ── PDF export with charts ──────────────────────────────────────────────────
+  const exportAllPDF = async () => {
+    if (!hasData) { toast.error("No data to export."); return; }
+    setExporting("pdf");
+    setExportMenuOpen(false);
+
+    try {
+      // Capture chart images in parallel
+      const [summaryImg, defectImg] = await Promise.all([
+        svgToDataURL(summaryChartRef.current),
+        svgToDataURL(defectChartRef.current),
+      ]);
+
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const PW = doc.internal.pageSize.getWidth(); // 297mm
+      const PH = doc.internal.pageSize.getHeight(); // 210mm
+      const margin = 12;
+      const dateRange =
+        startTime && endTime ? `${startTime}  →  ${endTime}` : "All Records";
+
+      // ── Page 1: Header + KPIs + Summary Chart + Model Table ──
+      doc.setFillColor(30, 64, 175);
+      doc.rect(0, 0, PW, 18, "F");
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("Rework Report — Quality Control Dashboard", margin, 12);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Period: ${dateRange}`, PW - margin, 8, { align: "right" });
+      doc.text(
+        `Exported: ${new Date().toLocaleString("en-IN")}`,
+        PW - margin,
+        13,
+        { align: "right" },
+      );
+
+      // KPI row
+      doc.setTextColor(30, 41, 59);
+      let kx = margin;
+      const kpiItems = [
+        { label: "TOTAL REWORK", value: filteredTotal.toLocaleString(), bg: [239, 246, 255], fg: [29, 78, 216] },
+        { label: "OPEN / PENDING", value: totalOpen.toLocaleString(), bg: [254, 242, 242], fg: [185, 28, 28] },
+        { label: "CLOSED", value: totalClosed.toLocaleString(), bg: [236, 253, 245], fg: [5, 150, 105] },
+        ...(overallRatio != null
+          ? [{ label: "DEFECT RATIO", value: `${overallRatio.toFixed(2)}%`, bg: [255, 251, 235], fg: [217, 119, 6] }]
+          : []),
+      ];
+      kpiItems.forEach((k) => {
+        doc.setFillColor(...k.bg);
+        doc.roundedRect(kx, 20, 52, 16, 2, 2, "F");
+        doc.setFontSize(13);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...k.fg);
+        doc.text(k.value, kx + 26, 30, { align: "center" });
+        doc.setFontSize(6.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(100, 116, 139);
+        doc.text(k.label, kx + 26, 34, { align: "center" });
+        kx += 55;
+      });
+
+      let y = 40;
+
+      // Summary bar chart
+      if (summaryImg) {
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 41, 59);
+        doc.text("Rework Volume by Model", margin, y + 5);
+        y += 7;
+        const chartW = PW - margin * 2;
+        const chartH = Math.min(70, Math.max(40, aggregated.length * 5 + 30));
+        doc.addImage(summaryImg.dataURL, "PNG", margin, y, chartW, chartH);
+        y += chartH + 4;
+      }
+
+      // Summary table
+      if (y > PH - 40) { doc.addPage(); y = margin; }
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 41, 59);
+      doc.text("Model Breakdown", margin, y + 5);
+      y += 7;
+
+      autoTable(doc, {
+        startY: y,
+        head: [["Sr.", "Model", "Total", "Open", "Closed", "Close Rate %"]],
+        body: aggregated.map((r, i) => [
+          i + 1,
+          r.Model_Name,
+          r.total,
+          r.open,
+          r.closed,
+          r.total > 0 ? `${((r.closed / r.total) * 100).toFixed(1)}%` : "0%",
+        ]),
+        styles: { fontSize: 7.5, cellPadding: 1.8, font: "helvetica" },
+        headStyles: {
+          fillColor: [30, 64, 175],
+          textColor: 255,
+          fontStyle: "bold",
+          halign: "center",
+        },
+        columnStyles: {
+          0: { cellWidth: 10, halign: "center" },
+          1: { cellWidth: 80 },
+          2: { halign: "center", fontStyle: "bold", textColor: [29, 78, 216] },
+          3: { halign: "center", fontStyle: "bold", textColor: [185, 28, 28] },
+          4: { halign: "center", fontStyle: "bold", textColor: [5, 150, 105] },
+          5: { halign: "center" },
+        },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { left: margin, right: margin },
+      });
+
+      // ── Page 2: Defect Ratio ──
+      doc.addPage();
+      y = margin;
+
+      // Page header stripe
+      doc.setFillColor(180, 83, 9);
+      doc.rect(0, 0, PW, 10, "F");
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("Defect Ratio Analysis", margin, 7);
+      y = 14;
+
+      if (defectImg) {
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 41, 59);
+        doc.text("Defect Ratio by Model (Rework ÷ Production)", margin, y + 5);
+        y += 7;
+        const chartW = PW - margin * 2;
+        const chartH = Math.min(75, Math.max(40, ratioData.filter(r => r.defectRatio != null).length * 5 + 30));
+        doc.addImage(defectImg.dataURL, "PNG", margin, y, chartW, chartH);
+        y += chartH + 4;
+      }
+
+      if (y > PH - 40) { doc.addPage(); y = margin; }
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 41, 59);
+      doc.text("Per-Model Defect Ratio Table", margin, y + 5);
+      y += 7;
+
+      autoTable(doc, {
+        startY: y,
+        head: [["Sr.", "Model", "Production", "Rework", "Open", "Closed", "Defect Ratio %", "Severity"]],
+        body: ratioData.map((r, i) => [
+          i + 1,
+          r.Model_Name,
+          r.production != null ? r.production.toLocaleString() : "—",
+          r.reworkTotal,
+          r.open,
+          r.closed,
+          r.defectRatio != null ? `${r.defectRatio.toFixed(2)}%` : "N/A",
+          r.defectRatio != null ? ratioLevel(r.defectRatio).label : "No Data",
+        ]),
+        styles: { fontSize: 7.5, cellPadding: 1.8 },
+        headStyles: {
+          fillColor: [180, 83, 9],
+          textColor: 255,
+          fontStyle: "bold",
+          halign: "center",
+        },
+        columnStyles: {
+          0: { cellWidth: 10, halign: "center" },
+          1: { cellWidth: 70 },
+          2: { halign: "center", textColor: [29, 78, 216] },
+          3: { halign: "center", textColor: [185, 28, 28] },
+          4: { halign: "center" },
+          5: { halign: "center" },
+          6: { halign: "center", fontStyle: "bold" },
+          7: { halign: "center", fontStyle: "bold" },
+        },
+        alternateRowStyles: { fillColor: [255, 251, 235] },
+        margin: { left: margin, right: margin },
+        didParseCell: (data) => {
+          if (data.section === "body" && data.column.index === 7) {
+            const sev = data.cell.text[0];
+            const colors = {
+              Critical: [220, 38, 38],
+              High: [217, 119, 6],
+              Moderate: [234, 88, 12],
+              Good: [22, 163, 74],
+            };
+            if (colors[sev]) data.cell.styles.textColor = colors[sev];
+          }
+        },
+      });
+
+      // ── Page 3: Detail Records ──
+      if (categoryFilteredData.length > 0) {
+        doc.addPage();
+        doc.setFillColor(30, 41, 59);
+        doc.rect(0, 0, PW, 10, "F");
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text(
+          `Detail Records  (${categoryFilteredData.length.toLocaleString()} rows — first 500 shown in PDF)`,
+          margin,
+          7,
+        );
+
+        const sliceData = categoryFilteredData.slice(0, 500);
+        autoTable(doc, {
+          startY: 14,
+          head: [
+            [
+              "Sr.", "Model", "Category", "Station", "Process",
+              "Assy Sr. No.", "Rework IN", "Rework Out", "User",
+              "Status", "Duration",
+            ],
+          ],
+          body: sliceData.map((r, i) => [
+            i + 1,
+            r.Model_Name,
+            r.Category ?? "—",
+            r.Station ?? "—",
+            r.Process_Code ?? "—",
+            r.Assembly_Sr_No ?? "—",
+            r.Rework_IN ? String(r.Rework_IN).slice(0, 16) : "—",
+            r.Rework_Out ? String(r.Rework_Out).slice(0, 16) : "—",
+            r.UserName ?? "—",
+            r.Rework_Status ?? "—",
+            r.Duration ?? "—",
+          ]),
+          styles: { fontSize: 6.5, cellPadding: 1.4 },
+          headStyles: {
+            fillColor: [30, 41, 59],
+            textColor: 255,
+            fontStyle: "bold",
+            halign: "center",
+            fontSize: 7,
+          },
+          columnStyles: {
+            0: { cellWidth: 8, halign: "center" },
+            1: { cellWidth: 44 },
+            2: { cellWidth: 22 },
+            6: { cellWidth: 24 },
+            7: { cellWidth: 24 },
+          },
+          alternateRowStyles: { fillColor: [241, 245, 249] },
+          margin: { left: margin, right: margin },
+        });
+      }
+
+      // Page numbers
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(148, 163, 184);
+        doc.text(`Page ${i} of ${pageCount}`, PW - margin, PH - 4, { align: "right" });
+        doc.text("WRL Dashboard — Rework Report", margin, PH - 4);
+      }
+
+      const dateStr = new Date().toISOString().split("T")[0];
+      doc.save(`Rework_Report_${dateStr}.pdf`);
+      toast.success("PDF report downloaded!");
+    } catch (err) {
+      console.error(err);
+      toast.error("PDF export failed.");
+    } finally {
+      setExporting(null);
+    }
+  };
 
   const TABS = [
     { id: "summary", icon: BarChart2, label: "Summary" },
@@ -936,27 +1790,27 @@ const ReworkReport = () => {
 
   if (variantsLoading) return <Loader />;
 
-  /* ══════════════════════════════════════════════════════════
-     RENDER — lives inside Layout <Outlet />, use h-full
-  ══════════════════════════════════════════════════════════ */
+  const anyExporting = exporting !== null;
+
   return (
     <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
-      {/* ── PAGE HEADER — sticky ── */}
-      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
-        <div>
+      {/* ── PAGE HEADER ── */}
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0 gap-3">
+        <div className="shrink-0">
           <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
             Rework Report
           </h1>
           <p className="text-[11px] text-slate-400">
-            Quality Control · Rework & Defect Ratio Dashboard
+            Quality Control · Rework &amp; Defect Ratio Dashboard
           </p>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           {hasData && (
             <>
               <KpiCard
-                label="Total Records"
-                value={totalCount.toLocaleString()}
+                label="Total Rework"
+                value={filteredTotal.toLocaleString()}
                 colorClass="bg-blue-50 border-blue-100"
                 textClass="text-blue-700"
                 subClass="text-blue-500"
@@ -975,7 +1829,7 @@ const ReworkReport = () => {
                 textClass="text-emerald-700"
                 subClass="text-emerald-500"
               />
-              {overallRatio !== null && (
+              {overallRatio != null && (
                 <KpiCard
                   label="Defect Ratio"
                   value={`${overallRatio.toFixed(2)}%`}
@@ -985,6 +1839,67 @@ const ReworkReport = () => {
                   badge={overallRl}
                 />
               )}
+
+              {/* Export All dropdown */}
+              <div className="relative shrink-0" ref={exportMenuRef}>
+                <button
+                  onClick={() => setExportMenuOpen((v) => !v)}
+                  disabled={anyExporting}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-all shadow-sm ${
+                    anyExporting
+                      ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                      : "bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                  }`}
+                >
+                  {anyExporting ? (
+                    <Spinner cls="w-3.5 h-3.5" />
+                  ) : (
+                    <FileDown className="w-3.5 h-3.5" />
+                  )}
+                  {anyExporting
+                    ? exporting === "excel"
+                      ? "Exporting Excel…"
+                      : "Exporting PDF…"
+                    : "Export All"}
+                  <ChevronDown
+                    className={`w-3 h-3 transition-transform ${exportMenuOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {exportMenuOpen && !anyExporting && (
+                  <div className="absolute right-0 top-full mt-1.5 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="px-3 py-2 border-b border-slate-100 bg-slate-50">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Export Format
+                      </p>
+                    </div>
+                    <button
+                      onClick={exportAllExcel}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors text-left"
+                    >
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <div>
+                        <div className="font-semibold text-sm">Excel (All Tabs)</div>
+                        <div className="text-[10px] text-slate-400">
+                          Summary + Defect Ratio + Detail
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={exportAllPDF}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors text-left border-t border-slate-100"
+                    >
+                      <FileText className="w-4 h-4 text-red-500 shrink-0" />
+                      <div>
+                        <div className="font-semibold text-sm">PDF (with Charts)</div>
+                        <div className="text-[10px] text-slate-400">
+                          Bar charts + formatted tables
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -992,15 +1907,21 @@ const ReworkReport = () => {
 
       {/* ── BODY ── */}
       <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
-        {/* ── FILTERS + QUICK FILTERS ── */}
+        {/* ── FILTERS ROW ── */}
         <div className="flex gap-3 shrink-0">
-          {/* Filters card */}
+          {/* Main filters */}
           <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex items-center gap-1.5 mb-3">
               <Filter className="w-3 h-3 text-slate-400" />
               <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
                 Filters
               </p>
+              {hasData && selectedCategories.length > 0 && (
+                <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                  <Zap className="w-2.5 h-2.5" />
+                  Re-run query to update results
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap gap-3 items-end">
               <div className="min-w-[190px] flex-1">
@@ -1013,6 +1934,12 @@ const ReworkReport = () => {
                       variants.find((v) => v.value === e.target.value) || null,
                     )
                   }
+                />
+              </div>
+              <div className="min-w-[190px] flex-1">
+                <CategoryMultiSelect
+                  selected={selectedCategories}
+                  onChange={setSelectedCategories}
                 />
               </div>
               <div className="min-w-[185px] flex-1">
@@ -1032,22 +1959,16 @@ const ReworkReport = () => {
               <div className="flex items-center gap-2 pb-0.5 shrink-0">
                 <button
                   onClick={handleQuery}
-                  disabled={loading}
+                  disabled={isLoading}
                   className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    loading
+                    isLoading
                       ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                       : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
                   }`}
                 >
-                  {loading ? <Spinner /> : <RefreshCw className="w-4 h-4" />}
-                  {loading ? "Loading…" : "Run Query"}
+                  {isLoading ? <Spinner /> : <RefreshCw className="w-4 h-4" />}
+                  {isLoading ? "Loading…" : "Run Query"}
                 </button>
-                {hasData && (
-                  <ExportButton
-                    fetchData={fetchExportData}
-                    filename="Rework_Report"
-                  />
-                )}
                 {selectedModel && (
                   <button
                     onClick={() => setSelectedModel(null)}
@@ -1059,44 +1980,66 @@ const ReworkReport = () => {
                 )}
               </div>
             </div>
+
+            <ActiveFilterBanner
+              categories={selectedCategories}
+              onClear={() => setSelectedCategories([])}
+              onRemove={(c) =>
+                setSelectedCategories((prev) => prev.filter((x) => x !== c))
+              }
+              recordCount={categoryFilteredData.length}
+              totalCount={hasData ? reworkData.length : 0}
+            />
           </div>
 
           {/* Quick filters */}
           <div className="w-60 shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">
-              Quick Filters
-            </p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                Quick Filters
+              </p>
+              {selectedCategories.length > 0 && (
+                <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full">
+                  <Tag className="w-2.5 h-2.5" /> {selectedCategories.length} cat
+                </span>
+              )}
+            </div>
             <p className="text-[10px] text-slate-400 mb-3">
-              Select a preset time range.
+              {selectedCategories.length > 0
+                ? `Category filter will apply: ${selectedCategories.join(", ")}`
+                : "Select a preset time range."}
             </p>
             <div className="flex flex-col gap-2">
               <QuickBtn
                 label="YESTERDAY"
                 sublabel="Prev day 08:00 → today 08:00"
-                loading={ydayLoading}
+                loading={loadingKey === "yesterday"}
                 onClick={fetchYesterdayData}
                 colorClass="bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                categoryCount={selectedCategories.length}
               />
               <QuickBtn
                 label="TODAY"
                 sublabel="08:00 → now"
-                loading={todayLoading}
+                loading={loadingKey === "today"}
                 onClick={fetchTodayData}
                 colorClass="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                categoryCount={selectedCategories.length}
               />
               <QuickBtn
                 label="MTD"
                 sublabel="Month to date"
-                loading={monthLoading}
+                loading={loadingKey === "mtd"}
                 onClick={fetchMTDData}
                 colorClass="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                categoryCount={selectedCategories.length}
               />
             </div>
           </div>
         </div>
 
         {/* ── EMPTY / LOADING STATE ── */}
-        {!hasData && !loading && (
+        {!hasData && !isLoading && (
           <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center gap-3 text-slate-400 py-24">
             <PackageOpen className="w-14 h-14 opacity-20" strokeWidth={1.2} />
             <p className="text-base font-bold text-slate-500">No data loaded</p>
@@ -1105,18 +2048,17 @@ const ReworkReport = () => {
             </p>
           </div>
         )}
-        {loading && !hasData && (
+        {isLoading && !hasData && (
           <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-center gap-3">
             <Spinner cls="w-6 h-6 text-blue-600" />
-            <span className="text-sm text-slate-400">
-              Fetching rework data…
-            </span>
+            <span className="text-sm text-slate-400">Fetching rework data…</span>
           </div>
         )}
 
-        {/* ── TAB BAR ── */}
+        {/* ── TAB BAR + CONTENT ── */}
         {hasData && (
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col shrink-0">
+            {/* Tab buttons */}
             <div className="flex items-center gap-1 px-2 pt-1.5 border-b border-slate-100 bg-slate-50/50">
               {TABS.map((tab) => {
                 const isActive = activeTab === tab.id;
@@ -1137,14 +2079,22 @@ const ReworkReport = () => {
                     {tab.label}
                     {tab.id === "detail" && (
                       <span
-                        className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isActive ? "bg-blue-100 text-blue-700" : "bg-slate-200 text-slate-500"}`}
+                        className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          isActive
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-slate-200 text-slate-500"
+                        }`}
                       >
-                        {filteredData.length.toLocaleString()}
+                        {categoryFilteredData.length.toLocaleString()}
                       </span>
                     )}
-                    {tab.id === "defect" && overallRatio !== null && (
+                    {tab.id === "defect" && overallRatio != null && (
                       <span
-                        className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isActive ? `${overallRl.bg} ${overallRl.color}` : "bg-slate-200 text-slate-500"}`}
+                        className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          isActive
+                            ? `${overallRl.bg} ${overallRl.color}`
+                            : "bg-slate-200 text-slate-500"
+                        }`}
                       >
                         {overallRatio.toFixed(2)}%
                       </span>
@@ -1152,26 +2102,44 @@ const ReworkReport = () => {
                   </button>
                 );
               })}
+              {selectedCategories.length > 0 && (
+                <div className="ml-auto flex items-center gap-1.5 pr-2">
+                  <Tag className="w-3 h-3 text-blue-400" />
+                  <span className="text-[10px] font-mono text-blue-600 font-bold">
+                    {selectedCategories.length === 1
+                      ? selectedCategories[0]
+                      : `${selectedCategories.length} categories`}
+                  </span>
+                  <button
+                    onClick={() => setSelectedCategories([])}
+                    className="w-4 h-4 rounded-full bg-slate-200 hover:bg-red-100 text-slate-500 hover:text-red-600 flex items-center justify-center transition-colors"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* ── SUMMARY TAB ── */}
+            {/* ══════════════ SUMMARY TAB ══════════════ */}
             {activeTab === "summary" && (
               <div className="p-4 flex flex-col gap-4">
-                {/* Bar chart + donut */}
-                <div className="grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-4">
+                <div className="grid grid-cols-1 xl:grid-cols-[1fr_260px] gap-4">
                   <div className="bg-white rounded-xl border border-slate-200 p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <BarChart2 className="w-3.5 h-3.5 text-blue-500" />
                       <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
                         Rework Volume by Model
                       </span>
+                      {selectedCategories.length > 0 && (
+                        <span className="ml-auto text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                          {selectedCategories.join(", ")}
+                        </span>
+                      )}
                     </div>
                     {aggregated.length > 0 ? (
-                      <ReworkBarChart data={aggregated} />
+                      <ReworkBarChart data={aggregated} chartRef={summaryChartRef} />
                     ) : (
-                      <p className="text-xs text-slate-400 font-mono">
-                        No model data
-                      </p>
+                      <p className="text-xs text-slate-400 font-mono">No model data</p>
                     )}
                   </div>
                   <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -1191,7 +2159,7 @@ const ReworkReport = () => {
                             cls: "bg-emerald-50 border-emerald-200 text-emerald-700",
                           },
                           {
-                            label: "Open/Pending",
+                            label: "Open / Pending",
                             val: totalOpen,
                             cls: "bg-red-50 border-red-200 text-red-700",
                           },
@@ -1200,9 +2168,7 @@ const ReworkReport = () => {
                             key={s.label}
                             className={`flex justify-between items-center px-3 py-2 rounded-lg border ${s.cls}`}
                           >
-                            <span className="text-[11px] font-mono">
-                              {s.label}
-                            </span>
+                            <span className="text-[11px] font-mono">{s.label}</span>
                             <span className="text-lg font-black font-mono">
                               {s.val.toLocaleString()}
                             </span>
@@ -1213,7 +2179,6 @@ const ReworkReport = () => {
                   </div>
                 </div>
 
-                {/* Model breakdown */}
                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
                     <div className="flex items-center gap-2">
@@ -1222,11 +2187,30 @@ const ReworkReport = () => {
                         Model Breakdown
                       </span>
                     </div>
-                    <span className="text-[11px] text-slate-400">
-                      {aggregated.length} model
-                      {aggregated.length !== 1 ? "s" : ""} · Click row to filter
-                      detail
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] text-slate-400">
+                        {aggregated.length} model{aggregated.length !== 1 ? "s" : ""} · Click
+                        row to filter detail
+                      </span>
+                      <button
+                        onClick={async () => {
+                          const data = await fetchSummaryExport();
+                          if (data.length) {
+                            const ws = XLSX.utils.json_to_sheet(data);
+                            const wb = XLSX.utils.book_new();
+                            XLSX.utils.book_append_sheet(wb, ws, "Summary");
+                            XLSX.writeFile(
+                              wb,
+                              `Rework_Summary_${new Date().toISOString().split("T")[0]}.xlsx`,
+                            );
+                            toast.success("Summary exported!");
+                          }
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-[11px] font-semibold hover:bg-emerald-100 transition-all"
+                      >
+                        <FileSpreadsheet className="w-3 h-3" /> Export
+                      </button>
+                    </div>
                   </div>
                   <BreakdownTable
                     data={aggregated}
@@ -1237,10 +2221,9 @@ const ReworkReport = () => {
               </div>
             )}
 
-            {/* ── DEFECT RATIO TAB ── */}
+            {/* ══════════════ DEFECT RATIO TAB ══════════════ */}
             {activeTab === "defect" && (
               <div className="p-4 flex flex-col gap-4">
-                {/* Severity legend */}
                 <div className="flex items-center flex-wrap gap-4 px-4 py-2.5 bg-slate-50 rounded-lg border border-slate-200">
                   <span className="text-[10px] font-bold font-mono uppercase tracking-wider text-slate-400">
                     Severity:
@@ -1271,12 +2254,12 @@ const ReworkReport = () => {
                       </div>
                     );
                   })}
-                  {prodLoading && (
+                  {isProd && (
                     <span className="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono ml-auto">
                       <Spinner cls="w-3 h-3" /> Loading production…
                     </span>
                   )}
-                  {!hasProd && !prodLoading && (
+                  {!hasProd && !isProd && (
                     <span className="text-[11px] text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 font-mono ml-auto">
                       ⚠ Production data unavailable
                     </span>
@@ -1288,7 +2271,6 @@ const ReworkReport = () => {
                   )}
                 </div>
 
-                {/* Ratio bars */}
                 {hasProd && (
                   <div className="bg-white rounded-xl border border-orange-200 overflow-hidden">
                     <div className="flex items-center gap-2 px-4 py-2.5 border-b border-orange-100 bg-orange-50/30">
@@ -1296,27 +2278,48 @@ const ReworkReport = () => {
                       <span className="text-[11px] font-semibold text-orange-600 uppercase tracking-widest">
                         Defect Ratio by Model — Rework ÷ Per-Model Production
                       </span>
+                      {selectedCategories.length > 0 && (
+                        <span className="ml-auto text-[10px] font-mono text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                          {selectedCategories.join(", ")}
+                        </span>
+                      )}
                     </div>
                     <div className="p-4">
-                      <DefectRatioBars data={ratioData} />
+                      <DefectRatioBars data={ratioData} chartRef={defectChartRef} />
                     </div>
                   </div>
                 )}
 
-                {/* Ratio table */}
                 <div className="bg-white rounded-xl border border-orange-200 overflow-hidden">
-                  <div className="flex items-center gap-2 px-4 py-2.5 border-b border-orange-100 bg-orange-50/30">
-                    <Target className="w-3.5 h-3.5 text-orange-500" />
-                    <span className="text-[11px] font-semibold text-orange-600 uppercase tracking-widest">
-                      Per-Model Defect Ratio Table
-                    </span>
+                  <div className="flex items-center justify-between px-4 py-2.5 border-b border-orange-100 bg-orange-50/30">
+                    <div className="flex items-center gap-2">
+                      <Target className="w-3.5 h-3.5 text-orange-500" />
+                      <span className="text-[11px] font-semibold text-orange-600 uppercase tracking-widest">
+                        Per-Model Defect Ratio Table
+                      </span>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const data = await fetchDefectExport();
+                        if (data.length) {
+                          const ws = XLSX.utils.json_to_sheet(data);
+                          const wb = XLSX.utils.book_new();
+                          XLSX.utils.book_append_sheet(wb, ws, "Defect Ratio");
+                          XLSX.writeFile(wb, `Rework_Defect_${new Date().toISOString().split("T")[0]}.xlsx`);
+                          toast.success("Defect ratio exported!");
+                        }
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-orange-200 bg-orange-50 text-orange-700 text-[11px] font-semibold hover:bg-orange-100 transition-all"
+                    >
+                      <FileSpreadsheet className="w-3 h-3" /> Export
+                    </button>
                   </div>
                   <DefectRatioTable data={ratioData} />
                 </div>
               </div>
             )}
 
-            {/* ── DETAIL TAB ── */}
+            {/* ══════════════ DETAIL TAB ══════════════ */}
             {activeTab === "detail" && (
               <div className="flex flex-col min-h-0">
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 shrink-0">
@@ -1324,34 +2327,61 @@ const ReworkReport = () => {
                     <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
                       {selectedModel
                         ? `Filtered: ${selectedModel}`
-                        : "All Records"}
+                        : selectedCategories.length > 0
+                          ? `Categories: ${selectedCategories.join(", ")}`
+                          : "All Records"}
                     </span>
                     <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono">
-                      {filteredData.length.toLocaleString()} rows
+                      {categoryFilteredData.length.toLocaleString()} rows
                     </span>
                     {selectedModel && (
                       <button
                         onClick={() => setSelectedModel(null)}
                         className="flex items-center gap-1 px-2 py-1 rounded-md border border-blue-200 bg-blue-50 text-blue-700 text-[10px] font-bold hover:bg-blue-100 transition-all"
                       >
-                        Clear filter <X className="w-2.5 h-2.5" />
+                        Clear model <X className="w-2.5 h-2.5" />
+                      </button>
+                    )}
+                    {selectedCategories.length > 0 && (
+                      <button
+                        onClick={() => setSelectedCategories([])}
+                        className="flex items-center gap-1 px-2 py-1 rounded-md border border-violet-200 bg-violet-50 text-violet-700 text-[10px] font-bold hover:bg-violet-100 transition-all"
+                      >
+                        Clear categories <X className="w-2.5 h-2.5" />
                       </button>
                     )}
                   </div>
-                  {hasMore && (
-                    <span className="text-[11px] text-slate-400 font-mono">
-                      Scroll to load more ↓
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {hasMore && (
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        Scroll to load more ↓
+                      </span>
+                    )}
+                    <button
+                      onClick={async () => {
+                        const data = await fetchDetailExport();
+                        if (data.length) {
+                          const ws = XLSX.utils.json_to_sheet(data);
+                          const wb = XLSX.utils.book_new();
+                          XLSX.utils.book_append_sheet(wb, ws, "Detail Records");
+                          XLSX.writeFile(wb, `Rework_Detail_${new Date().toISOString().split("T")[0]}.xlsx`);
+                          toast.success("Detail records exported!");
+                        }
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 text-[11px] font-semibold hover:border-emerald-300 hover:text-emerald-700 transition-all"
+                    >
+                      <FileSpreadsheet className="w-3 h-3" /> Export Detail
+                    </button>
+                  </div>
                 </div>
                 <div className="overflow-auto max-h-[520px]">
                   <table className="min-w-full text-xs text-left border-separate border-spacing-0">
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-slate-100">
                         <th className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap w-10">
-                          Sr. No.
+                          Sr.
                         </th>
-                        {columns.map((k) => (
+                        {DETAIL_COLUMNS.map((k) => (
                           <th
                             key={k}
                             className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap"
@@ -1362,18 +2392,18 @@ const ReworkReport = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredData.map((row, i) => (
+                      {categoryFilteredData.map((row, i) => (
                         <tr
                           key={i}
                           ref={
-                            i === filteredData.length - 1 ? lastRowRef : null
+                            i === categoryFilteredData.length - 1 ? lastRowRef : null
                           }
                           className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
                         >
                           <td className="px-3 py-2 border-b border-slate-100 text-slate-400 font-mono text-center">
                             {i + 1}
                           </td>
-                          {columns.map((k) => (
+                          {DETAIL_COLUMNS.map((k) => (
                             <td
                               key={k}
                               className="px-3 py-2 border-b border-slate-100 whitespace-nowrap"
@@ -1397,7 +2427,7 @@ const ReworkReport = () => {
                       ))}
                     </tbody>
                   </table>
-                  {loading && (
+                  {isLoading && (
                     <div className="flex items-center justify-center py-4 gap-2 text-blue-600 text-xs border-t border-slate-100">
                       <Spinner /> Loading more records…
                     </div>
