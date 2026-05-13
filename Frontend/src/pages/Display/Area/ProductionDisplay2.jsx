@@ -75,7 +75,7 @@ const ProductionDisplay2 = ({
           accentHex={ACCENT}
         />
         <TimerBar progress={progress} accentHex={ACCENT} />
-        <div className="grid grid-cols-6 gap-2.5 px-4 py-2.5 bg-slate-50">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 px-4 py-2.5 bg-slate-50">
           <StatCard
             label="Shift Target"
             value={d.ShiftOutputTarget}
@@ -107,9 +107,9 @@ const ProductionDisplay2 = ({
         </div>
       </div>
 
-      <div className="flex flex-1 min-h-0 px-4 py-2 gap-4">
+      <div className="flex flex-col xl:flex-row flex-1 min-h-0 px-4 py-2 gap-4 overflow-hidden">
         <div
-          className="w-[55%] shrink-0 rounded-2xl border-2 shadow-md overflow-hidden"
+          className="w-full xl:w-[55%] min-h-[320px] rounded-2xl border-2 shadow-md overflow-hidden"
           style={{
             borderColor: `${ACCENT}20`,
             background: `linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)`,
@@ -123,7 +123,7 @@ const ProductionDisplay2 = ({
             accentHex={ACCENT}
           />
         </div>
-        <div className="w-[45%] flex flex-col min-w-0">
+        <div className="w-full xl:w-[45%] flex flex-col min-w-0 min-h-0">
           <div
             className="text-white font-bold text-sm text-center py-2.5 rounded-t-xl tracking-wider uppercase flex items-center justify-center gap-2"
             style={{
@@ -139,7 +139,7 @@ const ProductionDisplay2 = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-2.5 px-4 py-2.5 bg-white border-t border-slate-200 shrink-0">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2.5 px-4 py-2.5 bg-white border-t border-slate-200 shrink-0">
         <StatCard
           label="Monthly Plan"
           value={d.MonthlyPlanQty}

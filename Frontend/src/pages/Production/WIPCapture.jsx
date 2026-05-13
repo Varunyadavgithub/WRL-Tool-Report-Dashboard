@@ -172,6 +172,7 @@ const WIPCapture = () => {
      Save WIP Entry
   ────────────────────────────────────────── */
   const saveWIPCapture = async () => {
+    if (loading) return;
     if (!selectedWorkCenter) {
       toast.error("Please select a work center.");
       return;
@@ -217,9 +218,9 @@ const WIPCapture = () => {
 
         setSerialNumber("");
 
-        setTimeout(() => {
+        requestAnimationFrame(() => {
           inputRef.current?.focus();
-        }, 100);
+        });
 
         await fetchCaptures(); // ✅ refresh table from backend
       }
@@ -229,6 +230,16 @@ const WIPCapture = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (serialNumber.length === 15) {
+      const timeout = setTimeout(() => {
+        saveWIPCapture();
+      }, 100); // small delay for scanner completion
+
+      return () => clearTimeout(timeout);
+    }
+  }, [serialNumber]);
 
   /* ──────────────────────────────────────────
      Scanner Enter Key
@@ -493,7 +504,7 @@ const WIPCapture = () => {
                       </td>
 
                       <td className="px-4 py-3 border-b border-slate-100 text-slate-500 whitespace-nowrap">
-                        {new Date(item.createdAt).toLocaleString()}
+                        {item.createdAt?.replace("T", " ").replace("Z", "")}
                       </td>
                     </tr>
                   ))}

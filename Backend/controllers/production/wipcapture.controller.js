@@ -22,8 +22,7 @@ export const captureWIP = tryCatch(async (req, res) => {
 
   try {
     /* ──────────────────────────────────────────
-       Check Duplicate In Production Table
-       If exists → already processed
+          MUST EXIST IN PRODUCTION FIRST
     ────────────────────────────────────────── */
     const productionCheck = await pool
       .request()
@@ -33,8 +32,8 @@ export const captureWIP = tryCatch(async (req, res) => {
         WHERE BarcodeNo = @serialNumber
       `);
 
-    if (productionCheck.recordset.length > 0) {
-      throw new AppError("Serial Number already processed in production", 409);
+    if (productionCheck.recordset.length === 0) {
+      throw new AppError("Serial Number not found in production", 404);
     }
 
     /* ──────────────────────────────────────────
