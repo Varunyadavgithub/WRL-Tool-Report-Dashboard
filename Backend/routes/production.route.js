@@ -81,7 +81,9 @@ import {
 import {
   getStopLossDetail,
   getStopLossLocations,
+  getStopLossLines,
   getStopLossSummary,
+  getStopLossStations,
 } from "../controllers/production/stopLoss.controller.js";
 //import { getManpower, getManpowerHourly } from "../controllers/production/manpower.controller.js";
 //import { getManpowerReport } from "../controllers/production/getManPowerReport.controller.js";
@@ -165,7 +167,9 @@ router.get("/month-total-production", getQuickFiltersBarcodeDetails);
 // -----------------> Stop Loss Report
 router.get("/stop-loss/summary", getStopLossSummary);
 router.get("/stop-loss/detail", getStopLossDetail);
+router.get("/stop-loss/lines", getStopLossLines);
 router.get("/stop-loss/locations", getStopLossLocations);
+router.get("/stop-loss/stations", getStopLossStations);
 // Final Loading — model breakdown
 router.get("/final-loading-model", getFinalLoadingModelBreakdown);
 router.get("/final-loading-hp-frz-model", getFinalLoadingHPFrzModelBreakdown);

@@ -38,7 +38,12 @@ import {
 import { getDispatchHoldDetails } from "../controllers/quality/holdCabinetDetails.controller.js";
 import { getCPTReport } from "../controllers/quality/cptReport.controller.js";
 import {
-  getReworkReport, getReworkReportExport, getReworkReportQuick, getProductionReport,
+  getReworkReport,
+  getReworkReportQuick,
+  getReworkReportExport,
+  getReworkSummaryExport,
+  getReworkDefectExport,
+  getProductionReport,
 } from "../controllers/quality/rework.controller.js";
 import {
   deleteBeeModel, getBeeModels, saveBeeModels, saveBeeRating,
@@ -67,8 +72,10 @@ router.get("/defects/:fgsrNo", getFpaDefectDetails);
 
 // Rework
 router.get("/rework-report", getReworkReport);
-router.get("/rework-report-export", getReworkReportExport);
 router.get("/rework-report-quick", getReworkReportQuick);
+router.get("/rework-report-export", getReworkReportExport);
+router.get("/rework-summary-export", getReworkSummaryExport);
+router.get("/rework-defect-export", getReworkDefectExport);
 router.get("/production-report", getProductionReport);
 
 // FPA Reports
