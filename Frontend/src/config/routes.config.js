@@ -115,9 +115,10 @@ const Monitoring = lazy(() => import("../pages/Display/Monitoring"));
 const Management = lazy(() => import("../pages/Display/Management"));
 const WIPCapture = lazy(() => import("../pages/Production/WIPCapture"));
 
-// Role constants for consistency
+// ─── Role Constants ───────────────────────────────────────────────────────────
 export const ROLES = {
-  ADMIN: "admin",
+  SUPER_ADMIN: "super admin", // Full access — including in-progress modules
+  ADMIN: "admin", // All live modules only (no in-progress modules)
   LOGISTIC: "logistic",
   QUALITY_MANAGER: "quality manager",
   LINE_QUALITY_ENGINEER: "line quality engineer",
@@ -132,29 +133,79 @@ export const ROLES = {
   SUS_LINE_USER: "sus line user",
 };
 
-// Centralized route configuration
+// ─── Role Groups (reusable shorthand) ────────────────────────────────────────
+// Every item carries an explicit roles list — access is always intentional.
+// Rule: SUPER_ADMIN is always first, ADMIN second, then specific roles.
+//
+// IN-PROGRESS modules (Compliance, Audit Report, Utility, Forms):
+//   → Only SUPER_ADMIN. ADMIN is excluded until the module goes live.
+//
+// LIVE modules:
+//   → Both SUPER_ADMIN and ADMIN, plus any other permitted roles.
+
+const ALL_ROLES = Object.values(ROLES);
+
+// Both admin tiers — use for any live page accessible to all admin-level users
+const BOTH_ADMINS = [ROLES.SUPER_ADMIN, ROLES.ADMIN];
+
+const QUALITY_ROLES = [
+  ROLES.SUPER_ADMIN,
+  ROLES.ADMIN,
+  ROLES.QUALITY_MANAGER,
+  ROLES.LINE_QUALITY_ENGINEER,
+  ROLES.BIS_ENGINEER,
+  ROLES.FPA,
+  ROLES.LPT,
+];
+
+// Roles that can see the general production reports (not WIP-only)
+const PRODUCTION_REPORT_ROLES = [
+  ROLES.SUPER_ADMIN,
+  ROLES.ADMIN,
+  ROLES.PRODUCTION_MANAGER,
+  ROLES.PLANNING_TEAM,
+  ROLES.LOGISTIC,
+  ROLES.QUALITY_MANAGER,
+  ROLES.LINE_QUALITY_ENGINEER,
+];
+
+// Dispatch roles (general reports)
+const DISPATCH_REPORT_ROLES = [
+  ROLES.SUPER_ADMIN,
+  ROLES.ADMIN,
+  ROLES.LOGISTIC,
+  ROLES.PRODUCTION_MANAGER,
+  ROLES.PLANNING_TEAM,
+];
+
+// ─── Route Configuration ──────────────────────────────────────────────────────
 export const ROUTE_CONFIG = [
+  // ── Display ──────────────────────────────────────────────────────────────
   {
     key: "display",
     icon: Monitor,
     label: "Display",
     basePath: "/display",
-    roles: [ROLES.ADMIN, ROLES.PLANNING_TEAM],
     items: [
       {
         path: "/display/management",
         label: "Management",
         icon: Wrench,
         component: Management,
+        roles: [...BOTH_ADMINS, ROLES.PLANNING_TEAM],
       },
     ],
     hiddenItems: [
       {
         path: "/display/:slug",
         component: Monitoring,
+        // Monitoring display is accessible to all authenticated users
+        roles: ALL_ROLES,
       },
     ],
   },
+
+  // ── Planning ─────────────────────────────────────────────────────────────
   {
     key: "planing",
     icon: CalendarRange,
@@ -165,15 +216,20 @@ export const ROUTE_CONFIG = [
         path: "/planing/production-planing",
         label: "Production Planning",
         component: ProductionPlaning,
-        roles: [ROLES.ADMIN, ROLES.PRODUCTION_MANAGER, ROLES.PLANNING_TEAM],
+        roles: [...BOTH_ADMINS, ROLES.PRODUCTION_MANAGER, ROLES.PLANNING_TEAM],
       },
       {
         path: "/planing/daily-planing",
         label: "Daily Plan",
         component: DailyPlan,
+        roles: [...BOTH_ADMINS, ROLES.PRODUCTION_MANAGER, ROLES.PLANNING_TEAM],
       },
     ],
   },
+
+  // ── Production ───────────────────────────────────────────────────────────
+  // SUS_LINE_USER → sees only Production module, only WIP Capture page.
+  // All other production report pages are hidden from SUS_LINE_USER.
   {
     key: "production",
     icon: Factory,
@@ -184,62 +240,75 @@ export const ROUTE_CONFIG = [
         path: "/production/overview",
         label: "Production Report",
         component: ProductionOverview,
+        roles: PRODUCTION_REPORT_ROLES,
       },
       {
         path: "/production/component-traceability-report",
         label: "Component Traceability Report",
         component: ComponentTraceabilityReport,
+        roles: PRODUCTION_REPORT_ROLES,
       },
       {
         path: "/production/hourly-report",
         label: "Hourly Report",
         component: HourlyReport,
+        roles: PRODUCTION_REPORT_ROLES,
       },
       {
         path: "/production/line-hourly-report",
         label: "Line Hourly Report",
         component: LineHourlyReport,
+        roles: PRODUCTION_REPORT_ROLES,
       },
       {
         path: "/production/consolidated-report",
         label: "Consolidated Report",
         component: ConsolidatedReport,
+        roles: PRODUCTION_REPORT_ROLES,
       },
       {
         path: "/production/model-name-update",
         label: "Model Name Update",
         component: ModelNameUpdate,
-        roles: [ROLES.ADMIN, ROLES.LOGISTIC],
+        roles: [...BOTH_ADMINS],
       },
       {
         path: "/production/nfc-report",
         label: "NFC Report",
         component: NFCReport,
+        roles: PRODUCTION_REPORT_ROLES,
       },
       {
         path: "/production/total-production",
         label: "Total Production",
         component: TotalProduction,
+        roles: PRODUCTION_REPORT_ROLES,
       },
       {
         path: "/production/stop-loss-report",
         label: "Stop Loss Report",
         component: StopLossReport,
+        roles: PRODUCTION_REPORT_ROLES,
       },
       {
         path: "/production/manpower-report",
         label: "Manpower Report",
         component: ManpowerReport,
-        roles: [ROLES.ADMIN],
+        roles: [ROLES.SUPER_ADMIN],
       },
       {
+        // SUS_LINE_USER's only permitted page in the entire app
         path: "/production/wip-capture",
         label: "WIP Capture",
         component: WIPCapture,
-        roles: [ROLES.ADMIN, ROLES.LOGISTIC],
+        roles: [...BOTH_ADMINS, ROLES.SUS_LINE_USER],
       },
     ],
   },
+
+  // ── Quality ──────────────────────────────────────────────────────────────
+  // Quality module is visible only to quality-related roles and admin.
+  // Each page further narrows access where needed.
   {
     key: "quality",
     icon: ShieldCheck,
@@ -251,7 +320,7 @@ export const ROUTE_CONFIG = [
         label: "Rework Report",
         component: ReworkReport,
         roles: [
-          ROLES.ADMIN,
+          ...BOTH_ADMINS,
           ROLES.QUALITY_MANAGER,
           ROLES.LINE_QUALITY_ENGINEER,
         ],
@@ -261,7 +330,7 @@ export const ROUTE_CONFIG = [
         label: "Gas Charging Report",
         component: GasChargingReport,
         roles: [
-          ROLES.ADMIN,
+          ...BOTH_ADMINS,
           ROLES.QUALITY_MANAGER,
           ROLES.LINE_QUALITY_ENGINEER,
         ],
@@ -271,7 +340,7 @@ export const ROUTE_CONFIG = [
         label: "EST Report",
         component: ESTReport,
         roles: [
-          ROLES.ADMIN,
+          ...BOTH_ADMINS,
           ROLES.QUALITY_MANAGER,
           ROLES.LINE_QUALITY_ENGINEER,
         ],
@@ -280,34 +349,53 @@ export const ROUTE_CONFIG = [
         path: "/quality/cpt-report",
         label: "CPT Report",
         component: CPTReport,
+        roles: QUALITY_ROLES,
       },
       {
         path: "/quality/fpa",
         label: "FPA",
         component: FPA,
-        roles: [ROLES.ADMIN, ROLES.FPA, ROLES.QUALITY_MANAGER],
+        roles: [...BOTH_ADMINS, ROLES.FPA, ROLES.QUALITY_MANAGER],
       },
       {
         path: "/quality/fpa-report",
         label: "FPA Report",
         component: FPAReports,
+        roles: [
+          ...BOTH_ADMINS,
+          ROLES.FPA,
+          ROLES.QUALITY_MANAGER,
+          ROLES.LINE_QUALITY_ENGINEER,
+        ],
       },
       {
         path: "/quality/fpa-history",
         label: "FPA History",
         component: FPAHistory,
+        roles: [
+          ...BOTH_ADMINS,
+          ROLES.FPA,
+          ROLES.QUALITY_MANAGER,
+          ROLES.LINE_QUALITY_ENGINEER,
+        ],
       },
       {
         path: "/quality/fpa-defect-report",
         label: "FPA Defect Report",
         component: FPADefectReport,
+        roles: [
+          ...BOTH_ADMINS,
+          ROLES.FPA,
+          ROLES.QUALITY_MANAGER,
+          ROLES.LINE_QUALITY_ENGINEER,
+        ],
       },
       {
         path: "/quality/lpt",
         label: "LPT",
         component: LPT,
         roles: [
-          ROLES.ADMIN,
+          ...BOTH_ADMINS,
           ROLES.LINE_QUALITY_ENGINEER,
           ROLES.QUALITY_MANAGER,
           ROLES.LPT,
@@ -318,7 +406,7 @@ export const ROUTE_CONFIG = [
         label: "LPT Report",
         component: LPTReport,
         roles: [
-          ROLES.ADMIN,
+          ...BOTH_ADMINS,
           ROLES.LINE_QUALITY_ENGINEER,
           ROLES.QUALITY_MANAGER,
           ROLES.LPT,
@@ -329,7 +417,7 @@ export const ROUTE_CONFIG = [
         label: "LPT Recipe",
         component: LPTRecipe,
         roles: [
-          ROLES.ADMIN,
+          ...BOTH_ADMINS,
           ROLES.LINE_QUALITY_ENGINEER,
           ROLES.QUALITY_MANAGER,
           ROLES.LPT,
@@ -340,7 +428,7 @@ export const ROUTE_CONFIG = [
         label: "Dispatch Hold",
         component: DispatchHold,
         roles: [
-          ROLES.ADMIN,
+          ...BOTH_ADMINS,
           ROLES.LINE_QUALITY_ENGINEER,
           ROLES.FPA,
           ROLES.QUALITY_MANAGER,
@@ -350,26 +438,26 @@ export const ROUTE_CONFIG = [
         path: "/quality/hold-cabinate-details",
         label: "Hold Cabinet Details",
         component: HoldCabinateDetails,
+        roles: QUALITY_ROLES,
       },
       {
         path: "/quality/tag-update",
         label: "Tag Update",
         component: TagUpdate,
-        roles: [ROLES.ADMIN, ROLES.QUALITY_MANAGER],
+        roles: [...BOTH_ADMINS, ROLES.QUALITY_MANAGER],
       },
       {
         path: "/quality/upload-bis-report",
         label: "Upload BIS Report",
         component: UploadBISReport,
-        roles: [ROLES.ADMIN, ROLES.BIS_ENGINEER, ROLES.QUALITY_MANAGER],
+        roles: [...BOTH_ADMINS, ROLES.BIS_ENGINEER, ROLES.QUALITY_MANAGER],
       },
       {
         path: "/quality/bis-reports",
         label: "BIS Reports",
         component: BISReports,
         roles: [
-          ROLES.ADMIN,
-          ROLES.LINE_QUALITY_ENGINEER,
+          ...BOTH_ADMINS,
           ROLES.BIS_ENGINEER,
           ROLES.FPA,
           ROLES.QUALITY_MANAGER,
@@ -380,8 +468,7 @@ export const ROUTE_CONFIG = [
         label: "BEE Calculation",
         component: BEECalculation,
         roles: [
-          ROLES.ADMIN,
-          ROLES.LINE_QUALITY_ENGINEER,
+          ...BOTH_ADMINS,
           ROLES.BIS_ENGINEER,
           ROLES.FPA,
           ROLES.QUALITY_MANAGER,
@@ -389,6 +476,9 @@ export const ROUTE_CONFIG = [
       },
     ],
   },
+
+  // ── Dispatch ─────────────────────────────────────────────────────────────
+  // GATE_ENTRY_USER → sees only the Dispatch module, only the Gate Entry page.
   {
     key: "dispatch",
     icon: Truck,
@@ -399,147 +489,177 @@ export const ROUTE_CONFIG = [
         path: "/dispatch/dispatch-performance-report",
         label: "Dispatch Performance Report",
         component: DispatchPerformanceReport,
+        roles: DISPATCH_REPORT_ROLES,
       },
       {
         path: "/dispatch/dispatch-report",
         label: "Dispatch Report",
         component: DispatchReport,
+        roles: DISPATCH_REPORT_ROLES,
       },
       {
         path: "/dispatch/dispatch-unloading",
         label: "Dispatch Unloading",
         component: DispatchUnloading,
+        roles: DISPATCH_REPORT_ROLES,
       },
       {
         path: "/dispatch/fg-casting",
         label: "FG Casting",
         component: FGCasting,
+        roles: DISPATCH_REPORT_ROLES,
       },
       {
         path: "/dispatch/fg-dispatchReport",
         label: "FG Dispatch Report",
         component: FGDispatchReport,
+        roles: DISPATCH_REPORT_ROLES,
       },
       {
+        // GATE_ENTRY_USER's only permitted page in the entire app
         path: "/dispatch/gate-entry",
         label: "Gate Entry",
         component: GateEntry,
-        roles: [ROLES.ADMIN, ROLES.GATE_ENTRY_USER],
+        roles: [...BOTH_ADMINS, ROLES.GATE_ENTRY_USER],
       },
       {
         path: "/dispatch/error-log",
         label: "Error Log",
         component: ErrorLog,
+        roles: [...BOTH_ADMINS, ROLES.LOGISTIC],
       },
       {
         path: "/dispatch/remove-error-serials",
         label: "Remove Error Serials",
         component: RemoveDispatchSerials,
+        roles: [...BOTH_ADMINS, ROLES.LOGISTIC],
       },
     ],
   },
+
+  // ── Visitor ──────────────────────────────────────────────────────────────
   {
     key: "visitor",
     icon: UserCheck,
     label: "Visitor",
     basePath: "/visitor",
-    roles: [ROLES.ADMIN, ROLES.SECURITY, ROLES.HR],
     items: [
       {
         path: "/visitor/dashboard",
         label: "Dashboard",
         component: Dashboard,
+        roles: [...BOTH_ADMINS, ROLES.SECURITY, ROLES.HR],
       },
       {
         path: "/visitor/generate-pass",
         label: "Generate Pass",
         component: GeneratePass,
+        roles: [...BOTH_ADMINS, ROLES.SECURITY, ROLES.HR],
       },
       {
         path: "/visitor/in-out",
         label: "In / Out",
         component: InOut,
+        roles: [...BOTH_ADMINS, ROLES.SECURITY, ROLES.HR],
       },
       {
         path: "/visitor/reports",
         label: "Reports",
         component: Reports,
+        roles: [...BOTH_ADMINS, ROLES.SECURITY, ROLES.HR],
       },
       {
         path: "/visitor/history",
         label: "History",
         component: History,
+        roles: [...BOTH_ADMINS, ROLES.SECURITY, ROLES.HR],
       },
       {
         path: "/visitor/manage-employee",
         label: "Manage Employee",
         component: ManageEmployee,
-        roles: [ROLES.ADMIN, ROLES.HR],
+        roles: [...BOTH_ADMINS, ROLES.HR],
       },
     ],
     hiddenItems: [
       {
         path: "/visitor-pass-display/:passId",
         component: VisitorPassDisplay,
+        roles: [...BOTH_ADMINS, ROLES.SECURITY, ROLES.HR],
       },
     ],
   },
+
+  // ── Compliance ───────────────────────────────────────────────────────────
+  // 🚧 IN PROGRESS — SUPER_ADMIN only until live
   {
     key: "compliance",
     icon: SlidersHorizontal,
     label: "Compliance",
     basePath: "/compliance",
-    roles: [ROLES.ADMIN],
     items: [
       {
         path: "/compliance/calibiration",
         label: "Calibration",
         component: Calibiration,
+        roles: [ROLES.SUPER_ADMIN],
       },
     ],
   },
+
+  // ── Audit Report ─────────────────────────────────────────────────────────
+  // 🚧 IN PROGRESS — SUPER_ADMIN only until live
   {
     key: "auditReport",
     icon: ClipboardCheck,
     label: "Audit Report",
     basePath: "/auditreport",
-    roles: [ROLES.ADMIN, ROLES.QUALITY_MANAGER],
     items: [
       {
         path: "/auditreport/build-templates",
         label: "Build Templates",
         component: TemplateBuilder,
+        roles: [ROLES.SUPER_ADMIN],
       },
       {
         path: "/auditreport/templates",
         label: "All Templates",
         component: TemplateList,
+        roles: [ROLES.SUPER_ADMIN],
       },
       {
         path: "/auditreport/audits",
         label: "Audits",
         component: AuditList,
+        roles: [ROLES.SUPER_ADMIN],
       },
     ],
     hiddenItems: [
       {
         path: "/auditreport/templates/:id",
         component: TemplateBuilder,
+        roles: [ROLES.SUPER_ADMIN],
       },
       {
         path: "/auditreport/audits/new",
         component: AuditEntry,
+        roles: [ROLES.SUPER_ADMIN],
       },
       {
         path: "/auditreport/audits/:id",
         component: AuditEntry,
+        roles: [ROLES.SUPER_ADMIN],
       },
       {
         path: "/auditreport/audits/:id/view",
         component: AuditView,
+        roles: [ROLES.SUPER_ADMIN],
       },
     ],
   },
+
+  // ── Utility / Readings ───────────────────────────────────────────────────
+  // 🚧 IN PROGRESS — SUPER_ADMIN only until live
   {
     key: "reading",
     icon: Gauge,
@@ -550,10 +670,13 @@ export const ROUTE_CONFIG = [
         path: "/reading/dehumidifier",
         label: "Utility Reading",
         component: DehumidifierDashboard,
-        roles: [ROLES.ADMIN],
+        roles: [ROLES.SUPER_ADMIN],
       },
     ],
   },
+
+  // ── Forms ────────────────────────────────────────────────────────────────
+  // 🚧 IN PROGRESS — SUPER_ADMIN only until live
   {
     key: "forms",
     icon: FileText,
@@ -564,58 +687,56 @@ export const ROUTE_CONFIG = [
         path: "/forms/manpower-form",
         label: "Manpower Form",
         component: ManpowerForm,
-        roles: [ROLES.ADMIN, ROLES.PRODUCTION_MANAGER],
+        roles: [ROLES.SUPER_ADMIN],
       },
       {
         path: "/forms/manpower-approval",
         label: "Manpower Approval",
         component: ManpowerApproval,
-        roles: [ROLES.ADMIN, ROLES.HR],
+        roles: [ROLES.SUPER_ADMIN],
       },
       {
         path: "/forms/security-manpower",
         label: "Security Manpower List",
         component: SecurityManpowerList,
-        roles: [ROLES.SECURITY],
+        roles: [ROLES.SUPER_ADMIN],
       },
     ],
   },
 ];
 
-// Utility function to check access
+// ─── Access Utilities ─────────────────────────────────────────────────────────
+
+/**
+ * Check if a user role is in the allowed roles list.
+ * If no roles list is provided, access is DENIED (secure by default).
+ */
 export const canAccess = (userRole, allowedRoles) => {
-  if (!allowedRoles || allowedRoles.length === 0) return true;
+  if (!allowedRoles || allowedRoles.length === 0) return false; // deny by default
   return allowedRoles.includes(userRole);
 };
 
-// Get filtered routes for a user
+/**
+ * Returns the flat list of { path, component } route objects a user can access.
+ * Used to register React Router <Route> elements.
+ */
 export const getAccessibleRoutes = (userRole) => {
   const routes = [];
 
   ROUTE_CONFIG.forEach((section) => {
-    if (section.roles && !canAccess(userRole, section.roles)) {
-      return;
-    }
-
-    const accessibleItems = section.items.filter((item) => {
-      if (item.roles) return canAccess(userRole, item.roles);
-      if (section.roles) return canAccess(userRole, section.roles);
-      return true;
+    // Visible items
+    section.items.forEach((item) => {
+      if (canAccess(userRole, item.roles)) {
+        routes.push({ path: item.path, component: item.component });
+      }
     });
 
-    accessibleItems.forEach((item) => {
-      routes.push({
-        path: item.path,
-        component: item.component,
-      });
-    });
-
+    // Hidden items (no sidebar entry, but still need a registered route)
     if (section.hiddenItems) {
       section.hiddenItems.forEach((item) => {
-        routes.push({
-          path: item.path,
-          component: item.component,
-        });
+        if (canAccess(userRole, item.roles)) {
+          routes.push({ path: item.path, component: item.component });
+        }
       });
     }
   });
@@ -623,24 +744,18 @@ export const getAccessibleRoutes = (userRole) => {
   return routes;
 };
 
-// Get filtered menu for sidebar
+/**
+ * Returns the sidebar menu structure filtered for the given user role.
+ * Sections with zero accessible items are omitted entirely.
+ */
 export const getAccessibleMenu = (userRole) => {
   return ROUTE_CONFIG.map((section) => {
-    if (section.roles && !canAccess(userRole, section.roles)) {
-      return null;
-    }
-
-    const accessibleItems = section.items.filter((item) => {
-      if (item.roles) return canAccess(userRole, item.roles);
-      if (section.roles) return canAccess(userRole, section.roles);
-      return true;
-    });
+    const accessibleItems = section.items.filter((item) =>
+      canAccess(userRole, item.roles),
+    );
 
     if (accessibleItems.length === 0) return null;
 
-    return {
-      ...section,
-      items: accessibleItems,
-    };
+    return { ...section, items: accessibleItems };
   }).filter(Boolean);
 };
