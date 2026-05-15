@@ -5,31 +5,35 @@ import { AppError } from "../../utils/AppError.js";
 import { convertToIST } from "../../utils/convertToIST.js";
 
 // ── Singleton connection pool ──────────────────────────────────────────────────
-// Bug fix: previously a new pool was opened AND closed on every request.
-// Reusing a single pool is far more efficient and avoids "too many connections".
 let _pool = null;
 
 async function getPool() {
   if (_pool && _pool.connected) return _pool;
   _pool = await new sql.ConnectionPool(dbConfig1).connect();
-  _pool.on("error", () => { _pool = null; }); // reset on fatal error so next call reconnects
+  _pool.on("error", () => { _pool = null; });
   return _pool;
 }
 
-// ── Shared query builder ───────────────────────────────────────────────────────
-// Bug fix: BREAKS CTE only covered a single day (the fromDate day).
-// For multi-day queries every break must be replicated across all days in range.
-// We now expand breaks using master..spt_values to cover the full date span.
-//
-// Extra fix: NetSeconds < 0 was theoretically possible if a break fully covered
-// a stop — added GREATEST-equivalent with CASE to clamp to 0.
+// ── IST date helpers ───────────────────────────────────────────────────────────
+function nowIST() {
+  const now = new Date();
+  return new Date(now.getTime() + (330 - now.getTimezoneOffset()) * 60_000);
+}
+function todayIST8AM() {
+  const d = nowIST(); d.setHours(8, 0, 0, 0); return d;
+}
+function yesterdayIST8AM() {
+  const d = todayIST8AM(); d.setDate(d.getDate() - 1); return d;
+}
+function startOfMonthIST8AM() {
+  const d = nowIST(); d.setDate(1); d.setHours(8, 0, 0, 0); return d;
+}
+
+// ── Shared CTE builder ─────────────────────────────────────────────────────────
 function buildCTE(station) {
   const stationFilter = station ? "AND M.PLCLocation = @station" : "";
-
   return `
     ;WITH
-
-    -- Raw emergency transactions in range
     EMG AS (
       SELECT
         T.RefID,
@@ -49,9 +53,6 @@ function buildCTE(station) {
         AND M.LineName  = @lineName
         ${stationFilter}
     ),
-
-    -- Expand shift breaks across every calendar day in the query range
-    -- Bug fix: previously only the fromDate day was used, breaking multi-day reports
     BREAKS AS (
       SELECT
         SB.Name,
@@ -61,53 +62,39 @@ function buildCTE(station) {
           + CAST(SB.EndTime   AS DATETIME) AS BreakEnd
       FROM ShiftBreaks SB
       CROSS JOIN (
-        SELECT number
-        FROM   master..spt_values
-        WHERE  type   = 'P'
-          AND  number BETWEEN 0 AND DATEDIFF(DAY, @fromDate, @toDate)
+        SELECT number FROM master..spt_values
+        WHERE type = 'P' AND number BETWEEN 0 AND DATEDIFF(DAY, @fromDate, @toDate)
       ) N
     ),
-
-    -- Subtract break overlap from each stop duration
     CALC AS (
       SELECT
-        E.RefID,
-        E.StationName,
-        E.EmgOn,
-        E.EmgOff,
-        E.TotalSeconds,
-        -- Bug fix: clamp to 0 so negative NetSeconds never appear
+        E.RefID, E.StationName, E.EmgOn, E.EmgOff, E.TotalSeconds,
         CASE
           WHEN E.TotalSeconds - ISNULL(SUM(
             CASE
               WHEN B.BreakStart < E.EmgOff AND B.BreakEnd > E.EmgOn
               THEN DATEDIFF(SECOND,
                 CASE WHEN E.EmgOn  > B.BreakStart THEN E.EmgOn  ELSE B.BreakStart END,
-                CASE WHEN E.EmgOff < B.BreakEnd   THEN E.EmgOff ELSE B.BreakEnd   END
-              )
+                CASE WHEN E.EmgOff < B.BreakEnd   THEN E.EmgOff ELSE B.BreakEnd   END)
               ELSE 0
-            END
-          ), 0) > 0
+            END), 0) > 0
           THEN E.TotalSeconds - ISNULL(SUM(
             CASE
               WHEN B.BreakStart < E.EmgOff AND B.BreakEnd > E.EmgOn
               THEN DATEDIFF(SECOND,
                 CASE WHEN E.EmgOn  > B.BreakStart THEN E.EmgOn  ELSE B.BreakStart END,
-                CASE WHEN E.EmgOff < B.BreakEnd   THEN E.EmgOff ELSE B.BreakEnd   END
-              )
+                CASE WHEN E.EmgOff < B.BreakEnd   THEN E.EmgOff ELSE B.BreakEnd   END)
               ELSE 0
-            END
-          ), 0)
+            END), 0)
           ELSE 0
         END AS NetSeconds
-      FROM EMG E
-      CROSS JOIN BREAKS B
+      FROM EMG E CROSS JOIN BREAKS B
       GROUP BY E.RefID, E.StationName, E.EmgOn, E.EmgOff, E.TotalSeconds
     )
   `;
 }
 
-// Helper — attach common params to a request
+// ── Bind common params ─────────────────────────────────────────────────────────
 function bindCommonParams(request, isFromDate, isToDate, location, lineName, station) {
   request
     .input("fromDate", sql.DateTime, isFromDate)
@@ -118,47 +105,109 @@ function bindCommonParams(request, isFromDate, isToDate, location, lineName, sta
   return request;
 }
 
+// ── Summary query string ───────────────────────────────────────────────────────
+const SUMMARY_SELECT = `
+  SELECT
+    StationName AS [Station_Name],
+    CONVERT(VARCHAR, DATEADD(SECOND, SUM(NetSeconds), 0), 108) AS [Total_Stop_Time],
+    SUM(NetSeconds) AS [Total_Seconds],
+    COUNT(*)        AS [Total_Stop_Count]
+  FROM CALC
+  WHERE NetSeconds > 0
+  GROUP BY StationName
+  ORDER BY SUM(NetSeconds) DESC;
+`;
+
+// ── Shared quick-filter runner ─────────────────────────────────────────────────
+async function runQuickFilter(req, res, fromDate, toDate, label) {
+  const { location, lineName, station } = req.query;
+  if (!location) throw new AppError("Location is required", 400);
+  if (!lineName) throw new AppError("Line Name is required", 400);
+
+  const query   = `${buildCTE(station)}${SUMMARY_SELECT}`;
+  const pool    = await getPool();
+  const request = pool.request();
+  bindCommonParams(request, fromDate, toDate, location, lineName, station);
+  const result  = await request.query(query);
+
+  res.status(200).json({
+    success: true, message: `${label} Stop & Loss Summary retrieved successfully`,
+    data: result.recordset, totalCount: result.recordset.length,
+  });
+}
+
+// ── Live — currently active (EmgOff IS NULL) stops ────────────────────────────
+// All filters are optional so the tab loads on page open without any selection.
+// Elapsed_Seconds is stamped at query time; the frontend ticks it locally.
+export const getStopLossLive = tryCatch(async (req, res) => {
+  const { location, lineName, station } = req.query;
+
+  const pool    = await getPool();
+  const request = pool.request();
+
+  const conditions = ["T.EmgOff IS NULL", "M.Active = 1"];
+
+  if (location) {
+    conditions.push("M.Location = @location");
+    request.input("location", sql.NVarChar, location);
+  }
+  if (lineName) {
+    conditions.push("M.LineName = @lineName");
+    request.input("lineName", sql.NVarChar, lineName);
+  }
+  if (station) {
+    conditions.push("M.PLCLocation = @station");
+    request.input("station", sql.NVarChar, station);
+  }
+
+  const result = await request.query(`
+    SELECT
+      T.RefID,
+      M.PLCLocation                            AS [Station_Name],
+      M.Location,
+      M.LineName,
+      CONVERT(VARCHAR(19), T.EmgOn, 120)       AS [Stop_Since],
+      DATEDIFF(SECOND, T.EmgOn, GETDATE())     AS [Elapsed_Seconds],
+      CONVERT(VARCHAR(8), T.EmgOn, 108)        AS [Stop_Time],
+      CONVERT(DATE,       T.EmgOn)             AS [Date]
+    FROM EMGTrans T
+    INNER JOIN EMGMaster M
+      ON  T.PLCCode = M.PLCCode
+      AND T.MEMBit  = M.MEMBit
+    WHERE ${conditions.join(" AND ")}
+    ORDER BY T.EmgOn ASC;
+  `);
+
+  res.status(200).json({
+    success:    true,
+    message:    "Live active stops retrieved successfully",
+    data:       result.recordset,
+    totalCount: result.recordset.length,
+    fetchedAt:  new Date().toISOString(),
+  });
+});
+
 // ── Summary Report ─────────────────────────────────────────────────────────────
 export const getStopLossSummary = tryCatch(async (req, res) => {
   const { fromDate, toDate, location, lineName, station } = req.query;
-
   if (!fromDate || !toDate) throw new AppError("From Date and To Date are required", 400);
   if (!location)            throw new AppError("Location is required", 400);
   if (!lineName)            throw new AppError("Line Name is required", 400);
 
   const isFromDate = convertToIST(fromDate);
   const isToDate   = convertToIST(toDate);
-
-  const query = `
-    ${buildCTE(station)}
-    SELECT
-      StationName AS [Station_Name],
-      CONVERT(VARCHAR, DATEADD(SECOND, SUM(NetSeconds), 0), 108) AS [Total_Stop_Time],
-      SUM(NetSeconds)  AS [Total_Seconds],
-      COUNT(*)         AS [Total_Stop_Count]
-    FROM CALC
-    WHERE NetSeconds > 0
-    GROUP BY StationName
-    ORDER BY SUM(NetSeconds) DESC;
-  `;
-
-  const pool    = await getPool();
-  const request = pool.request();
+  const query      = `${buildCTE(station)}${SUMMARY_SELECT}`;
+  const pool       = await getPool();
+  const request    = pool.request();
   bindCommonParams(request, isFromDate, isToDate, location, lineName, station);
-
   const result = await request.query(query);
 
-  res.status(200).json({
-    success: true,
-    message: "Stop & Loss Summary retrieved successfully",
-    data: result.recordset,
-  });
+  res.status(200).json({ success: true, message: "Stop & Loss Summary retrieved successfully", data: result.recordset });
 });
 
 // ── Detail Report ──────────────────────────────────────────────────────────────
 export const getStopLossDetail = tryCatch(async (req, res) => {
   const { fromDate, toDate, location, lineName, station } = req.query;
-
   if (!fromDate || !toDate) throw new AppError("From Date and To Date are required", 400);
   if (!location)            throw new AppError("Location is required", 400);
   if (!lineName)            throw new AppError("Line Name is required", 400);
@@ -184,80 +233,38 @@ export const getStopLossDetail = tryCatch(async (req, res) => {
   const pool    = await getPool();
   const request = pool.request();
   bindCommonParams(request, isFromDate, isToDate, location, lineName, station);
+  const result  = await request.query(query);
 
-  const result = await request.query(query);
-
-  res.status(200).json({
-    success: true,
-    message: "Stop & Loss Detail retrieved successfully",
-    data: result.recordset,
-  });
+  res.status(200).json({ success: true, message: "Stop & Loss Detail retrieved successfully", data: result.recordset });
 });
 
 // ── Lines ──────────────────────────────────────────────────────────────────────
 export const getStopLossLines = tryCatch(async (req, res) => {
   const { location } = req.query;
-
   const pool    = await getPool();
   const request = pool.request();
-
-  let query = `
-    SELECT DISTINCT LineName
-    FROM   EMGMaster
-    WHERE  Active   = 1
-      AND  LineName IS NOT NULL
-      AND  LineName <> ''
-  `;
-
-  if (location) {
-    query += `  AND Location = @location\n`;
-    request.input("location", sql.NVarChar, location);
-  }
-
-  query += `  ORDER BY LineName;`;
-
+  let query = `SELECT DISTINCT LineName FROM EMGMaster WHERE Active = 1 AND LineName IS NOT NULL AND LineName <> ''`;
+  if (location) { query += ` AND Location = @location`; request.input("location", sql.NVarChar, location); }
+  query += ` ORDER BY LineName;`;
   const result = await request.query(query);
-  res.status(200).json({
-    success: true,
-    message: "Lines retrieved successfully",
-    data: result.recordset,
-  });
+  res.status(200).json({ success: true, message: "Lines retrieved successfully", data: result.recordset });
 });
 
 // ── Locations ──────────────────────────────────────────────────────────────────
 export const getStopLossLocations = tryCatch(async (req, res) => {
   const { lineName } = req.query;
-
   const pool    = await getPool();
   const request = pool.request();
-
-  let query = `
-    SELECT DISTINCT Location
-    FROM   EMGMaster
-    WHERE  Active = 1
-      AND  Location IS NOT NULL
-      AND  Location <> ''
-  `;
-
-  if (lineName) {
-    query += `  AND LineName = @lineName\n`;
-    request.input("lineName", sql.NVarChar, lineName);
-  }
-
-  query += `  ORDER BY Location;`;
-
+  let query = `SELECT DISTINCT Location FROM EMGMaster WHERE Active = 1 AND Location IS NOT NULL AND Location <> ''`;
+  if (lineName) { query += ` AND LineName = @lineName`; request.input("lineName", sql.NVarChar, lineName); }
+  query += ` ORDER BY Location;`;
   const result = await request.query(query);
-  res.status(200).json({
-    success: true,
-    message: "Locations retrieved successfully",
-    data: result.recordset,
-  });
+  res.status(200).json({ success: true, message: "Locations retrieved successfully", data: result.recordset });
 });
 
 // ── Stations ───────────────────────────────────────────────────────────────────
 export const getStopLossStations = tryCatch(async (req, res) => {
   const { location, lineName } = req.query;
-
   if (!location) throw new AppError("Location is required", 400);
   if (!lineName) throw new AppError("Line Name is required", 400);
 
@@ -266,19 +273,15 @@ export const getStopLossStations = tryCatch(async (req, res) => {
     .input("location", sql.NVarChar, location)
     .input("lineName", sql.NVarChar, lineName)
     .query(`
-      SELECT DISTINCT PLCLocation AS StationName
-      FROM   EMGMaster
-      WHERE  Active      = 1
-        AND  Location    = @location
-        AND  LineName    = @lineName
-        AND  PLCLocation IS NOT NULL
-        AND  PLCLocation <> ''
+      SELECT DISTINCT PLCLocation AS StationName FROM EMGMaster
+      WHERE Active = 1 AND Location = @location AND LineName = @lineName
+        AND PLCLocation IS NOT NULL AND PLCLocation <> ''
       ORDER BY PLCLocation;
     `);
-
-  res.status(200).json({
-    success: true,
-    message: "Stations retrieved successfully",
-    data: result.recordset,
-  });
+  res.status(200).json({ success: true, message: "Stations retrieved successfully", data: result.recordset });
 });
+
+// ── Today / Yesterday / MTD ────────────────────────────────────────────────────
+export const getStopLossToday     = tryCatch(async (req, res) => { await runQuickFilter(req, res, todayIST8AM(), nowIST(), "Today"); });
+export const getStopLossYesterday = tryCatch(async (req, res) => { await runQuickFilter(req, res, yesterdayIST8AM(), todayIST8AM(), "Yesterday"); });
+export const getStopLossMTD       = tryCatch(async (req, res) => { await runQuickFilter(req, res, startOfMonthIST8AM(), nowIST(), "MTD"); });
