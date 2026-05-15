@@ -92,9 +92,6 @@ const ManageEmployee = lazy(() => import("../pages/Visitor/ManageEmployee"));
 
 const Calibiration = lazy(() => import("../pages/Compliance/Calibration"));
 
-const ManageTasks = lazy(() => import("../pages/TaskReminders/ManageTasks"));
-const TaskOverview = lazy(() => import("../pages/TaskReminders/TaskOverview"));
-
 const TemplateBuilder = lazy(
   () => import("../pages/AuditReport/Template/TemplateBuilder"),
 );
@@ -498,25 +495,6 @@ export const ROUTE_CONFIG = [
         path: "/compliance/calibiration",
         label: "Calibration",
         component: Calibiration,
-      },
-    ],
-  },
-  {
-    key: "taskReminders",
-    icon: BellRing,
-    label: "Task Reminders",
-    basePath: "/reminder",
-    roles: [ROLES.ADMIN],
-    items: [
-      {
-        path: "/reminder/tasks",
-        label: "Manage Tasks",
-        component: ManageTasks,
-      },
-      {
-        path: "/reminder/overview",
-        label: "Task Overview",
-        component: TaskOverview,
       },
     ],
   },
