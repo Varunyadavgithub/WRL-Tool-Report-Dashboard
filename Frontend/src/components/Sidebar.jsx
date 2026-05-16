@@ -1,14 +1,20 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaChevronDown, FaChevronUp, FaBars, FaTimes } from "react-icons/fa";
+import { Settings } from "lucide-react";
 import { useRoleAccess } from "../hooks/useRoleAccess.js";
+import { ROLES } from "../config/routes.config.js";
 
 const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
-  const { accessibleMenu } = useRoleAccess();
+  const { accessibleMenu, userRole } = useRoleAccess();
   const [expandedMenus, setExpandedMenus] = useState({});
   const [isMobile, setIsMobile] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const sidebarRef = useRef(null);
+
+  const isSuperAdmin = userRole === ROLES.SUPER_ADMIN;
+  const isSettingsActive = location.pathname === "/settings";
 
   useEffect(() => {
     const handleResize = () => {
@@ -92,6 +98,7 @@ const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
         role="navigation"
         aria-label="Main navigation"
       >
+        {/* ── Top toggle ─────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between p-4 border-b border-gray-700/50 flex-shrink-0">
           <div
             className={`overflow-hidden transition-all duration-300 ${
@@ -100,8 +107,8 @@ const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
                 : "w-0 opacity-0"
             }`}
           >
-            <h1 className="text-lg font-bold tracking-wide whitespace-nowrap">
-              Menu
+            <h1 className="text-lg font-semibold tracking-wide whitespace-nowrap">
+              Dashboard Menu
             </h1>
           </div>
           <button
@@ -119,6 +126,7 @@ const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
           </button>
         </div>
 
+        {/* ── Nav items ──────────────────────────────────────────────────── */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2">
           <ul className="space-y-1 px-2">
             {accessibleMenu.map((menu) => {
@@ -204,13 +212,61 @@ const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
           </ul>
         </nav>
 
-        <div className="flex-shrink-0 border-t border-gray-700/50 p-3">
-          <div
-            className={`text-xs text-gray-500 text-center transition-all duration-300 ${
-              isSidebarExpanded || isMobile ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            2025 Western Refrigeration
+        {/* ── Footer ─────────────────────────────────────────────────────── */}
+        <div className="flex-shrink-0 border-t border-gray-700/50">
+          {/* Settings gear — SUPER_ADMIN only */}
+          {isSuperAdmin && (
+            <div className="px-3 pt-3 pb-1 flex justify-center">
+              <button
+                onClick={() => navigate("/settings")}
+                title="Permission Manager"
+                className={`
+          w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg
+          transition-all duration-200 group relative text-center cursor-pointer
+          ${
+            isSettingsActive
+              ? "bg-indigo-600/20 text-white"
+              : "text-white hover:bg-gray-800 hover:text-white"
+          }
+        `}
+              >
+                {/* Spinning gear on hover via CSS */}
+                <Settings
+                  size={18}
+                  className={`flex-shrink-0 transition-transform duration-500 ${
+                    isSettingsActive
+                      ? "rotate-45 text-white"
+                      : "group-hover:rotate-90 text-white"
+                  }`}
+                />
+
+                <span
+                  className={`text-sm font-medium whitespace-nowrap transition-all duration-300 text-center text-white ${
+                    isSidebarExpanded || isMobile
+                      ? "opacity-100 w-auto"
+                      : "opacity-0 w-0 overflow-hidden"
+                  }`}
+                >
+                  Permission Manager
+                </span>
+
+                {/* Active indicator dot (collapsed mode) */}
+                {isSettingsActive && !isSidebarExpanded && !isMobile && (
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-white" />
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Copyright */}
+          <div className="p-3 flex justify-center">
+            <div
+              className={`text-xs text-white text-center transition-all duration-300 ${
+                isSidebarExpanded || isMobile ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              2025 Western Refrigeration
+            </div>
           </div>
         </div>
       </aside>

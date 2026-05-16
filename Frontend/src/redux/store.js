@@ -3,6 +3,7 @@ import authSlice from "./slices/authSlice.js";
 import estReportSlice from "./slices/estReportSlice.js";
 import gasChargingSlice from "./slices/gasChargingSlice.js";
 import fpaReportReducer from "./slices/fpaReportSlice.js";
+import permissionReducer from "./slices/permissionSlice.js";
 
 import { commonApi } from "./api/commonApi.js";
 import { taskReminderApi } from "./api/taskReminder.js";
@@ -20,6 +21,7 @@ import {
   REGISTER,
 } from "redux-persist";
 import storage from "redux-persist/lib/storage";
+import { permissionApi } from "./api/permissionApi.js";
 
 const persistConfig = {
   key: "root",
@@ -29,20 +31,24 @@ const persistConfig = {
     estReportApi.reducerPath,
     gasChargingApi.reducerPath,
     fpaReportApi.reducerPath,
+    permissionApi.reducerPath,
   ],
 };
 
+// reducer
 const rootReducer = combineReducers({
   auth: authSlice,
   estReport: estReportSlice,
   gasCharging: gasChargingSlice,
   fpaReport: fpaReportReducer,
+  permissions: permissionReducer,
 
   [commonApi.reducerPath]: commonApi.reducer,
   [taskReminderApi.reducerPath]: taskReminderApi.reducer,
   [estReportApi.reducerPath]: estReportApi.reducer,
   [gasChargingApi.reducerPath]: gasChargingApi.reducer,
   [fpaReportApi.reducerPath]: fpaReportApi.reducer,
+  [permissionApi.reducerPath]: permissionApi.reducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
@@ -60,6 +66,7 @@ const store = configureStore({
       estReportApi.middleware,
       gasChargingApi.middleware,
       fpaReportApi.middleware,
+      permissionApi.middleware,
     ),
 });
 

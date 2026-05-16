@@ -117,24 +117,44 @@ const WIPCapture = lazy(() => import("../pages/Production/WIPCapture"));
 
 // ─── Role Constants ───────────────────────────────────────────────────────────
 export const ROLES = {
-  SUPER_ADMIN: "super admin", // Full access — including in-progress modules
-  ADMIN: "admin", // All live modules only (no in-progress modules)
+  SUPER_ADMIN: "super admin", // 226005 — full access incl. in-progress modules
+  ADMIN: "admin", // 222003/223002 — all live modules only
   LOGISTIC: "logistic",
-  QUALITY_MANAGER: "quality manager",
-  LINE_QUALITY_ENGINEER: "line quality engineer",
-  BIS_ENGINEER: "bis engineer",
-  FPA: "fpa",
-  LPT: "lpt",
-  GATE_ENTRY_USER: "gate entry user",
-  PRODUCTION_MANAGER: "production manager",
-  PLANNING_TEAM: "planning team",
-  SECURITY: "security",
-  HR: "hr",
-  SUS_LINE_USER: "sus line user",
+  QUALITY_MANAGER: "quality manager", // 223005
+  LINE_QUALITY_ENGINEER: "line quality engineer", // 224002
+  BIS_ENGINEER: "bis engineer", // 225004
+  FPA: "fpa", // 225003
+  LPT: "lpt", // 225006
+  GATE_ENTRY_USER: "gate entry user", // 226001
+  PRODUCTION_MANAGER: "production manager", // 223006
+  PLANNING_TEAM: "planning team", // 222002 / 223004
+  SECURITY: "security", // 224004
+  HR: "hr", // 224005
+  SUS_LINE_USER: "sus line user", // 226004
+
+  // ── Previously missing roles (now added) ──────────────────────────────────
+  PRODUCTION_OPERATOR: "production operator", // 222001 — floor production staff
+  ROLE_USER: "roleuser", // 222004
+  QUALITY_OPERATOR: "quality operator", // 223001 — floor quality staff
+  QUALITY_ENGINEER: "quality engineer", // 223003
+  BRAZING_OPERATOR: "brazing operator", // 223007
+  QUALITY_AUDITOR: "quality auditor", // 223008
+  REPORT_USERS: "report users", // 223009 — view-only report access
+  REPORT_USERS_ADMIN: "report users admin", // 223010 — report access with admin view
+  REWORK_OPERATOR: "rework operator", // 224001
+  ID_MAKER: "id maker", // 224003
+  FREEZER_LABEL_ROLE: "freezer label role", // 224006
+  CHOC_LABEL_ROLE: "choc label role", // 224007
+  OPERATIONS: "operations", // 224008 — operations/floor management
+  CHOC_COMP_SCANNING: "choc comp scanning", // 225001
+  FREEZER_COMP_SCANNING: "freezer comp scanning", // 225002
+  SUS_FG_LABEL: "sus fg label", // 225005
+  CHEM_DATA_USER: "chem data user", // 225007
+  VISI2_POST_QA: "visi-2 post qa", // 226002
+  VISI_COMP_SCAN: "visi comp scan", // 226003
 };
 
 // ─── Role Groups (reusable shorthand) ────────────────────────────────────────
-// Every item carries an explicit roles list — access is always intentional.
 // Rule: SUPER_ADMIN is always first, ADMIN second, then specific roles.
 //
 // IN-PROGRESS modules (Compliance, Audit Report, Utility, Forms):
@@ -148,6 +168,7 @@ const ALL_ROLES = Object.values(ROLES);
 // Both admin tiers — use for any live page accessible to all admin-level users
 const BOTH_ADMINS = [ROLES.SUPER_ADMIN, ROLES.ADMIN];
 
+// All roles that are quality-related (for quality module pages)
 const QUALITY_ROLES = [
   ROLES.SUPER_ADMIN,
   ROLES.ADMIN,
@@ -156,9 +177,14 @@ const QUALITY_ROLES = [
   ROLES.BIS_ENGINEER,
   ROLES.FPA,
   ROLES.LPT,
+  ROLES.QUALITY_OPERATOR,
+  ROLES.QUALITY_ENGINEER,
+  ROLES.QUALITY_AUDITOR,
+  ROLES.VISI2_POST_QA,
 ];
 
-// Roles that can see the general production reports (not WIP-only)
+// Roles that can see general production reports
+// Includes all floor/operator/report roles that were previously locked out
 const PRODUCTION_REPORT_ROLES = [
   ROLES.SUPER_ADMIN,
   ROLES.ADMIN,
@@ -167,6 +193,13 @@ const PRODUCTION_REPORT_ROLES = [
   ROLES.LOGISTIC,
   ROLES.QUALITY_MANAGER,
   ROLES.LINE_QUALITY_ENGINEER,
+  ROLES.PRODUCTION_OPERATOR, // ← was missing — floor production staff
+  ROLES.OPERATIONS, // ← was missing — operations team
+  ROLES.REPORT_USERS, // ← was missing — dedicated report viewers
+  ROLES.REPORT_USERS_ADMIN, // ← was missing — report viewers with admin view
+  ROLES.QUALITY_OPERATOR, // ← was missing — floor quality staff
+  ROLES.QUALITY_ENGINEER, // ← was missing
+  ROLES.QUALITY_AUDITOR, // ← was missing
 ];
 
 // Dispatch roles (general reports)
@@ -176,6 +209,8 @@ const DISPATCH_REPORT_ROLES = [
   ROLES.LOGISTIC,
   ROLES.PRODUCTION_MANAGER,
   ROLES.PLANNING_TEAM,
+  ROLES.OPERATIONS, // ← was missing
+  ROLES.REPORT_USERS_ADMIN, // ← was missing
 ];
 
 // ─── Route Configuration ──────────────────────────────────────────────────────
@@ -270,7 +305,7 @@ export const ROUTE_CONFIG = [
         path: "/production/model-name-update",
         label: "Model Name Update",
         component: ModelNameUpdate,
-        roles: [...BOTH_ADMINS],
+        roles: [...BOTH_ADMINS, ROLES.LOGISTIC],
       },
       {
         path: "/production/nfc-report",
@@ -294,14 +329,14 @@ export const ROUTE_CONFIG = [
         path: "/production/manpower-report",
         label: "Manpower Report",
         component: ManpowerReport,
-        roles: [ROLES.SUPER_ADMIN],
+        roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN],
       },
       {
         // SUS_LINE_USER's only permitted page in the entire app
         path: "/production/wip-capture",
         label: "WIP Capture",
         component: WIPCapture,
-        roles: [...BOTH_ADMINS, ROLES.SUS_LINE_USER],
+        roles: [...BOTH_ADMINS, ROLES.LOGISTIC, ROLES.SUS_LINE_USER],
       },
     ],
   },
@@ -458,6 +493,7 @@ export const ROUTE_CONFIG = [
         component: BISReports,
         roles: [
           ...BOTH_ADMINS,
+          ROLES.LINE_QUALITY_ENGINEER,
           ROLES.BIS_ENGINEER,
           ROLES.FPA,
           ROLES.QUALITY_MANAGER,
@@ -469,6 +505,7 @@ export const ROUTE_CONFIG = [
         component: BEECalculation,
         roles: [
           ...BOTH_ADMINS,
+          ROLES.LINE_QUALITY_ENGINEER,
           ROLES.BIS_ENGINEER,
           ROLES.FPA,
           ROLES.QUALITY_MANAGER,

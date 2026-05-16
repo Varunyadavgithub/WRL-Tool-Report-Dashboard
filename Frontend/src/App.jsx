@@ -1,13 +1,22 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useRoleAccess } from "./hooks/useRoleAccess.js";
+import { ROUTE_CONFIG, ROLES } from "./config/routes.config.js";
+import { initializePermissions } from "./utils/permissionStore";
 
-const Layout    = lazy(() => import("./components/Layout"));
-const Login     = lazy(() => import("./pages/Auth/Login"));
-const Home      = lazy(() => import("./pages/Home"));
-const NotFound  = lazy(() => import("./pages/NotFound"));
-const Monitoring = lazy(() => import("./pages/Display/Monitoring")); // ADD
+const Layout = lazy(() => import("./components/Layout"));
+const Login = lazy(() => import("./pages/Auth/Login"));
+const Home = lazy(() => import("./pages/Home"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Monitoring = lazy(() => import("./pages/Display/Monitoring"));
+const Settings = lazy(() => import("./pages/Settings/Settings"));
+
+// ── Seed permissions from routeConfig on first ever load ─────────────────────
+// This runs once. After that, the stored permissions are used.
+// If you add new routes, call resetPermissionInit() from the browser console
+// (or the Reset button in Settings) to re-seed.
+initializePermissions(ROUTE_CONFIG, ROLES, ROLES.SUPER_ADMIN);
 
 function App() {
   const [isSidebarExpanded, setSidebarExpanded] = useState(false);
@@ -19,16 +28,16 @@ function App() {
     <Suspense
       fallback={
         <div className="flex justify-center items-center min-h-screen">
-          <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+          <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500" />
         </div>
       }
     >
       <Routes>
-        {/* Public Routes */}
+        {/* Public routes */}
         <Route path="/login" element={<Login />} />
-        <Route path="/display/:slug" element={<Monitoring />} /> {/* ADD */}
+        <Route path="/display/:slug" element={<Monitoring />} />
 
-        {/* Protected Layout Route */}
+        {/* Protected layout routes */}
         <Route element={<ProtectedRoute />}>
           <Route
             element={
@@ -39,6 +48,11 @@ function App() {
             }
           >
             <Route path="/" index element={<Home />} />
+
+            {/* Settings — always registered, guarded inside the component */}
+            <Route path="/settings" element={<Settings />} />
+
+            {/* Dynamic role-based routes */}
             {accessibleRoutes.map((route) => (
               <Route
                 key={route.path}
@@ -46,6 +60,7 @@ function App() {
                 element={<route.component />}
               />
             ))}
+
             <Route path="*" element={<NotFound />} />
           </Route>
         </Route>

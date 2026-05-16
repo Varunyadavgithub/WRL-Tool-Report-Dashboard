@@ -1,5 +1,6 @@
 import { Router } from "express";
 import authRoutes from "./auth.route.js";
+import permissionRoutes from "./permission.route.js";
 import commonRoutes from "./common.route.js";
 import visitorRoutes from "./visitor.route.js";
 import qualityRoutes from "./quality.route.js";
@@ -17,6 +18,7 @@ import dashboardRoute from "./display.route.js";
 const routers = Router();
 
 routers.use("/auth", authRoutes);
+routers.use("/permission", permissionRoutes);
 routers.use("/shared", commonRoutes);
 routers.use("/prod", productionRoutes);
 routers.use("/quality", qualityRoutes);
