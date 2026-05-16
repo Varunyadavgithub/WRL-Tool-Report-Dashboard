@@ -7,8 +7,7 @@ import { AppError } from "../utils/AppError.js";
    GET LOGGED-IN USER PERMISSIONS
 ========================================================= */
 export const getMyPermissions = tryCatch(async (req, res) => {
-  console.log(req.user)
-  const role = String(req.user.role).toUpperCase();
+  const role = req.user?.roleName.toLowerCase();
 
   if (!role) throw new AppError("Role not found", 400);
 

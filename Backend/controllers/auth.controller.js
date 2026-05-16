@@ -214,6 +214,7 @@ export const login = tryCatch(async (req, res) => {
         name: user.UserName,
         usercode: user.UserCode,
         role: user.UserRole,
+        roleName: user.RoleName,
       },
       process.env.JWT_SECRET,
       { expiresIn: "1d" },
