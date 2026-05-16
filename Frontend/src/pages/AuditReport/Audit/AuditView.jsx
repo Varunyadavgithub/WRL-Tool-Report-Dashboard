@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -23,6 +23,16 @@ import {
   FaDownload,
   FaFilePdf,
   FaFileExcel,
+  FaSearch,
+  FaFilter,
+  FaChevronDown,
+  FaChevronUp,
+  FaCopy,
+  FaPrint,
+  FaHistory,
+  FaShieldAlt,
+  FaLink,
+  FaCheckDouble,
 } from "react-icons/fa";
 import { MdFormatListNumbered, MdUpdate, MdDateRange } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
@@ -38,6 +48,82 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
+// ==================== CONSTANTS ====================
+const STATUS_CONFIG = {
+  pass: {
+    label: "Pass",
+    icon: FaCheckCircle,
+    bg: "bg-green-50",
+    text: "text-green-700",
+    border: "border-green-200",
+    badge: "bg-green-100 text-green-700",
+    rowBg: "bg-green-50/60",
+  },
+  fail: {
+    label: "Fail",
+    icon: FaTimesCircle,
+    bg: "bg-red-50",
+    text: "text-red-700",
+    border: "border-red-200",
+    badge: "bg-red-100 text-red-700",
+    rowBg: "bg-red-50/60",
+  },
+  warning: {
+    label: "Warning",
+    icon: FaExclamationTriangle,
+    bg: "bg-amber-50",
+    text: "text-amber-700",
+    border: "border-amber-200",
+    badge: "bg-amber-100 text-amber-700",
+    rowBg: "bg-amber-50/60",
+  },
+  na: {
+    label: "N/A",
+    icon: FaBan,
+    bg: "bg-blue-50",
+    text: "text-blue-700",
+    border: "border-blue-200",
+    badge: "bg-blue-100 text-blue-700",
+    rowBg: "bg-blue-50/40",
+  },
+  pending: {
+    label: "Pending",
+    icon: FaClipboardCheck,
+    bg: "",
+    text: "text-gray-600",
+    border: "border-gray-200",
+    badge: "bg-gray-100 text-gray-600",
+    rowBg: "",
+  },
+};
+
+const AUDIT_STATUS = {
+  draft: {
+    label: "Draft",
+    bg: "bg-gray-100",
+    text: "text-gray-700",
+    dot: "bg-gray-400",
+  },
+  submitted: {
+    label: "Submitted",
+    bg: "bg-blue-50",
+    text: "text-blue-700",
+    dot: "bg-blue-500",
+  },
+  approved: {
+    label: "Approved",
+    bg: "bg-green-50",
+    text: "text-green-700",
+    dot: "bg-green-500",
+  },
+  rejected: {
+    label: "Rejected",
+    bg: "bg-red-50",
+    text: "text-red-700",
+    dot: "bg-red-500",
+  },
+};
+
 // ==================== HELPERS ====================
 const formatFileSize = (bytes) => {
   if (!bytes) return "";
@@ -46,201 +132,246 @@ const formatFileSize = (bytes) => {
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 };
 
+const relativeTime = (dateStr) => {
+  if (!dateStr) return "";
+  try {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return formatDateForDisplay(dateStr);
+  } catch {
+    return "";
+  }
+};
+
+// ==================== SUB-COMPONENTS ====================
+const CheckpointStatusBadge = ({ status }) => {
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
+  const Icon = cfg.icon;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.badge}`}
+    >
+      <Icon size={9} /> {cfg.label}
+    </span>
+  );
+};
+
+const AuditStatusBadge = ({ status, large }) => {
+  const cfg = AUDIT_STATUS[status] || AUDIT_STATUS.submitted;
+  return (
+    <span
+      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full font-semibold ${large ? "text-sm" : "text-xs"} ${cfg.bg} ${cfg.text}`}
+    >
+      <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+      {cfg.label}
+    </span>
+  );
+};
+
+const MiniProgressBar = ({ pass, fail, warning, na, total }) => {
+  if (!total) return null;
+  return (
+    <div className="h-2 bg-gray-100 rounded-full overflow-hidden flex">
+      {pass > 0 && (
+        <div
+          className="bg-green-400 h-full transition-all"
+          style={{ width: `${(pass / total) * 100}%` }}
+        />
+      )}
+      {warning > 0 && (
+        <div
+          className="bg-amber-400 h-full transition-all"
+          style={{ width: `${(warning / total) * 100}%` }}
+        />
+      )}
+      {fail > 0 && (
+        <div
+          className="bg-red-400   h-full transition-all"
+          style={{ width: `${(fail / total) * 100}%` }}
+        />
+      )}
+      {na > 0 && (
+        <div
+          className="bg-blue-300  h-full transition-all"
+          style={{ width: `${(na / total) * 100}%` }}
+        />
+      )}
+    </div>
+  );
+};
+
+const FieldIcon = ({ fieldId }) => {
+  const icons = {
+    modelName: <BiSolidFactory className="text-indigo-500" />,
+    serialNo: <FaBarcode className="text-purple-500" />,
+    serial: <FaBarcode className="text-purple-500" />,
+    date: <FaCalendarAlt className="text-red-400" />,
+    shift: <FaClock className="text-amber-500" />,
+    eid: <FaIdBadge className="text-teal-500" />,
+  };
+  return icons[fieldId] || <FaClipboardCheck className="text-gray-400" />;
+};
+
+// ==================== MAIN COMPONENT ====================
 const AuditView = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { getAuditById, approveAudit, rejectAudit } = useAuditData();
 
+  const exportBtnRef = useRef(null);
+
+  // Core state
   const [audit, setAudit] = useState(null);
   const [template, setTemplate] = useState(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Approval modal
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [approvalAction, setApprovalAction] = useState("approve");
   const [approverName, setApproverName] = useState("");
   const [approvalComments, setApprovalComments] = useState("");
+
+  // Image
   const [imagePreview, setImagePreview] = useState(null);
+
+  // Export menu
   const [showExportMenu, setShowExportMenu] = useState(false);
 
-  // Load audit data
+  // Section collapse
+  const [collapsedSections, setCollapsedSections] = useState({});
+
+  // Checkpoint filter
+  const [cpFilter, setCpFilter] = useState("all");
+  const [cpSearch, setCpSearch] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Timeline panel
+  const [showTimeline, setShowTimeline] = useState(false);
+
+  // ==================== Keyboard shortcuts ====================
   useEffect(() => {
-    const loadAudit = async () => {
-      if (id) {
-        setInitialLoading(true);
-        try {
-          const auditData = await getAuditById(id);
-          if (auditData) {
-            setAudit(auditData);
-            setTemplate({
-              columns: auditData.columns || [],
-              infoFields: auditData.infoFields || [],
-              headerConfig: auditData.headerConfig || {},
-            });
-          }
-        } catch (err) {
-          toast.error(`Failed to load audit: ${err.message}`);
-          navigate("/auditreport/audits");
-        } finally {
-          setInitialLoading(false);
-        }
+    const handler = (e) => {
+      if (e.key === "Escape") {
+        setImagePreview(null);
+        setShowApprovalModal(false);
+        setShowExportMenu(false);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "p") {
+        e.preventDefault();
+        window.print();
       }
     };
-    loadAudit();
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // Close export menu on outside click
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const handler = (e) => {
+      if (exportBtnRef.current && !exportBtnRef.current.contains(e.target)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showExportMenu]);
+
+  // ==================== Load audit ====================
+  useEffect(() => {
+    const load = async () => {
+      if (!id) return;
+      setInitialLoading(true);
+      try {
+        const data = await getAuditById(id);
+        if (data) {
+          setAudit(data);
+          setTemplate({
+            columns: data.columns || [],
+            infoFields: data.infoFields || [],
+            headerConfig: data.headerConfig || {},
+          });
+        }
+      } catch (err) {
+        toast.error(`Failed to load audit: ${err.message}`);
+        navigate("/auditreport/audits");
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+    load();
   }, [id, getAuditById, navigate]);
 
+  // ==================== Approval ====================
   const openApprovalModal = (action) => {
     setApprovalAction(action);
+    setApproverName("");
+    setApprovalComments("");
     setShowApprovalModal(true);
   };
 
   const handleApproval = async () => {
     if (!approverName.trim()) {
-      toast.error("Please enter approver name");
+      toast.error("Approver name is required");
       return;
     }
     if (approvalAction === "reject" && !approvalComments.trim()) {
-      toast.error("Please enter rejection reason");
+      toast.error("Rejection reason is required");
       return;
     }
-
     setActionLoading(true);
     try {
-      const approvalData = { approverName, comments: approvalComments };
-      const updatedAudit =
+      const payload = { approverName, comments: approvalComments };
+      const updated =
         approvalAction === "approve"
-          ? await approveAudit(id, approvalData)
-          : await rejectAudit(id, approvalData);
-
-      setAudit(updatedAudit);
+          ? await approveAudit(id, payload)
+          : await rejectAudit(id, payload);
+      setAudit(updated);
       setShowApprovalModal(false);
-      setApproverName("");
-      setApprovalComments("");
       toast.success(
-        `Audit ${approvalAction === "approve" ? "approved" : "rejected"} successfully!`,
+        `Audit ${approvalAction === "approve" ? "approved ?" : "rejected"} successfully!`,
       );
     } catch (err) {
-      toast.error(`Failed to ${approvalAction} audit: ` + err.message);
+      toast.error(`Failed to ${approvalAction}: ${err.message}`);
     } finally {
       setActionLoading(false);
     }
   };
 
-  // ==================== Field icon ====================
-  const getFieldIcon = useCallback((fieldId) => {
-    switch (fieldId) {
-      case "modelName":
-        return <BiSolidFactory className="text-lg text-indigo-600" />;
-      case "serialNo":
-      case "serial":
-        return <FaBarcode className="text-lg text-purple-600" />;
-      case "date":
-        return <FaCalendarAlt className="text-lg text-red-500" />;
-      case "shift":
-        return <FaClock className="text-lg text-orange-500" />;
-      case "eid":
-        return <FaIdBadge className="text-lg text-teal-600" />;
-      default:
-        return <FaClipboardCheck className="text-lg text-gray-500" />;
-    }
-  }, []);
-
-  // ==================== Checkpoint status badge ====================
-  const getStatusBadge = useCallback((status) => {
-    switch (status) {
-      case "pass":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-            <FaCheckCircle /> Pass
-          </span>
-        );
-      case "fail":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
-            <FaTimesCircle /> Fail
-          </span>
-        );
-      case "warning":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
-            <FaExclamationTriangle /> Warning
-          </span>
-        );
-      case "na":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-            N/A
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
-            Pending
-          </span>
-        );
-    }
-  }, []);
-
-  // ==================== Audit status badge ====================
-  const getAuditStatusBadge = useCallback((status) => {
-    switch (status) {
-      case "draft":
-        return (
-          <span className="px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm font-medium">
-            Draft
-          </span>
-        );
-      case "submitted":
-        return (
-          <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-            Submitted
-          </span>
-        );
-      case "approved":
-        return (
-          <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-            Approved
-          </span>
-        );
-      case "rejected":
-        return (
-          <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-medium">
-            Rejected
-          </span>
-        );
-      default:
-        return null;
-    }
-  }, []);
-
-  const getSectionTotalCheckpoints = useCallback((section) => {
-    if (section.stages && Array.isArray(section.stages)) {
-      return section.stages.reduce(
-        (total, stage) => total + (stage.checkPoints?.length || 0),
-        0,
-      );
-    }
-    return section.checkPoints?.length || 0;
-  }, []);
-
   // ==================== Summary ====================
   const getSummary = useCallback(() => {
-    if (audit?.summary) {
-      let summary = audit.summary;
-      if (typeof summary === "string") {
+    if (!audit)
+      return { pass: 0, fail: 0, warning: 0, pending: 0, na: 0, total: 0 };
+
+    if (audit.summary) {
+      let s = audit.summary;
+      if (typeof s === "string") {
         try {
-          summary = JSON.parse(summary);
+          s = JSON.parse(s);
         } catch {
-          summary = null;
+          s = null;
         }
       }
-      if (summary && typeof summary === "object") {
+      if (s && typeof s === "object") {
+        const p = Number(s.pass ?? s.Pass ?? 0);
+        const f = Number(s.fail ?? s.Fail ?? 0);
+        const w = Number(s.warning ?? s.Warning ?? 0);
+        const n = Number(s.na ?? s.Na ?? s.NA ?? 0);
+        const d = Number(s.pending ?? s.Pending ?? 0);
         return {
-          pass: summary.pass ?? summary.Pass ?? 0,
-          fail: summary.fail ?? summary.Fail ?? 0,
-          warning: summary.warning ?? summary.Warning ?? 0,
-          pending: summary.pending ?? summary.Pending ?? 0,
-          na: summary.na ?? summary.Na ?? summary.NA ?? 0,
-          total: summary.total ?? summary.Total ?? 0,
+          pass: p,
+          fail: f,
+          warning: w,
+          na: n,
+          pending: d,
+          total: Number(s.total ?? s.Total ?? p + f + w + n + d),
         };
       }
     }
@@ -250,7 +381,7 @@ const AuditView = () => {
       warning = 0,
       pending = 0,
       na = 0;
-    let sections = audit?.sections;
+    let sections = audit.sections;
     if (typeof sections === "string") {
       try {
         sections = JSON.parse(sections);
@@ -258,37 +389,24 @@ const AuditView = () => {
         sections = [];
       }
     }
-    if (!sections || !Array.isArray(sections)) {
-      return { pass: 0, fail: 0, warning: 0, pending: 0, na: 0, total: 0 };
-    }
+    if (!Array.isArray(sections))
+      return { pass, fail, warning, pending, na, total: 0 };
 
     sections.forEach((section) => {
       if (!section) return;
-      if (section.stages && Array.isArray(section.stages)) {
-        section.stages.forEach((stage) => {
-          stage?.checkPoints?.forEach((cp) => {
-            if (!cp) return;
-            const s = (cp.status || "pending").toLowerCase();
-            if (s === "pass") pass++;
-            else if (s === "fail") fail++;
-            else if (s === "warning") warning++;
-            else if (s === "na") na++;
-            else pending++;
-          });
-        });
-      } else if (section.checkPoints && Array.isArray(section.checkPoints)) {
-        section.checkPoints.forEach((cp) => {
-          if (!cp) return;
-          const s = (cp.status || "pending").toLowerCase();
-          if (s === "pass") pass++;
-          else if (s === "fail") fail++;
-          else if (s === "warning") warning++;
-          else if (s === "na") na++;
-          else pending++;
-        });
-      }
+      const cps = section.stages
+        ? section.stages.flatMap((st) => st?.checkPoints || [])
+        : section.checkPoints || [];
+      cps.forEach((cp) => {
+        if (!cp) return;
+        const s = (cp.status || "pending").toLowerCase();
+        if (s === "pass") pass++;
+        else if (s === "fail") fail++;
+        else if (s === "warning") warning++;
+        else if (s === "na") na++;
+        else pending++;
+      });
     });
-
     return {
       pass,
       fail,
@@ -299,111 +417,147 @@ const AuditView = () => {
     };
   }, [audit]);
 
+  const summary = useMemo(() => getSummary(), [getSummary]);
+  const passRate =
+    summary.total > 0 ? Math.round((summary.pass / summary.total) * 100) : 0;
+
   // ==================== Info field value ====================
   const getInfoFieldValue = useCallback(
     (fieldId) => {
       if (!audit?.infoData) return "-";
-      if (audit.infoData[fieldId]) return audit.infoData[fieldId];
-      const alternates = {
-        serialNo: ["serial", "serialNumber", "serialNo"],
-        modelName: ["model", "modelName", "modelVariant"],
-        date: ["auditDate", "date", "reportDate"],
+      const alts = {
+        serialNo: ["serialNo", "serial", "serialNumber"],
+        modelName: ["modelName", "model", "modelVariant"],
+        date: ["date", "auditDate", "reportDate"],
         shift: ["shift", "shiftName"],
         eid: ["eid", "employeeId", "auditorId"],
       };
-      if (alternates[fieldId]) {
-        for (const alt of alternates[fieldId]) {
-          if (audit.infoData[alt]) return audit.infoData[alt];
-        }
+      const keys = alts[fieldId] || [fieldId];
+      for (const k of keys) {
+        if (audit.infoData[k]) return audit.infoData[k];
       }
       return "-";
     },
     [audit],
   );
 
+  // ==================== Section helpers ====================
+  const getSectionStats = (section) => {
+    let pass = 0,
+      fail = 0,
+      warning = 0,
+      pending = 0,
+      na = 0;
+    const cps = section.stages
+      ? section.stages.flatMap((st) => st?.checkPoints || [])
+      : section.checkPoints || [];
+    cps.forEach((cp) => {
+      const s = (cp?.status || "pending").toLowerCase();
+      if (s === "pass") pass++;
+      else if (s === "fail") fail++;
+      else if (s === "warning") warning++;
+      else if (s === "na") na++;
+      else pending++;
+    });
+    return {
+      pass,
+      fail,
+      warning,
+      pending,
+      na,
+      total: pass + fail + warning + pending + na,
+    };
+  };
+
+  // ==================== Checkpoint filter ====================
+  const matchesFilter = (cp) => {
+    if (cpFilter !== "all" && (cp.status || "pending") !== cpFilter)
+      return false;
+    if (cpSearch) {
+      const q = cpSearch.toLowerCase();
+      return JSON.stringify(cp).toLowerCase().includes(q);
+    }
+    return true;
+  };
+
+  // ==================== Copy helpers ====================
+  const copyToClipboard = (text, label) => {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => toast.success(`${label} copied!`));
+  };
+
   // ==================== Image cell ====================
-  // Normalises both storage formats into a single preview payload shape:
-  //   { name, fileName, data|null, size|null, uploadedAt|null }
-  const renderImageViewCell = useCallback(
-    (column, checkpoint) => {
-      const imageData = checkpoint[column.id];
+  const renderImageViewCell = useCallback((column, checkpoint) => {
+    const imageData = checkpoint[column.id];
+    const isFilename = typeof imageData === "string" && imageData.length > 0;
+    const isOldFormat =
+      imageData && typeof imageData === "object" && imageData.data;
 
-      // New format: plain filename string saved by backend
-      const isFilename = typeof imageData === "string" && imageData.length > 0;
-      // Old format: base64 object { data, name, size, uploadedAt, ... }
-      const isOldFormat =
-        imageData && typeof imageData === "object" && imageData.data;
+    if (isFilename || isOldFormat) {
+      const imgSrc = isFilename
+        ? `${baseURL}audit-report/images/${imageData}`
+        : imageData.data;
 
-      if (isFilename || isOldFormat) {
-        const imgSrc = isFilename
-          ? `${baseURL}audit-report/images/${imageData}`
-          : imageData.data;
-
-        // Always keep base64 data in `data` field, never put a URL there
-        const previewPayload = isFilename
-          ? {
-              name: imageData,
-              fileName: imageData,
-              data: null, // server image — download via endpoint
-              size: null,
-              uploadedAt: null,
-            }
-          : {
-              name: imageData.name,
-              fileName: imageData.name,
-              data: imageData.data, // real base64 blob
-              size: imageData.size,
-              uploadedAt: imageData.uploadedAt,
-            };
-
-        return (
-          <td key={column.id} className="px-3 py-2 border-r border-gray-200">
-            <div className="flex justify-center">
-              <div
-                className="relative group cursor-pointer"
-                onClick={() => setImagePreview(previewPayload)}
-              >
-                <img
-                  src={imgSrc}
-                  alt={previewPayload.name || "Checkpoint image"}
-                  className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200 group-hover:border-blue-400 transition-all group-hover:shadow-md"
-                  onError={(e) => {
-                    e.target.src =
-                      "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzljYTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==";
-                    e.target.classList.add("opacity-50");
-                  }}
-                />
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 rounded-lg transition-all flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
-                  <FaSearchPlus className="text-white" size={16} />
-                </div>
-              </div>
-            </div>
-          </td>
-        );
-      }
+      const preview = isFilename
+        ? {
+            name: imageData,
+            fileName: imageData,
+            data: null,
+            size: null,
+            uploadedAt: null,
+          }
+        : {
+            name: imageData.name,
+            fileName: imageData.name,
+            data: imageData.data,
+            size: imageData.size,
+            uploadedAt: imageData.uploadedAt,
+          };
 
       return (
-        <td key={column.id} className="px-3 py-2 border-r border-gray-200">
+        <td key={column.id} className="px-3 py-2 border-r border-gray-100">
           <div className="flex justify-center">
-            <span className="text-xs text-gray-400 italic flex items-center gap-1">
-              <FaImage className="text-gray-300" size={12} />
-              No image
-            </span>
+            <div
+              className="relative group cursor-pointer"
+              onClick={() => setImagePreview(preview)}
+            >
+              <img
+                src={imgSrc}
+                alt={preview.name || "img"}
+                className="w-16 h-16 object-cover rounded-xl border-2 border-gray-200 group-hover:border-indigo-400 transition-all group-hover:shadow-lg"
+                onError={(e) => {
+                  e.target.src =
+                    "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzljYTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkVycm9yPC90ZXh0Pjwvc3ZnPg==";
+                }}
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 rounded-xl transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                <FaSearchPlus className="text-white" size={14} />
+              </div>
+            </div>
           </div>
         </td>
       );
-    },
-    [setImagePreview],
-  );
+    }
 
-  // ==================== Export helpers ====================
+    return (
+      <td key={column.id} className="px-3 py-2 border-r border-gray-100">
+        <div className="flex justify-center">
+          <span className="text-xs text-gray-300 italic flex items-center gap-1">
+            <FaImage size={10} /> —
+          </span>
+        </div>
+      </td>
+    );
+  }, []);
+
+  // ==================== Export data builders ====================
   const getExportTableData = useCallback(() => {
     if (!audit || !template) return { headers: [], rows: [] };
-    const visibleCols = template.columns?.filter((col) => col.visible) || [];
-    const headers = visibleCols
-      .filter((col) => col.type !== "image")
-      .map((col) => col.name);
-
+    const visibleCols = (template.columns || []).filter(
+      (c) => c.visible && c.type !== "image",
+    );
+    const headers = visibleCols.map((c) => c.name);
     const rows = [];
     let sections = audit.sections;
     if (typeof sections === "string") {
@@ -413,47 +567,32 @@ const AuditView = () => {
         sections = [];
       }
     }
-    if (!sections || !Array.isArray(sections)) return { headers, rows };
+    if (!Array.isArray(sections)) return { headers, rows };
 
     sections.forEach((section) => {
-      if (section.stages && Array.isArray(section.stages)) {
-        section.stages.forEach((stage) => {
-          stage.checkPoints?.forEach((checkpoint) => {
-            const row = [];
-            visibleCols
-              .filter((col) => col.type !== "image")
-              .forEach((col) => {
-                if (col.id === "section") row.push(section.sectionName || "-");
-                else if (col.id === "stage") row.push(stage.stageName || "-");
-                else if (col.id === "status") {
-                  const s = checkpoint.status || "pending";
-                  row.push(
-                    s === "na" ? "N/A" : s.charAt(0).toUpperCase() + s.slice(1),
-                  );
-                } else row.push(checkpoint[col.id] || "-");
-              });
-            rows.push(row);
-          });
-        });
-      } else if (section.checkPoints && Array.isArray(section.checkPoints)) {
-        section.checkPoints.forEach((checkpoint) => {
-          const row = [];
-          visibleCols
-            .filter((col) => col.type !== "image")
-            .forEach((col) => {
-              if (col.id === "section") row.push(section.sectionName || "-");
-              else if (col.id === "status") {
-                const s = checkpoint.status || "pending";
-                row.push(
-                  s === "na" ? "N/A" : s.charAt(0).toUpperCase() + s.slice(1),
-                );
-              } else row.push(checkpoint[col.id] || "-");
-            });
-          rows.push(row);
-        });
-      }
-    });
+      const pairs = section.stages
+        ? section.stages.flatMap((stage) =>
+            (stage.checkPoints || []).map((cp) => ({ section, stage, cp })),
+          )
+        : (section.checkPoints || []).map((cp) => ({
+            section,
+            stage: null,
+            cp,
+          }));
 
+      pairs.forEach(({ section: sec, stage, cp }) => {
+        const row = visibleCols.map((col) => {
+          if (col.id === "section") return sec.sectionName || "-";
+          if (col.id === "stage") return stage?.stageName || "-";
+          if (col.id === "status") {
+            const s = cp.status || "pending";
+            return s === "na" ? "N/A" : s.charAt(0).toUpperCase() + s.slice(1);
+          }
+          return cp[col.id] || "-";
+        });
+        rows.push(row);
+      });
+    });
     return { headers, rows };
   }, [audit, template]);
 
@@ -461,15 +600,15 @@ const AuditView = () => {
     if (!audit || !template) return [];
     return (template.infoFields?.filter((f) => f.visible) || []).map(
       (field) => {
-        let value = getInfoFieldValue(field.id);
-        if (field.id === "date") value = formatDateForDisplay(value);
-        return [field.name, value];
+        let v = getInfoFieldValue(field.id);
+        if (field.id === "date") v = formatDateForDisplay(v);
+        return [field.name, v];
       },
     );
   }, [audit, template, getInfoFieldValue]);
 
   const getSummaryForExport = useCallback(() => {
-    const s = getSummary();
+    const s = summary;
     return [
       ["Total Checks", s.total],
       ["Passed", s.pass],
@@ -477,81 +616,73 @@ const AuditView = () => {
       ["Failed", s.fail],
       ["Not Applicable", s.na],
       ["Pending", s.pending],
-      [
-        "Pass Rate",
-        s.total > 0 ? Math.round((s.pass / s.total) * 100) + "%" : "0%",
-      ],
+      ["Pass Rate", s.total > 0 ? `${passRate}%` : "0%"],
     ];
-  }, [getSummary]);
+  }, [summary, passRate]);
 
   // ==================== Export PDF ====================
   const handleExportPDF = useCallback(() => {
     try {
       const doc = new jsPDF("l", "mm", "a4");
-      const pageWidth = doc.internal.pageSize.getWidth();
-      let yPos = 15;
+      const pw = doc.internal.pageSize.getWidth();
+      let y = 15;
 
       doc.setFontSize(18);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 64, 175);
-      doc.text(audit.reportName || "Audit Report", pageWidth / 2, yPos, {
+      doc.text(audit.reportName || "Audit Report", pw / 2, y, {
         align: "center",
       });
-      yPos += 8;
-
+      y += 8;
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 100, 100);
-      doc.text(`Template: ${audit.templateName || "-"}`, pageWidth / 2, yPos, {
+      doc.text(`Template: ${audit.templateName || "-"}`, pw / 2, y, {
         align: "center",
       });
-      yPos += 5;
-
+      y += 5;
       doc.setTextColor(0, 0, 0);
       doc.text(
-        `Status: ${(audit.status || "").charAt(0).toUpperCase() + (audit.status || "").slice(1)}`,
-        pageWidth / 2,
-        yPos,
+        `Status: ${(audit.status || "").charAt(0).toUpperCase() + (audit.status || "").slice(1)}  |  Pass Rate: ${passRate}%`,
+        pw / 2,
+        y,
         { align: "center" },
       );
-      yPos += 5;
-
+      y += 5;
       if (audit.auditCode) {
-        doc.text(`Audit Code: ${audit.auditCode}`, pageWidth / 2, yPos, {
+        doc.text(`Audit Code: ${audit.auditCode}`, pw / 2, y, {
           align: "center",
         });
-        yPos += 5;
+        y += 5;
       }
 
-      const headerItems = [];
+      const headerMeta = [];
       if (template?.headerConfig?.showFormatNo !== false && audit.formatNo)
-        headerItems.push(`Format No: ${audit.formatNo}`);
+        headerMeta.push(`Format No: ${audit.formatNo}`);
       if (template?.headerConfig?.showRevNo !== false && audit.revNo)
-        headerItems.push(`Rev No: ${audit.revNo}`);
+        headerMeta.push(`Rev No: ${audit.revNo}`);
       if (template?.headerConfig?.showRevDate !== false && audit.revDate)
-        headerItems.push(`Rev Date: ${formatDateForDisplay(audit.revDate)}`);
-      if (headerItems.length > 0) {
+        headerMeta.push(`Rev Date: ${formatDateForDisplay(audit.revDate)}`);
+      if (headerMeta.length) {
         doc.setFontSize(9);
         doc.setTextColor(80, 80, 80);
-        doc.text(headerItems.join("  |  "), pageWidth / 2, yPos, {
-          align: "center",
-        });
-        yPos += 8;
+        doc.text(headerMeta.join("  |  "), pw / 2, y, { align: "center" });
+        y += 8;
       } else {
-        yPos += 3;
+        y += 3;
       }
 
-      const infoData = getInfoDataForExport();
-      if (infoData.length > 0) {
+      const infoRows = getInfoDataForExport();
+      if (infoRows.length) {
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(0, 0, 0);
-        doc.text("Audit Information", 14, yPos);
-        yPos += 2;
+        doc.text("Audit Information", 14, y);
+        y += 2;
         autoTable(doc, {
-          startY: yPos,
+          startY: y,
           head: [["Field", "Value"]],
-          body: infoData,
+          body: infoRows,
           theme: "grid",
           headStyles: {
             fillColor: [59, 130, 246],
@@ -563,35 +694,35 @@ const AuditView = () => {
           columnStyles: { 0: { fontStyle: "bold", cellWidth: 60 } },
           margin: { left: 14, right: 14 },
         });
-        yPos = doc.lastAutoTable.finalY + 8;
+        y = doc.lastAutoTable.finalY + 8;
       }
 
       if (audit.notes) {
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(0, 0, 0);
-        doc.text("Notes", 14, yPos);
-        yPos += 5;
+        doc.text("Notes", 14, y);
+        y += 5;
         doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
-        const splitNotes = doc.splitTextToSize(audit.notes, pageWidth - 28);
-        doc.text(splitNotes, 14, yPos);
-        yPos += splitNotes.length * 5 + 8;
+        const noteLines = doc.splitTextToSize(audit.notes, pw - 28);
+        doc.text(noteLines, 14, y);
+        y += noteLines.length * 5 + 8;
       }
 
       const { headers, rows } = getExportTableData();
-      if (headers.length > 0 && rows.length > 0) {
-        if (yPos > doc.internal.pageSize.getHeight() - 40) {
+      if (headers.length && rows.length) {
+        if (y > doc.internal.pageSize.getHeight() - 40) {
           doc.addPage();
-          yPos = 15;
+          y = 15;
         }
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(0, 0, 0);
-        doc.text("Checkpoint Details", 14, yPos);
-        yPos += 2;
+        doc.text("Checkpoint Details", 14, y);
+        y += 2;
         autoTable(doc, {
-          startY: yPos,
+          startY: y,
           head: [headers],
           body: rows,
           theme: "grid",
@@ -605,122 +736,117 @@ const AuditView = () => {
           alternateRowStyles: { fillColor: [245, 247, 250] },
           margin: { left: 14, right: 14 },
           didParseCell: (data) => {
-            const statusColIndex = headers.indexOf("Status");
-            if (
-              data.section === "body" &&
-              data.column.index === statusColIndex
-            ) {
-              const val = (data.cell.raw || "").toLowerCase();
-              if (val === "pass") {
+            const si = headers.indexOf("Status");
+            if (data.section === "body" && data.column.index === si) {
+              const v = (data.cell.raw || "").toLowerCase();
+              if (v === "pass") {
                 data.cell.styles.textColor = [21, 128, 61];
                 data.cell.styles.fillColor = [220, 252, 231];
-              } else if (val === "fail") {
+              }
+              if (v === "fail") {
                 data.cell.styles.textColor = [185, 28, 28];
                 data.cell.styles.fillColor = [254, 226, 226];
-              } else if (val === "warning") {
+              }
+              if (v === "warning") {
                 data.cell.styles.textColor = [161, 98, 7];
                 data.cell.styles.fillColor = [254, 249, 195];
-              } else if (val === "n/a") {
+              }
+              if (v === "n/a") {
                 data.cell.styles.textColor = [29, 78, 216];
                 data.cell.styles.fillColor = [219, 234, 254];
               }
             }
           },
         });
-        yPos = doc.lastAutoTable.finalY + 8;
+        y = doc.lastAutoTable.finalY + 8;
       }
 
-      const summaryData = getSummaryForExport();
-      if (yPos > doc.internal.pageSize.getHeight() - 50) {
+      if (y > doc.internal.pageSize.getHeight() - 50) {
         doc.addPage();
-        yPos = 15;
+        y = 15;
       }
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(0, 0, 0);
-      doc.text("Audit Summary", 14, yPos);
-      yPos += 2;
+      doc.text("Audit Summary", 14, y);
+      y += 2;
       autoTable(doc, {
-        startY: yPos,
+        startY: y,
         head: [["Metric", "Value"]],
-        body: summaryData,
+        body: getSummaryForExport(),
         theme: "grid",
-        headStyles: {
-          fillColor: [59, 130, 246],
-          textColor: 255,
-          fontSize: 9,
-          fontStyle: "bold",
-        },
+        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontSize: 9 },
         bodyStyles: { fontSize: 9 },
         columnStyles: { 0: { fontStyle: "bold", cellWidth: 60 } },
         margin: { left: 14, right: 14 },
         tableWidth: 150,
       });
-      yPos = doc.lastAutoTable.finalY + 8;
+      y = doc.lastAutoTable.finalY + 8;
 
-      if (yPos > doc.internal.pageSize.getHeight() - 40) {
+      if (y > doc.internal.pageSize.getHeight() - 40) {
         doc.addPage();
-        yPos = 15;
+        y = 15;
       }
       const sigs = audit.signatures || {};
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.text("Signatures", 14, yPos);
-      yPos += 8;
+      doc.text("Signatures", 14, y);
+      y += 8;
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
-      doc.text("Auditor:", 14, yPos);
+      doc.text("Auditor:", 14, y);
       doc.setFont("helvetica", "normal");
-      doc.text(sigs.auditor?.name || audit.createdBy || "-", 60, yPos);
-      yPos += 5;
+      doc.text(sigs.auditor?.name || audit.createdBy || "-", 60, y);
+      y += 5;
       doc.setFontSize(9);
       doc.setTextColor(100, 100, 100);
       doc.text(
-        `Date: ${sigs.auditor?.date ? formatDateForDisplay(sigs.auditor.date) : audit.createdAt ? formatDateForDisplay(audit.createdAt) : "-"}`,
+        `Date: ${sigs.auditor?.date ? formatDateForDisplay(sigs.auditor.date) : formatDateForDisplay(audit.createdAt)}`,
         60,
-        yPos,
+        y,
       );
-      yPos += 8;
+      y += 8;
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
-      doc.text("Approved By:", 14, yPos);
+      doc.text("Approved By:", 14, y);
       doc.setFont("helvetica", "normal");
-      doc.text(audit.approvedBy || sigs.approver?.name || "-", 60, yPos);
-      yPos += 5;
+      doc.text(audit.approvedBy || sigs.approver?.name || "-", 60, y);
+      y += 5;
       doc.setFontSize(9);
       doc.setTextColor(100, 100, 100);
       doc.text(
         `Date: ${audit.approvedAt ? formatDateForDisplay(audit.approvedAt) : sigs.approver?.date ? formatDateForDisplay(sigs.approver.date) : "-"}`,
         60,
-        yPos,
+        y,
       );
 
-      const pageCount = doc.internal.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
+      const pc = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pc; i++) {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
         doc.text(
-          `Generated on ${formatDateForDisplay(new Date().toISOString())} | Page ${i} of ${pageCount}`,
-          pageWidth / 2,
+          `Generated ${formatDateForDisplay(new Date().toISOString())} | Page ${i} of ${pc}`,
+          pw / 2,
           doc.internal.pageSize.getHeight() - 8,
           { align: "center" },
         );
         doc.text(
-          "Confidential - Internal Use Only",
-          pageWidth / 2,
+          "Confidential – Internal Use Only",
+          pw / 2,
           doc.internal.pageSize.getHeight() - 4,
           { align: "center" },
         );
       }
 
-      const fileName = `${audit.reportName || "Audit_Report"}_${audit.auditCode || id}.pdf`;
-      doc.save(fileName.replace(/\s+/g, "_"));
-      toast.success("PDF exported successfully!");
+      doc.save(
+        `${(audit.reportName || "Audit_Report").replace(/\s+/g, "_")}_${audit.auditCode || id}.pdf`,
+      );
+      toast.success("PDF exported!");
     } catch (err) {
-      console.error("PDF export error:", err);
-      toast.error("Failed to export PDF. Please try again.");
+      console.error(err);
+      toast.error("PDF export failed.");
     }
   }, [
     audit,
@@ -729,14 +855,16 @@ const AuditView = () => {
     getExportTableData,
     getInfoDataForExport,
     getSummaryForExport,
+    passRate,
   ]);
 
   // ==================== Export Excel ====================
   const handleExportExcel = useCallback(() => {
     try {
       const wb = XLSX.utils.book_new();
+      const sigs = audit.signatures || {};
 
-      const infoSheetData = [
+      const infoData = [
         ["Audit Report"],
         [""],
         ["Report Name", audit.reportName || "-"],
@@ -747,38 +875,30 @@ const AuditView = () => {
             (audit.status || "").slice(1),
         ],
         ["Audit Code", audit.auditCode || "-"],
+        ["Pass Rate", `${passRate}%`],
       ];
       if (template?.headerConfig?.showFormatNo !== false)
-        infoSheetData.push(["Format No", audit.formatNo || "-"]);
+        infoData.push(["Format No", audit.formatNo || "-"]);
       if (template?.headerConfig?.showRevNo !== false)
-        infoSheetData.push(["Rev No", audit.revNo || "-"]);
+        infoData.push(["Rev No", audit.revNo || "-"]);
       if (template?.headerConfig?.showRevDate !== false)
-        infoSheetData.push(["Rev Date", formatDateForDisplay(audit.revDate)]);
-      infoSheetData.push([""]);
-      infoSheetData.push(["--- Audit Information ---"]);
-      getInfoDataForExport().forEach((row) => infoSheetData.push(row));
-      infoSheetData.push([""]);
-      infoSheetData.push(["Notes", audit.notes || "No notes added."]);
-      infoSheetData.push([""]);
-      infoSheetData.push(["--- Signatures ---"]);
-      const sigs = audit.signatures || {};
-      infoSheetData.push([
-        "Auditor",
-        sigs.auditor?.name || audit.createdBy || "-",
-      ]);
-      infoSheetData.push([
+        infoData.push(["Rev Date", formatDateForDisplay(audit.revDate)]);
+      infoData.push([""], ["--- Audit Information ---"]);
+      getInfoDataForExport().forEach((r) => infoData.push(r));
+      infoData.push([""], ["Notes", audit.notes || "No notes added."]);
+      infoData.push([""], ["--- Signatures ---"]);
+      infoData.push(["Auditor", sigs.auditor?.name || audit.createdBy || "-"]);
+      infoData.push([
         "Auditor Date",
         sigs.auditor?.date
           ? formatDateForDisplay(sigs.auditor.date)
-          : audit.createdAt
-            ? formatDateForDisplay(audit.createdAt)
-            : "-",
+          : formatDateForDisplay(audit.createdAt),
       ]);
-      infoSheetData.push([
+      infoData.push([
         "Approved By",
         audit.approvedBy || sigs.approver?.name || "-",
       ]);
-      infoSheetData.push([
+      infoData.push([
         "Approval Date",
         audit.approvedAt
           ? formatDateForDisplay(audit.approvedAt)
@@ -787,28 +907,31 @@ const AuditView = () => {
             : "-",
       ]);
       if (audit.approvalComments)
-        infoSheetData.push(["Approval Comments", audit.approvalComments]);
+        infoData.push(["Approval Comments", audit.approvalComments]);
 
-      const infoSheet = XLSX.utils.aoa_to_sheet(infoSheetData);
-      infoSheet["!cols"] = [{ wch: 20 }, { wch: 50 }];
+      const infoSheet = XLSX.utils.aoa_to_sheet(infoData);
+      infoSheet["!cols"] = [{ wch: 22 }, { wch: 50 }];
       XLSX.utils.book_append_sheet(wb, infoSheet, "Audit Info");
 
       const { headers, rows } = getExportTableData();
-      if (headers.length > 0) {
-        const checkpointSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-        checkpointSheet["!cols"] = headers.map((h) => ({
+      if (headers.length) {
+        const cpSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        cpSheet["!cols"] = headers.map((h) => ({
           wch: Math.max(h.length + 5, 15),
         }));
-        XLSX.utils.book_append_sheet(wb, checkpointSheet, "Checkpoints");
+        XLSX.utils.book_append_sheet(wb, cpSheet, "Checkpoints");
       }
 
-      const summarySheetData = [["Audit Summary"], [""], ["Metric", "Value"]];
-      getSummaryForExport().forEach((row) => summarySheetData.push(row));
-      const summarySheet = XLSX.utils.aoa_to_sheet(summarySheetData);
-      summarySheet["!cols"] = [{ wch: 20 }, { wch: 15 }];
+      const summarySheet = XLSX.utils.aoa_to_sheet([
+        ["Audit Summary"],
+        [""],
+        ["Metric", "Value"],
+        ...getSummaryForExport(),
+      ]);
+      summarySheet["!cols"] = [{ wch: 22 }, { wch: 15 }];
       XLSX.utils.book_append_sheet(wb, summarySheet, "Summary");
 
-      const metadataSheetData = [
+      const metaData = [
         ["Audit Metadata"],
         [""],
         ["Audit ID", audit.id || "-"],
@@ -818,25 +941,25 @@ const AuditView = () => {
         ["Created At", formatDateTimeForDisplay(audit.createdAt)],
         ["Last Updated", formatDateTimeForDisplay(audit.updatedAt)],
       ];
-      if (audit.submittedBy)
-        metadataSheetData.push(["Submitted By", audit.submittedBy]);
+      if (audit.submittedBy) metaData.push(["Submitted By", audit.submittedBy]);
       if (audit.submittedAt)
-        metadataSheetData.push([
+        metaData.push([
           "Submitted At",
           formatDateTimeForDisplay(audit.submittedAt),
         ]);
-      metadataSheetData.push([""]);
-      metadataSheetData.push(["Generated On", new Date().toLocaleString()]);
-      const metadataSheet = XLSX.utils.aoa_to_sheet(metadataSheetData);
-      metadataSheet["!cols"] = [{ wch: 20 }, { wch: 40 }];
-      XLSX.utils.book_append_sheet(wb, metadataSheet, "Metadata");
+      metaData.push([""], ["Generated On", new Date().toLocaleString()]);
+      const metaSheet = XLSX.utils.aoa_to_sheet(metaData);
+      metaSheet["!cols"] = [{ wch: 22 }, { wch: 40 }];
+      XLSX.utils.book_append_sheet(wb, metaSheet, "Metadata");
 
-      const fileName = `${audit.reportName || "Audit_Report"}_${audit.auditCode || id}.xlsx`;
-      XLSX.writeFile(wb, fileName.replace(/\s+/g, "_"));
-      toast.success("Excel exported successfully!");
+      XLSX.writeFile(
+        wb,
+        `${(audit.reportName || "Audit_Report").replace(/\s+/g, "_")}_${audit.auditCode || id}.xlsx`,
+      );
+      toast.success("Excel exported!");
     } catch (err) {
-      console.error("Excel export error:", err);
-      toast.error("Failed to export Excel. Please try again.");
+      console.error(err);
+      toast.error("Excel export failed.");
     }
   }, [
     audit,
@@ -845,15 +968,77 @@ const AuditView = () => {
     getExportTableData,
     getInfoDataForExport,
     getSummaryForExport,
+    passRate,
   ]);
+
+  // ==================== Timeline events ====================
+  const timelineEvents = useMemo(() => {
+    if (!audit) return [];
+    const evs = [];
+    if (audit.createdAt)
+      evs.push({
+        label: "Created",
+        time: audit.createdAt,
+        icon: FaClipboardCheck,
+        color: "text-gray-500",
+        bg: "bg-gray-100",
+        by: audit.createdBy,
+      });
+    if (audit.submittedAt)
+      evs.push({
+        label: "Submitted",
+        time: audit.submittedAt,
+        icon: FaCheckDouble,
+        color: "text-blue-600",
+        bg: "bg-blue-100",
+        by: audit.submittedBy,
+      });
+    if (audit.approvedAt && audit.status === "approved")
+      evs.push({
+        label: "Approved",
+        time: audit.approvedAt,
+        icon: FaCheckCircle,
+        color: "text-green-600",
+        bg: "bg-green-100",
+        by: audit.approvedBy,
+      });
+    if (audit.approvedAt && audit.status === "rejected")
+      evs.push({
+        label: "Rejected",
+        time: audit.approvedAt,
+        icon: FaTimesCircle,
+        color: "text-red-600",
+        bg: "bg-red-100",
+        by: audit.approvedBy,
+      });
+    if (
+      audit.updatedAt &&
+      audit.updatedAt !== audit.createdAt &&
+      audit.updatedAt !== audit.submittedAt &&
+      audit.updatedAt !== audit.approvedAt
+    ) {
+      evs.push({
+        label: "Last Updated",
+        time: audit.updatedAt,
+        icon: FaHistory,
+        color: "text-gray-400",
+        bg: "bg-gray-50",
+        by: null,
+      });
+    }
+    return evs.sort((a, b) => new Date(a.time) - new Date(b.time));
+  }, [audit]);
 
   // ==================== Loading / not found ====================
   if (initialLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 py-6 px-4 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading audit...</p>
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto" />
+          <div>
+            <p className="font-semibold text-gray-700">Loading Audit</p>
+            <p className="text-sm text-gray-400 mt-1">Fetching report data…</p>
+          </div>
         </div>
       </div>
     );
@@ -861,14 +1046,18 @@ const AuditView = () => {
 
   if (!audit) {
     return (
-      <div className="min-h-screen bg-gray-100 py-6 px-4 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-700 mb-4">
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <div className="text-center bg-white rounded-2xl shadow-lg p-10 max-w-sm mx-4">
+          <HiClipboardDocumentCheck className="text-5xl text-gray-200 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-700 mb-2">
             Audit Not Found
           </h2>
+          <p className="text-sm text-gray-400 mb-6">
+            The audit you're looking for doesn't exist or was deleted.
+          </p>
           <button
             onClick={() => navigate("/auditreport/audits")}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md shadow-indigo-200 transition-all"
           >
             Back to Audits
           </button>
@@ -877,16 +1066,10 @@ const AuditView = () => {
     );
   }
 
-  const summary = getSummary();
-  const visibleColumns = template?.columns?.filter((col) => col.visible) || [];
+  const visibleColumns = (template?.columns || []).filter((c) => c.visible);
   const signatures = audit.signatures || {};
-
-  // Build a set of field IDs already shown in the info section
-  const knownInfoFieldIds = new Set(
-    (template?.infoFields || []).map((f) => f.id),
-  );
-  // Also exclude common aliases so they don't double-appear
-  const infoAliases = new Set([
+  const knownIds = new Set((template?.infoFields || []).map((f) => f.id));
+  const aliasSet = new Set([
     "serial",
     "serialNo",
     "serialNumber",
@@ -902,827 +1085,115 @@ const AuditView = () => {
   ]);
 
   return (
-    <div className="min-h-screen bg-gray-100 py-6 px-4">
-      {/* ==================== Image Preview Modal (Portal) ==================== */}
+    <div className="min-h-screen bg-slate-100 font-sans">
+      {/* ==================== IMAGE PREVIEW PORTAL ==================== */}
       {imagePreview &&
         createPortal(
           <div
-            className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 backdrop-blur-sm"
             style={{ zIndex: 99999 }}
             onClick={() => setImagePreview(null)}
           >
             <div
-              className="relative bg-white rounded-xl shadow-2xl"
-              style={{
-                maxWidth: "56rem",
-                maxHeight: "90vh",
-                overflow: "hidden",
-              }}
+              className="relative bg-white rounded-2xl shadow-2xl overflow-hidden max-w-4xl w-full max-h-[90vh]"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between p-3 bg-gray-800 text-white">
+              <div className="flex items-center justify-between px-4 py-3 bg-gray-900 text-white">
                 <div className="flex items-center gap-2">
-                  <FaImage />
-                  <span className="font-medium text-sm">
+                  <FaImage className="text-indigo-400" />
+                  <span className="font-semibold text-sm">
                     {imagePreview.name || imagePreview.fileName || "Image"}
                   </span>
                   {imagePreview.size && (
-                    <span className="text-xs text-gray-400">
-                      ({formatFileSize(imagePreview.size)})
+                    <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full">
+                      {formatFileSize(imagePreview.size)}
                     </span>
                   )}
                 </div>
                 <button
                   onClick={() => setImagePreview(null)}
-                  className="p-1 hover:bg-gray-700 rounded transition"
+                  className="p-1.5 hover:bg-gray-700 rounded-lg transition"
                 >
-                  <FaTimes />
+                  <FaTimes size={14} />
                 </button>
               </div>
-
-              {/* Image */}
-              <div className="p-4 flex items-center justify-center bg-gray-100">
+              <div className="p-6 flex items-center justify-center bg-gray-50 min-h-[300px]">
                 <img
                   src={
                     imagePreview.data
                       ? imagePreview.data
                       : `${baseURL}audit-report/images/${imagePreview.fileName}`
                   }
-                  alt={imagePreview.name || imagePreview.fileName}
-                  style={{
-                    maxWidth: "100%",
-                    maxHeight: "70vh",
-                    objectFit: "contain",
-                  }}
-                  className="rounded-lg"
+                  alt={imagePreview.name || "Preview"}
+                  className="max-w-full max-h-[65vh] object-contain rounded-xl shadow-md"
                   onError={(e) => {
                     e.target.src =
-                      "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBOb3QgRm91bmQ8L3RleHQ+PC9zdmc+";
+                      "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2YxZjVmOSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNiIgZmlsbD0iI2NiZDVlMSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIG5vdCBmb3VuZDwvdGV4dD48L3N2Zz4=";
                   }}
                 />
               </div>
-
-              {/* Footer */}
-              <div className="p-3 bg-gray-50 border-t flex justify-between items-center">
-                <span className="text-xs text-gray-500">
+              <div className="px-4 py-3 bg-white border-t border-gray-100 flex items-center justify-between">
+                <span className="text-xs text-gray-400">
                   {imagePreview.uploadedAt
                     ? `Uploaded: ${new Date(imagePreview.uploadedAt).toLocaleString()}`
-                    : "Checkpoint Image"}
+                    : "Checkpoint image"}
                 </span>
-                {imagePreview.data ? (
-                  <a
-                    href={imagePreview.data}
-                    download={
-                      imagePreview.name || imagePreview.fileName || "image"
-                    }
-                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
-                  >
-                    <FaDownload size={12} /> Download
-                  </a>
-                ) : (
-                  <a
-                    href={`${baseURL}audit-report/images/${imagePreview.fileName}/download`}
-                    download={imagePreview.fileName}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
-                  >
-                    <FaDownload size={12} /> Download
-                  </a>
-                )}
+                <a
+                  href={
+                    imagePreview.data
+                      ? imagePreview.data
+                      : `${baseURL}audit-report/images/${imagePreview.fileName}/download`
+                  }
+                  download={
+                    imagePreview.name || imagePreview.fileName || "image"
+                  }
+                  className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition"
+                >
+                  <FaDownload size={11} /> Download
+                </a>
               </div>
             </div>
           </div>,
           document.body,
         )}
 
-      <div className="mx-auto">
-        {/* ==================== Sticky Header ==================== */}
-        <div className="sticky top-0 z-40 bg-gray-100/90 backdrop-blur border-b border-gray-200 shadow-sm p-4">
-          <div className="mb-4 flex flex-wrap justify-between items-center gap-3">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => navigate("/auditreport/audits")}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-all"
-              >
-                <FaArrowLeft /> Back
-              </button>
-              <h1 className="text-xl font-bold text-gray-800">View Audit</h1>
-              {getAuditStatusBadge(audit.status)}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {/* Export dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowExportMenu(!showExportMenu)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-all text-sm"
-                >
-                  <FaDownload /> Export
-                  <svg
-                    className={`w-4 h-4 transition-transform ${showExportMenu ? "rotate-180" : ""}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                </button>
-                {showExportMenu && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setShowExportMenu(false)}
-                    />
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-20 overflow-hidden">
-                      <button
-                        onClick={() => {
-                          handleExportPDF();
-                          setShowExportMenu(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors"
-                      >
-                        <FaFilePdf className="text-red-600" /> Export as PDF
-                      </button>
-                      <hr className="border-gray-100" />
-                      <button
-                        onClick={() => {
-                          handleExportExcel();
-                          setShowExportMenu(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors"
-                      >
-                        <FaFileExcel className="text-green-600" /> Export as
-                        Excel
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {audit.status !== "approved" && (
-                <button
-                  onClick={() => navigate(`/auditreport/audits/${id}`)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all text-sm"
-                >
-                  <FaEdit /> Edit
-                </button>
-              )}
-              {audit.status === "submitted" && (
-                <>
-                  <button
-                    onClick={() => openApprovalModal("approve")}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all text-sm"
-                  >
-                    <FaCheck /> Approve
-                  </button>
-                  <button
-                    onClick={() => openApprovalModal("reject")}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all text-sm"
-                  >
-                    <FaBan /> Reject
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ==================== Approval banner ==================== */}
-        {(audit.status === "approved" || audit.status === "rejected") &&
-          audit.approvedBy && (
-            <div
-              className={`my-4 p-4 rounded-lg ${
-                audit.status === "approved"
-                  ? "bg-green-50 border border-green-200"
-                  : "bg-red-50 border border-red-200"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                {audit.status === "approved" ? (
-                  <FaCheckCircle className="text-green-600" />
-                ) : (
-                  <FaTimesCircle className="text-red-600" />
-                )}
-                <span
-                  className={`font-medium ${audit.status === "approved" ? "text-green-800" : "text-red-800"}`}
-                >
-                  {audit.status === "approved" ? "Approved" : "Rejected"} by{" "}
-                  {audit.approvedBy}
-                </span>
-                {audit.approvedAt && (
-                  <span className="text-gray-500 text-sm">
-                    on {formatDateTimeForDisplay(audit.approvedAt)}
-                  </span>
-                )}
-              </div>
-              {audit.approvalComments && (
-                <p className="mt-2 text-gray-600 text-sm pl-6">
-                  <strong>Comments:</strong> {audit.approvalComments}
-                </p>
-              )}
-            </div>
-          )}
-
-        {/* ==================== Main Report Container ==================== */}
-        <div className="bg-white shadow-xl rounded-lg overflow-hidden border-2 border-gray-300">
-          {/* Header Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 border-b-2 border-gray-300">
-            <div className="md:col-span-2 bg-gradient-to-r from-blue-600 to-blue-800 p-6">
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-3 mb-2">
-                  <HiClipboardDocumentCheck className="text-4xl text-white" />
-                </div>
-                <h1 className="text-2xl md:text-3xl font-bold text-white">
-                  {audit.reportName || "Audit Report"}
-                </h1>
-                <p className="text-blue-200 text-sm mt-2">
-                  Template: {audit.templateName}
-                </p>
-                {audit.auditCode && (
-                  <p className="text-blue-200 text-xs mt-1">
-                    Code: {audit.auditCode}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="bg-gray-50 divide-y divide-gray-300">
-              {template?.headerConfig?.showFormatNo !== false && (
-                <div className="p-3 flex items-center gap-3">
-                  <MdFormatListNumbered className="text-xl text-blue-600 flex-shrink-0" />
-                  <div className="flex-1">
-                    <span className="text-xs text-gray-500 block">
-                      Format No
-                    </span>
-                    <span className="font-semibold text-gray-800">
-                      {audit.formatNo || "-"}
-                    </span>
-                  </div>
-                </div>
-              )}
-              {template?.headerConfig?.showRevNo !== false && (
-                <div className="p-3 flex items-center gap-3">
-                  <MdUpdate className="text-xl text-green-600 flex-shrink-0" />
-                  <div className="flex-1">
-                    <span className="text-xs text-gray-500 block">Rev. No</span>
-                    <span className="font-semibold text-gray-800">
-                      {audit.revNo || "-"}
-                    </span>
-                  </div>
-                </div>
-              )}
-              {template?.headerConfig?.showRevDate !== false && (
-                <div className="p-3 flex items-center gap-3">
-                  <MdDateRange className="text-xl text-purple-600 flex-shrink-0" />
-                  <div className="flex-1">
-                    <span className="text-xs text-gray-500 block">
-                      Rev. Date
-                    </span>
-                    <span className="font-semibold text-gray-800">
-                      {formatDateForDisplay(audit.revDate)}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Info Section */}
-          <div className="grid grid-cols-2 md:grid-cols-4 border-b-2 border-gray-300 bg-gray-50">
-            {template?.infoFields
-              ?.filter((field) => field.visible)
-              .map((field, index, arr) => (
-                <div
-                  key={field.id}
-                  className={`p-4 ${index < arr.length - 1 ? "border-r border-gray-300" : ""}`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    {getFieldIcon(field.id)}
-                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                      {field.name}
-                    </span>
-                  </div>
-                  <span className="font-semibold text-gray-800 block">
-                    {field.id === "date"
-                      ? formatDateForDisplay(getInfoFieldValue(field.id))
-                      : getInfoFieldValue(field.id)}
-                  </span>
-                  {field.id === "modelName" && audit.infoData?.modelCode && (
-                    <span className="text-xs text-red-600 block mt-1">
-                      Code: {audit.infoData.modelCode}
-                    </span>
-                  )}
-                </div>
-              ))}
-          </div>
-
-          {/* Additional Info — only show truly extra fields not in template infoFields */}
-          {audit.infoData &&
-            (() => {
-              const extraEntries = Object.entries(audit.infoData).filter(
-                ([key, value]) => {
-                  if (!value) return false;
-                  if (knownInfoFieldIds.has(key)) return false;
-                  if (infoAliases.has(key)) return false;
-                  return true;
-                },
-              );
-              if (extraEntries.length === 0) return null;
-              return (
-                <div className="p-4 border-b-2 border-gray-300 bg-blue-50">
-                  <h4 className="font-semibold text-gray-700 mb-2 text-sm">
-                    Additional Information:
-                  </h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                    {extraEntries.map(([key, value]) => (
-                      <div key={key} className="bg-white p-2 rounded border">
-                        <span className="text-xs text-gray-500 uppercase block">
-                          {key.replace(/([A-Z])/g, " $1").trim()}
-                        </span>
-                        <span className="font-medium text-gray-800">
-                          {value}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-
-          {/* Notes Section */}
-          <div className="p-4 border-b-2 border-gray-300 bg-yellow-50">
-            <div className="flex items-center gap-2 mb-2">
-              <FaStickyNote className="text-lg text-yellow-600" />
-              <span className="font-semibold text-gray-700">Notes:</span>
-            </div>
-            <p className="text-gray-700 leading-relaxed pl-6">
-              {audit.notes || "No notes added."}
-            </p>
-          </div>
-
-          {/* ==================== Main Table ==================== */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gradient-to-r from-gray-700 to-gray-800 text-white">
-                  {visibleColumns.map((column) => (
-                    <th
-                      key={column.id}
-                      className={`px-3 py-3 text-left font-semibold border-r border-gray-600 text-sm ${column.width || ""} ${
-                        column.type === "image" ? "bg-gray-600" : ""
-                      }`}
-                    >
-                      <div className="flex items-center gap-1">
-                        {column.type === "image" && (
-                          <FaImage size={12} className="text-pink-300" />
-                        )}
-                        {column.name}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {audit.sections?.map((section) => {
-                  const hasStages =
-                    section.stages && Array.isArray(section.stages);
-                  const sectionTotalRows = getSectionTotalCheckpoints(section);
-                  let sectionRowRendered = false;
-
-                  if (hasStages) {
-                    return section.stages.map((stage) => {
-                      let stageRowRendered = false;
-
-                      return stage.checkPoints?.map(
-                        (checkpoint, checkpointIndex) => {
-                          const showSectionCell =
-                            !sectionRowRendered && checkpointIndex === 0;
-                          const showStageCell =
-                            !stageRowRendered && checkpointIndex === 0;
-
-                          if (
-                            showSectionCell &&
-                            section.stages.indexOf(stage) === 0
-                          ) {
-                            sectionRowRendered = true;
-                          }
-                          if (showStageCell) stageRowRendered = true;
-
-                          return (
-                            <tr
-                              key={`${section.id}-${stage.id}-${checkpoint.id}-${checkpointIndex}`}
-                              className={`border-b border-gray-200 hover:bg-blue-50 transition-colors ${
-                                checkpoint.status === "pass"
-                                  ? "bg-green-50"
-                                  : checkpoint.status === "fail"
-                                    ? "bg-red-50"
-                                    : checkpoint.status === "warning"
-                                      ? "bg-yellow-50"
-                                      : checkpoint.status === "na"
-                                        ? "bg-blue-50"
-                                        : ""
-                              }`}
-                            >
-                              {visibleColumns.map((column) => {
-                                if (column.id === "section") {
-                                  if (
-                                    showSectionCell &&
-                                    section.stages.indexOf(stage) === 0
-                                  ) {
-                                    return (
-                                      <td
-                                        key={column.id}
-                                        className="px-3 py-2 font-bold bg-gray-100 border-r border-gray-300 text-center align-middle"
-                                        rowSpan={sectionTotalRows}
-                                      >
-                                        <span className="text-red-700 text-sm font-semibold">
-                                          {section.sectionName || "-"}
-                                        </span>
-                                      </td>
-                                    );
-                                  }
-                                  return null;
-                                }
-
-                                if (column.id === "stage") {
-                                  if (showStageCell) {
-                                    return (
-                                      <td
-                                        key={column.id}
-                                        className="px-3 py-2 font-bold bg-indigo-50 border-r border-gray-300 text-center align-middle"
-                                        rowSpan={stage.checkPoints?.length || 1}
-                                      >
-                                        <span className="text-indigo-700 text-sm font-semibold">
-                                          {stage.stageName || "-"}
-                                        </span>
-                                      </td>
-                                    );
-                                  }
-                                  return null;
-                                }
-
-                                if (column.type === "image") {
-                                  return renderImageViewCell(
-                                    column,
-                                    checkpoint,
-                                  );
-                                }
-
-                                if (column.id === "status") {
-                                  return (
-                                    <td
-                                      key={column.id}
-                                      className="px-3 py-2 border-r border-gray-200"
-                                    >
-                                      {getStatusBadge(checkpoint.status)}
-                                    </td>
-                                  );
-                                }
-
-                                return (
-                                  <td
-                                    key={column.id}
-                                    className="px-3 py-2 border-r border-gray-200"
-                                  >
-                                    <span className="text-gray-700 text-sm">
-                                      {checkpoint[column.id] || "-"}
-                                    </span>
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          );
-                        },
-                      );
-                    });
-                  } else {
-                    // Flat checkpoints (no stages)
-                    return section.checkPoints?.map(
-                      (checkpoint, checkpointIndex) => (
-                        <tr
-                          key={`${section.id}-${checkpoint.id}-${checkpointIndex}`}
-                          className={`border-b border-gray-200 hover:bg-blue-50 transition-colors ${
-                            checkpoint.status === "pass"
-                              ? "bg-green-50"
-                              : checkpoint.status === "fail"
-                                ? "bg-red-50"
-                                : checkpoint.status === "warning"
-                                  ? "bg-yellow-50"
-                                  : checkpoint.status === "na"
-                                    ? "bg-blue-50"
-                                    : ""
-                          }`}
-                        >
-                          {visibleColumns.map((column) => {
-                            if (column.id === "section") {
-                              if (checkpointIndex === 0) {
-                                return (
-                                  <td
-                                    key={column.id}
-                                    className="px-3 py-2 font-bold bg-gray-100 border-r border-gray-300 align-middle text-center"
-                                    rowSpan={section.checkPoints?.length || 1}
-                                  >
-                                    <span className="text-gray-700 text-sm">
-                                      {section.sectionName || "-"}
-                                    </span>
-                                  </td>
-                                );
-                              }
-                              return null;
-                            }
-
-                            if (column.type === "image") {
-                              return renderImageViewCell(column, checkpoint);
-                            }
-
-                            if (column.id === "status") {
-                              return (
-                                <td
-                                  key={column.id}
-                                  className="px-3 py-2 border-r border-gray-200"
-                                >
-                                  {getStatusBadge(checkpoint.status)}
-                                </td>
-                              );
-                            }
-
-                            return (
-                              <td
-                                key={column.id}
-                                className="px-3 py-2 border-r border-gray-200"
-                              >
-                                <span className="text-gray-700 text-sm">
-                                  {checkpoint[column.id] || "-"}
-                                </span>
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ),
-                    );
-                  }
-                })}
-
-                {(!audit.sections || audit.sections.length === 0) && (
-                  <tr>
-                    <td
-                      colSpan={visibleColumns.length}
-                      className="px-4 py-8 text-center text-gray-500"
-                    >
-                      No checkpoint data available
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ==================== Summary Section ==================== */}
-          <div className="p-4 bg-gray-100 border-t-2 border-gray-300">
-            <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
-              <FaClipboardCheck className="text-blue-600" />
-              Audit Summary
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-              <div className="bg-white rounded-lg p-3 text-center shadow-sm border">
-                <div className="text-2xl font-bold text-gray-700">
-                  {summary.total}
-                </div>
-                <span className="text-xs text-gray-500">Total Checks</span>
-              </div>
-              <div className="bg-green-50 rounded-lg p-3 text-center shadow-sm border border-green-200">
-                <div className="flex items-center justify-center gap-1 text-green-700 font-bold text-2xl">
-                  <FaCheckCircle className="text-lg" />
-                  {summary.pass}
-                </div>
-                <span className="text-xs text-green-600">Passed</span>
-              </div>
-              <div className="bg-yellow-50 rounded-lg p-3 text-center shadow-sm border border-yellow-200">
-                <div className="flex items-center justify-center gap-1 text-yellow-700 font-bold text-2xl">
-                  <FaExclamationTriangle className="text-lg" />
-                  {summary.warning}
-                </div>
-                <span className="text-xs text-yellow-600">Warnings</span>
-              </div>
-              <div className="bg-red-50 rounded-lg p-3 text-center shadow-sm border border-red-200">
-                <div className="flex items-center justify-center gap-1 text-red-700 font-bold text-2xl">
-                  <FaTimesCircle className="text-lg" />
-                  {summary.fail}
-                </div>
-                <span className="text-xs text-red-600">Failed</span>
-              </div>
-              <div className="bg-blue-50 rounded-lg p-3 text-center shadow-sm border border-blue-200">
-                <div className="text-2xl font-bold text-blue-600">
-                  {summary.na}
-                </div>
-                <span className="text-xs text-blue-500">Not Applicable</span>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3 text-center shadow-sm border border-gray-200">
-                <div className="text-2xl font-bold text-gray-500">
-                  {summary.pending}
-                </div>
-                <span className="text-xs text-gray-500">Pending</span>
-              </div>
-            </div>
-
-            {/* Pass Rate bar */}
-            <div className="mt-4">
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600">Pass Rate</span>
-                <span className="font-medium text-gray-800">
-                  {summary.total > 0
-                    ? Math.round((summary.pass / summary.total) * 100)
-                    : 0}
-                  %
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div
-                  className="bg-green-500 h-3 rounded-full transition-all"
-                  style={{
-                    width: `${summary.total > 0 ? (summary.pass / summary.total) * 100 : 0}%`,
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* ==================== Signature Section ==================== */}
-          <div className="grid grid-cols-1 md:grid-cols-2 border-t-2 border-gray-300">
-            <div className="p-6 border-r border-b md:border-b-0 border-gray-300">
-              <div className="flex items-center gap-2 mb-4 justify-center">
-                <FaUserCheck className="text-xl text-blue-600" />
-                <span className="text-sm font-semibold text-gray-700">
-                  Auditor Signature
-                </span>
-              </div>
-              <div className="text-center">
-                <div className="border-b-2 border-gray-400 w-3/4 mx-auto mb-2 pb-4 min-h-[40px] flex items-end justify-center">
-                  <span className="text-gray-800 font-medium">
-                    {signatures.auditor?.name || audit.createdBy || ""}
-                  </span>
-                </div>
-                <span className="text-xs text-gray-500">
-                  {signatures.auditor?.date
-                    ? formatDateForDisplay(signatures.auditor.date)
-                    : audit.createdAt
-                      ? formatDateForDisplay(audit.createdAt)
-                      : "Date"}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <div className="flex items-center gap-2 mb-4 justify-center">
-                <FaUserShield className="text-xl text-purple-600" />
-                <span className="text-sm font-semibold text-gray-700">
-                  Approved By
-                </span>
-              </div>
-              <div className="text-center">
-                {audit.approvedBy || signatures.approver?.name ? (
-                  <>
-                    <div className="border-b-2 border-gray-400 w-3/4 mx-auto mb-2 pb-4 min-h-[40px] flex items-end justify-center">
-                      <span className="text-gray-800 font-medium">
-                        {audit.approvedBy || signatures.approver?.name}
-                      </span>
-                    </div>
-                    <span className="text-xs text-gray-500">
-                      {audit.approvedAt
-                        ? formatDateForDisplay(audit.approvedAt)
-                        : signatures.approver?.date
-                          ? formatDateForDisplay(signatures.approver.date)
-                          : "Date"}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <div className="border-b-2 border-gray-400 w-3/4 mx-auto mb-2 pb-4 min-h-[40px]" />
-                    <span className="text-xs text-gray-500">Name & Date</span>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ==================== Metadata Footer ==================== */}
-        <div className="mt-6">
-          <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h4 className="text-sm font-semibold text-gray-800 tracking-wide uppercase">
-                Audit Metadata
-              </h4>
-              <div className="h-px flex-1 bg-gray-200 ml-4" />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-6 text-sm">
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  Audit Code
-                </p>
-                <p className="text-gray-800 font-semibold">
-                  {audit.auditCode || "-"}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  Created By
-                </p>
-                <p className="text-gray-800 font-semibold">
-                  {audit.createdBy || "-"}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  Created At
-                </p>
-                <p className="text-gray-700">
-                  {formatDateTimeForDisplay(audit.createdAt)}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  Last Updated
-                </p>
-                <p className="text-gray-700">
-                  {formatDateTimeForDisplay(audit.updatedAt)}
-                </p>
-              </div>
-              {audit.submittedBy && (
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    Submitted By
-                  </p>
-                  <p className="text-gray-800 font-semibold">
-                    {audit.submittedBy}
-                  </p>
-                </div>
-              )}
-              {audit.submittedAt && (
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    Submitted At
-                  </p>
-                  <p className="text-gray-700">
-                    {formatDateTimeForDisplay(audit.submittedAt)}
-                  </p>
-                </div>
-              )}
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  Template ID
-                </p>
-                <p className="text-gray-700 font-mono text-xs break-all">
-                  {audit.templateId}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  Audit ID
-                </p>
-                <p className="text-gray-700 font-mono text-xs break-all">
-                  {audit.id}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ==================== Approval Modal ==================== */}
+      {/* ==================== APPROVAL MODAL ==================== */}
       {showApprovalModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div
-              className={`p-4 text-white ${approvalAction === "approve" ? "bg-green-600" : "bg-red-600"}`}
+              className={`px-5 py-4 text-white ${approvalAction === "approve" ? "bg-gradient-to-r from-green-600 to-green-700" : "bg-gradient-to-r from-red-600 to-red-700"}`}
             >
-              <h3 className="text-lg font-bold">
+              <h3 className="text-lg font-black flex items-center gap-2">
+                {approvalAction === "approve" ? <FaCheck /> : <FaBan />}
                 {approvalAction === "approve"
                   ? "Approve Audit"
                   : "Reject Audit"}
               </h3>
+              <p className="text-sm opacity-80 mt-1">{audit.reportName}</p>
             </div>
-            <div className="p-6">
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">
                   Your Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={approverName}
                   onChange={(e) => setApproverName(e.target.value)}
-                  placeholder="Enter your name"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter your full name"
+                  autoFocus
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none text-sm transition-all"
                 />
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Comments{" "}
-                  {approvalAction === "reject" && (
-                    <span className="text-red-500">*</span>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">
+                  {approvalAction === "reject" ? (
+                    <>
+                      Rejection Reason <span className="text-red-500">*</span>
+                    </>
+                  ) : (
+                    "Comments (optional)"
                   )}
                 </label>
                 <textarea
@@ -1730,50 +1201,990 @@ const AuditView = () => {
                   onChange={(e) => setApprovalComments(e.target.value)}
                   placeholder={
                     approvalAction === "reject"
-                      ? "Enter rejection reason..."
-                      : "Enter any comments (optional)..."
+                      ? "Describe why this audit is being rejected…"
+                      : "Add any approval notes…"
                   }
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none text-sm resize-none transition-all"
                 />
               </div>
             </div>
-            <div className="p-4 bg-gray-50 flex justify-end gap-3">
+            <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
               <button
-                onClick={() => {
-                  setShowApprovalModal(false);
-                  setApproverName("");
-                  setApprovalComments("");
-                }}
+                onClick={() => setShowApprovalModal(false)}
                 disabled={actionLoading}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium disabled:opacity-50"
+                className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl font-semibold text-sm disabled:opacity-50 transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={handleApproval}
                 disabled={actionLoading}
-                className={`px-4 py-2 text-white rounded-lg font-medium disabled:opacity-50 flex items-center gap-2 ${
+                className={`px-5 py-2 text-white rounded-xl font-bold text-sm disabled:opacity-50 flex items-center gap-2 transition-all ${
                   approvalAction === "approve"
-                    ? "bg-green-600 hover:bg-green-700"
-                    : "bg-red-600 hover:bg-red-700"
+                    ? "bg-green-600 hover:bg-green-700 shadow-md shadow-green-200"
+                    : "bg-red-600 hover:bg-red-700 shadow-md shadow-red-200"
                 }`}
               >
                 {actionLoading ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                    Processing...
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{" "}
+                    Processing…
                   </>
                 ) : approvalAction === "approve" ? (
-                  "Approve"
+                  <>
+                    <FaCheck size={12} /> Approve
+                  </>
                 ) : (
-                  "Reject"
+                  <>
+                    <FaBan size={12} /> Reject
+                  </>
                 )}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* ==================== STICKY HEADER ==================== */}
+      <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
+        <div className="px-4 py-3 max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate("/auditreport/audits")}
+              className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-semibold transition-all"
+            >
+              <FaArrowLeft size={11} /> Back
+            </button>
+            <div className="flex items-center gap-2">
+              <HiClipboardDocumentCheck className="text-xl text-indigo-600" />
+              <div>
+                <h1 className="text-sm font-black text-gray-800 leading-none">
+                  View Audit
+                </h1>
+                <p className="text-xs text-gray-400 mt-0.5 leading-none truncate max-w-[200px]">
+                  {audit.reportName}
+                </p>
+              </div>
+            </div>
+            <AuditStatusBadge status={audit.status} />
+
+            {/* Sticky mini summary */}
+            <div className="hidden lg:flex items-center gap-3 pl-3 border-l border-gray-200">
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="w-2 h-2 rounded-full bg-green-400" />
+                <span className="font-bold text-green-700">{summary.pass}</span>
+                <span className="text-gray-400">pass</span>
+              </div>
+              {summary.fail > 0 && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="w-2 h-2 rounded-full bg-red-400" />
+                  <span className="font-bold text-red-600">{summary.fail}</span>
+                  <span className="text-gray-400">fail</span>
+                </div>
+              )}
+              <div
+                className={`text-xs font-bold ${passRate >= 90 ? "text-green-600" : passRate >= 70 ? "text-amber-600" : "text-red-600"}`}
+              >
+                {passRate}% pass rate
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Timeline toggle */}
+            <button
+              onClick={() => setShowTimeline((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border transition-all ${
+                showTimeline
+                  ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                  : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+              }`}
+              title="Activity Timeline"
+            >
+              <FaHistory size={12} />
+              <span className="hidden sm:inline">Timeline</span>
+            </button>
+
+            {/* Copy link */}
+            <button
+              onClick={() => copyToClipboard(window.location.href, "Link")}
+              className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl border border-gray-200 transition-all"
+              title="Copy link"
+            >
+              <FaLink size={12} />
+            </button>
+
+            {/* Print */}
+            <button
+              onClick={() => window.print()}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl border border-gray-200 transition-all"
+              title="Print (Ctrl+P)"
+            >
+              <FaPrint size={12} />
+            </button>
+
+            {/* Export dropdown */}
+            <div className="relative" ref={exportBtnRef}>
+              <button
+                onClick={() => setShowExportMenu((v) => !v)}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition-all"
+              >
+                <FaDownload size={11} /> Export
+                <FaChevronDown
+                  size={10}
+                  className={`transition-transform ${showExportMenu ? "rotate-180" : ""}`}
+                />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-xl border border-gray-200 z-30 overflow-hidden">
+                  <button
+                    onClick={() => {
+                      handleExportPDF();
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors font-medium"
+                  >
+                    <FaFilePdf className="text-red-500 flex-shrink-0" /> Export
+                    as PDF
+                  </button>
+                  <div className="h-px bg-gray-100" />
+                  <button
+                    onClick={() => {
+                      handleExportExcel();
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors font-medium"
+                  >
+                    <FaFileExcel className="text-green-500 flex-shrink-0" />{" "}
+                    Export as Excel
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {audit.status !== "approved" && (
+              <button
+                onClick={() => navigate(`/auditreport/audits/${id}`)}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-indigo-200"
+              >
+                <FaEdit size={11} /> Edit
+              </button>
+            )}
+            {audit.status === "submitted" && (
+              <>
+                <button
+                  onClick={() => openApprovalModal("approve")}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-green-200"
+                >
+                  <FaCheck size={11} /> Approve
+                </button>
+                <button
+                  onClick={() => openApprovalModal("reject")}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-red-200"
+                >
+                  <FaBan size={11} /> Reject
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-[1600px] mx-auto px-4 py-5 flex gap-4">
+        {/* ==================== TIMELINE SIDEBAR ==================== */}
+        {showTimeline && (
+          <aside className="w-64 flex-shrink-0">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 sticky top-[65px]">
+              <h3 className="font-bold text-gray-800 text-sm mb-4 flex items-center gap-2">
+                <FaHistory className="text-indigo-500" /> Activity Timeline
+              </h3>
+              <div className="relative">
+                <div className="absolute left-3.5 top-0 bottom-0 w-0.5 bg-gray-100" />
+                <div className="space-y-4">
+                  {timelineEvents.map((ev, i) => {
+                    const Icon = ev.icon;
+                    return (
+                      <div key={i} className="relative pl-9">
+                        <div
+                          className={`absolute left-0 w-7 h-7 rounded-full ${ev.bg} flex items-center justify-center flex-shrink-0`}
+                        >
+                          <Icon size={12} className={ev.color} />
+                        </div>
+                        <div>
+                          <p className={`text-xs font-bold ${ev.color}`}>
+                            {ev.label}
+                          </p>
+                          {ev.by && (
+                            <p className="text-xs text-gray-500">{ev.by}</p>
+                          )}
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            {formatDateTimeForDisplay(ev.time)}
+                          </p>
+                          <p className="text-[10px] text-gray-300">
+                            {relativeTime(ev.time)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {timelineEvents.length === 0 && (
+                    <p className="text-xs text-gray-400 text-center py-4">
+                      No activity recorded
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </aside>
+        )}
+
+        {/* ==================== MAIN CONTENT ==================== */}
+        <div className="flex-1 min-w-0 space-y-4">
+          {/* ==================== APPROVAL BANNER ==================== */}
+          {(audit.status === "approved" || audit.status === "rejected") && (
+            <div
+              className={`rounded-2xl border px-5 py-4 flex items-start gap-4 ${
+                audit.status === "approved"
+                  ? "bg-green-50 border-green-200"
+                  : "bg-red-50 border-red-200"
+              }`}
+            >
+              <div
+                className={`p-2 rounded-xl flex-shrink-0 ${audit.status === "approved" ? "bg-green-100" : "bg-red-100"}`}
+              >
+                {audit.status === "approved" ? (
+                  <FaCheckCircle className="text-green-600 text-xl" />
+                ) : (
+                  <FaTimesCircle className="text-red-600 text-xl" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p
+                  className={`font-bold text-sm ${audit.status === "approved" ? "text-green-800" : "text-red-800"}`}
+                >
+                  {audit.status === "approved"
+                    ? "Audit Approved"
+                    : "Audit Rejected"}
+                  {audit.approvedBy && (
+                    <span className="font-normal"> by {audit.approvedBy}</span>
+                  )}
+                </p>
+                {audit.approvedAt && (
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {formatDateTimeForDisplay(audit.approvedAt)}
+                  </p>
+                )}
+                {audit.approvalComments && (
+                  <p className="text-sm text-gray-600 mt-2 bg-white rounded-lg px-3 py-2 border border-gray-200">
+                    <span className="font-semibold">Comments:</span>{" "}
+                    {audit.approvalComments}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ==================== REPORT CARD ==================== */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            {/* Header banner */}
+            <div className="grid grid-cols-1 md:grid-cols-3 border-b border-gray-100">
+              <div className="md:col-span-2 bg-gradient-to-br from-slate-800 to-indigo-900 p-7">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-white/10 rounded-xl flex-shrink-0">
+                    <HiClipboardDocumentCheck className="text-3xl text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-2xl font-black text-white leading-tight truncate">
+                      {audit.reportName || "Audit Report"}
+                    </h1>
+                    <p className="text-indigo-300 text-sm mt-1">
+                      Template: {audit.templateName}
+                    </p>
+                    {audit.auditCode && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-xs bg-white/10 text-indigo-200 px-2.5 py-1 rounded-full font-mono">
+                          {audit.auditCode}
+                        </span>
+                        <button
+                          onClick={() =>
+                            copyToClipboard(audit.auditCode, "Audit code")
+                          }
+                          className="text-indigo-400 hover:text-white transition"
+                          title="Copy code"
+                        >
+                          <FaCopy size={11} />
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 mt-3">
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                          passRate >= 90
+                            ? "bg-green-500/20 text-green-300"
+                            : passRate >= 70
+                              ? "bg-amber-500/20 text-amber-300"
+                              : "bg-red-500/20 text-red-300"
+                        }`}
+                      >
+                        {passRate}% Pass Rate
+                      </span>
+                      <span className="text-xs text-white/50">
+                        {summary.total} checkpoints
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 divide-y divide-gray-100">
+                {template?.headerConfig?.showFormatNo !== false && (
+                  <div className="p-3.5 flex items-center gap-3">
+                    <MdFormatListNumbered className="text-xl text-indigo-500 flex-shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-gray-400 uppercase tracking-widest block">
+                        Format No
+                      </span>
+                      <span className="font-bold text-gray-700 text-sm">
+                        {audit.formatNo || "—"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {template?.headerConfig?.showRevNo !== false && (
+                  <div className="p-3.5 flex items-center gap-3">
+                    <MdUpdate className="text-xl text-green-500 flex-shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-gray-400 uppercase tracking-widest block">
+                        Rev. No
+                      </span>
+                      <span className="font-bold text-gray-700 text-sm">
+                        {audit.revNo || "—"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {template?.headerConfig?.showRevDate !== false && (
+                  <div className="p-3.5 flex items-center gap-3">
+                    <MdDateRange className="text-xl text-purple-500 flex-shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-gray-400 uppercase tracking-widest block">
+                        Rev. Date
+                      </span>
+                      <span className="font-bold text-gray-700 text-sm">
+                        {formatDateForDisplay(audit.revDate) || "—"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Info fields */}
+            <div className="grid grid-cols-2 md:grid-cols-4 border-b border-gray-100 bg-white">
+              {template?.infoFields
+                ?.filter((f) => f.visible)
+                .map((field, i, arr) => (
+                  <div
+                    key={field.id}
+                    className={`p-4 ${i < arr.length - 1 ? "border-r" : ""} border-gray-100`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <FieldIcon fieldId={field.id} />
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        {field.name}
+                      </span>
+                    </div>
+                    <span className="font-bold text-gray-800 text-sm block">
+                      {field.id === "date"
+                        ? formatDateForDisplay(getInfoFieldValue(field.id))
+                        : getInfoFieldValue(field.id)}
+                    </span>
+                    {field.id === "modelName" && audit.infoData?.modelCode && (
+                      <span className="text-xs text-indigo-500 mt-1 block">
+                        Code: {audit.infoData.modelCode}
+                      </span>
+                    )}
+                  </div>
+                ))}
+            </div>
+
+            {/* Extra info data */}
+            {audit.infoData &&
+              (() => {
+                const extras = Object.entries(audit.infoData).filter(
+                  ([k, v]) => v && !knownIds.has(k) && !aliasSet.has(k),
+                );
+                if (!extras.length) return null;
+                return (
+                  <div className="p-4 border-b border-gray-100 bg-indigo-50/30">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                      Additional Information
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {extras.map(([k, v]) => (
+                        <div
+                          key={k}
+                          className="bg-white rounded-xl border border-gray-100 p-3"
+                        >
+                          <span className="text-[10px] text-gray-400 uppercase tracking-wide block">
+                            {k.replace(/([A-Z])/g, " $1").trim()}
+                          </span>
+                          <span className="font-semibold text-gray-800 text-sm">
+                            {v}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+            {/* Notes */}
+            <div className="p-4 border-b border-gray-100 bg-amber-50/50">
+              <div className="flex items-center gap-2 mb-2">
+                <FaStickyNote className="text-amber-500" />
+                <span className="font-semibold text-gray-700 text-sm">
+                  Notes
+                </span>
+              </div>
+              <p className="text-gray-600 text-sm pl-5 leading-relaxed">
+                {audit.notes || (
+                  <span className="text-gray-300 italic">No notes added.</span>
+                )}
+              </p>
+            </div>
+
+            {/* ==================== CHECKPOINT FILTER BAR ==================== */}
+            <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100 flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setShowFilters((v) => !v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                  showFilters || cpFilter !== "all" || cpSearch
+                    ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                    : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <FaFilter size={10} /> Filters
+                {(cpFilter !== "all" || cpSearch) && (
+                  <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                )}
+              </button>
+
+              {showFilters && (
+                <>
+                  <div className="relative">
+                    <FaSearch
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300"
+                      size={10}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Search checkpoints…"
+                      value={cpSearch}
+                      onChange={(e) => setCpSearch(e.target.value)}
+                      className="pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-xl focus:border-indigo-400 outline-none w-48"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {["all", "pass", "fail", "warning", "na", "pending"].map(
+                      (f) => (
+                        <button
+                          key={f}
+                          onClick={() => setCpFilter(f)}
+                          className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                            cpFilter === f
+                              ? f === "all"
+                                ? "bg-slate-800 text-white"
+                                : `${STATUS_CONFIG[f]?.badge}`
+                              : "bg-white text-gray-500 border border-gray-200 hover:border-gray-300"
+                          }`}
+                        >
+                          {f === "all" ? "All" : STATUS_CONFIG[f]?.label}
+                        </button>
+                      ),
+                    )}
+                    {(cpFilter !== "all" || cpSearch) && (
+                      <button
+                        onClick={() => {
+                          setCpFilter("all");
+                          setCpSearch("");
+                        }}
+                        className="px-2 py-1 text-xs text-red-500 hover:text-red-700 rounded-lg transition"
+                      >
+                        <FaTimes size={10} />
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* ==================== SECTIONS + TABLE ==================== */}
+            {audit.sections?.map((section) => {
+              const hasStages = section.stages && Array.isArray(section.stages);
+              const isCollapsed = collapsedSections[section.id];
+              const stats = getSectionStats(section);
+              const sPct =
+                stats.total > 0
+                  ? Math.round(
+                      ((stats.pass + stats.fail + stats.warning + stats.na) /
+                        stats.total) *
+                        100,
+                    )
+                  : 0;
+
+              return (
+                <div
+                  key={section.id}
+                  className="border-b border-gray-100 last:border-b-0"
+                >
+                  {/* Section header */}
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-slate-700 text-white sticky top-[57px] z-20">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <button
+                        onClick={() =>
+                          setCollapsedSections((prev) => ({
+                            ...prev,
+                            [section.id]: !prev[section.id],
+                          }))
+                        }
+                        className="p-1 hover:bg-white/10 rounded transition flex-shrink-0"
+                      >
+                        {isCollapsed ? (
+                          <FaChevronDown size={11} />
+                        ) : (
+                          <FaChevronUp size={11} />
+                        )}
+                      </button>
+                      <span className="font-bold text-sm truncate">
+                        {section.sectionName || "Unnamed Section"}
+                      </span>
+                      <div className="hidden sm:flex items-center gap-1.5 text-xs flex-shrink-0">
+                        {stats.pass > 0 && (
+                          <span className="bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full">
+                            {stats.pass}?
+                          </span>
+                        )}
+                        {stats.fail > 0 && (
+                          <span className="bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full">
+                            {stats.fail}?
+                          </span>
+                        )}
+                        {stats.warning > 0 && (
+                          <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full">
+                            {stats.warning}!
+                          </span>
+                        )}
+                        {stats.pending > 0 && (
+                          <span className="bg-white/10 text-slate-300 px-2 py-0.5 rounded-full">
+                            {stats.pending} pending
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-xs text-slate-400 flex-shrink-0">
+                      {sPct}%
+                    </span>
+                  </div>
+
+                  {isCollapsed && (
+                    <div className="px-4 py-2 bg-slate-50 text-xs text-gray-400 flex items-center justify-between">
+                      <span>{stats.total} checkpoints hidden</span>
+                      <span>{sPct}% complete</span>
+                    </div>
+                  )}
+
+                  {!isCollapsed && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200">
+                            {visibleColumns.map((col) => (
+                              <th
+                                key={col.id}
+                                className={`px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide border-r border-gray-200 last:border-r-0 whitespace-nowrap ${col.width || ""} ${
+                                  col.type === "image"
+                                    ? "text-pink-600 bg-pink-50"
+                                    : "text-gray-500"
+                                }`}
+                              >
+                                <div className="flex items-center gap-1">
+                                  {col.type === "image" && (
+                                    <FaImage
+                                      size={10}
+                                      className="text-pink-400"
+                                    />
+                                  )}
+                                  {col.name}
+                                </div>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {hasStages
+                            ? section.stages.map((stage) => {
+                                const filteredCPs = (
+                                  stage.checkPoints || []
+                                ).filter(matchesFilter);
+                                if (!filteredCPs.length) return null;
+                                let stageRendered = false;
+
+                                return filteredCPs.map((checkpoint, cpIdx) => {
+                                  const showStage =
+                                    !stageRendered && cpIdx === 0;
+                                  if (showStage) stageRendered = true;
+                                  const statusCfg =
+                                    STATUS_CONFIG[checkpoint.status] ||
+                                    STATUS_CONFIG.pending;
+
+                                  return (
+                                    <tr
+                                      key={`${stage.id || "s"}-${checkpoint.id || cpIdx}`}
+                                      className={`border-b border-gray-100 last:border-b-0 hover:bg-slate-50/80 transition-colors ${statusCfg.rowBg}`}
+                                    >
+                                      {visibleColumns.map((col) => {
+                                        if (col.id === "section") return null;
+
+                                        if (col.id === "stage") {
+                                          if (showStage) {
+                                            return (
+                                              <td
+                                                key={col.id}
+                                                rowSpan={filteredCPs.length}
+                                                className="px-3 py-2 font-semibold text-indigo-800 bg-indigo-50/60 border-r border-gray-200 text-center align-middle"
+                                              >
+                                                <span className="text-xs">
+                                                  {stage.stageName || "—"}
+                                                </span>
+                                              </td>
+                                            );
+                                          }
+                                          return null;
+                                        }
+
+                                        if (col.type === "image")
+                                          return renderImageViewCell(
+                                            col,
+                                            checkpoint,
+                                          );
+
+                                        if (col.id === "status") {
+                                          return (
+                                            <td
+                                              key={col.id}
+                                              className="px-3 py-2 border-r border-gray-100"
+                                            >
+                                              <CheckpointStatusBadge
+                                                status={checkpoint.status}
+                                              />
+                                            </td>
+                                          );
+                                        }
+
+                                        return (
+                                          <td
+                                            key={col.id}
+                                            className="px-3 py-2 border-r border-gray-100 last:border-r-0"
+                                          >
+                                            <span className="text-gray-700 text-xs">
+                                              {checkpoint[col.id] || "—"}
+                                            </span>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  );
+                                });
+                              })
+                            : (section.checkPoints || [])
+                                .filter(matchesFilter)
+                                .map((checkpoint, cpIdx) => {
+                                  const statusCfg =
+                                    STATUS_CONFIG[checkpoint.status] ||
+                                    STATUS_CONFIG.pending;
+                                  return (
+                                    <tr
+                                      key={`${checkpoint.id || cpIdx}`}
+                                      className={`border-b border-gray-100 last:border-b-0 hover:bg-slate-50/80 transition-colors ${statusCfg.rowBg}`}
+                                    >
+                                      {visibleColumns.map((col) => {
+                                        if (col.id === "section") {
+                                          if (cpIdx === 0) {
+                                            return (
+                                              <td
+                                                key={col.id}
+                                                rowSpan={
+                                                  (
+                                                    section.checkPoints || []
+                                                  ).filter(matchesFilter).length
+                                                }
+                                                className="px-3 py-2 font-semibold text-gray-700 bg-gray-50 border-r border-gray-200 text-center align-middle"
+                                              >
+                                                <span className="text-xs">
+                                                  {section.sectionName || "—"}
+                                                </span>
+                                              </td>
+                                            );
+                                          }
+                                          return null;
+                                        }
+                                        if (col.type === "image")
+                                          return renderImageViewCell(
+                                            col,
+                                            checkpoint,
+                                          );
+                                        if (col.id === "status") {
+                                          return (
+                                            <td
+                                              key={col.id}
+                                              className="px-3 py-2 border-r border-gray-100"
+                                            >
+                                              <CheckpointStatusBadge
+                                                status={checkpoint.status}
+                                              />
+                                            </td>
+                                          );
+                                        }
+                                        return (
+                                          <td
+                                            key={col.id}
+                                            className="px-3 py-2 border-r border-gray-100 last:border-r-0"
+                                          >
+                                            <span className="text-gray-700 text-xs">
+                                              {checkpoint[col.id] || "—"}
+                                            </span>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  );
+                                })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {(!audit.sections || audit.sections.length === 0) && (
+              <div className="p-12 text-center">
+                <FaClipboardCheck className="text-4xl text-gray-200 mx-auto mb-3" />
+                <p className="text-gray-400 text-sm">
+                  No checkpoint data available
+                </p>
+              </div>
+            )}
+
+            {/* ==================== SUMMARY ==================== */}
+            <div className="p-5 bg-gray-50 border-t border-gray-200">
+              <h3 className="font-bold text-gray-700 mb-4 text-sm flex items-center gap-2">
+                <FaClipboardCheck className="text-indigo-500" /> Audit Summary
+              </h3>
+              <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+                {[
+                  {
+                    key: "total",
+                    label: "Total",
+                    bg: "bg-white",
+                    border: "border-gray-200",
+                    color: "text-gray-800",
+                    icon: null,
+                  },
+                  {
+                    key: "pass",
+                    label: "Passed",
+                    bg: "bg-green-50",
+                    border: "border-green-200",
+                    color: "text-green-700",
+                    icon: FaCheckCircle,
+                  },
+                  {
+                    key: "warning",
+                    label: "Warnings",
+                    bg: "bg-amber-50",
+                    border: "border-amber-200",
+                    color: "text-amber-700",
+                    icon: FaExclamationTriangle,
+                  },
+                  {
+                    key: "fail",
+                    label: "Failed",
+                    bg: "bg-red-50",
+                    border: "border-red-200",
+                    color: "text-red-700",
+                    icon: FaTimesCircle,
+                  },
+                  {
+                    key: "na",
+                    label: "N/A",
+                    bg: "bg-blue-50",
+                    border: "border-blue-200",
+                    color: "text-blue-700",
+                    icon: FaBan,
+                  },
+                  {
+                    key: "pending",
+                    label: "Pending",
+                    bg: "bg-gray-50",
+                    border: "border-gray-200",
+                    color: "text-gray-500",
+                    icon: null,
+                  },
+                ].map(({ key, label, bg, border, color, icon: Icon }) => (
+                  <div
+                    key={key}
+                    className={`${bg} rounded-xl p-3.5 text-center border ${border} shadow-sm`}
+                  >
+                    <div
+                      className={`text-2xl font-black ${color} flex items-center justify-center gap-1`}
+                    >
+                      {Icon && <Icon size={14} />} {summary[key]}
+                    </div>
+                    <span className="text-xs text-gray-400 mt-1 block">
+                      {label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Stacked bar */}
+              {summary.total > 0 && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs text-gray-500">
+                      Overall Progress
+                    </span>
+                    <span
+                      className={`text-sm font-black ${passRate >= 90 ? "text-green-600" : passRate >= 70 ? "text-amber-600" : "text-red-600"}`}
+                    >
+                      {passRate}% pass rate
+                    </span>
+                  </div>
+                  <MiniProgressBar {...summary} />
+                  <div className="flex items-center gap-4 mt-2">
+                    {[
+                      ["bg-green-400", "Pass"],
+                      ["bg-amber-400", "Warning"],
+                      ["bg-red-400", "Fail"],
+                      ["bg-blue-300", "N/A"],
+                      ["bg-gray-200", "Pending"],
+                    ].map(([c, l]) => (
+                      <span
+                        key={l}
+                        className="flex items-center gap-1 text-[10px] text-gray-400"
+                      >
+                        <span className={`w-2 h-2 rounded-full ${c}`} />
+                        {l}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ==================== SIGNATURES ==================== */}
+            <div className="grid grid-cols-1 md:grid-cols-2 border-t border-gray-100">
+              {[
+                {
+                  role: "auditor",
+                  label: "Auditor Signature",
+                  icon: FaUserCheck,
+                  color: "text-indigo-600",
+                  name: signatures.auditor?.name || audit.createdBy,
+                  date: signatures.auditor?.date || audit.createdAt,
+                },
+                {
+                  role: "approver",
+                  label: "Approved By",
+                  icon: FaUserShield,
+                  color: "text-purple-600",
+                  name: audit.approvedBy || signatures.approver?.name,
+                  date: audit.approvedAt || signatures.approver?.date,
+                },
+              ].map(({ role, label, icon: Icon, color, name, date }, i) => (
+                <div
+                  key={role}
+                  className={`p-6 ${i === 0 ? "border-r border-gray-100" : ""}`}
+                >
+                  <div className="flex items-center gap-2 mb-5 justify-center">
+                    <Icon className={`text-lg ${color}`} />
+                    <span className="text-sm font-bold text-gray-700">
+                      {label}
+                    </span>
+                  </div>
+                  <div className="text-center">
+                    <div className="border-b-2 border-gray-300 w-3/4 mx-auto pb-6 mb-3 min-h-[50px] flex items-end justify-center">
+                      <span className="text-gray-800 font-semibold text-lg">
+                        {name || ""}
+                      </span>
+                    </div>
+                    <span className="text-xs text-gray-400">
+                      {date ? formatDateForDisplay(date) : "Not signed"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ==================== METADATA FOOTER ==================== */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <FaShieldAlt className="text-slate-400" />
+              <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider">
+                Audit Metadata
+              </h4>
+              <div className="h-px flex-1 bg-gray-100" />
+              <button
+                onClick={() => copyToClipboard(String(audit.id), "Audit ID")}
+                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-indigo-600 transition"
+              >
+                <FaCopy size={10} /> Copy ID
+              </button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-5">
+              {[
+                { label: "Audit ID", value: audit.id, mono: true },
+                { label: "Audit Code", value: audit.auditCode },
+                { label: "Template ID", value: audit.templateId, mono: true },
+                { label: "Created By", value: audit.createdBy },
+                {
+                  label: "Created At",
+                  value: formatDateTimeForDisplay(audit.createdAt),
+                },
+                {
+                  label: "Last Updated",
+                  value: formatDateTimeForDisplay(audit.updatedAt),
+                },
+                audit.submittedBy && {
+                  label: "Submitted By",
+                  value: audit.submittedBy,
+                },
+                audit.submittedAt && {
+                  label: "Submitted At",
+                  value: formatDateTimeForDisplay(audit.submittedAt),
+                },
+              ]
+                .filter(Boolean)
+                .map(({ label, value, mono }) => (
+                  <div key={label} className="space-y-1">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                      {label}
+                    </p>
+                    <p
+                      className={`text-gray-800 ${mono ? "font-mono text-xs break-all text-gray-500" : "font-semibold text-sm"}`}
+                    >
+                      {value || "—"}
+                    </p>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
