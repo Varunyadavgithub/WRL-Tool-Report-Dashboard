@@ -21,8 +21,8 @@ export const useRoleAccess = () => {
     const map = {};
 
     permissions.forEach((p) => {
-      if (!map[p.sectionKey]) map[p.sectionKey] = {};
-      map[p.sectionKey][p.path] = p.canAccess;
+      if (!map[p.SectionKey]) map[p.SectionKey] = {};
+      map[p.SectionKey][p.Path] = p.CanAccess;
     });
 
     return map;

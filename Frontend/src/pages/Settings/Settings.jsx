@@ -149,7 +149,8 @@ export default function Settings() {
   };
 
   const handleReset = () => {
-    // Reset to default permissions based on ROUTE_CONFIG
+    // Reset to deny all permissions (secure by default)
+    // Permissions are now managed from backend, no hardcoded defaults
     const defaultPermissions = {};
     ROUTE_CONFIG.forEach((section) => {
       const allItems = [
@@ -158,14 +159,12 @@ export default function Settings() {
       ];
 
       allItems.forEach((item) => {
-        const allowedRoles = item.roles ?? [];
-
         if (!defaultPermissions[section.key]) {
           defaultPermissions[section.key] = {};
         }
 
-        // Default: only allow if role is in the allowed roles list
-        defaultPermissions[section.key][item.path] = allowedRoles.includes(selectedRole);
+        // Default: deny all access
+        defaultPermissions[section.key][item.path] = false;
       });
     });
 
