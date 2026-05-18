@@ -56,7 +56,7 @@ export default function Settings() {
   const { user } = useSelector((store) => store.auth);
   const { rolePermissions, loading } = useSelector((store) => store.permissions);
   const dispatch = useDispatch();
-  const userRole = user?.role?.toLowerCase?.() ?? "";
+  const userRole = user?.roleName?.toLowerCase?.() ?? "";
 
   const [selectedRole, setSelectedRole] = useState(MANAGEABLE_ROLES[0]?.value ?? "");
   const [permissions, setPermissions] = useState({});

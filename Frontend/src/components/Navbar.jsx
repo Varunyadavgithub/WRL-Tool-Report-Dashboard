@@ -46,10 +46,10 @@ const NavBar = () => {
             </div>
             <div
               className={`${
-                user.role === "admin" ? "text-red-500" : "text-gray-400"
+                user.roleName === "admin" ? "text-red-500" : "text-gray-400"
               } text-xs md:text-sm`}
             >
-              {user.role}
+              {user.roleName}
             </div>
           </div>
 

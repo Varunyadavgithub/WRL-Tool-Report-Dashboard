@@ -234,7 +234,8 @@ export const login = tryCatch(async (req, res) => {
         id: user.UserID,
         name: user.UserName,
         usercode: user.UserCode,
-        role: user.RoleName.toLowerCase(),
+        role: user.UserRole, // numeric role code
+        roleName: user.RoleName.toLowerCase(), // role name string
       },
     });
   } finally {

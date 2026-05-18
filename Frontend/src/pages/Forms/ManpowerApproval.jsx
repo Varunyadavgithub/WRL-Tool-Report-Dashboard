@@ -38,7 +38,7 @@ const ManpowerApproval = () => {
     }
   }, []);
 
-  const userRole = user?.role || "HR";
+  const userRole = user?.roleName || "HR";
 
   useEffect(() => {
     fetchData();

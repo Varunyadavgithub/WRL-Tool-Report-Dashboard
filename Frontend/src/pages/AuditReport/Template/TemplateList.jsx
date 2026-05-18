@@ -340,7 +340,7 @@ const TemplateList = () => {
     ROLES.ADMIN,
     ROLES.QUALITY_MANAGER,
     ROLES.LINE_QUALITY_ENGINEER,
-  ].includes(user?.role);
+  ].includes(user?.roleName);
 
   // Keyboard shortcut — Ctrl+F ? focus search
   useEffect(() => {

@@ -359,7 +359,7 @@ export default function Settings() {
   // capturing a stale closure (handleSave is defined later in the function).
   const saveRef    = useRef(null);
 
-  const userRole = user?.role?.toLowerCase?.() ?? "";
+  const userRole = user?.roleName?.toLowerCase?.() ?? "";
 
   // ── Toast helpers ──────────────────────────────────────────────────────────
   const addToast = useCallback((message, type = "info") => {

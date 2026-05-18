@@ -7,26 +7,20 @@ const SUPER_ADMIN_ROLE = ROLES.SUPER_ADMIN;
 
 export const useRoleAccess = () => {
   const { user } = useSelector((state) => state.auth);
-  const userRole = user?.role?.toLowerCase?.() ?? "";
+  const userRole = user?.roleName?.toLowerCase?.() ?? "";
 
   const { data } = useGetMyPermissionsQuery(undefined, {
-    skip: userRole === SUPER_ADMIN_ROLE,
+    skip: !user || userRole === SUPER_ADMIN_ROLE,
   });
 
-  const permissions = data?.permissions || [];
-
+  // Backend returns permissions as an object: { [SectionKey]: { [Path]: boolean } }
   const permissionMap = useMemo(() => {
-    if (!permissions.length) return null;
+    if (userRole === SUPER_ADMIN_ROLE) return null;
+    if (!data?.permissions) return null;
 
-    const map = {};
-
-    permissions.forEach((p) => {
-      if (!map[p.SectionKey]) map[p.SectionKey] = {};
-      map[p.SectionKey][p.Path] = p.CanAccess;
-    });
-
-    return map;
-  }, [permissions]);
+    // Backend already returns the correct format, use it directly
+    return data.permissions;
+  }, [data, userRole]);
 
   const canAccess = (sectionKey, path) => {
     if (userRole === SUPER_ADMIN_ROLE) return true;
