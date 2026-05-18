@@ -1,0 +1,178 @@
+{
+  "templateCode": "TMPL0004",
+  "templateName": "Trail",
+  "version": "1.0",
+  "headerConfig": {
+    "showFormatNo": false,
+    "showRevNo": false,
+    "showRevDate": false,
+    "defaultFormatNo": "",
+    "defaultRevNo": ""
+  },
+  "infoFields": [
+    {
+      "id": "modelName",
+      "name": "Model Name",
+      "type": "text",
+      "required": true,
+      "visible": true
+    },
+    {
+      "id": "date",
+      "name": "Date",
+      "type": "date",
+      "required": true,
+      "visible": true
+    },
+    {
+      "id": "shift",
+      "name": "Shift",
+      "type": "select",
+      "required": true,
+      "visible": true,
+      "options": [
+        "Day Shift",
+        "Night Shift"
+      ]
+    },
+    {
+      "id": "serial",
+      "name": "Serial No.",
+      "type": "text",
+      "required": true,
+      "visible": true
+    }
+  ],
+  "columns": [
+    {
+      "id": "section",
+      "name": "Section",
+      "visible": true,
+      "required": true,
+      "width": "w-32",
+      "type": "text",
+      "isGroupColumn": true
+    },
+    {
+      "id": "stage",
+      "name": "Stage",
+      "visible": true,
+      "required": true,
+      "width": "w-32",
+      "type": "text",
+      "isGroupColumn": true
+    },
+    {
+      "id": "checkPoint",
+      "name": "Check Points",
+      "visible": true,
+      "required": false,
+      "width": "w-40",
+      "type": "text"
+    },
+    {
+      "id": "method",
+      "name": "Method of Inspection",
+      "visible": true,
+      "required": false,
+      "width": "w-40",
+      "type": "text"
+    },
+    {
+      "id": "specification",
+      "name": "Specifications",
+      "visible": true,
+      "required": false,
+      "width": "w-48",
+      "type": "text"
+    },
+    {
+      "id": "observation",
+      "name": "Observations",
+      "visible": true,
+      "required": false,
+      "width": "w-40",
+      "type": "text",
+      "entryField": true
+    },
+    {
+      "id": "image",
+      "name": "Image",
+      "visible": true,
+      "required": false,
+      "width": "w-36",
+      "type": "image",
+      "entryField": true
+    },
+    {
+      "id": "remark",
+      "name": "Remark",
+      "visible": true,
+      "required": false,
+      "width": "w-40",
+      "type": "text",
+      "entryField": true
+    },
+    {
+      "id": "status",
+      "name": "Status",
+      "visible": true,
+      "required": false,
+      "width": "w-28",
+      "type": "status",
+      "entryField": true
+    }
+  ],
+  "defaultSections": [
+    {
+      "id": 1778913355517,
+      "sectionName": "Final Freezer",
+      "stages": [
+        {
+          "id": 1778913355518,
+          "stageName": "FG LABEL",
+          "checkPoints": [
+            {
+              "id": 1778913355519,
+              "checkPoint": "LABEL CHECK",
+              "method": "Visual",
+              "specification": "45"
+            }
+          ]
+        },
+        {
+          "id": 1778913436793,
+          "stageName": "FG Inspection",
+          "checkPoints": [
+            {
+              "id": 1778913436794,
+              "checkPoint": "CHECK",
+              "method": "FFG",
+              "specification": "54"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 1778913454113,
+      "sectionName": "GAS Charging",
+      "stages": [
+        {
+          "id": 1778913454114,
+          "stageName": "BOM WEIGHT",
+          "checkPoints": [
+            {
+              "id": 1778913454115,
+              "checkPoint": "Check",
+              "method": "dsd",
+              "specification": "54"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "savedAt": "2026-05-16T06:38:07.290Z",
+  "updatedAt": "2026-05-16T06:38:07.290Z"
+}
