@@ -20,6 +20,16 @@ const transformTemplate = (template) => {
     infoFields: template.InfoFields ?? template.infoFields ?? [],
     columns: template.Columns ?? template.columns ?? [],
     defaultSections: template.DefaultSections ?? template.defaultSections ?? [],
+    models: (() => {
+      const raw = template.Models ?? template.models;
+      if (!raw) return [];
+      if (Array.isArray(raw)) return raw;
+      try { return JSON.parse(raw); } catch { return []; }
+    })(),
+    approvalStatus: template.ApprovalStatus ?? template.approvalStatus,
+    approvedBy: template.ApprovedBy ?? template.approvedBy,
+    approvedAt: template.ApprovedAt ?? template.approvedAt,
+    rejectionReason: template.RejectionReason ?? template.rejectionReason,
     createdBy: template.CreatedBy ?? template.createdBy,
     createdAt: template.CreatedAt ?? template.createdAt,
     updatedBy: template.UpdatedBy ?? template.updatedBy,
@@ -51,6 +61,7 @@ const transformAudit = (audit) => {
     createdAt: audit.CreatedAt ?? audit.createdAt,
     updatedBy: audit.UpdatedBy ?? audit.updatedBy,
     updatedAt: audit.UpdatedAt ?? audit.updatedAt,
+    startedAt:   audit.StartedAt   ?? audit.startedAt,
     submittedBy: audit.SubmittedBy ?? audit.submittedBy,
     submittedAt: audit.SubmittedAt ?? audit.submittedAt,
     approvedBy: audit.ApprovedBy ?? audit.approvedBy,
@@ -328,6 +339,28 @@ export const useAuditData = () => {
     }
   }, []);
 
+  const fetchAuditModelSummary = useCallback(async (params = {}) => {
+    try {
+      const response = await axios.get(`${API_BASE}/audits/model-summary`, { params });
+      return response.data;
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to load audit summary";
+      console.error("Audit model summary error:", err);
+      throw new Error(message);
+    }
+  }, []);
+
+  const fetchAuditStats = useCallback(async (params = {}) => {
+    try {
+      const response = await axios.get(`${API_BASE}/audits/stats`, { params });
+      return response.data;
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to load audit stats";
+      console.error("Audit stats error:", err);
+      throw new Error(message);
+    }
+  }, []);
+
   return {
     templates,
     audits,
@@ -349,6 +382,8 @@ export const useAuditData = () => {
     deleteAudit,
     approveAudit,
     rejectAudit,
+    fetchAuditModelSummary,
+    fetchAuditStats,
   };
 };
 

@@ -75,6 +75,7 @@ export const commonApi = createApi({
 export const {
   useGetModelVariantsQuery,
   useGetModelVariantsByAssemblyQuery,
+  useLazyGetModelVariantsByAssemblyQuery,
   useGetStagesQuery,
   useGetComponentTypesQuery,
   useGetEmployeesWithDepartmentsQuery,

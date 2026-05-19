@@ -98,9 +98,17 @@ const TemplateBuilder = lazy(
 const TemplateList = lazy(
   () => import("../pages/AuditReport/Template/TemplateList"),
 );
+const TemplateApproval = lazy(
+  () => import("../pages/AuditReport/Template/TemplateApproval"),
+);
+const SerialScan = lazy(
+  () => import("../pages/AuditReport/Template/SerialScan"),
+);
 const AuditList = lazy(() => import("../pages/AuditReport/Audit/AuditList"));
 const AuditEntry = lazy(() => import("../pages/AuditReport/Audit/AuditEntry"));
 const AuditView = lazy(() => import("../pages/AuditReport/Audit/AuditView"));
+const AuditApproval = lazy(() => import("../pages/AuditReport/Audit/AuditApproval"));
+const AuditDashboard = lazy(() => import("../pages/AuditReport/Auditdashboard"));
 
 const DehumidifierDashboard = lazy(
   () => import("../pages/Readings/DehumidifierDashboard"),
@@ -477,22 +485,41 @@ export const ROUTE_CONFIG = [
     basePath: "/auditreport",
     items: [
       {
-        path: "/auditreport/build-templates",
-        label: "Build Templates",
-        component: TemplateBuilder,
+        path: "/auditreport/templates",
+        label: "Templates",
+        component: TemplateList,
       },
       {
-        path: "/auditreport/templates",
-        label: "All Templates",
-        component: TemplateList,
+        path: "/auditreport/approval",
+        label: "Template Approval",
+        component: TemplateApproval,
+      },
+      {
+        path: "/auditreport/serial-scan",
+        label: "Serial Scan",
+        component: SerialScan,
       },
       {
         path: "/auditreport/audits",
         label: "Audits",
         component: AuditList,
       },
+      {
+        path: "/auditreport/audit-approval",
+        label: "Audit Approval",
+        component: AuditApproval,
+      },
+      {
+        path: "/auditreport/dashboard",
+        label: "Dashboard",
+        component: AuditDashboard,
+      },
     ],
     hiddenItems: [
+      {
+        path: "/auditreport/templates/new",
+        component: TemplateBuilder,
+      },
       {
         path: "/auditreport/templates/:id",
         component: TemplateBuilder,
@@ -511,6 +538,7 @@ export const ROUTE_CONFIG = [
       },
     ],
   },
+
 
   // ── Utility / Readings ───────────────────────────────────────────────────
   {
