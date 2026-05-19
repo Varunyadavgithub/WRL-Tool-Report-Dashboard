@@ -44,7 +44,7 @@ export const getAllTemplates = tryCatch(async (req, res) => {
 
   const query = `
     WITH TemplateData AS (
-      SELECT 
+      SELECT
         Id,
         TemplateCode,
         TemplateFileName,
@@ -53,6 +53,11 @@ export const getAllTemplates = tryCatch(async (req, res) => {
         Category,
         Version,
         IsActive,
+        Models,
+        ApprovalStatus,
+        ApprovedBy,
+        ApprovedAt,
+        RejectionReason,
         CreatedBy,
         CreatedAt,
         UpdatedBy,
@@ -61,7 +66,7 @@ export const getAllTemplates = tryCatch(async (req, res) => {
       FROM AuditTemplates
       ${whereClause}
     )
-    SELECT 
+    SELECT
       (SELECT COUNT(*) FROM TemplateData) AS TotalCount,
       *
     FROM TemplateData
@@ -118,7 +123,7 @@ export const getTemplateById = tryCatch(async (req, res) => {
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
   const result = await pool.request().input("id", sql.Int, id).query(`
-    SELECT 
+    SELECT
       Id,
       TemplateCode,
       TemplateFileName,
@@ -127,6 +132,11 @@ export const getTemplateById = tryCatch(async (req, res) => {
       Category,
       Version,
       IsActive,
+      Models,
+      ApprovalStatus,
+      ApprovedBy,
+      ApprovedAt,
+      RejectionReason,
       CreatedBy,
       CreatedAt,
       UpdatedBy,
@@ -177,6 +187,8 @@ export const createTemplate = tryCatch(async (req, res) => {
     category,
     version = "01",
     isActive,
+    approvalStatus,
+    models,
     headerConfig,
     infoFields,
     columns,
@@ -188,7 +200,8 @@ export const createTemplate = tryCatch(async (req, res) => {
   }
 
   const templateCode = await generateTemplateCode();
-  const createdBy = req.user?.userCode || "SYSTEM";
+  // Store the creator's display name; fall back to usercode then SYSTEM
+  const createdBy = req.user?.name || req.user?.usercode || "SYSTEM";
 
   // Save JSON config to file first
   const fileResult = await saveTemplateFile({
@@ -213,15 +226,17 @@ export const createTemplate = tryCatch(async (req, res) => {
     .input("category", sql.VarChar, category || null)
     .input("version", sql.VarChar, version || "01")
     .input("isActive", sql.Bit, isActive !== false ? 1 : 0)
+    .input("approvalStatus", sql.VarChar, approvalStatus || "draft")
+    .input("models", sql.NVarChar, models ? JSON.stringify(models) : null)
     .input("createdBy", sql.VarChar, createdBy).query(`
       INSERT INTO AuditTemplates (
         TemplateCode, TemplateFileName, Name, Description, Category, Version, IsActive,
-        CreatedBy, CreatedAt, UpdatedBy, UpdatedAt
+        Models, ApprovalStatus, CreatedBy, CreatedAt, UpdatedBy, UpdatedAt
       )
       OUTPUT INSERTED.*
       VALUES (
         @templateCode, @templateFileName, @name, @description, @category, @version, @isActive,
-        @createdBy, GETDATE(), @createdBy, GETDATE()
+        @models, @approvalStatus, @createdBy, GETDATE(), @createdBy, GETDATE()
       );
     `);
 
@@ -251,17 +266,22 @@ export const updateTemplate = tryCatch(async (req, res) => {
     category,
     version,
     isActive,
+    models,
     headerConfig,
     infoFields,
     columns,
     defaultSections,
+    approvalStatus,
+    approvedBy,
+    approvedAt,
+    rejectionReason,
   } = req.body;
 
   if (!id) {
     throw new AppError("Template ID is required", 400);
   }
 
-  const updatedBy = req.user?.userCode || "SYSTEM";
+  const updatedBy = req.user?.name || req.user?.usercode || "SYSTEM";
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
 
@@ -280,46 +300,66 @@ export const updateTemplate = tryCatch(async (req, res) => {
   const currentTemplate = checkResult.recordset[0];
   const oldFileName = currentTemplate.TemplateFileName;
 
-  // Backup existing template file before update
-  if (oldFileName) {
-    try {
-      await backupTemplateFile(oldFileName);
-    } catch (err) {
-      console.warn("Could not backup template file:", err.message);
-    }
-  }
+  // Only rewrite the JSON file when actual template content is included in the request.
+  // Status-only updates (approve/reject/submit) must not overwrite sections/columns.
+  const hasFileContent =
+    headerConfig !== undefined ||
+    infoFields !== undefined ||
+    columns !== undefined ||
+    defaultSections !== undefined;
 
-  // Update JSON config file (handles rename if name changed)
-  const fileResult = await updateTemplateFile({
-    oldFileName,
-    templateName: name || currentTemplate.Name,
-    version: version || currentTemplate.Version || "01",
-    templateCode: currentTemplate.TemplateCode,
-    headerConfig: headerConfig || {},
-    infoFields: infoFields || [],
-    columns: columns || [],
-    defaultSections: defaultSections || [],
-  });
+  let resolvedFileName = oldFileName;
+
+  if (hasFileContent) {
+    if (oldFileName) {
+      try {
+        await backupTemplateFile(oldFileName);
+      } catch (err) {
+        console.warn("Could not backup template file:", err.message);
+      }
+    }
+    const fileResult = await updateTemplateFile({
+      oldFileName,
+      templateName: name || currentTemplate.Name,
+      version: version || currentTemplate.Version || "01",
+      templateCode: currentTemplate.TemplateCode,
+      headerConfig: headerConfig || {},
+      infoFields: infoFields || [],
+      columns: columns || [],
+      defaultSections: defaultSections || [],
+    });
+    resolvedFileName = fileResult.fileName;
+  }
 
   // Update metadata in database
   const result = await pool
     .request()
     .input("id", sql.Int, id)
-    .input("templateFileName", sql.VarChar, fileResult.fileName)
-    .input("name", sql.NVarChar, name)
+    .input("templateFileName", sql.VarChar, resolvedFileName)
+    .input("name", sql.NVarChar, name || currentTemplate.Name)
     .input("description", sql.NVarChar, description || null)
     .input("category", sql.VarChar, category || null)
     .input("version", sql.VarChar, version || "01")
     .input("isActive", sql.Bit, isActive !== false ? 1 : 0)
+    .input("approvalStatus", sql.VarChar, approvalStatus || currentTemplate.approvalStatus || null)
+    .input("approvedBy", sql.VarChar, approvedBy || null)
+    .input("approvedAt", sql.DateTime, approvedAt ? new Date(approvedAt) : null)
+    .input("rejectionReason", sql.NVarChar, rejectionReason || null)
+    .input("models", sql.NVarChar, models !== undefined ? JSON.stringify(models) : null)
     .input("updatedBy", sql.VarChar, updatedBy).query(`
       UPDATE AuditTemplates
-      SET 
+      SET
         TemplateFileName = @templateFileName,
         Name = @name,
         Description = @description,
         Category = @category,
         Version = @version,
         IsActive = @isActive,
+        ${models !== undefined ? "Models = @models," : ""}
+        ApprovalStatus = @approvalStatus,
+        ApprovedBy = @approvedBy,
+        ApprovedAt = @approvedAt,
+        RejectionReason = @rejectionReason,
         UpdatedBy = @updatedBy,
         UpdatedAt = GETDATE()
       OUTPUT INSERTED.*
@@ -335,10 +375,13 @@ export const updateTemplate = tryCatch(async (req, res) => {
     message: "Template updated successfully",
     data: {
       ...template,
-      HeaderConfig: headerConfig || {},
-      InfoFields: infoFields || [],
-      Columns: columns || [],
-      DefaultSections: defaultSections || [],
+      // Only echo back file fields if they were part of this request
+      ...(hasFileContent && {
+        HeaderConfig: headerConfig || {},
+        InfoFields: infoFields || [],
+        Columns: columns || [],
+        DefaultSections: defaultSections || [],
+      }),
     },
   });
 });
@@ -351,7 +394,7 @@ export const deleteTemplate = tryCatch(async (req, res) => {
     throw new AppError("Template ID is required", 400);
   }
 
-  const updatedBy = req.user?.userCode || "SYSTEM";
+  const updatedBy = req.user?.name || req.user?.usercode || "SYSTEM";
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
 
@@ -435,7 +478,7 @@ export const duplicateTemplate = tryCatch(async (req, res) => {
 
   const original = originalResult.recordset[0];
   const newTemplateCode = await generateTemplateCode();
-  const createdBy = req.user?.userCode || "SYSTEM";
+  const createdBy = req.user?.name || req.user?.usercode || "SYSTEM";
   const newName = `${original.Name} (Copy)`;
 
   // Load original template config from file
@@ -444,16 +487,17 @@ export const duplicateTemplate = tryCatch(async (req, res) => {
     try {
       originalConfig = await readTemplateFile(original.TemplateFileName);
     } catch (err) {
-      console.warn("Could not load original template config:", err.message);
+      console.warn("Could not load original template config from file:", err.message);
     }
   }
 
-  if (!originalConfig) {
+  // Fallback to database columns if file config is empty or missing
+  if (!originalConfig || !originalConfig.defaultSections || originalConfig.defaultSections.length === 0) {
     originalConfig = {
-      headerConfig: {},
-      infoFields: [],
-      columns: [],
-      defaultSections: [],
+      headerConfig: original.HeaderConfig ? JSON.parse(original.HeaderConfig) : {},
+      infoFields: original.InfoFields ? JSON.parse(original.InfoFields) : [],
+      columns: original.Columns ? JSON.parse(original.Columns) : [],
+      defaultSections: original.DefaultSections ? JSON.parse(original.DefaultSections) : [],
     };
   }
 
@@ -468,7 +512,7 @@ export const duplicateTemplate = tryCatch(async (req, res) => {
     defaultSections: originalConfig.defaultSections,
   });
 
-  // Create new template in database
+  // Create new template in database as draft so it goes through approval
   const result = await pool
     .request()
     .input("templateCode", sql.VarChar, newTemplateCode)
@@ -481,12 +525,12 @@ export const duplicateTemplate = tryCatch(async (req, res) => {
     .input("createdBy", sql.VarChar, createdBy).query(`
       INSERT INTO AuditTemplates (
         TemplateCode, TemplateFileName, Name, Description, Category, Version, IsActive,
-        CreatedBy, CreatedAt, UpdatedBy, UpdatedAt
+        ApprovalStatus, CreatedBy, CreatedAt, UpdatedBy, UpdatedAt
       )
       OUTPUT INSERTED.*
       VALUES (
         @templateCode, @templateFileName, @name, @description, @category, @version, @isActive,
-        @createdBy, GETDATE(), @createdBy, GETDATE()
+        'draft', @createdBy, GETDATE(), @createdBy, GETDATE()
       );
     `);
 

@@ -1,7 +1,8 @@
 import sql from "mssql";
-import { dbConfig3 } from "../../config/db.config.js";
+import { dbConfig1, dbConfig3 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { convertToIST } from "../../utils/convertToIST.js";
 import { generateAuditCode } from "../../utils/generateCode.js";
 import {
   processAuditImages,
@@ -225,6 +226,7 @@ export const createAudit = tryCatch(async (req, res) => {
     infoFields,
     headerConfig,
     signatures,
+    startedAt,
     status = "submitted",
   } = req.body;
 
@@ -293,17 +295,22 @@ export const createAudit = tryCatch(async (req, res) => {
       )
       .input("signatures", sql.NVarChar, JSON.stringify(signatures || {}))
       .input("summary", sql.NVarChar, JSON.stringify(summary))
+      .input("startedAt", sql.DateTime, startedAt ? new Date(startedAt) : null)
+      .input("submittedAt", sql.DateTime, status === "submitted" ? new Date() : null)
+      .input("submittedBy", sql.VarChar, status === "submitted" ? createdBy : null)
       .input("createdBy", sql.VarChar, createdBy).query(`
         INSERT INTO Audits (
           AuditCode, TemplateId, TemplateName, ReportName, FormatNo, RevNo, RevDate,
           Notes, Status, InfoData, Sections, Columns, InfoFields, HeaderConfig,
-          Signatures, Summary, CreatedBy, CreatedAt, UpdatedBy, UpdatedAt
+          Signatures, Summary, StartedAt, SubmittedAt, SubmittedBy,
+          CreatedBy, CreatedAt, UpdatedBy, UpdatedAt
         )
         OUTPUT INSERTED.*
         VALUES (
           @auditCode, @templateId, @templateName, @reportName, @formatNo, @revNo, @revDate,
           @notes, @status, @infoData, @sections, @columns, @infoFields, @headerConfig,
-          @signatures, @summary, @createdBy, GETDATE(), @createdBy, GETDATE()
+          @signatures, @summary, @startedAt, @submittedAt, @submittedBy,
+          @createdBy, GETDATE(), @createdBy, GETDATE()
         );
       `);
 
@@ -382,6 +389,9 @@ export const updateAudit = tryCatch(async (req, res) => {
     if (currentAudit.Status === "approved") {
       throw new AppError("Cannot edit an approved audit", 400);
     }
+    if (currentAudit.Status === "submitted") {
+      throw new AppError("Cannot edit a submitted audit — it is pending approval by the Line Quality Engineer", 400);
+    }
 
     let processedSections = sections;
 
@@ -424,6 +434,12 @@ export const updateAudit = tryCatch(async (req, res) => {
         notes !== undefined ? notes : currentAudit.Notes,
       )
       .input("status", sql.VarChar, status || currentAudit.Status)
+      .input("submittedAt", sql.DateTime,
+        status === "submitted" && currentAudit.Status !== "submitted"
+          ? new Date() : currentAudit.SubmittedAt || null)
+      .input("submittedBy", sql.VarChar,
+        status === "submitted" && currentAudit.Status !== "submitted"
+          ? updatedBy : currentAudit.SubmittedBy || null)
       .input(
         "infoData",
         sql.NVarChar,
@@ -448,7 +464,8 @@ export const updateAudit = tryCatch(async (req, res) => {
           ReportName = @reportName, FormatNo = @formatNo, RevNo = @revNo,
           RevDate = @revDate, Notes = @notes, Status = @status,
           InfoData = @infoData, Sections = @sections, Signatures = @signatures,
-          Summary = @summary, UpdatedBy = @updatedBy, UpdatedAt = GETDATE()
+          Summary = @summary, SubmittedAt = @submittedAt, SubmittedBy = @submittedBy,
+          UpdatedBy = @updatedBy, UpdatedAt = GETDATE()
         OUTPUT INSERTED.*
         WHERE Id = @id AND IsDeleted = 0;
       `);
@@ -579,16 +596,26 @@ export const approveAudit = tryCatch(async (req, res) => {
       );
     }
 
+    // Merge approver name + date into the Signatures JSON
+    const today = new Date().toISOString().split("T")[0];
+    const existingSignatures = safeJsonParse(currentAudit.Signatures, {});
+    const updatedSignatures = {
+      ...existingSignatures,
+      approver: { name: approverName, date: today },
+    };
+
     const result = await pool
       .request()
       .input("id", sql.Int, id)
       .input("approvedBy", sql.VarChar, approverName)
       .input("comments", sql.NVarChar, comments || null)
+      .input("signatures", sql.NVarChar, JSON.stringify(updatedSignatures))
       .input("updatedBy", sql.VarChar, approvedBy).query(`
         UPDATE Audits
-        SET 
+        SET
           Status = 'approved', ApprovedBy = @approvedBy, ApprovedAt = GETDATE(),
-          ApprovalComments = @comments, UpdatedBy = @updatedBy, UpdatedAt = GETDATE()
+          ApprovalComments = @comments, Signatures = @signatures,
+          UpdatedBy = @updatedBy, UpdatedAt = GETDATE()
         OUTPUT INSERTED.*
         WHERE Id = @id AND IsDeleted = 0;
       `);
@@ -783,4 +810,102 @@ export const getAuditStats = tryCatch(async (req, res) => {
   } finally {
     if (pool) await pool.close();
   }
+});
+
+// ==================== GET AUDIT MODEL SUMMARY ====================
+export const getAuditModelSummary = tryCatch(async (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  const now = new Date();
+
+  // Mirror LPT exactly: today 08:00 → tomorrow 20:00 (local), then IST-shifted
+  const defaultStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0, 0);
+  const defaultEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 20, 0, 0);
+
+  const start = convertToIST(startDate ? new Date(startDate) : defaultStart);
+  const end   = convertToIST(endDate   ? new Date(endDate)   : defaultEnd);
+
+  // ── Step 1: Production count + Audit Required per model (production DB) ──
+  let prodRows = [];
+  const prodPool = await new sql.ConnectionPool(dbConfig1).connect();
+  try {
+    const res1 = await prodPool.request()
+      .input("StartDate", sql.DateTime, start)
+      .input("EndDate",   sql.DateTime, end)
+      .query(`
+        WITH PROD AS (
+          SELECT
+            c.Name  AS ModelName,
+            cnt.ModelCount,
+            1       AS AuditRequired
+          FROM (
+            SELECT b.Material, COUNT(*) AS ModelCount
+            FROM   ProcessActivity  a
+            INNER JOIN MaterialBarcode b ON a.PSNo = b.DocNo
+            WHERE  a.StationCode IN (1220010, 1230017)
+              AND  a.ActivityType = 5
+              AND  a.ActivityOn   BETWEEN @StartDate AND @EndDate
+              AND  b.Type NOT IN (0, 200)
+            GROUP BY b.Material
+          ) AS cnt
+          INNER JOIN Material c ON cnt.Material = c.MatCode
+        )
+        SELECT ModelName, ModelCount, AuditRequired
+        FROM   PROD
+        WHERE  ModelCount > 0
+        ORDER BY ModelCount DESC;
+      `);
+    prodRows = res1.recordset;
+  } finally {
+    await prodPool.close();
+  }
+
+  // ── Step 2: Audit done count per model (audit DB) ──
+  let auditRows = [];
+  const auditPool = await new sql.ConnectionPool(dbConfig3).connect();
+  try {
+    const res2 = await auditPool.request()
+      .input("StartDate", sql.DateTime, start)
+      .input("EndDate",   sql.DateTime, end)
+      .query(`
+        SELECT
+          JSON_VALUE(InfoData, '$.modelName') AS ModelName,
+          COUNT(*)                            AS AuditDone
+        FROM Audits
+        WHERE  IsDeleted = 0
+          AND  CreatedAt BETWEEN @StartDate AND @EndDate
+          AND  JSON_VALUE(InfoData, '$.modelName') IS NOT NULL
+        GROUP BY JSON_VALUE(InfoData, '$.modelName');
+      `);
+    auditRows = res2.recordset;
+  } finally {
+    await auditPool.close();
+  }
+
+  // ── Step 3: Merge ──
+  const auditMap = {};
+  auditRows.forEach((r) => { if (r.ModelName) auditMap[r.ModelName] = r.AuditDone; });
+
+  const data = prodRows.map((r) => {
+    const auditDone = auditMap[r.ModelName] || 0;
+    const pending   = Math.max(0, r.AuditRequired - auditDone);
+    const percentage = r.AuditRequired > 0
+      ? parseFloat(((auditDone * 100) / r.AuditRequired).toFixed(2))
+      : 0;
+    return {
+      modelName:     r.ModelName,
+      production:    r.ModelCount,
+      auditRequired: r.AuditRequired,
+      auditDone,
+      pending,
+      percentage,
+    };
+  });
+
+  res.status(200).json({
+    success: true,
+    data,
+    startDate: start.toISOString(),
+    endDate:   end.toISOString(),
+  });
 });

@@ -40,6 +40,30 @@ app.use("/uploads", express.static(path.resolve("uploads"))); // Static files
     global.pool3 = await connectToDB(dbConfig3);
     //global.pool3 = await connectToDB(dbConfig4);
     console.log("Successfully connected to all databases.");
+
+    // ── Schema migrations (idempotent) ──────────────────────────────────────
+    await global.pool3.request().query(`
+      IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = 'AuditTemplates' AND COLUMN_NAME = 'Models'
+      )
+      BEGIN
+        ALTER TABLE AuditTemplates ADD Models NVARCHAR(MAX) NULL;
+        PRINT 'Migration: Added Models column to AuditTemplates';
+      END
+    `);
+
+    await global.pool3.request().query(`
+      IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = 'Audits' AND COLUMN_NAME = 'StartedAt'
+      )
+      BEGIN
+        ALTER TABLE Audits ADD StartedAt DATETIME NULL;
+        PRINT 'Migration: Added StartedAt column to Audits';
+      END
+    `);
+
   } catch (error) {
     console.error("Database connection failed:", error);
     process.exit(1);

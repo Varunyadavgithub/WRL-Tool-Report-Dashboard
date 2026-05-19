@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useSelector } from "react-redux";
 import {
   FaCalendarAlt,
   FaClock,
@@ -31,6 +32,8 @@ import {
   FaKeyboard,
   FaCheckDouble,
   FaBan,
+  FaFileAlt,
+  FaHourglassHalf,
 } from "react-icons/fa";
 import {
   MdFormatListNumbered,
@@ -45,6 +48,7 @@ import { useGetModelVariantsByAssemblyQuery } from "../../../redux/api/commonApi
 import toast from "react-hot-toast";
 import { getCurrentShift } from "../../../utils/shiftUtils.js";
 import { baseURL } from "../../../assets/assets.js";
+import { ROLES } from "../../../config/routes.config";
 
 // ==================== CONSTANTS ====================
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -266,16 +270,27 @@ const AuditEntry = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
-  const templateId = searchParams.get("template");
+  const templateId    = searchParams.get("template");
+  const serialFromUrl = searchParams.get("serial") || "";
+  const { user } = useSelector((store) => store.auth);
+
+  // Capture the moment the operator opened the audit form
+  const startedAtRef = useRef(new Date().toISOString());
 
   const {
     getTemplateById,
     getAuditById,
     createAudit,
     updateAudit,
+    approveAudit,
+    rejectAudit,
     loading,
     error,
   } = useAuditData();
+
+  const isAdmin        = [user?.role, user?.roleName].includes(ROLES.SUPER_ADMIN);
+  const isLQE          = [user?.role, user?.roleName].includes(ROLES.LINE_QUALITY_ENGINEER);
+  const isQualityOp    = [user?.role, user?.roleName].includes(ROLES.QUALITY_OPERATOR);
 
   const [saving, setSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState("idle");
@@ -283,6 +298,11 @@ const AuditEntry = () => {
   const [template, setTemplate] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Approval modal (used by Line Quality Engineer)
+  const [approvalModal, setApprovalModal]     = useState({ open: false, action: null });
+  const [approvalComments, setApprovalComments] = useState("");
+  const [approving, setApproving]             = useState(false);
 
   // Section collapse state
   const [collapsedSections, setCollapsedSections] = useState({});
@@ -361,6 +381,10 @@ const AuditEntry = () => {
     revDate: "",
     notes: "",
     status: "submitted",
+    createdBy: "",
+    approvalComments: "",
+    startedAt: "",
+    submittedAt: "",
   });
   const [infoData, setInfoData] = useState({});
   const [sections, setSections] = useState([]);
@@ -381,7 +405,7 @@ const AuditEntry = () => {
         modelCode: first.value,
       }));
       setModelFetched(true);
-      toast.success(`Model found: ${first.label}`, { icon: "??" });
+      toast.success(`Model found: ${first.label}`);
     } else if (modelVariants?.length === 0 && debouncedSerial) {
       toast.error("No model found for this serial number");
     }
@@ -448,7 +472,7 @@ const AuditEntry = () => {
             : section,
         ),
       );
-      toast.success(`Image uploaded!`, { icon: "??" });
+      toast.success("Image uploaded!");
     } catch (err) {
       toast.error(err.message);
     }
@@ -573,6 +597,10 @@ const AuditEntry = () => {
               revDate: audit.revDate || "",
               notes: audit.notes || "",
               status: audit.status || "submitted",
+              createdBy: audit.createdBy || "",
+              approvalComments: audit.approvalComments || "",
+              startedAt: audit.startedAt || "",
+              submittedAt: audit.submittedAt || "",
             });
             const existingInfoData = audit.infoData || {};
             setInfoData(existingInfoData);
@@ -597,6 +625,12 @@ const AuditEntry = () => {
         } else if (templateId) {
           const tmpl = await getTemplateById(templateId);
           if (tmpl) {
+            // Check if template is approved (admin can use any template)
+            if (!isAdmin && tmpl.approvalStatus !== "approved") {
+              toast.error("Template is not approved. Please use an approved template.");
+              navigate("/auditreport/templates");
+              return;
+            }
             setTemplate(tmpl);
             const todayDate = getCurrentDate();
             const shift = getCurrentShift();
@@ -612,17 +646,30 @@ const AuditEntry = () => {
             });
             const initialInfoData = {};
             tmpl.infoFields?.forEach((field) => {
-              initialInfoData[field.id] =
-                field.id === "date"
-                  ? todayDate
-                  : field.id === "shift"
-                    ? shift.value
-                    : "";
+              if (field.id === "date") {
+                initialInfoData[field.id] = todayDate;
+              } else if (field.id === "shift") {
+                initialInfoData[field.id] = shift.value;
+              } else if (field.id === "serialNo" || field.id === "serial") {
+                initialInfoData[field.id] = serialFromUrl;
+              } else {
+                initialInfoData[field.id] = "";
+              }
             });
+
+            // Pre-fill serial from URL — the debounce + RTK Query will
+            // automatically fetch and populate modelName from MaterialBarcode
+            if (serialFromUrl) {
+              setSerialNo(serialFromUrl);
+            }
+
             setInfoData(initialInfoData);
             setSections(migrateTemplateStructure(tmpl.defaultSections));
             setSignatures({
-              auditor: { name: "", date: todayDate },
+              auditor: {
+                name: user?.name || user?.userCode || user?.usercode || "",
+                date: todayDate,
+              },
               reviewer: { name: "", date: "" },
               approver: { name: "", date: "" },
             });
@@ -638,6 +685,58 @@ const AuditEntry = () => {
     };
     loadData();
   }, [id, templateId]);
+
+  // ── Permissions (recalculate whenever auditData or user changes) ─────────────
+  const isOwner = !!id && !!auditData.createdBy &&
+    (user?.userCode === auditData.createdBy || user?.name === auditData.createdBy ||
+     user?.usercode === auditData.createdBy);
+
+  const canEdit =
+    auditData.status !== 'approved' &&                              // approved = read-only for everyone
+    (
+      !id ||                                                        // new audit
+      (isAdmin && auditData.status !== 'submitted') ||             // admin can edit draft/rejected only
+      (['draft', 'rejected'].includes(auditData.status) && (isOwner || isAdmin))
+    );
+
+  // LQE or Super Admin reviewing a submitted audit
+  const isLQEReview = !!id && (isLQE || isAdmin) && auditData.status === 'submitted';
+
+  // Force preview-mode (read-only) when the user cannot edit
+  useEffect(() => {
+    if (!initialLoading && id && !canEdit) setShowPreview(true);
+  }, [initialLoading, canEdit, id]);
+
+  // ── Approval handlers (Line Quality Engineer) ────────────────────────────────
+  const handleAuditApproval = async () => {
+    if (!id) return;
+    const isApprove = approvalModal.action === 'approve';
+    if (!isApprove && !approvalComments.trim()) {
+      toast.error("Rejection reason is required");
+      return;
+    }
+    setApproving(true);
+    try {
+      const payload = {
+        approverName: user?.name || user?.userCode || user?.usercode || "LQE",
+        comments: approvalComments.trim() || null,
+      };
+      if (isApprove) {
+        await approveAudit(id, payload);
+        toast.success("Audit approved successfully");
+      } else {
+        await rejectAudit(id, payload);
+        toast.success("Audit rejected — returned to operator for correction");
+      }
+      setApprovalModal({ open: false, action: null });
+      setApprovalComments("");
+      navigate("/auditreport/audits");
+    } catch (err) {
+      toast.error(err.message || "Action failed");
+    } finally {
+      setApproving(false);
+    }
+  };
 
   // Handlers
   const handleSerialChange = useCallback((value) => {
@@ -722,9 +821,7 @@ const AuditEntry = () => {
           : section,
       ),
     );
-    toast.success(`All checkpoints set to "${STATUS_CONFIG[status]?.label}"`, {
-      icon: "?",
-    });
+    toast.success(`All checkpoints set to "${STATUS_CONFIG[status]?.label}"`);
   };
 
   const toggleSection = (sectionId) => {
@@ -734,7 +831,10 @@ const AuditEntry = () => {
     }));
   };
 
-  const visibleColumns = template?.columns?.filter((col) => col.visible) || [];
+  // "section" is shown as a sticky group-header bar outside the table.
+  // Including it in visibleColumns creates a <th> with no matching <td> (body returns null),
+  // which shifts every body column one position right — making specification appear blank.
+  const visibleColumns = template?.columns?.filter((col) => col.visible && col.id !== "section") || [];
 
   const getSummary = useCallback(() => {
     let pass = 0,
@@ -842,6 +942,7 @@ const AuditEntry = () => {
         revDate: auditData.revDate || null,
         notes: auditData.notes || null,
         status: "submitted",
+        startedAt: auditData.startedAt || startedAtRef.current,
         infoData: finalInfoData,
         sections,
         signatures,
@@ -858,6 +959,54 @@ const AuditEntry = () => {
       console.error("Submit error:", error);
       setAutoSaveStatus("error");
       toast.error(error.message || "Error submitting audit.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Save as Draft
+  const handleSaveAsDraft = async () => {
+    if (!auditData.templateId) {
+      toast.error("Template is required");
+      return;
+    }
+
+    setSaving(true);
+    setAutoSaveStatus("saving");
+    try {
+      const finalInfoData = {
+        ...infoData,
+        serialNo: serialNo.trim() || "",
+        serial: serialNo.trim() || "",
+        shift: infoData.shift || currentShift.value,
+        date: infoData.date || currentDate,
+      };
+      const auditPayload = {
+        templateId: parseInt(auditData.templateId, 10),
+        templateName: auditData.templateName,
+        reportName: auditData.reportName || "Draft Audit",
+        formatNo: auditData.formatNo || null,
+        revNo: auditData.revNo || null,
+        revDate: auditData.revDate || null,
+        notes: auditData.notes || null,
+        status: "draft",
+        startedAt: auditData.startedAt || startedAtRef.current,
+        infoData: finalInfoData,
+        sections,
+        signatures,
+        columns: template?.columns || [],
+        infoFields: template?.infoFields || [],
+        headerConfig: template?.headerConfig || {},
+      };
+      if (id) await updateAudit(id, auditPayload);
+      else await createAudit(auditPayload);
+      setAutoSaveStatus("idle");
+      toast.success("Audit saved as draft");
+      setTimeout(() => navigate("/auditreport/audits"), 500);
+    } catch (error) {
+      console.error("Save as draft error:", error);
+      setAutoSaveStatus("error");
+      toast.error(error.message || "Error saving audit as draft.");
     } finally {
       setSaving(false);
     }
@@ -956,13 +1105,13 @@ const AuditEntry = () => {
                   className={`text-xs mt-1 block ${infoData.modelName ? "text-green-600" : "text-gray-400"}`}
                 >
                   {isLoadingModels || isFetchingModels
-                    ? "? Fetching model data…"
+                    ? "Fetching model data…"
                     : !serialNo
-                      ? "? Enter serial number first"
+                      ? "Enter serial number first"
                       : infoData.modelName
-                        ? `? Code: ${infoData.modelCode || "N/A"}`
+                        ? `Code: ${infoData.modelCode || "N/A"}`
                         : debouncedSerial
-                          ? "? No model found"
+                          ? "No model found"
                           : "Waiting for serial…"}
                 </span>
               </>
@@ -981,7 +1130,7 @@ const AuditEntry = () => {
               className="w-full font-semibold text-amber-800 bg-amber-50 border-b-2 border-amber-200 outline-none rounded px-2 py-1 cursor-not-allowed"
             />
             <span className="text-xs text-amber-600 mt-1 block">
-              ? Auto: {currentShift.label}
+              Auto: {currentShift.label}
             </span>
           </div>
         );
@@ -997,7 +1146,7 @@ const AuditEntry = () => {
               className="w-full font-semibold text-red-800 bg-red-50 border-b-2 border-red-200 outline-none rounded px-2 py-1 cursor-not-allowed"
             />
             <span className="text-xs text-red-500 mt-1 block">
-              ? Auto: Today's Date
+              Auto: Today's Date
             </span>
           </div>
         );
@@ -1219,7 +1368,7 @@ const AuditEntry = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 font-sans">
+    <div className="min-h-screen bg-gray-50 font-sans">
       {/* ==================== Image Preview Modal ==================== */}
       {imagePreview && (
         <div
@@ -1230,7 +1379,7 @@ const AuditEntry = () => {
             className="relative max-w-4xl w-full max-h-[90vh] bg-white rounded-2xl overflow-hidden shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-4 py-3 bg-gray-900 text-white">
+            <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100 text-gray-700">
               <div className="flex items-center gap-2">
                 <FaImage className="text-indigo-400" />
                 <span className="font-medium text-sm">
@@ -1313,8 +1462,8 @@ const AuditEntry = () => {
       )}
 
       {/* ==================== STICKY HEADER ==================== */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3 max-w-[1600px] mx-auto">
+      <div className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
+        <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3 w-full">
           <div className="flex items-center gap-3 flex-wrap">
             <button
               onClick={() => navigate("/auditreport/audits")}
@@ -1335,13 +1484,25 @@ const AuditEntry = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-600 border border-red-100 flex items-center gap-1">
                 <FaCalendarAlt size={10} /> {formatDateForDisplay(currentDate)}
               </span>
               <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-600 border border-amber-100 flex items-center gap-1">
                 <FaClock size={10} /> {currentShift.label}
               </span>
+              {/* Audit Start Time */}
+              <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center gap-1" title="Audit started at">
+                <FaClock size={10} />
+                Start: {new Date(auditData.startedAt || startedAtRef.current).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+              </span>
+              {/* Audit End / Submitted Time */}
+              {auditData.submittedAt && (
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1" title="Audit submitted at">
+                  <FaCheckCircle size={10} />
+                  End: {new Date(auditData.submittedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                </span>
+              )}
             </div>
 
             <AutoSaveIndicator status={autoSaveStatus} />
@@ -1362,29 +1523,62 @@ const AuditEntry = () => {
             >
               <FaPrint size={14} />
             </button>
-            <button
-              onClick={() => setShowPreview(!showPreview)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
-                showPreview
-                  ? "bg-amber-500 hover:bg-amber-600 text-white"
-                  : "bg-gray-700 hover:bg-gray-800 text-white"
-              }`}
-            >
-              {showPreview ? (
-                <>
-                  <FaEdit size={12} /> Edit
-                </>
-              ) : (
-                <>
-                  <FaEye size={12} /> Preview
-                </>
-              )}
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={saving || isLoadingModels}
-              className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm transition-all shadow-md shadow-indigo-200"
-            >
+
+            {/* Preview/Edit toggle — only when user can edit */}
+            {canEdit && (
+              <button
+                onClick={() => setShowPreview(!showPreview)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all border ${
+                  showPreview
+                    ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200"
+                    : "bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200"
+                }`}
+              >
+                {showPreview ? (
+                  <><FaEdit size={12} /> Edit</>
+                ) : (
+                  <><FaEye size={12} /> Preview</>
+                )}
+              </button>
+            )}
+
+            {/* LQE: Approve / Reject buttons */}
+            {isLQEReview && (
+              <>
+                <button
+                  onClick={() => { setApprovalComments(""); setApprovalModal({ open: true, action: 'reject' }); }}
+                  className="flex items-center gap-2 px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold text-sm transition-all shadow-md shadow-red-200"
+                >
+                  <FaTimesCircle size={12} /> Reject
+                </button>
+                <button
+                  onClick={() => { setApprovalComments(""); setApprovalModal({ open: true, action: 'approve' }); }}
+                  className="flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-sm transition-all shadow-md shadow-emerald-200"
+                >
+                  <FaCheckCircle size={12} /> Approve
+                </button>
+              </>
+            )}
+
+            {/* Save / Submit — only for editable audits */}
+            {canEdit && (
+              <>
+                <button
+                  onClick={handleSaveAsDraft}
+                  disabled={saving || isLoadingModels}
+                  className="flex items-center gap-2 px-5 py-2 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm transition-all shadow-md shadow-gray-200"
+                >
+                  {saving ? (
+                    <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving…</>
+                  ) : (
+                    <><FaFileAlt size={12} /> Save as Draft</>
+                  )}
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={saving || isLoadingModels}
+                  className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm transition-all shadow-md shadow-indigo-200"
+                >
               {saving ? (
                 <>
                   <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />{" "}
@@ -1395,13 +1589,15 @@ const AuditEntry = () => {
                   <FaPaperPlane size={12} /> Submit
                 </>
               )}
-            </button>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
 
       {/* ==================== MAIN LAYOUT ==================== */}
-      <div className="max-w-[1600px] mx-auto px-4 py-5 flex gap-4">
+      <div className="w-full px-4 py-4 flex gap-4">
         {/* ==================== LEFT SIDEBAR ==================== */}
         <aside className="hidden xl:flex flex-col gap-4 w-64 flex-shrink-0">
           <ProgressBar summary={summary} />
@@ -1494,31 +1690,78 @@ const AuditEntry = () => {
 
         {/* ==================== MAIN CONTENT ==================== */}
         <div className="flex-1 min-w-0">
+
+          {/* ── Status Banner ─────────────────────────────────────────────── */}
+          {id && auditData.status === 'submitted' && !isLQEReview && (
+            <div className="mb-3 flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm">
+              <FaHourglassHalf className="text-amber-500 flex-shrink-0" />
+              <div>
+                <p className="font-bold text-amber-800">Submitted — Pending Approval</p>
+                <p className="text-xs text-amber-600 mt-0.5">This audit has been submitted to the Line Quality Engineer for review. Editing is locked until a decision is made.</p>
+              </div>
+            </div>
+          )}
+          {id && auditData.status === 'submitted' && isLQEReview && (
+            <div className="mb-3 flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl text-sm">
+              <FaUserCheck className="text-blue-500 flex-shrink-0" />
+              <div>
+                <p className="font-bold text-blue-800">Pending Your Approval</p>
+                <p className="text-xs text-blue-600 mt-0.5">Review the audit below and use the Approve / Reject buttons in the header.</p>
+              </div>
+            </div>
+          )}
+          {id && auditData.status === 'rejected' && (
+            <div className="mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <FaTimesCircle className="text-red-500 flex-shrink-0" />
+                <p className="font-bold text-red-800">Rejected — Corrections Required</p>
+              </div>
+              {auditData.approvalComments && (
+                <div className="mt-2 ml-5 px-3 py-2 bg-red-100 border border-red-200 rounded-lg">
+                  <p className="text-[10px] text-red-500 font-bold uppercase tracking-wider mb-0.5">Rejection Remark</p>
+                  <p className="text-xs text-red-700 font-medium">{auditData.approvalComments}</p>
+                </div>
+              )}
+              <p className="text-xs text-red-500 mt-2 ml-5">Please make the necessary corrections and resubmit.</p>
+            </div>
+          )}
+          {id && auditData.status === 'approved' && (
+            <div className="mb-3 flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm">
+              <FaCheckCircle className="text-emerald-500 flex-shrink-0" />
+              <p className="font-bold text-emerald-800">Approved — This audit has been approved and is now read-only.</p>
+            </div>
+          )}
+
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             {/* ==================== REPORT HEADER ==================== */}
-            <div className="grid grid-cols-1 md:grid-cols-3 border-b-2 border-gray-100">
-              <div className="md:col-span-2 bg-gradient-to-br from-slate-800 to-indigo-900 p-7">
+            <div className="grid grid-cols-1 md:grid-cols-3 border-b border-gray-100">
+              <div className="md:col-span-2 bg-indigo-50 border-r border-indigo-100 p-6">
                 <div className="flex items-start gap-4">
-                  <div className="p-3 bg-white/10 rounded-xl">
-                    <HiClipboardDocumentCheck className="text-3xl text-white" />
+                  <div className="p-3 bg-indigo-100 rounded-xl flex-shrink-0">
+                    <HiClipboardDocumentCheck className="text-2xl text-indigo-600" />
                   </div>
                   <div>
-                    <h1 className="text-2xl font-black text-white leading-tight">
+                    <h1 className="text-xl font-black text-gray-900 leading-tight">
                       {auditData.reportName || "Audit Report"}
                     </h1>
-                    <p className="text-indigo-300 text-sm mt-1">
+                    <p className="text-indigo-500 text-sm mt-1">
                       Template: {auditData.templateName}
                     </p>
-                    <div className="flex items-center gap-2 mt-3">
-                      <span className="px-2.5 py-1 bg-white/10 rounded-full text-xs text-white">
+                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                      <span className="px-2.5 py-1 bg-white border border-indigo-100 rounded-full text-xs text-indigo-700 font-semibold">
                         {summary.total} Checkpoints
                       </span>
-                      <span className="px-2.5 py-1 bg-green-500/20 rounded-full text-xs text-green-300">
+                      <span className="px-2.5 py-1 bg-emerald-50 border border-emerald-100 rounded-full text-xs text-emerald-700 font-semibold">
                         {summary.pass} Passed
                       </span>
                       {summary.fail > 0 && (
-                        <span className="px-2.5 py-1 bg-red-500/20 rounded-full text-xs text-red-300">
+                        <span className="px-2.5 py-1 bg-red-50 border border-red-100 rounded-full text-xs text-red-600 font-semibold">
                           {summary.fail} Failed
+                        </span>
+                      )}
+                      {summary.pending > 0 && (
+                        <span className="px-2.5 py-1 bg-amber-50 border border-amber-100 rounded-full text-xs text-amber-700 font-semibold">
+                          {summary.pending} Pending
                         </span>
                       )}
                     </div>
@@ -1526,7 +1769,7 @@ const AuditEntry = () => {
                 </div>
               </div>
 
-              <div className="bg-gray-50 divide-y divide-gray-100">
+              <div className="bg-white divide-y divide-gray-100">
                 {template?.headerConfig?.showFormatNo !== false && (
                   <div className="p-3.5 flex items-center gap-3">
                     <MdFormatListNumbered className="text-xl text-indigo-500 flex-shrink-0" />
@@ -1566,6 +1809,35 @@ const AuditEntry = () => {
                     </div>
                   </div>
                 )}
+                {/* Audit Start */}
+                <div className="p-3.5 flex items-center gap-3">
+                  <FaClock className="text-lg text-indigo-500 flex-shrink-0" />
+                  <div>
+                    <span className="text-[10px] text-gray-400 uppercase tracking-widest block">
+                      Audit Start
+                    </span>
+                    <span className="font-bold text-gray-700 text-sm">
+                      {(() => {
+                        const t = auditData.startedAt || startedAtRef.current;
+                        return t ? new Date(t).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true }) : "—";
+                      })()}
+                    </span>
+                  </div>
+                </div>
+                {/* Audit End */}
+                <div className="p-3.5 flex items-center gap-3">
+                  <FaCheckCircle className="text-lg text-emerald-500 flex-shrink-0" />
+                  <div>
+                    <span className="text-[10px] text-gray-400 uppercase tracking-widest block">
+                      Audit End
+                    </span>
+                    <span className="font-bold text-gray-700 text-sm">
+                      {auditData.submittedAt
+                        ? new Date(auditData.submittedAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })
+                        : "—"}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1663,42 +1935,42 @@ const AuditEntry = () => {
                   className="border-b border-gray-100 last:border-b-0"
                 >
                   {/* Section Header */}
-                  <div className="flex items-center justify-between px-4 py-3 bg-slate-700 text-white sticky top-[57px] z-20">
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-50 border-b border-indigo-100 sticky top-[57px] z-20">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <button
                         onClick={() => toggleSection(section.id)}
-                        className="p-1 hover:bg-white/10 rounded transition"
+                        className="p-1 hover:bg-indigo-100 rounded transition text-indigo-400"
                       >
                         {isCollapsed ? (
-                          <FaChevronDown size={12} />
+                          <FaChevronDown size={11} />
                         ) : (
-                          <FaChevronUp size={12} />
+                          <FaChevronUp size={11} />
                         )}
                       </button>
-                      <span className="font-bold text-sm truncate">
+                      <span className="font-black text-sm text-indigo-800 truncate">
                         {section.sectionName || "Unnamed Section"}
                       </span>
-                      <span className="text-slate-300 text-xs flex-shrink-0">
+                      <span className="text-indigo-400 text-xs flex-shrink-0">
                         {sectionStats.total} checks
                       </span>
                       <div className="hidden sm:flex items-center gap-1 text-xs">
                         {sectionStats.pass > 0 && (
-                          <span className="bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full">
-                            {sectionStats.pass}?
+                          <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">
+                            {sectionStats.pass} pass
                           </span>
                         )}
                         {sectionStats.fail > 0 && (
-                          <span className="bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full">
-                            {sectionStats.fail}?
+                          <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-semibold">
+                            {sectionStats.fail} fail
                           </span>
                         )}
                         {sectionStats.warning > 0 && (
-                          <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full">
-                            {sectionStats.warning}!
+                          <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">
+                            {sectionStats.warning} warn
                           </span>
                         )}
                         {sectionStats.pending > 0 && (
-                          <span className="bg-white/10 text-slate-300 px-2 py-0.5 rounded-full">
+                          <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-semibold">
                             {sectionStats.pending} pending
                           </span>
                         )}
@@ -1708,32 +1980,32 @@ const AuditEntry = () => {
                     {/* Bulk Actions */}
                     {!showPreview && (
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <span className="text-xs text-slate-400 mr-1 hidden sm:inline">
+                        <span className="text-xs text-indigo-300 mr-1 hidden sm:inline">
                           Bulk:
                         </span>
                         {[
                           {
                             status: "pass",
                             icon: FaCheckDouble,
-                            color: "hover:bg-green-500/30 text-green-300",
+                            color: "hover:bg-emerald-100 text-emerald-600",
                             title: "All Pass",
                           },
                           {
                             status: "fail",
                             icon: FaTimesCircle,
-                            color: "hover:bg-red-500/30 text-red-300",
+                            color: "hover:bg-red-100 text-red-500",
                             title: "All Fail",
                           },
                           {
                             status: "warning",
                             icon: FaExclamationTriangle,
-                            color: "hover:bg-amber-500/30 text-amber-300",
+                            color: "hover:bg-amber-100 text-amber-500",
                             title: "All Warning",
                           },
                           {
                             status: "na",
                             icon: FaBan,
-                            color: "hover:bg-blue-500/30 text-blue-300",
+                            color: "hover:bg-blue-100 text-blue-500",
                             title: "All N/A",
                           },
                         ].map(({ status, icon: Icon, color, title }) => (
@@ -1752,7 +2024,7 @@ const AuditEntry = () => {
 
                   {/* Collapsed indicator */}
                   {isCollapsed && (
-                    <div className="px-4 py-2 bg-slate-50 text-xs text-gray-400 flex items-center justify-between">
+                    <div className="px-4 py-2 bg-indigo-50/50 text-xs text-indigo-400 flex items-center justify-between border-b border-indigo-100">
                       <span>{sectionStats.total} checkpoints hidden</span>
                       <span>{sectionPct}% complete</span>
                     </div>
@@ -1763,14 +2035,14 @@ const AuditEntry = () => {
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="bg-gray-50 border-b border-gray-200">
+                          <tr className="bg-gray-50 border-b border-gray-100">
                             {visibleColumns.map((column) => (
                               <th
                                 key={column.id}
-                                className={`px-3 py-2.5 text-left font-semibold text-xs uppercase tracking-wide border-r border-gray-200 last:border-r-0 whitespace-nowrap ${column.width} ${
+                                className={`px-3 py-2.5 text-left font-bold text-[10px] uppercase tracking-wider border-r border-gray-100 last:border-r-0 whitespace-nowrap ${column.width} ${
                                   column.entryField || column.type === "image"
-                                    ? "text-indigo-700 bg-indigo-50"
-                                    : "text-gray-500"
+                                    ? "text-indigo-600 bg-indigo-50/60"
+                                    : "text-gray-500 bg-gray-50"
                                 }`}
                               >
                                 <div className="flex items-center gap-1">
@@ -2117,106 +2389,193 @@ const AuditEntry = () => {
             </div>
 
             {/* ==================== SIGNATURES ==================== */}
-            <div className="grid grid-cols-1 md:grid-cols-2 border-t-2 border-gray-100">
-              {[
-                {
-                  role: "auditor",
-                  label: "Auditor Signature",
-                  icon: FaUserCheck,
-                  color: "text-indigo-600",
-                  ring: "focus:ring-indigo-100 focus:border-indigo-400",
-                },
-                {
-                  role: "approver",
-                  label: "Approved By",
-                  icon: FaUserShield,
-                  color: "text-purple-600",
-                  ring: "focus:ring-purple-100 focus:border-purple-400",
-                },
-              ].map(({ role, label, icon: Icon, color, ring }, i) => (
-                <div
-                  key={role}
-                  className={`p-6 ${i === 0 ? "border-r border-gray-100" : ""}`}
-                >
-                  <div className="flex items-center gap-2 mb-4">
-                    <Icon className={`text-lg ${color}`} />
-                    <span className="text-sm font-bold text-gray-700">
-                      {label}
-                    </span>
-                  </div>
-                  {showPreview ? (
-                    <div className="text-center py-4">
-                      <div className="border-b-2 border-gray-300 w-3/4 mx-auto pb-6 mb-2">
-                        <span className="text-gray-700 font-semibold text-lg">
-                          {signatures[role]?.name || ""}
-                        </span>
-                      </div>
-                      <span className="text-xs text-gray-400">
-                        {formatDateForDisplay(signatures[role]?.date) || "Date"}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                          Name
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Enter full name"
-                          value={signatures[role]?.name || ""}
-                          onChange={(e) =>
-                            handleSignatureChange(role, "name", e.target.value)
-                          }
-                          className={`w-full text-sm text-gray-700 bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 transition-all ${ring}`}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                          Date
-                        </label>
-                        <input
-                          type="date"
-                          value={signatures[role]?.date || ""}
-                          onChange={(e) =>
-                            handleSignatureChange(role, "date", e.target.value)
-                          }
-                          className={`w-full text-sm text-gray-700 bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 transition-all ${ring}`}
-                        />
-                      </div>
-                    </div>
-                  )}
+            <div className="border-t border-gray-100 grid grid-cols-1 md:grid-cols-2">
+              {/* Auditor */}
+              <div className="px-6 py-5 flex items-center gap-6 border-r border-gray-100">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <FaUserCheck className="text-indigo-500" />
+                  <span className="text-sm font-bold text-gray-700">Auditor</span>
                 </div>
-              ))}
+                <div className="flex items-center gap-6">
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Name</p>
+                    <p className="text-sm font-semibold text-gray-800">{signatures.auditor?.name || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Date</p>
+                    <p className="text-sm font-semibold text-gray-800">{formatDateForDisplay(signatures.auditor?.date) || "—"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Approver */}
+              <div className="px-6 py-5 flex items-center gap-6">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <FaUserShield className="text-purple-500" />
+                  <span className="text-sm font-bold text-gray-700">Approved By</span>
+                </div>
+                <div className="flex items-center gap-6">
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Name</p>
+                    <p className="text-sm font-semibold text-gray-800">{signatures.approver?.name || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Date</p>
+                    <p className="text-sm font-semibold text-gray-800">{formatDateForDisplay(signatures.approver?.date) || "—"}</p>
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {/* ==================== LQE INLINE REVIEW PANEL ==================== */}
+            {isLQEReview && (
+              <div className="border-t border-blue-100 bg-blue-50/40 px-6 py-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <FaUserCheck className="text-blue-500" />
+                  <h3 className="text-sm font-black text-blue-800">Review Decision</h3>
+                  <span className="text-xs text-blue-500 ml-1">— Add remarks and approve or reject this audit</span>
+                </div>
+                <div className="mb-4">
+                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1.5">
+                    Remarks <span className="text-red-400 font-normal normal-case">(required for rejection)</span>
+                  </label>
+                  <textarea
+                    value={approvalComments}
+                    onChange={(e) => setApprovalComments(e.target.value)}
+                    placeholder="Add review remarks or rejection reason…"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 resize-none transition-all bg-white"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={async () => {
+                      if (!approvalComments.trim()) { toast.error("Rejection reason is required"); return; }
+                      setApprovalModal({ open: true, action: 'reject' });
+                    }}
+                    disabled={approving}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-40 shadow-sm shadow-red-200"
+                  >
+                    <FaTimesCircle size={13} /> Reject Audit
+                  </button>
+                  <button
+                    onClick={() => setApprovalModal({ open: true, action: 'approve' })}
+                    disabled={approving}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-40 shadow-sm shadow-emerald-200"
+                  >
+                    <FaCheckCircle size={13} /> Approve Audit
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* ==================== FOOTER SUBMIT ==================== */}
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
               <p className="text-xs text-gray-400">
                 {summary.pending > 0
-                  ? `? ${summary.pending} checkpoint${summary.pending !== 1 ? "s" : ""} still pending`
-                  : "? All checkpoints reviewed"}
+                  ? `${summary.pending} checkpoint${summary.pending !== 1 ? "s" : ""} still pending`
+                  : "All checkpoints reviewed"}
               </p>
-              <button
-                onClick={handleSubmit}
-                disabled={saving || isLoadingModels}
-                className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-indigo-200/60"
-              >
-                {saving ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{" "}
-                    Submitting…
-                  </>
-                ) : (
-                  <>
-                    <FaPaperPlane size={13} /> Submit Audit
-                  </>
-                )}
-              </button>
+              {canEdit ? (
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleSaveAsDraft}
+                    disabled={saving || isLoadingModels}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-gray-200/60"
+                  >
+                    {saving ? (
+                      <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving…</>
+                    ) : (
+                      <><FaFileAlt size={13} /> Save as Draft</>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={saving || isLoadingModels}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-indigo-200/60"
+                  >
+                    {saving ? (
+                      <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Submitting…</>
+                    ) : (
+                      <><FaPaperPlane size={13} /> Submit Audit</>
+                    )}
+                  </button>
+                </div>
+              ) : isLQEReview ? (
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => { setApprovalComments(""); setApprovalModal({ open: true, action: 'reject' }); }}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm transition-all"
+                  >
+                    <FaTimesCircle size={13} /> Reject
+                  </button>
+                  <button
+                    onClick={() => { setApprovalComments(""); setApprovalModal({ open: true, action: 'approve' }); }}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all"
+                  >
+                    <FaCheckCircle size={13} /> Approve Audit
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
       </div>
+
+      {/* ==================== Approval Modal (LQE) ==================== */}
+      {approvalModal.open && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
+          onClick={() => setApprovalModal({ open: false, action: null })}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={`px-6 py-4 text-white ${approvalModal.action === 'approve' ? 'bg-gradient-to-r from-emerald-600 to-emerald-700' : 'bg-gradient-to-r from-red-600 to-red-700'}`}>
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                {approvalModal.action === 'approve' ? <FaCheckCircle /> : <FaTimesCircle />}
+                {approvalModal.action === 'approve' ? 'Approve Audit' : 'Reject Audit'}
+              </h3>
+              <p className="text-xs mt-1 opacity-80">
+                {approvalModal.action === 'approve'
+                  ? 'Confirm approval. The audit will be marked as approved and locked.'
+                  : 'Provide a reason. The audit will be returned to the operator for correction.'}
+              </p>
+            </div>
+            <div className="p-6">
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-gray-700 mb-2">
+                  {approvalModal.action === 'approve' ? 'Comments (optional)' : 'Rejection Reason *'}
+                </label>
+                <textarea
+                  value={approvalComments}
+                  onChange={(e) => setApprovalComments(e.target.value)}
+                  placeholder={approvalModal.action === 'approve' ? 'Add any approval notes…' : 'Describe what needs to be corrected…'}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setApprovalModal({ open: false, action: null })}
+                  disabled={approving}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-all disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAuditApproval}
+                  disabled={approving || (approvalModal.action === 'reject' && !approvalComments.trim())}
+                  className={`px-5 py-2 text-white rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${approvalModal.action === 'approve' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
+                >
+                  {approving ? 'Processing…' : approvalModal.action === 'approve' ? 'Confirm Approve' : 'Confirm Reject'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -34,6 +34,7 @@ import {
 import { BiSolidFactory } from "react-icons/bi";
 import { MdOutlineFilterAltOff } from "react-icons/md";
 import useAuditData from "../../../hooks/useAuditData";
+import { generateAuditPDF } from "../../../utils/generateAuditPDF";
 import toast from "react-hot-toast";
 
 // ==================== CONSTANTS ====================
@@ -246,8 +247,10 @@ const AuditList = () => {
   const navigate = useNavigate();
   const searchRef = useRef(null);
 
-  const { audits, templates, deleteAudit, loadAudits, loadTemplates, loading } =
+  const { audits, templates, deleteAudit, loadAudits, loadTemplates, getAuditById, loading } =
     useAuditData();
+
+  const [pdfLoading, setPdfLoading] = useState(null); // audit id being downloaded
 
   // UI state
   const [initialLoading, setInitialLoading] = useState(true);
@@ -630,6 +633,21 @@ const AuditList = () => {
     }
     exportToCSV(rows, `audits-${Date.now()}.csv`);
     toast.success(`Exported ${rows.length} records`);
+  };
+
+  // ==================== PDF DOWNLOAD ====================
+  const handleDownloadPDF = async (audit) => {
+    setPdfLoading(audit.id);
+    try {
+      // Fetch full audit with sections & checkpoint data
+      const fullAudit = await getAuditById(audit.id);
+      generateAuditPDF(fullAudit);
+      toast.success("PDF downloaded");
+    } catch (err) {
+      toast.error("Failed to generate PDF: " + err.message);
+    } finally {
+      setPdfLoading(null);
+    }
   };
 
   const hasFilters =
@@ -1294,6 +1312,18 @@ const AuditList = () => {
                             >
                               <FaEye size={12} />
                             </button>
+                            <button
+                              onClick={() => handleDownloadPDF(audit)}
+                              disabled={pdfLoading === audit.id}
+                              className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-800 transition-all disabled:opacity-40"
+                              title="Download PDF Report"
+                            >
+                              {pdfLoading === audit.id ? (
+                                <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <FaDownload size={12} />
+                              )}
+                            </button>
                             {audit.status !== "approved" && (
                               <button
                                 onClick={() =>
@@ -1531,6 +1561,18 @@ const AuditList = () => {
                         <FaEye size={11} /> View
                       </button>
                       <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleDownloadPDF(audit)}
+                          disabled={pdfLoading === audit.id}
+                          className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition-all disabled:opacity-40"
+                          title="Download PDF"
+                        >
+                          {pdfLoading === audit.id ? (
+                            <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <FaDownload size={11} />
+                          )}
+                        </button>
                         {audit.status !== "approved" && (
                           <button
                             onClick={() =>

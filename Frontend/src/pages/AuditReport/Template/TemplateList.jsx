@@ -321,7 +321,7 @@ const TemplateList = () => {
   const navigate = useNavigate();
   const searchRef = useRef(null);
 
-  const { templates, deleteTemplate, duplicateTemplate, loadTemplates } =
+  const { templates, deleteTemplate, duplicateTemplate, loadTemplates, updateTemplate } =
     useAuditData();
 
   const [initialLoading, setInitialLoading] = useState(true);
@@ -330,17 +330,29 @@ const TemplateList = () => {
   const [filterCategory, setFilterCategory] = useState("");
   const [sortKey, setSortKey] = useState("updatedAt_desc");
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "list"
+  const [activeTab, setActiveTab] = useState("all"); // "all" | "draft"
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [dupLoadingId, setDupLoadingId] = useState(null); // per-template duplicate loading
+  const [dupLoadingId, setDupLoadingId] = useState(null);
+  const [submitLoadingId, setSubmitLoadingId] = useState(null);
   const [previewTemplate, setPreviewTemplate] = useState(null);
 
-  const canEdit = [
-    ROLES.ADMIN,
+  const canCreateEdit = [
+    ROLES.SUPER_ADMIN,
     ROLES.QUALITY_MANAGER,
     ROLES.LINE_QUALITY_ENGINEER,
   ].includes(user?.roleName);
+
+  const canApprove = [
+    ROLES.SUPER_ADMIN,
+    ROLES.QUALITY_MANAGER,
+  ].includes(user?.roleName);
+
+  const isAdmin = user?.roleName === ROLES.SUPER_ADMIN;
+  const isLineOperator = user?.roleName === ROLES.QUALITY_OPERATOR;
+  const isQualityManager = user?.roleName === ROLES.QUALITY_MANAGER;
+  const isLineQualityEngineer = user?.roleName === ROLES.LINE_QUALITY_ENGINEER;
 
   // Keyboard shortcut — Ctrl+F ? focus search
   useEffect(() => {
@@ -383,6 +395,18 @@ const TemplateList = () => {
       toast.error("Refresh failed");
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const handleSubmitForApproval = async (template) => {
+    setSubmitLoadingId(template.id);
+    try {
+      await updateTemplate(template.id, { approvalStatus: "pending_approval" });
+      toast.success(`"${template.name}" submitted for approval`);
+    } catch (err) {
+      toast.error("Submit failed: " + err.message);
+    } finally {
+      setSubmitLoadingId(null);
     }
   };
 
@@ -431,9 +455,26 @@ const TemplateList = () => {
     [templates],
   );
 
-  const filtered = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
+  // My draft templates — only visible to their creator and super admin
+  const myDrafts = useMemo(() => {
+    const myId = user?.name || user?.usercode;
     return enriched.filter((t) => {
+      if (t.approvalStatus !== "draft") return false;
+      return isAdmin || (myId && t.createdBy === myId);
+    });
+  }, [enriched, isAdmin, user]);
+
+  // Non-draft templates visible to this role
+  const filteredTemplates = useMemo(() => {
+    const nonDraft = enriched.filter((t) => t.approvalStatus !== "draft");
+    if (isLineOperator) return nonDraft.filter((t) => t.approvalStatus === "approved");
+    return nonDraft;
+  }, [enriched, isLineOperator]);
+
+  const filtered = useMemo(() => {
+    const base = activeTab === "draft" ? myDrafts : filteredTemplates;
+    const q = searchTerm.trim().toLowerCase();
+    return base.filter((t) => {
       if (
         q &&
         !["name", "description", "category"].some((k) =>
@@ -444,7 +485,7 @@ const TemplateList = () => {
       if (filterCategory && t.category !== filterCategory) return false;
       return true;
     });
-  }, [enriched, searchTerm, filterCategory]);
+  }, [activeTab, myDrafts, filteredTemplates, searchTerm, filterCategory]);
 
   const sorted = useMemo(() => {
     const [field, dir] = sortKey.split("_");
@@ -515,7 +556,7 @@ const TemplateList = () => {
           onEdit={() =>
             navigate(`/auditreport/templates/${previewTemplate.id}`)
           }
-          canEdit={canEdit}
+          canEdit={canCreateEdit}
         />
       )}
 
@@ -590,7 +631,7 @@ const TemplateList = () => {
 
       {/* ==================== STICKY HEADER ==================== */}
       <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-4 py-3 max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-3">
+        <div className="px-6 py-3 w-full flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-indigo-50 rounded-xl">
@@ -601,7 +642,7 @@ const TemplateList = () => {
                   Audit Templates
                 </h1>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {sorted.length} of {templates.length} templates
+                  {sorted.length} {activeTab === "draft" ? "draft" : ""} templates
                   {hasFilters && (
                     <span className="ml-1 text-indigo-500 font-semibold">
                       · filtered
@@ -613,6 +654,14 @@ const TemplateList = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Scan Serial button */}
+            <button
+              onClick={() => navigate("/auditreport/scan-serial")}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-xl font-bold text-sm transition-all"
+            >
+              <FaSearch size={11} /> Scan Serial
+            </button>
+
             {/* View toggle */}
             <div className="flex items-center bg-gray-100 rounded-xl p-1">
               <button
@@ -642,7 +691,7 @@ const TemplateList = () => {
               </span>
             </button>
 
-            {canEdit && (
+            {canCreateEdit && (
               <button
                 onClick={() => navigate("/auditreport/templates/new")}
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-200"
@@ -654,9 +703,47 @@ const TemplateList = () => {
         </div>
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-4 py-5 space-y-4">
+      {/* ==================== TAB BAR ==================== */}
+      {canCreateEdit && (
+        <div className="bg-white border-b border-gray-200 px-6">
+          <div className="flex items-center gap-0">
+            <button
+              onClick={() => { setActiveTab("all"); setSearchTerm(""); setFilterCategory(""); }}
+              className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-all ${
+                activeTab === "all"
+                  ? "border-indigo-600 text-indigo-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              <FaClipboardList size={12} />
+              All Templates
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeTab === "all" ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 text-gray-500"}`}>
+                {filteredTemplates.length}
+              </span>
+            </button>
+            <button
+              onClick={() => { setActiveTab("draft"); setSearchTerm(""); setFilterCategory(""); }}
+              className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-all ${
+                activeTab === "draft"
+                  ? "border-amber-500 text-amber-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              <FaFileAlt size={12} />
+              My Drafts
+              {myDrafts.length > 0 && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeTab === "draft" ? "bg-amber-100 text-amber-700" : "bg-amber-50 text-amber-600"}`}>
+                  {myDrafts.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="w-full px-6 py-5 space-y-4">
         {/* ==================== STATS ROW ==================== */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           <StatCard
             icon={HiClipboardDocumentCheck}
             label="Total Templates"
@@ -786,11 +873,17 @@ const TemplateList = () => {
               <FaFileAlt className="text-4xl text-gray-200" />
             </div>
             <h3 className="text-xl font-bold text-gray-600 mb-2">
-              {hasFilters ? "No matching templates" : "No templates yet"}
+              {hasFilters
+                ? "No matching templates"
+                : activeTab === "draft"
+                ? "No drafts yet"
+                : "No templates yet"}
             </h3>
             <p className="text-sm text-gray-400 mb-6 max-w-xs mx-auto">
               {hasFilters
                 ? "Try adjusting your search or category filter."
+                : activeTab === "draft"
+                ? "Templates you save as draft will appear here."
                 : "Create your first audit template to get started."}
             </p>
             <div className="flex items-center justify-center gap-3">
@@ -802,7 +895,7 @@ const TemplateList = () => {
                   <FaTimes size={11} /> Clear Filters
                 </button>
               )}
-              {canEdit && (
+              {canCreateEdit && (
                 <button
                   onClick={() => navigate("/auditreport/templates/new")}
                   className="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-indigo-200"
@@ -814,7 +907,7 @@ const TemplateList = () => {
           </div>
         ) : viewMode === "grid" ? (
           /* ==================== GRID VIEW ==================== */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-4">
             {sorted.map((template) => {
               const catCfg = getCategoryConfig(template.category);
               const isActive = template.isActive !== false;
@@ -831,16 +924,33 @@ const TemplateList = () => {
                       <div className="p-2.5 bg-white/10 rounded-xl flex-shrink-0">
                         <HiClipboardDocumentCheck className="text-xl text-white" />
                       </div>
-                      <span
-                        className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-bold flex-shrink-0 ${isActive ? "bg-green-500/20 text-green-300 border border-green-500/30" : "bg-white/10 text-white/50 border border-white/20"}`}
-                      >
-                        {isActive ? (
-                          <FaCheckCircle size={8} />
-                        ) : (
-                          <FaTimesCircle size={8} />
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {template.approvalStatus && (
+                          <span
+                            className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-bold ${
+                              template.approvalStatus === "approved" ? "bg-green-500/20 text-green-300 border border-green-500/30" :
+                              template.approvalStatus === "pending_approval" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" :
+                              template.approvalStatus === "rejected" ? "bg-red-500/20 text-red-300 border border-red-500/30" :
+                              "bg-gray-500/20 text-gray-300 border border-gray-500/30"
+                            }`}
+                          >
+                            {template.approvalStatus === "approved" ? "Approved" :
+                             template.approvalStatus === "pending_approval" ? "Pending" :
+                             template.approvalStatus === "rejected" ? "Rejected" :
+                             "Draft"}
+                          </span>
                         )}
-                        {isActive ? "Active" : "Inactive"}
-                      </span>
+                        <span
+                          className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-bold ${isActive ? "bg-green-500/20 text-green-300 border border-green-500/30" : "bg-white/10 text-white/50 border border-white/20"}`}
+                        >
+                          {isActive ? (
+                            <FaCheckCircle size={8} />
+                          ) : (
+                            <FaTimesCircle size={8} />
+                          )}
+                          {isActive ? "Active" : "Inactive"}
+                        </span>
+                      </div>
                     </div>
                     <h3 className="font-black text-white text-sm mt-3 leading-tight line-clamp-2">
                       {template.name}
@@ -887,16 +997,31 @@ const TemplateList = () => {
 
                   {/* Body actions */}
                   <div className="p-4 flex gap-2 flex-1 items-end">
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/auditreport/audits/new?template=${template.id}`,
-                        )
-                      }
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-indigo-200"
-                    >
-                      <FaPlus size={10} /> Use
-                    </button>
+                    {activeTab === "draft" ? (
+                      <button
+                        onClick={() => handleSubmitForApproval(template)}
+                        disabled={submitLoadingId === template.id}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-amber-200"
+                      >
+                        {submitLoadingId === template.id ? (
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <FaCheckCircle size={10} />
+                        )}
+                        {submitLoadingId === template.id ? "Submitting…" : "Submit for Approval"}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() =>
+                          navigate(
+                            `/auditreport/audits/new?template=${template.id}`,
+                          )
+                        }
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-indigo-200"
+                      >
+                        <FaPlus size={10} /> Use
+                      </button>
+                    )}
 
                     <button
                       onClick={() => setPreviewTemplate(template)}
@@ -906,29 +1031,34 @@ const TemplateList = () => {
                       <FaEye size={13} />
                     </button>
 
-                    {canEdit && (
+                    {canCreateEdit && (
+                      <button
+                        onClick={() =>
+                          navigate(`/auditreport/templates/${template.id}`)
+                        }
+                        className="p-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl transition-all"
+                        title="Edit"
+                      >
+                        <FaEdit size={13} />
+                      </button>
+                    )}
+
+                    {canCreateEdit && (
                       <>
-                        <button
-                          onClick={() =>
-                            navigate(`/auditreport/templates/${template.id}`)
-                          }
-                          className="p-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl transition-all"
-                          title="Edit"
-                        >
-                          <FaEdit size={13} />
-                        </button>
-                        <button
-                          onClick={() => handleDuplicate(template)}
-                          disabled={isDuplicating}
-                          className="p-2 bg-purple-50 hover:bg-purple-100 text-purple-600 rounded-xl transition-all disabled:opacity-50"
-                          title="Duplicate"
-                        >
-                          {isDuplicating ? (
-                            <div className="w-3.5 h-3.5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <FaCopy size={13} />
-                          )}
-                        </button>
+                        {activeTab !== "draft" && (
+                          <button
+                            onClick={() => handleDuplicate(template)}
+                            disabled={isDuplicating}
+                            className="p-2 bg-purple-50 hover:bg-purple-100 text-purple-600 rounded-xl transition-all disabled:opacity-50"
+                            title="Duplicate"
+                          >
+                            {isDuplicating ? (
+                              <div className="w-3.5 h-3.5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <FaCopy size={13} />
+                            )}
+                          </button>
+                        )}
                         <button
                           onClick={() => confirmDelete(template)}
                           className="p-2 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl transition-all"
@@ -998,9 +1128,26 @@ const TemplateList = () => {
                             <HiClipboardDocumentCheck className="text-indigo-500 text-base" />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-bold text-gray-800 text-sm truncate">
-                              {template.name}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-gray-800 text-sm truncate">
+                                {template.name}
+                              </p>
+                              {template.approvalStatus && (
+                                <span
+                                  className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                                    template.approvalStatus === "approved" ? "bg-green-100 text-green-700 border border-green-300" :
+                                    template.approvalStatus === "pending_approval" ? "bg-amber-100 text-amber-700 border border-amber-300" :
+                                    template.approvalStatus === "rejected" ? "bg-red-100 text-red-700 border border-red-300" :
+                                    "bg-gray-100 text-gray-600 border border-gray-300"
+                                  }`}
+                                >
+                                  {template.approvalStatus === "approved" ? "Approved" :
+                                   template.approvalStatus === "pending_approval" ? "Pending" :
+                                   template.approvalStatus === "rejected" ? "Rejected" :
+                                   "Draft"}
+                                </span>
+                              )}
+                            </div>
                             {template.description && (
                               <p className="text-xs text-gray-400 truncate max-w-[200px]">
                                 {template.description}
@@ -1070,16 +1217,31 @@ const TemplateList = () => {
                       {/* Actions */}
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() =>
-                              navigate(
-                                `/auditreport/audits/new?template=${template.id}`,
-                              )
-                            }
-                            className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all"
-                          >
-                            <FaPlus size={9} /> Use
-                          </button>
+                          {activeTab === "draft" ? (
+                            <button
+                              onClick={() => handleSubmitForApproval(template)}
+                              disabled={submitLoadingId === template.id}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all"
+                            >
+                              {submitLoadingId === template.id ? (
+                                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <FaCheckCircle size={9} />
+                              )}
+                              {submitLoadingId === template.id ? "…" : "Submit"}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() =>
+                                navigate(
+                                  `/auditreport/audits/new?template=${template.id}`,
+                                )
+                              }
+                              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all"
+                            >
+                              <FaPlus size={9} /> Use
+                            </button>
+                          )}
                           <button
                             onClick={() => setPreviewTemplate(template)}
                             className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg transition-all"
@@ -1087,31 +1249,35 @@ const TemplateList = () => {
                           >
                             <FaEye size={12} />
                           </button>
-                          {canEdit && (
+                          {canCreateEdit && (
+                            <button
+                              onClick={() =>
+                                navigate(
+                                  `/auditreport/templates/${template.id}`,
+                                )
+                              }
+                              className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-all"
+                              title="Edit"
+                            >
+                              <FaEdit size={12} />
+                            </button>
+                          )}
+                          {canCreateEdit && (
                             <>
-                              <button
-                                onClick={() =>
-                                  navigate(
-                                    `/auditreport/templates/${template.id}`,
-                                  )
-                                }
-                                className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-all"
-                                title="Edit"
-                              >
-                                <FaEdit size={12} />
-                              </button>
-                              <button
-                                onClick={() => handleDuplicate(template)}
-                                disabled={isDuplicating}
-                                className="p-1.5 bg-purple-50 hover:bg-purple-100 text-purple-600 rounded-lg transition-all disabled:opacity-50"
-                                title="Duplicate"
-                              >
-                                {isDuplicating ? (
-                                  <div className="w-3 h-3 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                  <FaCopy size={12} />
-                                )}
-                              </button>
+                              {activeTab !== "draft" && (
+                                <button
+                                  onClick={() => handleDuplicate(template)}
+                                  disabled={isDuplicating}
+                                  className="p-1.5 bg-purple-50 hover:bg-purple-100 text-purple-600 rounded-lg transition-all disabled:opacity-50"
+                                  title="Duplicate"
+                                >
+                                  {isDuplicating ? (
+                                    <div className="w-3 h-3 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <FaCopy size={12} />
+                                  )}
+                                </button>
+                              )}
                               <button
                                 onClick={() => confirmDelete(template)}
                                 className="p-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg transition-all"

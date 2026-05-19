@@ -17,6 +17,7 @@ import {
   rejectAudit,
   getAuditHistory,
   getAuditStats,
+  getAuditModelSummary,
 } from "../controllers/auditReport/audit.controller.js";
 import {
   downloadImage,
@@ -45,6 +46,7 @@ router.post("/templates/:id/duplicate", duplicateTemplate);
 
 // ==================== Audit Routes ====================
 router.get("/audits/stats", getAuditStats);
+router.get("/audits/model-summary", getAuditModelSummary);
 router.get("/audits", getAllAudits);
 router.get("/audits/:id/history", getAuditHistory);
 router.get("/audits/:id", getAuditById);
