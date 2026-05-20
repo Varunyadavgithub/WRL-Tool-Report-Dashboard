@@ -1,5 +1,22 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import logoUrl from "../assets/logo.png";
+
+// ── Convert local image asset to base64 for jsPDF ────────────────────────────
+const loadImageAsBase64 = (url) =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width  = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
 
 // ── Colour palette ────────────────────────────────────────────────────────────
 const C = {
@@ -42,7 +59,9 @@ const cpStatusColor = (s) => {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-export const generateAuditPDF = (audit) => {
+export const generateAuditPDF = async (audit) => {
+  // Load WRL logo
+  const logoBase64 = await loadImageAsBase64(logoUrl);
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const W = doc.internal.pageSize.getWidth();   // 297
   const H = doc.internal.pageSize.getHeight();  // 210
@@ -58,7 +77,7 @@ export const generateAuditPDF = (audit) => {
   };
 
   const checkY = (needed = 10) => {
-    if (y + needed > H - 18) addPage();
+    if (y + needed > H - 20) addPage();
   };
 
   const setFont = (size, style = "normal", color = C.black) => {
@@ -82,26 +101,54 @@ export const generateAuditPDF = (audit) => {
     doc.text(String(str ?? ""), x, ty, opts);
   };
 
-  // ── Page footer (runs on addPage) ────────────────────────────────────────────
+  // ── Page footer (runs on every page) ────────────────────────────────────────
 
   const drawPageFooter = () => {
-    const pg = doc.internal.getCurrentPageInfo().pageNumber;
+    const pg    = doc.internal.getCurrentPageInfo().pageNumber;
     const total = doc.internal.getNumberOfPages();
-    fillRect(0, H - 10, W, 10, C.primaryDark);
-    setFont(7, "normal", C.white);
-    text(`${audit.reportName || "Audit Report"}  |  ${audit.auditCode || ""}`, margin, H - 4);
-    text(`Page ${pg} of ${total}  |  Generated: ${new Date().toLocaleString("en-IN")}`, W - margin, H - 4, { align: "right" });
+
+    fillRect(0, H - 14, W, 14, C.primaryDark);
+
+    // Left column — report name + audit code
+    setFont(7, "bold", C.white);
+    text(audit.reportName || "Audit Report", margin, H - 9);
+    setFont(6.5, "normal", [180, 190, 250]);
+    text(audit.auditCode || "", margin, H - 4);
+
+    // Centre — Format No  |  Rev. No  |  Rev. Date
+    const centre = W / 2;
+    const revParts = [
+      audit.formatNo ? `Format No: ${audit.formatNo}` : null,
+      audit.revNo    ? `Rev. No: ${audit.revNo}`       : null,
+      audit.revDate  ? `Rev. Date: ${fmt(audit.revDate)}` : null,
+    ].filter(Boolean).join("   |   ");
+
+    setFont(6.5, "bold", [220, 230, 255]);
+    text(revParts, centre, H - 9, { align: "center" });
+    setFont(6, "normal", [160, 175, 230]);
+    text("Western Refrigeration Ltd — Product Quality Report", centre, H - 4, { align: "center" });
+
+    // Right — page number + generated timestamp
+    setFont(6.5, "normal", [180, 190, 250]);
+    text(`Page ${pg} / ${total}`, W - margin, H - 9, { align: "right" });
+    setFont(6, "normal", [160, 175, 230]);
+    text(`Generated: ${new Date().toLocaleString("en-IN")}`, W - margin, H - 4, { align: "right" });
   };
 
   // ── 1. HEADER BAND ──────────────────────────────────────────────────────────
 
-  fillRect(0, 0, W, 28, C.primaryDark);
+  fillRect(0, 0, W, 30, C.primaryDark);
 
-  // Left: logo placeholder + title
-  setFont(16, "bold", C.white);
-  text("QUALITY AUDIT REPORT", margin, 12);
+  // Left: WRL logo + title
+  const logoH = 20, logoW = 20;
+  if (logoBase64) {
+    doc.addImage(logoBase64, "PNG", margin, 5, logoW, logoH);
+  }
+  const titleX = logoBase64 ? margin + logoW + 4 : margin;
+  setFont(15, "bold", C.white);
+  text("QUALITY AUDIT REPORT", titleX, 13);
   setFont(8, "normal", [180, 190, 250]);
-  text("Warlam Refrigeration Ltd — Internal Quality Document", margin, 18);
+  text("Western Refrigeration Ltd — Product Quality Report", titleX, 21);
 
   // Right: audit code + status badge
   const statusLabel = (audit.status || "unknown").toUpperCase();
@@ -112,9 +159,9 @@ export const generateAuditPDF = (audit) => {
   text(statusLabel, W - margin - 19, 10.5, { align: "center" });
 
   setFont(9, "bold", [220, 220, 255]);
-  text(audit.auditCode || "", W - margin, 20, { align: "right" });
+  text(audit.auditCode || "", W - margin, 22, { align: "right" });
 
-  y = 33;
+  y = 35;
 
   // ── 2. META INFO ROW ────────────────────────────────────────────────────────
 

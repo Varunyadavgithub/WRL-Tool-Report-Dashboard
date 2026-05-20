@@ -33,8 +33,10 @@ import {
 } from "react-icons/fa";
 import { BiSolidFactory } from "react-icons/bi";
 import { MdOutlineFilterAltOff } from "react-icons/md";
+import { useSelector } from "react-redux";
 import useAuditData from "../../../hooks/useAuditData";
 import { generateAuditPDF } from "../../../utils/generateAuditPDF";
+import { ROLES } from "../../../config/routes.config";
 import toast from "react-hot-toast";
 
 // ==================== CONSTANTS ====================
@@ -250,6 +252,20 @@ const AuditList = () => {
   const { audits, templates, deleteAudit, loadAudits, loadTemplates, getAuditById, loading } =
     useAuditData();
 
+  const { user } = useSelector((store) => store.auth);
+  // Quality Auditor can only view — no create, edit, or delete
+  const isViewOnly       = [user?.role, user?.roleName].includes(ROLES.QUALITY_AUDITOR);
+  const isQualityAuditor = isViewOnly;
+  // My Drafts tab — Quality Auditor's own draft audits
+  const [showMyDrafts, setShowMyDrafts] = useState(false);
+  const myDraftCount = useMemo(
+    () => audits.filter(
+      (a) => a.status === "draft" &&
+        (a.createdBy === user?.userCode || a.createdBy === user?.usercode || a.createdBy === user?.name)
+    ).length,
+    [audits, user],
+  );
+
   const [pdfLoading, setPdfLoading] = useState(null); // audit id being downloaded
 
   // UI state
@@ -438,6 +454,12 @@ const AuditList = () => {
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     return enrichedAudits.filter((a) => {
+      // My Drafts mode — only this user's draft audits
+      if (showMyDrafts) {
+        const isOwn = a.createdBy === user?.userCode || a.createdBy === user?.usercode || a.createdBy === user?.name;
+        if (a.status !== "draft" || !isOwn) return false;
+      }
+
       if (
         q &&
         ![
@@ -451,7 +473,7 @@ const AuditList = () => {
       )
         return false;
 
-      if (filterStatus && a.status !== filterStatus) return false;
+      if (!showMyDrafts && filterStatus && a.status !== filterStatus) return false;
       if (filterTemplate && String(a.templateId) !== String(filterTemplate))
         return false;
 
@@ -464,7 +486,7 @@ const AuditList = () => {
       }
       return true;
     });
-  }, [
+  }, [showMyDrafts, user,
     enrichedAudits,
     searchTerm,
     filterStatus,
@@ -641,7 +663,7 @@ const AuditList = () => {
     try {
       // Fetch full audit with sections & checkpoint data
       const fullAudit = await getAuditById(audit.id);
-      generateAuditPDF(fullAudit);
+      await generateAuditPDF(fullAudit);
       toast.success("PDF downloaded");
     } catch (err) {
       toast.error("Failed to generate PDF: " + err.message);
@@ -655,7 +677,8 @@ const AuditList = () => {
     filterStatus ||
     filterTemplate ||
     filterDateFrom ||
-    filterDateTo;
+    filterDateTo ||
+    showMyDrafts;
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -663,6 +686,7 @@ const AuditList = () => {
     setFilterTemplate("");
     setFilterDateFrom("");
     setFilterDateTo("");
+    setShowMyDrafts(false);
   };
 
   // ==================== TH COMPONENT ====================
@@ -800,6 +824,24 @@ const AuditList = () => {
               </div>
             </div>
 
+            {/* My Drafts tab — Quality Auditor only */}
+            {isQualityAuditor && (
+              <button
+                onClick={() => { setShowMyDrafts((v) => !v); setFilterStatus(""); }}
+                className={`ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                  showMyDrafts
+                    ? "bg-amber-500 text-white border-amber-500 shadow-sm shadow-amber-200"
+                    : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                }`}
+              >
+                <FaFileAlt size={10} />
+                My Drafts
+                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${showMyDrafts ? "bg-white/30 text-white" : "bg-amber-200 text-amber-800"}`}>
+                  {myDraftCount}
+                </span>
+              </button>
+            )}
+
             {/* Quick status filters */}
             <div className="hidden md:flex items-center gap-1 ml-2">
               {["", "submitted", "approved", "rejected"].map((s) => {
@@ -807,7 +849,7 @@ const AuditList = () => {
                 return (
                   <button
                     key={s || "all"}
-                    onClick={() => setFilterStatus(s)}
+                    onClick={() => { setFilterStatus(s); setShowMyDrafts(false); }}
                     className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
                       filterStatus === s
                         ? s
@@ -876,12 +918,14 @@ const AuditList = () => {
               </span>
             </button>
 
-            <button
-              onClick={() => navigate("/auditreport/templates")}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-200"
-            >
-              <FaPlus size={11} /> New Audit
-            </button>
+            {!isViewOnly && (
+              <button
+                onClick={() => navigate("/auditreport/templates")}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-200"
+              >
+                <FaPlus size={11} /> New Audit
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1074,12 +1118,14 @@ const AuditList = () => {
               >
                 <FaDownload size={11} /> Export Selected
               </button>
-              <button
-                onClick={handleBulkDelete}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 rounded-lg text-xs font-bold transition-all"
-              >
-                <FaTrash size={11} /> Delete Selected
-              </button>
+              {!isViewOnly && (
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 rounded-lg text-xs font-bold transition-all"
+                >
+                  <FaTrash size={11} /> Delete Selected
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -1107,12 +1153,14 @@ const AuditList = () => {
                   <MdOutlineFilterAltOff size={14} /> Clear Filters
                 </button>
               )}
-              <button
-                onClick={() => navigate("/auditreport/templates")}
-                className="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-indigo-200"
-              >
-                <FaPlus size={12} /> Create Audit
-              </button>
+              {!isViewOnly && (
+                <button
+                  onClick={() => navigate("/auditreport/templates")}
+                  className="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-indigo-200"
+                >
+                  <FaPlus size={12} /> Create Audit
+                </button>
+              )}
             </div>
           </div>
         ) : viewMode === "table" ? (
@@ -1324,7 +1372,7 @@ const AuditList = () => {
                                 <FaDownload size={12} />
                               )}
                             </button>
-                            {audit.status !== "approved" && (
+                            {!isViewOnly && audit.status !== "approved" && (
                               <button
                                 onClick={() =>
                                   navigate(`/auditreport/audits/${audit.id}`)
@@ -1335,7 +1383,7 @@ const AuditList = () => {
                                 <FaEdit size={12} />
                               </button>
                             )}
-                            {audit.status !== "approved" && (
+                            {!isViewOnly && audit.status !== "approved" && (
                               <button
                                 onClick={() => confirmDelete(audit)}
                                 className="p-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-400 hover:text-red-600 transition-all"
@@ -1573,7 +1621,7 @@ const AuditList = () => {
                             <FaDownload size={11} />
                           )}
                         </button>
-                        {audit.status !== "approved" && (
+                        {!isViewOnly && audit.status !== "approved" && (
                           <button
                             onClick={() =>
                               navigate(`/auditreport/audits/${audit.id}`)
@@ -1584,7 +1632,7 @@ const AuditList = () => {
                             <FaEdit size={11} />
                           </button>
                         )}
-                        {audit.status !== "approved" && (
+                        {!isViewOnly && audit.status !== "approved" && (
                           <button
                             onClick={() => confirmDelete(audit)}
                             className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-400 transition-all"

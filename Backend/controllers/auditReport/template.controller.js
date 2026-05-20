@@ -11,6 +11,28 @@ import {
   backupTemplateFile,
 } from "../../utils/storage/templateStorage.js";
 
+// ── History helper ────────────────────────────────────────────────────────────
+const logTemplateHistory = async (pool, { templateId, action, actionBy, comments, previousStatus, newStatus, fieldChanges }) => {
+  try {
+    await pool.request()
+      .input("templateId",     sql.Int,          templateId)
+      .input("action",         sql.NVarChar,     action)
+      .input("actionBy",       sql.NVarChar,     actionBy  || "SYSTEM")
+      .input("comments",       sql.NVarChar,     comments  || null)
+      .input("previousStatus", sql.NVarChar,     previousStatus || null)
+      .input("newStatus",      sql.NVarChar,     newStatus || null)
+      .input("fieldChanges",   sql.NVarChar,     fieldChanges ? JSON.stringify(fieldChanges) : null)
+      .query(`
+        INSERT INTO AuditTemplateHistory
+          (TemplateId, Action, ActionBy, ActionAt, Comments, PreviousStatus, NewStatus, FieldChanges)
+        VALUES
+          (@templateId, @action, @actionBy, GETDATE(), @comments, @previousStatus, @newStatus, @fieldChanges)
+      `);
+  } catch (err) {
+    console.warn("Failed to log template history:", err.message);
+  }
+};
+
 // Get all templates
 export const getAllTemplates = tryCatch(async (req, res) => {
   const { category, isActive, search, page = 1, limit = 50 } = req.query;
@@ -240,9 +262,16 @@ export const createTemplate = tryCatch(async (req, res) => {
       );
     `);
 
-  await pool.close();
-
   const template = result.recordset[0];
+  await logTemplateHistory(pool, {
+    templateId: template.Id,
+    action: "created",
+    actionBy: createdBy,
+    newStatus: approvalStatus || "draft",
+    fieldChanges: [{ field: "Name", from: null, to: name }],
+  });
+
+  await pool.close();
 
   res.status(201).json({
     success: true,
@@ -308,6 +337,15 @@ export const updateTemplate = tryCatch(async (req, res) => {
     columns !== undefined ||
     defaultSections !== undefined;
 
+  // Read old sections BEFORE backup/overwrite so we can diff them
+  let oldSections = [];
+  if (hasFileContent && oldFileName) {
+    try {
+      const oldConfig = await readTemplateFile(oldFileName);
+      oldSections = oldConfig?.defaultSections || [];
+    } catch { /* file may not exist yet */ }
+  }
+
   let resolvedFileName = oldFileName;
 
   if (hasFileContent) {
@@ -366,9 +404,111 @@ export const updateTemplate = tryCatch(async (req, res) => {
       WHERE Id = @id AND IsDeleted = 0;
     `);
 
-  await pool.close();
-
   const template = result.recordset[0];
+
+  // Build field-change log
+  const fieldChanges = [];
+  if (name && name !== currentTemplate.Name)
+    fieldChanges.push({ field: "Name", from: currentTemplate.Name, to: name });
+  if (description !== undefined && description !== currentTemplate.Description)
+    fieldChanges.push({ field: "Description", from: currentTemplate.Description, to: description });
+  if (category !== undefined && category !== currentTemplate.Category)
+    fieldChanges.push({ field: "Category", from: currentTemplate.Category, to: category });
+  if (approvalStatus && approvalStatus !== currentTemplate.ApprovalStatus)
+    fieldChanges.push({ field: "Status", from: currentTemplate.ApprovalStatus, to: approvalStatus });
+
+  // ── Section / checkpoint diff ────────────────────────────────────────────
+  if (hasFileContent && defaultSections !== undefined) {
+    const countCPs = (sections) =>
+      (sections || []).reduce((total, s) => {
+        if (s.stages) return total + s.stages.reduce((t, st) => t + (st.checkPoints?.length || 0), 0);
+        return total + (s.checkPoints?.length || 0);
+      }, 0);
+
+    const oldTotal = countCPs(oldSections);
+    const newTotal = countCPs(defaultSections);
+
+    // Total checkpoint change
+    if (oldTotal !== newTotal) {
+      const diff = newTotal - oldTotal;
+      fieldChanges.push({
+        field: "Total Checkpoints",
+        from: String(oldTotal),
+        to:   String(newTotal),
+        note: diff > 0 ? `+${diff} added` : `${diff} removed`,
+      });
+    }
+
+    // Section-level additions / removals
+    const oldSecNames = oldSections.map((s) => s.sectionName || "").filter(Boolean);
+    const newSecNames = (defaultSections || []).map((s) => s.sectionName || "").filter(Boolean);
+    const addedSecs   = newSecNames.filter((n) => !oldSecNames.includes(n));
+    const removedSecs = oldSecNames.filter((n) => !newSecNames.includes(n));
+
+    if (addedSecs.length)
+      fieldChanges.push({ field: "Sections Added",   from: null,                    to: addedSecs.join(", ") });
+    if (removedSecs.length)
+      fieldChanges.push({ field: "Sections Removed", from: removedSecs.join(", "), to: null });
+
+    // Per-section checkpoint changes
+    oldSections.forEach((oldSec) => {
+      const newSec = (defaultSections || []).find((s) => s.sectionName === oldSec.sectionName);
+      if (!newSec) return; // already captured in Sections Removed
+
+      const countSecCPs = (sec) => {
+        if (sec.stages) return sec.stages.reduce((t, st) => t + (st.checkPoints?.length || 0), 0);
+        return sec.checkPoints?.length || 0;
+      };
+
+      const oldN = countSecCPs(oldSec);
+      const newN = countSecCPs(newSec);
+      if (oldN !== newN) {
+        const diff = newN - oldN;
+        fieldChanges.push({
+          field: `Section — ${oldSec.sectionName || "Unnamed"}`,
+          from: String(oldN) + " checkpoints",
+          to:   String(newN) + " checkpoints",
+          note: diff > 0 ? `+${diff} added` : `${diff} removed`,
+        });
+      }
+
+      // Per-stage checkpoint changes within the section
+      (oldSec.stages || []).forEach((oldStage) => {
+        const newStage = (newSec.stages || []).find((st) => st.stageName === oldStage.stageName);
+        if (!newStage) return;
+        const oldSt = oldStage.checkPoints?.length || 0;
+        const newSt = newStage.checkPoints?.length || 0;
+        if (oldSt !== newSt) {
+          const diff = newSt - oldSt;
+          fieldChanges.push({
+            field: `Stage — ${oldStage.stageName || "Unnamed"}`,
+            from: String(oldSt) + " checkpoints",
+            to:   String(newSt) + " checkpoints",
+            note: diff > 0 ? `+${diff} added` : `${diff} removed`,
+          });
+        }
+      });
+    });
+  }
+
+  const historyAction =
+    approvalStatus === "pending_approval" ? "submitted_for_approval"
+    : approvalStatus === "approved"       ? "approved"
+    : approvalStatus === "rejected"       ? "rejected"
+    : hasFileContent                      ? "updated"
+    : "status_changed";
+
+  await logTemplateHistory(pool, {
+    templateId: parseInt(id),
+    action: historyAction,
+    actionBy: updatedBy,
+    comments: rejectionReason || null,
+    previousStatus: currentTemplate.ApprovalStatus,
+    newStatus: approvalStatus || currentTemplate.ApprovalStatus,
+    fieldChanges: fieldChanges.length > 0 ? fieldChanges : null,
+  });
+
+  await pool.close();
 
   res.status(200).json({
     success: true,
@@ -478,7 +618,8 @@ export const duplicateTemplate = tryCatch(async (req, res) => {
 
   const original = originalResult.recordset[0];
   const newTemplateCode = await generateTemplateCode();
-  const createdBy = req.user?.name || req.user?.usercode || "SYSTEM";
+  // Auth middleware is currently disabled — accept createdBy from request body as fallback
+  const createdBy = req.user?.name || req.user?.usercode || req.body?.createdBy || "SYSTEM";
   const newName = `${original.Name} (Copy)`;
 
   // Load original template config from file
@@ -549,6 +690,34 @@ export const duplicateTemplate = tryCatch(async (req, res) => {
       DefaultSections: originalConfig?.defaultSections || [],
     },
   });
+});
+
+// Get template history (change log)
+export const getTemplateHistory = tryCatch(async (req, res) => {
+  const { id } = req.params;
+  if (!id) throw new AppError("Template ID is required", 400);
+
+  const pool = await new sql.ConnectionPool(dbConfig3).connect();
+  try {
+    const result = await pool.request()
+      .input("templateId", sql.Int, id)
+      .query(`
+        SELECT Id, TemplateId, Action, ActionBy, ActionAt, Comments,
+               PreviousStatus, NewStatus, FieldChanges
+        FROM   AuditTemplateHistory
+        WHERE  TemplateId = @templateId
+        ORDER BY ActionAt DESC;
+      `);
+
+    const history = result.recordset.map((r) => ({
+      ...r,
+      FieldChanges: r.FieldChanges ? JSON.parse(r.FieldChanges) : null,
+    }));
+
+    res.status(200).json({ success: true, data: history });
+  } finally {
+    await pool.close();
+  }
 });
 
 // Get template categories

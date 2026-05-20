@@ -182,12 +182,13 @@ export const useAuditData = () => {
     }
   }, []);
 
-  const duplicateTemplate = useCallback(async (id) => {
+  const duplicateTemplate = useCallback(async (id, options = {}) => {
     setLoading(true);
     setError(null);
     try {
       const response = await axios.post(
         `${API_BASE}/templates/${id}/duplicate`,
+        options,   // forwards { createdBy } so backend can tag the duplicate correctly
       );
       const newTemplate = transformTemplate(response.data.data);
       setTemplates((prev) => [newTemplate, ...prev]);
@@ -350,6 +351,17 @@ export const useAuditData = () => {
     }
   }, []);
 
+  const getTemplateHistory = useCallback(async (id) => {
+    try {
+      const response = await axios.get(`${API_BASE}/templates/${id}/history`);
+      return response.data.data || [];
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to load template history";
+      console.error("Template history error:", err);
+      throw new Error(message);
+    }
+  }, []);
+
   const fetchAuditStats = useCallback(async (params = {}) => {
     try {
       const response = await axios.get(`${API_BASE}/audits/stats`, { params });
@@ -384,6 +396,7 @@ export const useAuditData = () => {
     rejectAudit,
     fetchAuditModelSummary,
     fetchAuditStats,
+    getTemplateHistory,
   };
 };
 

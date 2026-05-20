@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaPlus,
@@ -21,6 +21,7 @@ import {
   FaTimes,
   FaChevronRight,
   FaExclamationTriangle,
+  FaHistory,
 } from "react-icons/fa";
 import { MdOutlineFactCheck } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
@@ -118,6 +119,40 @@ const getTotalStages = (template) => {
 const getCategoryConfig = (category) =>
   CATEGORIES.find((c) => c.value === category) ||
   CATEGORIES[CATEGORIES.length - 1];
+
+const fmtDate = (d) => {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true });
+};
+
+const ACTION_CFG = {
+  created:               { label: "Created",               color: "text-indigo-600", dot: "bg-indigo-400", type: "new"  },
+  updated:               { label: "Updated",               color: "text-blue-600",   dot: "bg-blue-400",   type: "edit" },
+  submitted_for_approval:{ label: "Submitted for Approval",color: "text-amber-600",  dot: "bg-amber-400",  type: "edit" },
+  status_changed:        { label: "Status Changed",        color: "text-violet-600", dot: "bg-violet-400", type: "edit" },
+  approved:              { label: "Approved",              color: "text-green-600",  dot: "bg-green-500",  type: "edit" },
+  rejected:              { label: "Rejected",              color: "text-red-600",    dot: "bg-red-500",    type: "edit" },
+  deleted:               { label: "Deleted",               color: "text-gray-500",   dot: "bg-gray-400",   type: "edit" },
+};
+
+const STATUS_LABELS = {
+  draft:            { label: "Draft",           cls: "bg-gray-100 text-gray-700 border-gray-300" },
+  pending_approval: { label: "Pending",         cls: "bg-amber-100 text-amber-700 border-amber-300" },
+  approved:         { label: "Approved",        cls: "bg-green-100 text-green-700 border-green-300" },
+  rejected:         { label: "Rejected",        cls: "bg-red-100 text-red-700 border-red-300" },
+};
+
+const HistoryStatusBadge = ({ status }) => {
+  const cfg = STATUS_LABELS[status] || { label: "Not Set", cls: "bg-slate-100 text-slate-600 border-slate-200" };
+  return <span className={`inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${cfg.cls}`}>{cfg.label}</span>;
+};
+
+const TypeBadge = ({ type }) =>
+  type === "new" ? (
+    <span className="inline-flex items-center text-[9px] font-black px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 uppercase tracking-wide">New Template</span>
+  ) : (
+    <span className="inline-flex items-center text-[9px] font-black px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-wide">Template Edit</span>
+  );
 
 // ==================== SUB-COMPONENTS ====================
 const StatCard = ({ icon: Icon, label, value, sub, iconBg, iconColor }) => (
@@ -321,7 +356,7 @@ const TemplateList = () => {
   const navigate = useNavigate();
   const searchRef = useRef(null);
 
-  const { templates, deleteTemplate, duplicateTemplate, loadTemplates, updateTemplate } =
+  const { templates, deleteTemplate, duplicateTemplate, loadTemplates, updateTemplate, getTemplateHistory } =
     useAuditData();
 
   const [initialLoading, setInitialLoading] = useState(true);
@@ -329,7 +364,7 @@ const TemplateList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [sortKey, setSortKey] = useState("updatedAt_desc");
-  const [viewMode, setViewMode] = useState("grid"); // "grid" | "list"
+  const [viewMode, setViewMode] = useState("list"); // "grid" | "list"
   const [activeTab, setActiveTab] = useState("all"); // "all" | "draft"
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState(null);
@@ -337,6 +372,12 @@ const TemplateList = () => {
   const [dupLoadingId, setDupLoadingId] = useState(null);
   const [submitLoadingId, setSubmitLoadingId] = useState(null);
   const [previewTemplate, setPreviewTemplate] = useState(null);
+
+  // History inline expansion
+  const [expandedHistoryId, setExpandedHistoryId] = useState(null);
+  const [historyCache, setHistoryCache] = useState({});
+  const [historyLoadingId, setHistoryLoadingId] = useState(null);
+  const [expandedChanges, setExpandedChanges] = useState(new Set());
 
   const canCreateEdit = [
     ROLES.SUPER_ADMIN,
@@ -414,7 +455,11 @@ const TemplateList = () => {
   const handleDuplicate = async (template) => {
     setDupLoadingId(template.id);
     try {
-      await duplicateTemplate(template.id);
+      // Pass the current user so the duplicate is tagged with the correct createdBy
+      // (needed while auth middleware is disabled on the backend)
+      await duplicateTemplate(template.id, {
+        createdBy: user?.name || user?.userCode || user?.usercode || "SYSTEM",
+      });
       toast.success(`"${template.name}" duplicated!`);
     } catch (err) {
       toast.error("Duplicate failed: " + err.message);
@@ -441,6 +486,29 @@ const TemplateList = () => {
       toast.error("Delete failed: " + err.message);
     } finally {
       setDeleteLoading(false);
+    }
+  };
+
+  // ==================== HISTORY ====================
+  const toggleChange = (key) =>
+    setExpandedChanges((prev) => {
+      const s = new Set(prev);
+      s.has(key) ? s.delete(key) : s.add(key);
+      return s;
+    });
+
+  const openHistory = async (template) => {
+    if (expandedHistoryId === template.id) { setExpandedHistoryId(null); return; }
+    setExpandedHistoryId(template.id);
+    if (historyCache[template.id]) return;
+    setHistoryLoadingId(template.id);
+    try {
+      const data = await getTemplateHistory(template.id);
+      setHistoryCache((prev) => ({ ...prev, [template.id]: data }));
+    } catch (err) {
+      toast.error("Failed to load history: " + err.message);
+    } finally {
+      setHistoryLoadingId(null);
     }
   };
 
@@ -1071,14 +1139,114 @@ const TemplateList = () => {
                   </div>
 
                   {/* Footer */}
-                  <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 text-[10px] text-gray-400 flex items-center justify-between">
-                    <span>
-                      Updated{" "}
-                      {relativeTime(template.updatedAt || template.createdAt)}
-                    </span>
-                    <span className="font-mono text-gray-300">
-                      #{template.id}
-                    </span>
+                  <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 text-[10px] text-gray-400">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div>Updated {relativeTime(template.updatedAt || template.createdAt)}</div>
+                        {template.createdBy && (
+                          <div className="mt-0.5">
+                            <span className="text-gray-500 font-medium">By:</span> {template.createdBy}
+                          </div>
+                        )}
+                        {template.createdAt && (
+                          <div className="mt-0.5">
+                            <span className="text-gray-500 font-medium">On:</span>{" "}
+                            {new Date(template.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => openHistory(template)}
+                        className={`p-1.5 rounded-lg transition-all flex items-center gap-0.5 ${expandedHistoryId === template.id ? "bg-indigo-200 text-indigo-700" : "bg-indigo-50 hover:bg-indigo-100 text-indigo-600"}`}
+                        title="Change History"
+                      >
+                        <FaHistory size={11} />
+                        <FaChevronRight size={7} className={`transition-transform ${expandedHistoryId === template.id ? "rotate-90" : ""}`} />
+                      </button>
+                    </div>
+
+                    {/* Grid inline history */}
+                    {expandedHistoryId === template.id && (
+                      <div className="mt-3 border-t border-indigo-100 pt-3">
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <FaHistory className="text-indigo-400" size={10} />
+                          <span className="text-[9px] font-black text-indigo-700 uppercase tracking-wider">Change Log</span>
+                        </div>
+                        {historyLoadingId === template.id ? (
+                          <div className="flex justify-center py-4">
+                            <div className="w-5 h-5 border-4 border-indigo-100 border-t-indigo-400 rounded-full animate-spin" />
+                          </div>
+                        ) : (historyCache[template.id] || []).length === 0 ? (
+                          <p className="text-center py-3 text-gray-400 text-[10px]">No history recorded yet.</p>
+                        ) : (
+                          <div className="relative border-l-2 border-indigo-100 ml-2 space-y-1.5">
+                            {(historyCache[template.id] || []).map((entry) => {
+                              const cfg = ACTION_CFG[entry.Action?.toLowerCase()] || ACTION_CFG.updated;
+                              return (
+                                <div key={entry.Id} className="relative pl-4">
+                                  <div className={`absolute -left-[5px] top-2 w-2 h-2 rounded-full ring-1 ring-white ${cfg.dot}`} />
+                                  <div className="bg-white border border-gray-100 rounded-lg overflow-hidden">
+                                    <div className="px-2.5 py-1.5 flex flex-wrap items-center justify-between gap-1">
+                                      <div className="flex items-center gap-1 flex-wrap">
+                                        <TypeBadge type={cfg.type} />
+                                        <span className={`text-[9px] font-black ${cfg.color}`}>{cfg.label}</span>
+                                        {(entry.PreviousStatus || entry.NewStatus) && (
+                                          <div className="flex items-center gap-0.5">
+                                            {entry.PreviousStatus && <HistoryStatusBadge status={entry.PreviousStatus} />}
+                                            {entry.PreviousStatus && entry.NewStatus && <FaChevronRight size={6} className="text-gray-400" />}
+                                            {entry.NewStatus && <HistoryStatusBadge status={entry.NewStatus} />}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <span className="text-[9px] text-gray-400">{entry.ActionBy || "System"} · {fmtDate(entry.ActionAt)}</span>
+                                    </div>
+                                    {entry.Comments && (
+                                      <div className="px-2.5 py-1 bg-red-50 border-t border-red-100">
+                                        <span className="text-[9px] font-bold text-red-500 mr-1">Remarks:</span>
+                                        <span className="text-[9px] text-red-600">{entry.Comments}</span>
+                                      </div>
+                                    )}
+                                    {entry.FieldChanges?.length > 0 && (
+                                      <div className="px-2.5 py-1.5 border-t border-gray-50 flex flex-wrap gap-1">
+                                        {entry.FieldChanges.map((fc, fi) => {
+                                          const changeKey = `g_${template.id}_${entry.Id}_${fi}`;
+                                          const isChangeOpen = expandedChanges.has(changeKey);
+                                          const isRm  = !fc.to || fc.to === "";
+                                          const isAdd = !fc.from || fc.from === "";
+                                          const dotClr = isRm ? "bg-red-400" : isAdd ? "bg-green-400" : "bg-amber-400";
+                                          return (
+                                            <div key={fi} className="border border-gray-100 rounded overflow-hidden text-[9px]">
+                                              <button type="button" onClick={() => toggleChange(changeKey)}
+                                                className="flex items-center gap-1 px-2 py-1 bg-gray-50 hover:bg-gray-100 transition-colors w-full">
+                                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotClr}`} />
+                                                <span className="font-bold text-gray-600 uppercase">{fc.field}</span>
+                                                <FaChevronRight size={6} className={`text-gray-400 ml-auto transition-transform ${isChangeOpen ? "rotate-90" : ""}`} />
+                                              </button>
+                                              {isChangeOpen && (
+                                                <div className="grid grid-cols-2 gap-0.5 p-1 bg-white">
+                                                  <div className="bg-red-50 rounded px-1 py-0.5 border border-red-100">
+                                                    <p className="text-red-400 font-bold uppercase text-[8px]">Before</p>
+                                                    <p className="text-red-700 font-semibold break-all">{fc.from ?? "—"}</p>
+                                                  </div>
+                                                  <div className="bg-green-50 rounded px-1 py-0.5 border border-green-100">
+                                                    <p className="text-green-400 font-bold uppercase text-[8px]">After</p>
+                                                    <p className="text-green-700 font-semibold break-all">{fc.to ?? "—"}</p>
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -1105,6 +1273,9 @@ const TemplateList = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden xl:table-cell">
                     Updated
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden xl:table-cell">
+                    Created By
+                  </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
                     Actions
                   </th>
@@ -1115,11 +1286,14 @@ const TemplateList = () => {
                   const catCfg = getCategoryConfig(template.category);
                   const isActive = template.isActive !== false;
                   const isDuplicating = dupLoadingId === template.id;
+                  const isHistoryOpen = expandedHistoryId === template.id;
+                  const tHistory = historyCache[template.id] || [];
+                  const isHistoryLoading = historyLoadingId === template.id;
 
                   return (
+                    <React.Fragment key={template.id}>
                     <tr
-                      key={template.id}
-                      className={`hover:bg-indigo-50/30 transition-colors ${idx % 2 === 0 ? "bg-white" : "bg-gray-50/40"}`}
+                      className={`hover:bg-indigo-50/30 transition-colors ${idx % 2 === 0 ? "bg-white" : "bg-gray-50/40"} ${isHistoryOpen ? "bg-indigo-50/30" : ""}`}
                     >
                       {/* Template name */}
                       <td className="px-4 py-3">
@@ -1208,10 +1382,18 @@ const TemplateList = () => {
                       {/* Updated */}
                       <td className="px-4 py-3 hidden xl:table-cell">
                         <span className="text-xs text-gray-400">
-                          {relativeTime(
-                            template.updatedAt || template.createdAt,
-                          )}
+                          {relativeTime(template.updatedAt || template.createdAt)}
                         </span>
+                      </td>
+
+                      {/* Created By */}
+                      <td className="px-4 py-3 hidden xl:table-cell">
+                        <div className="text-xs text-gray-600 font-medium">{template.createdBy || "—"}</div>
+                        {template.createdAt && (
+                          <div className="text-[10px] text-gray-400 mt-0.5">
+                            {new Date(template.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                          </div>
+                        )}
                       </td>
 
                       {/* Actions */}
@@ -1232,11 +1414,7 @@ const TemplateList = () => {
                             </button>
                           ) : (
                             <button
-                              onClick={() =>
-                                navigate(
-                                  `/auditreport/audits/new?template=${template.id}`,
-                                )
-                              }
+                              onClick={() => navigate(`/auditreport/audits/new?template=${template.id}`)}
                               className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all"
                             >
                               <FaPlus size={9} /> Use
@@ -1249,13 +1427,18 @@ const TemplateList = () => {
                           >
                             <FaEye size={12} />
                           </button>
+                          {/* History button */}
+                          <button
+                            onClick={() => openHistory(template)}
+                            className={`p-1.5 rounded-lg transition-all flex items-center gap-0.5 ${isHistoryOpen ? "bg-indigo-200 text-indigo-700" : "bg-indigo-50 hover:bg-indigo-100 text-indigo-600"}`}
+                            title="Change History"
+                          >
+                            <FaHistory size={12} />
+                            <FaChevronRight size={7} className={`transition-transform ${isHistoryOpen ? "rotate-90" : ""}`} />
+                          </button>
                           {canCreateEdit && (
                             <button
-                              onClick={() =>
-                                navigate(
-                                  `/auditreport/templates/${template.id}`,
-                                )
-                              }
+                              onClick={() => navigate(`/auditreport/templates/${template.id}`)}
                               className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-all"
                               title="Edit"
                             >
@@ -1290,6 +1473,98 @@ const TemplateList = () => {
                         </div>
                       </td>
                     </tr>
+
+                    {/* Inline history row */}
+                    {isHistoryOpen && (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-4 bg-indigo-50/20 border-t border-indigo-100">
+                          <div className="flex items-center gap-2 mb-3">
+                            <FaHistory className="text-indigo-400" size={12} />
+                            <span className="text-xs font-black text-indigo-700 uppercase tracking-wider">Change Log — {template.name}</span>
+                          </div>
+                          {isHistoryLoading ? (
+                            <div className="flex items-center justify-center py-8">
+                              <div className="w-6 h-6 border-4 border-indigo-100 border-t-indigo-400 rounded-full animate-spin" />
+                            </div>
+                          ) : tHistory.length === 0 ? (
+                            <div className="text-center py-6 text-gray-400 text-xs">No history recorded yet.</div>
+                          ) : (
+                            <div className="relative border-l-2 border-indigo-100 ml-3 space-y-2">
+                              {tHistory.map((entry) => {
+                                const cfg = ACTION_CFG[entry.Action?.toLowerCase()] || ACTION_CFG.updated;
+                                return (
+                                  <div key={entry.Id} className="relative pl-5">
+                                    <div className={`absolute -left-[5px] top-2.5 w-2.5 h-2.5 rounded-full ring-2 ring-white ${cfg.dot}`} />
+                                    <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+                                      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <TypeBadge type={cfg.type} />
+                                          <span className={`text-[10px] font-black ${cfg.color}`}>{cfg.label}</span>
+                                          {(entry.PreviousStatus || entry.NewStatus) && (
+                                            <div className="flex items-center gap-1">
+                                              {entry.PreviousStatus && <HistoryStatusBadge status={entry.PreviousStatus} />}
+                                              {entry.PreviousStatus && entry.NewStatus && <FaChevronRight size={7} className="text-gray-400" />}
+                                              {entry.NewStatus && <HistoryStatusBadge status={entry.NewStatus} />}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-3 text-[10px] text-gray-400">
+                                          <span>{entry.ActionBy || "System"}</span>
+                                          <span>{fmtDate(entry.ActionAt)}</span>
+                                        </div>
+                                      </div>
+                                      {entry.Comments && (
+                                        <div className="px-4 py-2 bg-red-50 border-b border-red-100">
+                                          <span className="text-[9px] font-bold text-red-500 uppercase tracking-wider mr-2">Remarks:</span>
+                                          <span className="text-[10px] text-red-600">{entry.Comments}</span>
+                                        </div>
+                                      )}
+                                      {entry.FieldChanges?.length > 0 && (
+                                        <div className="px-4 py-2.5 flex flex-wrap gap-2">
+                                          {entry.FieldChanges.map((fc, fi) => {
+                                            const changeKey = `${entry.Id}_${fi}`;
+                                            const isChangeOpen = expandedChanges.has(changeKey);
+                                            const isRm  = !fc.to || fc.to === "";
+                                            const isAdd = !fc.from || fc.from === "";
+                                            const dotClr = isRm ? "bg-red-400" : isAdd ? "bg-green-400" : "bg-amber-400";
+                                            return (
+                                              <div key={fi} className="border border-gray-100 rounded-lg overflow-hidden text-[9px] min-w-[120px]">
+                                                <button type="button" onClick={() => toggleChange(changeKey)}
+                                                  className="w-full flex items-center justify-between px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 transition-colors">
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotClr}`} />
+                                                    <span className="font-bold text-gray-600 uppercase tracking-wide">{fc.field}</span>
+                                                    {fc.note && <span className={`px-1.5 py-0.5 rounded-full font-bold ${isRm ? "bg-red-100 text-red-600" : isAdd ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>{fc.note}</span>}
+                                                  </div>
+                                                  <FaChevronRight size={7} className={`text-gray-400 transition-transform ${isChangeOpen ? "rotate-90" : ""}`} />
+                                                </button>
+                                                {isChangeOpen && (
+                                                  <div className="grid grid-cols-2 gap-1 p-1.5 bg-white">
+                                                    <div className="bg-red-50 rounded px-1.5 py-1 border border-red-100">
+                                                      <p className="text-red-400 font-bold uppercase mb-0.5">Before</p>
+                                                      <p className="text-red-700 font-semibold break-all">{fc.from ?? "—"}</p>
+                                                    </div>
+                                                    <div className="bg-green-50 rounded px-1.5 py-1 border border-green-100">
+                                                      <p className="text-green-400 font-bold uppercase mb-0.5">After</p>
+                                                      <p className="text-green-700 font-semibold break-all">{fc.to ?? "—"}</p>
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
