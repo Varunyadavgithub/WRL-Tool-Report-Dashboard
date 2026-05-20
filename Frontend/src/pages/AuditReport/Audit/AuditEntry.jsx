@@ -19,6 +19,7 @@ import {
   FaBarcode,
   FaImage,
   FaCloudUploadAlt,
+  FaCamera,
   FaSearchPlus,
   FaTimes,
   FaTrash,
@@ -221,8 +222,32 @@ const AutoSaveIndicator = ({ status }) => {
   );
 };
 
-const DragDropImageZone = ({ onFile, refEl, refKey }) => {
+const ImageZone = ({ onFile, uploadRef }) => {
+  const [open, setOpen]         = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [showCam, setShowCam]   = useState(false);
+  const zoneRef   = useRef(null);
+  const videoRef  = useRef(null);
+  const streamRef = useRef(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const h = (e) => { if (zoneRef.current && !zoneRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  // Attach stream to video element after camera modal opens
+  useEffect(() => {
+    if (showCam && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [showCam]);
+
+  // Stop stream on unmount
+  useEffect(() => {
+    return () => { streamRef.current?.getTracks().forEach((t) => t.stop()); };
+  }, []);
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -231,37 +256,116 @@ const DragDropImageZone = ({ onFile, refEl, refKey }) => {
     if (file) onFile({ target: { files: [file] } });
   };
 
+  const startCamera = async () => {
+    setOpen(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      streamRef.current = stream;
+      setShowCam(true);
+    } catch {
+      toast.error("Camera access denied or not available on this device.");
+    }
+  };
+
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setShowCam(false);
+  };
+
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement("canvas");
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      const file = new File([blob], `photo_${Date.now()}.jpg`, { type: "image/jpeg" });
+      onFile({ target: { files: [file] } });
+      stopCamera();
+    }, "image/jpeg", 0.92);
+  };
+
   return (
-    <label
-      onDragOver={(e) => {
-        e.preventDefault();
-        setDragging(true);
-      }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={handleDrop}
-      className={`flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
-        dragging
-          ? "border-blue-500 bg-blue-50 scale-105"
-          : "border-gray-300 hover:border-blue-400 hover:bg-blue-50"
-      }`}
-    >
-      <FaCloudUploadAlt
-        size={22}
-        className={dragging ? "text-blue-500" : "text-gray-400"}
-      />
-      <span className="text-[10px] text-gray-400 mt-1 text-center leading-tight">
-        Drop or
-        <br />
-        click
-      </span>
-      <input
-        ref={refEl}
-        type="file"
-        accept="image/jpeg,image/png,image/gif,image/webp"
-        className="hidden"
-        onChange={onFile}
-      />
-    </label>
+    <>
+      {/* ── Trigger button + dropdown ───────────────────────────────────── */}
+      <div
+        ref={zoneRef}
+        className="relative flex flex-col items-center"
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={handleDrop}
+      >
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className={`flex flex-col items-center justify-center w-20 h-20 border-2 border-dashed rounded-xl cursor-pointer transition-all focus:outline-none ${
+            dragging ? "border-blue-500 bg-blue-50 scale-105"
+            : open    ? "border-indigo-400 bg-indigo-50"
+            :           "border-gray-300 hover:border-indigo-400 hover:bg-indigo-50"
+          }`}
+          title="Add photo"
+        >
+          <FaCamera size={18} className={open || dragging ? "text-indigo-500" : "text-gray-400"} />
+          <span className="text-[9px] text-gray-400 mt-1 font-medium">Add Photo</span>
+        </button>
+
+        {open && (
+          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden w-38 min-w-[140px]">
+            {/* Upload from file */}
+            <label className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-indigo-50 cursor-pointer transition-colors" onClick={() => setOpen(false)}>
+              <FaCloudUploadAlt size={13} className="text-indigo-500 flex-shrink-0" />
+              <span className="text-xs font-semibold text-gray-700">Upload File</span>
+              <input ref={uploadRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={onFile} />
+            </label>
+            <div className="h-px bg-gray-100 mx-3" />
+            {/* Open camera via getUserMedia */}
+            <button
+              type="button"
+              onClick={startCamera}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-indigo-50 transition-colors"
+            >
+              <FaCamera size={13} className="text-indigo-500 flex-shrink-0" />
+              <span className="text-xs font-semibold text-gray-700">Camera</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Camera modal ────────────────────────────────────────────────── */}
+      {showCam && (
+        <div className="fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-[200] p-4">
+          <p className="text-white text-sm font-semibold mb-3">Point the camera and click Capture</p>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="rounded-xl max-w-full max-h-[65vh] bg-black"
+          />
+          <div className="flex items-center gap-4 mt-5">
+            <button
+              type="button"
+              onClick={stopCamera}
+              className="px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold text-sm transition border border-white/20"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={capturePhoto}
+              className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition shadow-lg flex items-center gap-2"
+            >
+              <FaCamera size={14} /> Capture
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
@@ -288,9 +392,10 @@ const AuditEntry = () => {
     error,
   } = useAuditData();
 
-  const isAdmin        = [user?.role, user?.roleName].includes(ROLES.SUPER_ADMIN);
-  const isLQE          = [user?.role, user?.roleName].includes(ROLES.LINE_QUALITY_ENGINEER);
-  const isQualityOp    = [user?.role, user?.roleName].includes(ROLES.QUALITY_OPERATOR);
+  const isAdmin          = [user?.role, user?.roleName].includes(ROLES.SUPER_ADMIN);
+  const isLQE            = [user?.role, user?.roleName].includes(ROLES.LINE_QUALITY_ENGINEER);
+  const isQualityOp      = [user?.role, user?.roleName].includes(ROLES.QUALITY_OPERATOR);
+  const isQualityAuditor = [user?.role, user?.roleName].includes(ROLES.QUALITY_AUDITOR);
 
   const [saving, setSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState("idle");
@@ -640,7 +745,7 @@ const AuditEntry = () => {
               reportName: tmpl.name,
               formatNo: tmpl.headerConfig?.defaultFormatNo || "",
               revNo: tmpl.headerConfig?.defaultRevNo || "",
-              revDate: todayDate,
+              revDate: tmpl.headerConfig?.defaultRevDate || "",
               notes: "",
               status: "submitted",
             });
@@ -692,6 +797,7 @@ const AuditEntry = () => {
      user?.usercode === auditData.createdBy);
 
   const canEdit =
+    !isQualityAuditor &&                                            // quality auditor = always read-only
     auditData.status !== 'approved' &&                              // approved = read-only for everyone
     (
       !id ||                                                        // new audit
@@ -699,8 +805,8 @@ const AuditEntry = () => {
       (['draft', 'rejected'].includes(auditData.status) && (isOwner || isAdmin))
     );
 
-  // LQE or Super Admin reviewing a submitted audit
-  const isLQEReview = !!id && (isLQE || isAdmin) && auditData.status === 'submitted';
+  // LQE or Super Admin reviewing a submitted audit (never the Quality Auditor)
+  const isLQEReview = !!id && !isQualityAuditor && (isLQE || isAdmin) && auditData.status === 'submitted';
 
   // Force preview-mode (read-only) when the user cannot edit
   useEffect(() => {
@@ -1310,8 +1416,8 @@ const AuditEntry = () => {
               </p>
             </div>
           ) : (
-            <DragDropImageZone
-              refEl={(el) => (fileInputRefs.current[refKey] = el)}
+            <ImageZone
+              uploadRef={(el) => (fileInputRefs.current[refKey] = el)}
               onFile={(e) =>
                 handleImageUpload(
                   section.id,

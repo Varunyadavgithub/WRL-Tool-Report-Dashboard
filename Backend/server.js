@@ -64,6 +64,27 @@ app.use("/uploads", express.static(path.resolve("uploads"))); // Static files
       END
     `);
 
+    await global.pool3.request().query(`
+      IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_NAME = 'AuditTemplateHistory'
+      )
+      BEGIN
+        CREATE TABLE AuditTemplateHistory (
+          Id          INT IDENTITY(1,1) PRIMARY KEY,
+          TemplateId  INT           NOT NULL,
+          Action      NVARCHAR(50)  NOT NULL,
+          ActionBy    NVARCHAR(100) NULL,
+          ActionAt    DATETIME      NOT NULL DEFAULT GETDATE(),
+          Comments    NVARCHAR(MAX) NULL,
+          PreviousStatus NVARCHAR(50) NULL,
+          NewStatus      NVARCHAR(50) NULL,
+          FieldChanges   NVARCHAR(MAX) NULL
+        );
+        PRINT 'Migration: Created AuditTemplateHistory table';
+      END
+    `);
+
   } catch (error) {
     console.error("Database connection failed:", error);
     process.exit(1);

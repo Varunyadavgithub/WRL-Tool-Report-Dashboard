@@ -6,6 +6,7 @@ import {
   updateTemplate,
   deleteTemplate,
   duplicateTemplate,
+  getTemplateHistory,
 } from "../controllers/auditReport/template.controller.js";
 import {
   getAllAudits,
@@ -43,6 +44,7 @@ router.post("/templates", createTemplate);
 router.put("/templates/:id", updateTemplate);
 router.delete("/templates/:id", deleteTemplate);
 router.post("/templates/:id/duplicate", duplicateTemplate);
+router.get("/templates/:id/history", getTemplateHistory);
 
 // ==================== Audit Routes ====================
 router.get("/audits/stats", getAuditStats);

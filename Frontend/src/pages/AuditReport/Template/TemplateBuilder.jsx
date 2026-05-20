@@ -216,7 +216,7 @@ const TemplateBuilder = () => {
   const isAdmin = user?.roleName === ROLES.SUPER_ADMIN;
   const [headerConfig, setHeaderConfig] = useState({
     showFormatNo: true, showRevNo: true, showRevDate: true,
-    defaultFormatNo: "", defaultRevNo: "",
+    defaultFormatNo: "", defaultRevNo: "", defaultRevDate: "",
   });
   const [infoFields, setInfoFields] = useState(DEFAULT_INFO_FIELDS);
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
@@ -1078,6 +1078,11 @@ const TemplateBuilder = () => {
             <label className="text-xs text-gray-500 mb-1 block">Default Rev. No.</label>
             <input type="text" value={headerConfig.defaultRevNo} onChange={(e) => setHeaderConfig({ ...headerConfig, defaultRevNo: e.target.value })}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none" placeholder="A" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Default Rev. Date</label>
+            <input type="date" value={headerConfig.defaultRevDate || ""} onChange={(e) => setHeaderConfig({ ...headerConfig, defaultRevDate: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none" />
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import {
   FaSearch,
   FaArrowLeft,
@@ -15,6 +16,8 @@ import {
   FaIndustry,
   FaClipboardCheck,
   FaClock,
+  FaFileAlt,
+  FaEdit,
 } from "react-icons/fa";
 import { MdPendingActions } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
@@ -90,6 +93,7 @@ const fmtDate = (dateStr) => {
 const SerialScan = () => {
   const navigate = useNavigate();
   const { templates, loadTemplates, fetchAuditModelSummary, loadAudits } = useAuditData();
+  const { user } = useSelector((store) => store.auth);
 
   const [serialNumber, setSerialNumber] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -98,6 +102,8 @@ const SerialScan = () => {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [recentAudits, setRecentAudits] = useState([]);
   const [recentLoading, setRecentLoading] = useState(false);
+  const [myDrafts, setMyDrafts] = useState([]);
+  const [draftsLoading, setDraftsLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState(null);
 
   // ── Load ─────────────────────────────────────────────────────────────────────
@@ -105,22 +111,32 @@ const SerialScan = () => {
   const loadAll = useCallback(async () => {
     setSummaryLoading(true);
     setRecentLoading(true);
+    setDraftsLoading(true);
     try {
-      const [summaryRes, auditsRes] = await Promise.all([
+      const [summaryRes, auditsRes, draftsRes] = await Promise.all([
         fetchAuditModelSummary({}),
         loadAudits({ limit: 10, page: 1 }),
+        loadAudits({ status: "draft", limit: 50, page: 1 }),
         loadTemplates({ isActive: true }),
       ]);
       setSummary(summaryRes.data || []);
       setRecentAudits(auditsRes.data || []);
+
+      // Filter drafts to only this user's own drafts
+      const userCode = user?.userCode || user?.usercode || user?.name;
+      const ownDrafts = (draftsRes.data || []).filter(
+        (a) => !userCode || a.createdBy === userCode,
+      );
+      setMyDrafts(ownDrafts);
       setLastRefreshed(new Date());
     } catch (err) {
       toast.error("Failed to load data: " + err.message);
     } finally {
       setSummaryLoading(false);
       setRecentLoading(false);
+      setDraftsLoading(false);
     }
-  }, [fetchAuditModelSummary, loadAudits]);
+  }, [fetchAuditModelSummary, loadAudits, user]);
 
   useEffect(() => {
     loadAll();
@@ -376,8 +392,8 @@ const SerialScan = () => {
           </div>
         </div>
 
-        {/* ── Bottom grid: Model Summary | Recent Audits ───────────────────── */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {/* ── Bottom grid: Model Summary | Recent Audits | My Drafts ─────── */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           {/* ── Model Summary ─────────────────────────────────────────────── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
             <div className="px-5 py-3.5 border-b border-gray-50 flex items-center justify-between flex-shrink-0">
@@ -639,6 +655,80 @@ const SerialScan = () => {
               </div>
             )}
           </div>
+
+          {/* ── My Drafts ──────────────────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-amber-100 shadow-sm overflow-hidden flex flex-col">
+            <div className="px-5 py-3.5 border-b border-amber-50 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-amber-50 rounded-lg">
+                  <FaFileAlt className="text-amber-500 text-sm" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-gray-800">My Drafts</h3>
+                  <p className="text-[10px] text-gray-400">Your saved draft audits</p>
+                </div>
+              </div>
+              {myDrafts.length > 0 && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold border border-amber-200">
+                  {myDrafts.length} draft{myDrafts.length !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+
+            {draftsLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="w-8 h-8 border-4 border-amber-100 border-t-amber-400 rounded-full animate-spin" />
+              </div>
+            ) : myDrafts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+                <FaFileAlt className="text-3xl text-gray-200 mb-3" />
+                <p className="text-sm font-semibold text-gray-400">No drafts yet</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Saved drafts from serial scan will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-auto flex-1 divide-y divide-gray-50">
+                {myDrafts.map((draft, idx) => (
+                  <div
+                    key={draft.id}
+                    className={`px-4 py-3 flex items-start gap-3 hover:bg-amber-50/40 transition-colors ${idx % 2 === 1 ? "bg-gray-50/30" : ""}`}
+                  >
+                    <div className="p-1.5 bg-amber-50 rounded-lg flex-shrink-0 mt-0.5">
+                      <FaFileAlt className="text-amber-400 text-sm" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <p className="text-xs font-black text-gray-800 truncate">
+                          {draft.auditCode || `#${draft.id}`}
+                        </p>
+                        <StatusBadge status={draft.status} />
+                      </div>
+                      <p className="text-[11px] text-gray-500 truncate">
+                        {draft.templateName || "—"}
+                      </p>
+                      {(draft.infoData?.serialNo || draft.infoData?.serial) && (
+                        <p className="text-[10px] text-indigo-600 font-mono mt-0.5">
+                          {draft.infoData?.serialNo || draft.infoData?.serial}
+                        </p>
+                      )}
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {timeAgo(draft.updatedAt || draft.createdAt)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => navigate(`/auditreport/audits/${draft.id}`)}
+                      className="p-1.5 hover:bg-amber-100 rounded-lg transition text-amber-500 hover:text-amber-700 flex-shrink-0 mt-0.5"
+                      title="Continue draft"
+                    >
+                      <FaEdit size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
     </div>

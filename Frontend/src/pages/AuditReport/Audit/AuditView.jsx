@@ -37,7 +37,9 @@ import {
 import { MdFormatListNumbered, MdUpdate, MdDateRange } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
 import { BiSolidFactory } from "react-icons/bi";
+import { useSelector } from "react-redux";
 import useAuditData from "../../../hooks/useAuditData.js";
+import { ROLES } from "../../../config/routes.config.js";
 import toast from "react-hot-toast";
 import { baseURL } from "../../../assets/assets.js";
 import {
@@ -223,6 +225,9 @@ const AuditView = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { getAuditById, approveAudit, rejectAudit } = useAuditData();
+
+  const { user } = useSelector((store) => store.auth);
+  const isQualityAuditor = [user?.role, user?.roleName].includes(ROLES.QUALITY_AUDITOR);
 
   const exportBtnRef = useRef(null);
 
@@ -1324,67 +1329,65 @@ const AuditView = () => {
               <FaPrint size={12} />
             </button>
 
-            {/* Export dropdown */}
-            <div className="relative" ref={exportBtnRef}>
-              <button
-                onClick={() => setShowExportMenu((v) => !v)}
-                className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition-all"
-              >
-                <FaDownload size={11} /> Export
-                <FaChevronDown
-                  size={10}
-                  className={`transition-transform ${showExportMenu ? "rotate-180" : ""}`}
-                />
-              </button>
-              {showExportMenu && (
-                <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-xl border border-gray-200 z-30 overflow-hidden">
-                  <button
-                    onClick={() => {
-                      handleExportPDF();
-                      setShowExportMenu(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors font-medium"
-                  >
-                    <FaFilePdf className="text-red-500 flex-shrink-0" /> Export
-                    as PDF
-                  </button>
-                  <div className="h-px bg-gray-100" />
-                  <button
-                    onClick={() => {
-                      handleExportExcel();
-                      setShowExportMenu(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors font-medium"
-                  >
-                    <FaFileExcel className="text-green-500 flex-shrink-0" />{" "}
-                    Export as Excel
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {audit.status !== "approved" && (
-              <button
-                onClick={() => navigate(`/auditreport/audits/${id}`)}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-indigo-200"
-              >
-                <FaEdit size={11} /> Edit
-              </button>
-            )}
-            {audit.status === "submitted" && (
+            {/* Export, Edit, Approve, Reject — hidden for Quality Auditor */}
+            {!isQualityAuditor && (
               <>
-                <button
-                  onClick={() => openApprovalModal("approve")}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-green-200"
-                >
-                  <FaCheck size={11} /> Approve
-                </button>
-                <button
-                  onClick={() => openApprovalModal("reject")}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-red-200"
-                >
-                  <FaBan size={11} /> Reject
-                </button>
+                {/* Export dropdown */}
+                <div className="relative" ref={exportBtnRef}>
+                  <button
+                    onClick={() => setShowExportMenu((v) => !v)}
+                    className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition-all"
+                  >
+                    <FaDownload size={11} /> Export
+                    <FaChevronDown
+                      size={10}
+                      className={`transition-transform ${showExportMenu ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  {showExportMenu && (
+                    <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-xl border border-gray-200 z-30 overflow-hidden">
+                      <button
+                        onClick={() => { handleExportPDF(); setShowExportMenu(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors font-medium"
+                      >
+                        <FaFilePdf className="text-red-500 flex-shrink-0" /> Export as PDF
+                      </button>
+                      <div className="h-px bg-gray-100" />
+                      <button
+                        onClick={() => { handleExportExcel(); setShowExportMenu(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors font-medium"
+                      >
+                        <FaFileExcel className="text-green-500 flex-shrink-0" /> Export as Excel
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {audit.status !== "approved" && (
+                  <button
+                    onClick={() => navigate(`/auditreport/audits/${id}`)}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-indigo-200"
+                  >
+                    <FaEdit size={11} /> Edit
+                  </button>
+                )}
+
+                {audit.status === "submitted" && (
+                  <>
+                    <button
+                      onClick={() => openApprovalModal("approve")}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-green-200"
+                    >
+                      <FaCheck size={11} /> Approve
+                    </button>
+                    <button
+                      onClick={() => openApprovalModal("reject")}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-red-200"
+                    >
+                      <FaBan size={11} /> Reject
+                    </button>
+                  </>
+                )}
               </>
             )}
           </div>
