@@ -933,7 +933,7 @@ const TemplateBuilder = () => {
           />
           
           {/* Approval buttons */}
-          {id && templateMeta.approvalStatus === APPROVAL_STATUS.DRAFT && canCreateEdit && (
+          {templateMeta.approvalStatus === APPROVAL_STATUS.DRAFT && canCreateEdit && (
             <button onClick={handleSubmitForApproval} disabled={saving} className="px-4 py-2 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
               {saving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FaCheckDouble />}
               {saving ? "Submitting..." : "Submit for Approval"}
@@ -954,7 +954,7 @@ const TemplateBuilder = () => {
           )}
 
           {/* Admin can resubmit rejected templates */}
-          {id && templateMeta.approvalStatus === APPROVAL_STATUS.REJECTED && isAdmin && (
+          {id && templateMeta.approvalStatus === APPROVAL_STATUS.REJECTED && canCreateEdit && (
             <button onClick={handleSubmitForApproval} disabled={saving} className="px-4 py-2 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
               {saving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FaCheckDouble />}
               {saving ? "Resubmitting..." : "Resubmit for Approval"}
