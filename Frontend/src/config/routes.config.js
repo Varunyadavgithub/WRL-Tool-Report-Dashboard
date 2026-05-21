@@ -119,6 +119,11 @@ const ManpowerApproval = lazy(() => import("../pages/Forms/ManpowerApproval"));
 const SecurityManpowerList = lazy(
   () => import("../pages/Forms/SecurityManpowerList"),
 );
+const AttendanceRegister = lazy(() => import("../pages/Forms/AttendanceRegister"));
+const MyAttendance = lazy(() => import("../pages/Forms/MyAttendance"));
+const AttendanceDashboard = lazy(() => import("../pages/Forms/AttendanceDashboard"));
+const LeaveApplication = lazy(() => import("../pages/Forms/LeaveApplication"));
+const LeaveApproval = lazy(() => import("../pages/Forms/LeaveApproval"));
 const Monitoring = lazy(() => import("../pages/Display/Monitoring"));
 const Management = lazy(() => import("../pages/Display/Management"));
 const WIPCapture = lazy(() => import("../pages/Production/WIPCapture"));
@@ -576,6 +581,31 @@ export const ROUTE_CONFIG = [
         path: "/forms/security-manpower",
         label: "Security Manpower List",
         component: SecurityManpowerList,
+      },
+      {
+        path: "/forms/attendance",
+        label: "Attendance Register",
+        component: AttendanceRegister,
+      },
+      {
+        path: "/forms/my-attendance",
+        label: "My Attendance",
+        component: MyAttendance,
+      },
+      {
+        path: "/forms/attendance-dashboard",
+        label: "Attendance Dashboard",
+        component: AttendanceDashboard,
+      },
+      {
+        path: "/forms/leave-application",
+        label: "Leave Application",
+        component: LeaveApplication,
+      },
+      {
+        path: "/forms/leave-approval",
+        label: "Leave Approval",
+        component: LeaveApproval,
       },
     ],
   },
