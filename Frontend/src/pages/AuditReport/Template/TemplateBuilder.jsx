@@ -31,6 +31,7 @@ import {
   FaDownload,
   FaUpload,
   FaTable,
+  FaHistory,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { MdAddCircle, MdOutlineFactCheck, MdDragIndicator } from "react-icons/md";
@@ -170,12 +171,29 @@ const IconBtn = ({ icon: Icon, onClick, title, disabled, color = "gray", size = 
   );
 };
 
+const formatHistoryDate = (date) =>
+  date ? new Date(date).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }) : "—";
+
+const historyActionLabel = (action = "") =>
+  action
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || "Updated";
+
 // ==================== MAIN COMPONENT ====================
 const TemplateBuilder = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { user } = useSelector((store) => store.auth);
-  const { createTemplate, updateTemplate, getTemplateById } = useAuditData();
+  const { createTemplate, updateTemplate, getTemplateById, getTemplateHistory } = useAuditData();
 
   const [showColumnManager, setShowColumnManager] = useState(false);
   const [showInfoFieldManager, setShowInfoFieldManager] = useState(false);
@@ -190,6 +208,9 @@ const TemplateBuilder = () => {
   const [hasDraft, setHasDraft] = useState(false);
   const [showExcelModal, setShowExcelModal] = useState(false);
   const [excelPreview, setExcelPreview]     = useState(null); // { sections, totalCPs }
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [templateHistory, setTemplateHistory] = useState([]);
+  const [showReviewHistory, setShowReviewHistory] = useState(false);
   const newColInputRef  = useRef(null);
   const excelInputRef   = useRef(null);
 
@@ -221,11 +242,16 @@ const TemplateBuilder = () => {
   const [infoFields, setInfoFields] = useState(DEFAULT_INFO_FIELDS);
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
   const [defaultSections, setDefaultSections] = useState([makeSection()]);
+  const isApprovalReview = Boolean(id && templateMeta.approvalStatus === APPROVAL_STATUS.PENDING_APPROVAL);
+  const isReadOnly = isApprovalReview;
 
   // ==================== Keyboard shortcuts ====================
   useEffect(() => {
     const handler = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); handleSaveAsDraft(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (!isReadOnly) handleSaveAsDraft();
+      }
       if (e.key === "Escape") {
         setShowColumnManager(false);
         setShowInfoFieldManager(false);
@@ -235,16 +261,39 @@ const TemplateBuilder = () => {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [templateMeta, headerConfig, infoFields, columns, defaultSections]);
+  }, [templateMeta, headerConfig, infoFields, columns, defaultSections, isReadOnly]);
 
   // ==================== Auto-draft to localStorage ====================
   useEffect(() => {
-    if (templateMeta.name && !initialLoading) {
+    if (templateMeta.name && !initialLoading && !isReadOnly) {
       const draft = { templateMeta, headerConfig, infoFields, columns, defaultSections, savedAt: Date.now() };
       localStorage.setItem(`template_draft_${id || "new"}`, JSON.stringify(draft));
       setHasDraft(true);
     }
-  }, [templateMeta, headerConfig, infoFields, columns, defaultSections]);
+  }, [templateMeta, headerConfig, infoFields, columns, defaultSections, isReadOnly]);
+
+  useEffect(() => {
+    if (!isReadOnly || !id) {
+      setTemplateHistory([]);
+      return;
+    }
+
+    let alive = true;
+    const loadHistory = async () => {
+      setHistoryLoading(true);
+      try {
+        const data = await getTemplateHistory(id);
+        if (alive) setTemplateHistory(data);
+      } catch (err) {
+        if (alive) toast.error("Failed to load template history: " + err.message);
+      } finally {
+        if (alive) setHistoryLoading(false);
+      }
+    };
+
+    loadHistory();
+    return () => { alive = false; };
+  }, [isReadOnly, id, getTemplateHistory]);
 
   const clearDraft = () => {
     localStorage.removeItem(`template_draft_${id || "new"}`);
@@ -658,6 +707,9 @@ const TemplateBuilder = () => {
         rejectionReason: "",
         approvedBy: "",
         approvedAt: "",
+        // Pass user identity so backend can store correct CreatedBy when auth is disabled.
+        // String() coercion prevents "Invalid string" if userCode is stored as a number.
+        createdByUser: user?.name || String(user?.userCode ?? user?.usercode ?? "SYSTEM"),
         headerConfig,
         infoFields,
         columns,
@@ -695,6 +747,7 @@ const TemplateBuilder = () => {
         rejectionReason: "",
         approvedBy: "",
         approvedAt: "",
+        createdByUser: user?.name || String(user?.userCode ?? user?.usercode ?? "SYSTEM"),
         headerConfig,
         infoFields,
         columns,
@@ -898,32 +951,38 @@ const TemplateBuilder = () => {
           <button onClick={() => navigate("/auditreport/templates")} className="p-2 hover:bg-gray-100 rounded-lg transition text-gray-600"><FaArrowLeft /></button>
           <div className="flex items-center gap-2">
             <BiSolidFactory className="text-indigo-600 text-xl" />
-            <h1 className="text-lg font-bold text-gray-800">Template Builder</h1>
+            <h1 className="text-lg font-bold text-gray-800">{isReadOnly ? "Template Review" : "Template Builder"}</h1>
           </div>
-          {hasDraft && (
+          {hasDraft && !isReadOnly && (
             <button onClick={clearDraft} className="text-xs text-amber-600 hover:text-amber-700 underline">Clear draft</button>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowShortcuts(true)} className="p-2 hover:bg-gray-100 rounded-lg transition text-gray-600" title="Keyboard shortcuts"><FaKeyboard /></button>
+          {!isReadOnly && (
+            <button onClick={() => setShowShortcuts(true)} className="p-2 hover:bg-gray-100 rounded-lg transition text-gray-600" title="Keyboard shortcuts"><FaKeyboard /></button>
+          )}
 
           {/* Excel download template */}
-          <button
-            onClick={handleDownloadExcelTemplate}
-            className="flex items-center gap-2 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-sm font-semibold transition"
-            title="Download Excel template to fill in sections & checkpoints"
-          >
-            <FaDownload size={12} /> Excel Template
-          </button>
+          {!isReadOnly && (
+            <button
+              onClick={handleDownloadExcelTemplate}
+              className="flex items-center gap-2 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-sm font-semibold transition"
+              title="Download Excel template to fill in sections & checkpoints"
+            >
+              <FaDownload size={12} /> Excel Template
+            </button>
+          )}
 
           {/* Excel upload */}
-          <button
-            onClick={() => excelInputRef.current?.click()}
-            className="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-sm font-semibold transition"
-            title="Upload filled Excel file to bulk-import sections & checkpoints"
-          >
-            <FaUpload size={12} /> Import Excel
-          </button>
+          {!isReadOnly && (
+            <button
+              onClick={() => excelInputRef.current?.click()}
+              className="flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-sm font-semibold transition"
+              title="Upload filled Excel file to bulk-import sections & checkpoints"
+            >
+              <FaUpload size={12} /> Import Excel
+            </button>
+          )}
           <input
             ref={excelInputRef}
             type="file"
@@ -933,7 +992,7 @@ const TemplateBuilder = () => {
           />
           
           {/* Approval buttons */}
-          {templateMeta.approvalStatus === APPROVAL_STATUS.DRAFT && canCreateEdit && (
+          {!isReadOnly && templateMeta.approvalStatus === APPROVAL_STATUS.DRAFT && canCreateEdit && (
             <button onClick={handleSubmitForApproval} disabled={saving} className="px-4 py-2 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
               {saving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FaCheckDouble />}
               {saving ? "Submitting..." : "Submit for Approval"}
@@ -954,17 +1013,19 @@ const TemplateBuilder = () => {
           )}
 
           {/* Admin can resubmit rejected templates */}
-          {id && templateMeta.approvalStatus === APPROVAL_STATUS.REJECTED && canCreateEdit && (
+          {!isReadOnly && id && templateMeta.approvalStatus === APPROVAL_STATUS.REJECTED && canCreateEdit && (
             <button onClick={handleSubmitForApproval} disabled={saving} className="px-4 py-2 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
               {saving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FaCheckDouble />}
               {saving ? "Resubmitting..." : "Resubmit for Approval"}
             </button>
           )}
           
-          <button onClick={handleSaveAsDraft} disabled={saving} className="px-4 py-2 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-            {saving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FaSave />}
-            {saving ? "Saving..." : "Save Draft"}
-          </button>
+          {!isReadOnly && (
+            <button onClick={handleSaveAsDraft} disabled={saving} className="px-4 py-2 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+              {saving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FaSave />}
+              {saving ? "Saving..." : "Save Draft"}
+            </button>
+          )}
         </div>
       </header>
 
@@ -983,34 +1044,38 @@ const TemplateBuilder = () => {
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Template Name *</label>
             <input type="text" value={templateMeta.name} onChange={(e) => setTemplateMeta({ ...templateMeta, name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none" placeholder="Enter template name" />
+              disabled={isReadOnly}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none disabled:bg-gray-50 disabled:text-gray-600" placeholder="Enter template name" />
           </div>
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Category</label>
             <select value={templateMeta.category} onChange={(e) => setTemplateMeta({ ...templateMeta, category: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none">
+              disabled={isReadOnly}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none disabled:bg-gray-50 disabled:text-gray-600">
               {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
           </div>
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Version</label>
             <input type="text" value={templateMeta.version} onChange={(e) => setTemplateMeta({ ...templateMeta, version: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none" placeholder="1.0" />
+              disabled={isReadOnly}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none disabled:bg-gray-50 disabled:text-gray-600" placeholder="1.0" />
           </div>
           <div className="flex items-center gap-2 pt-5">
             <label className="flex items-center gap-2 text-sm text-gray-600">
-              <input type="checkbox" checked={templateMeta.isActive} onChange={(e) => setTemplateMeta({ ...templateMeta, isActive: e.target.checked })} className="rounded" />
+              <input type="checkbox" checked={templateMeta.isActive} onChange={(e) => setTemplateMeta({ ...templateMeta, isActive: e.target.checked })} disabled={isReadOnly} className="rounded disabled:opacity-60" />
               Active
             </label>
           </div>
           <div className="md:col-span-2 lg:col-span-4">
             <label className="text-xs text-gray-500 mb-1 block">Description</label>
             <textarea value={templateMeta.description} onChange={(e) => setTemplateMeta({ ...templateMeta, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none resize-none" rows="2" placeholder="Brief description..." />
+              disabled={isReadOnly}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none resize-none disabled:bg-gray-50 disabled:text-gray-600" rows="2" placeholder="Brief description..." />
           </div>
           <div className="md:col-span-2 lg:col-span-4">
             <label className="text-xs text-gray-500 mb-1 block">Applicable Models</label>
-            <div className="flex gap-2 mb-2">
+            {!isReadOnly && <div className="flex gap-2 mb-2">
               <input type="text" id="modelInput" placeholder="Add model (e.g., D525H223)"
                 className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none" />
               <button onClick={() => {
@@ -1021,13 +1086,14 @@ const TemplateBuilder = () => {
                 }
                 input.value = "";
               }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition">Add</button>
-            </div>
+            </div>}
             <div className="flex flex-wrap gap-2">
               {templateMeta.models.map((model, idx) => (
                 <span key={idx} className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium border border-indigo-200">
                   {model}
-                  <button onClick={() => setTemplateMeta({ ...templateMeta, models: templateMeta.models.filter((_, i) => i !== idx) })}
+                  {!isReadOnly && <button onClick={() => setTemplateMeta({ ...templateMeta, models: templateMeta.models.filter((_, i) => i !== idx) })}
                     className="text-indigo-400 hover:text-indigo-600 ml-1"><FaTimes size={10} /></button>
+                  }
                 </span>
               ))}
               {templateMeta.models.length === 0 && <span className="text-xs text-gray-400 italic">No models added yet</span>}
@@ -1058,31 +1124,34 @@ const TemplateBuilder = () => {
         <h2 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2"><FaInfoCircle /> Header Configuration</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input type="checkbox" checked={headerConfig.showFormatNo} onChange={(e) => setHeaderConfig({ ...headerConfig, showFormatNo: e.target.checked })} className="rounded" />
+            <input type="checkbox" checked={headerConfig.showFormatNo} onChange={(e) => setHeaderConfig({ ...headerConfig, showFormatNo: e.target.checked })} disabled={isReadOnly} className="rounded disabled:opacity-60" />
             Show Format No.
           </label>
           <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input type="checkbox" checked={headerConfig.showRevNo} onChange={(e) => setHeaderConfig({ ...headerConfig, showRevNo: e.target.checked })} className="rounded" />
+            <input type="checkbox" checked={headerConfig.showRevNo} onChange={(e) => setHeaderConfig({ ...headerConfig, showRevNo: e.target.checked })} disabled={isReadOnly} className="rounded disabled:opacity-60" />
             Show Rev. No.
           </label>
           <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input type="checkbox" checked={headerConfig.showRevDate} onChange={(e) => setHeaderConfig({ ...headerConfig, showRevDate: e.target.checked })} className="rounded" />
+            <input type="checkbox" checked={headerConfig.showRevDate} onChange={(e) => setHeaderConfig({ ...headerConfig, showRevDate: e.target.checked })} disabled={isReadOnly} className="rounded disabled:opacity-60" />
             Show Rev. Date
           </label>
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Default Format No.</label>
             <input type="text" value={headerConfig.defaultFormatNo} onChange={(e) => setHeaderConfig({ ...headerConfig, defaultFormatNo: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none" placeholder="FMT-001" />
+              disabled={isReadOnly}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none disabled:bg-gray-50 disabled:text-gray-600" placeholder="FMT-001" />
           </div>
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Default Rev. No.</label>
             <input type="text" value={headerConfig.defaultRevNo} onChange={(e) => setHeaderConfig({ ...headerConfig, defaultRevNo: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none" placeholder="A" />
+              disabled={isReadOnly}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none disabled:bg-gray-50 disabled:text-gray-600" placeholder="A" />
           </div>
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Default Rev. Date</label>
             <input type="date" value={headerConfig.defaultRevDate || ""} onChange={(e) => setHeaderConfig({ ...headerConfig, defaultRevDate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none" />
+              disabled={isReadOnly}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none disabled:bg-gray-50 disabled:text-gray-600" />
           </div>
         </div>
       </div>
@@ -1092,7 +1161,7 @@ const TemplateBuilder = () => {
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-bold text-gray-700 flex items-center gap-2"><FaTags /> Info Fields</h2>
-            <button onClick={() => setShowInfoFieldManager(true)} className="text-xs text-purple-600 hover:text-purple-700 font-semibold">Manage</button>
+            {!isReadOnly && <button onClick={() => setShowInfoFieldManager(true)} className="text-xs text-purple-600 hover:text-purple-700 font-semibold">Manage</button>}
           </div>
           <div className="flex flex-wrap gap-2">
             {infoFields.filter(f => f.visible).map((f) => <Badge key={f.id} color={f.required ? "blue" : "gray"}>{f.name}{f.required && "*"}</Badge>)}
@@ -1101,13 +1170,125 @@ const TemplateBuilder = () => {
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-bold text-gray-700 flex items-center gap-2"><FaColumns /> Table Columns</h2>
-            <button onClick={() => setShowColumnManager(true)} className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold">Manage</button>
+            {!isReadOnly && <button onClick={() => setShowColumnManager(true)} className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold">Manage</button>}
           </div>
           <div className="flex flex-wrap gap-2">
             {visibleColumns.map((c) => <Badge key={c.id} color={c.required ? "blue" : c.entryField ? "green" : "gray"}>{c.name}</Badge>)}
           </div>
         </div>
       </div>
+
+      {isReadOnly && (
+        <div className="bg-white mx-6 mt-4 rounded-xl border border-gray-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowReviewHistory((prev) => !prev)}
+            className="w-full px-5 py-3 bg-indigo-50 hover:bg-indigo-100 border-b border-indigo-100 flex items-center justify-between gap-3 transition-colors"
+          >
+            <h2 className="text-sm font-bold text-indigo-700 flex items-center gap-2">
+              <FaHistory /> Change Log
+            </h2>
+            <span className="flex items-center gap-2 text-[10px] text-indigo-400 font-semibold">
+              {historyLoading ? "Loading..." : `${templateHistory.length} entries`}
+              {showReviewHistory ? <FaChevronUp size={10} /> : <FaChevronDown size={10} />}
+            </span>
+          </button>
+
+          {showReviewHistory && (historyLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-6 h-6 border-4 border-indigo-100 border-t-indigo-500 rounded-full animate-spin" />
+            </div>
+          ) : templateHistory.length === 0 ? (
+            <div className="px-5 py-6 text-center text-xs text-gray-400">
+              No history recorded for this template yet.
+            </div>
+          ) : (
+            <div className="p-5">
+              <div className="relative border-l-2 border-indigo-100 ml-3 space-y-3">
+                {templateHistory.map((entry, idx) => {
+                  const changes = Array.isArray(entry.FieldChanges)
+                    ? entry.FieldChanges
+                    : (() => {
+                        try { return entry.FieldChanges ? JSON.parse(entry.FieldChanges) : []; }
+                        catch { return []; }
+                      })();
+                  const action = entry.Action?.toLowerCase() || "updated";
+                  const tone =
+                    action === "approved" ? "green" :
+                    action === "rejected" ? "red" :
+                    action === "submitted_for_approval" ? "amber" : "indigo";
+                  const toneCls = {
+                    green: "bg-green-100 text-green-700 border-green-200",
+                    red: "bg-red-100 text-red-700 border-red-200",
+                    amber: "bg-amber-100 text-amber-700 border-amber-200",
+                    indigo: "bg-indigo-100 text-indigo-700 border-indigo-200",
+                  }[tone];
+                  const dotCls = {
+                    green: "bg-green-500",
+                    red: "bg-red-500",
+                    amber: "bg-amber-400",
+                    indigo: "bg-indigo-400",
+                  }[tone];
+
+                  return (
+                    <div key={entry.Id || idx} className="relative pl-5">
+                      <span className={`absolute -left-[5px] top-3 w-2.5 h-2.5 rounded-full ring-2 ring-white ${dotCls}`} />
+                      <div className="border border-gray-100 rounded-xl overflow-hidden">
+                        <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-black ${toneCls}`}>
+                              {historyActionLabel(entry.Action)}
+                            </span>
+                            {(entry.PreviousStatus || entry.NewStatus) && (
+                              <span className="text-[10px] text-gray-500">
+                                {entry.PreviousStatus || "—"} → {entry.NewStatus || "—"}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-gray-400 flex items-center gap-2">
+                            <span>{entry.ActionBy || "System"}</span>
+                            <span>{formatHistoryDate(entry.ActionAt)}</span>
+                          </div>
+                        </div>
+
+                        {entry.Comments && (
+                          <div className="px-4 py-2 bg-red-50 border-b border-red-100">
+                            <span className="text-[9px] font-bold text-red-500 uppercase tracking-wider mr-2">Remarks:</span>
+                            <span className="text-[10px] text-red-600">{entry.Comments}</span>
+                          </div>
+                        )}
+
+                        {changes.length > 0 && (
+                          <div className="px-4 py-2.5 flex flex-wrap gap-2">
+                            {changes.map((change, ci) => (
+                              <div key={ci} className="rounded-lg border border-gray-100 overflow-hidden text-[10px] bg-white min-w-[150px] max-w-full">
+                                <div className="px-2.5 py-1.5 bg-gray-50 font-bold text-gray-600 uppercase tracking-wide">
+                                  {change.field || "Field"}
+                                  {change.note && <span className="ml-1 text-gray-400 normal-case">({change.note})</span>}
+                                </div>
+                                <div className="grid grid-cols-2 gap-1 p-1.5">
+                                  <div className="bg-red-50 rounded px-1.5 py-1 border border-red-100">
+                                    <p className="text-red-400 font-bold uppercase mb-0.5">Before</p>
+                                    <p className="text-red-700 font-semibold break-words">{change.from ?? "—"}</p>
+                                  </div>
+                                  <div className="bg-green-50 rounded px-1.5 py-1 border border-green-100">
+                                    <p className="text-green-400 font-bold uppercase mb-0.5">After</p>
+                                    <p className="text-green-700 font-semibold break-words">{change.to ?? "—"}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Section builder */}
       <div className="mx-6 mt-4 pb-8">
@@ -1139,7 +1320,7 @@ const TemplateBuilder = () => {
                 </span>
               )}
             </div>
-            <button onClick={addSection} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition flex items-center gap-1"><MdAddCircle /> Add Section</button>
+            {!isReadOnly && <button onClick={addSection} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition flex items-center gap-1"><MdAddCircle /> Add Section</button>}
           </div>
         </div>
 
@@ -1152,44 +1333,86 @@ const TemplateBuilder = () => {
           </div>
         )}
 
-        {filteredSections.map((section, sIdx) => (
-          <div key={section.id} className="bg-white rounded-xl border border-gray-200 mb-3 overflow-hidden">
+        {filteredSections.map((section, sIdx) => {
+          const sectionKey = section.id || `section-${sIdx}`;
+          const sectionCollapsed = isReadOnly ? collapsedSections[sectionKey] === true : false;
+
+          return (
+          <div key={sectionKey} className="bg-white rounded-xl border border-gray-200 mb-3 overflow-hidden">
             {/* Section header */}
             <div className={`flex items-center gap-2 px-4 py-3 border-b border-gray-200 ${searchQ && section.sectionName.toLowerCase().includes(searchQ) ? "bg-yellow-50 border-yellow-100" : "bg-gray-50"}`}>
-              <MdDragIndicator className="text-gray-300" />
+              {isReadOnly ? (
+                <button
+                  type="button"
+                  onClick={() => setCollapsedSections((prev) => ({ ...prev, [sectionKey]: !sectionCollapsed }))}
+                  className="p-1 text-gray-400 hover:text-indigo-600 transition"
+                  title={sectionCollapsed ? "Expand section" : "Collapse section"}
+                >
+                  {sectionCollapsed ? <FaChevronDown size={11} /> : <FaChevronUp size={11} />}
+                </button>
+              ) : (
+                <MdDragIndicator className="text-gray-300" />
+              )}
               <input type="text" value={section.sectionName} onChange={(e) => updateSectionName(section.id, e.target.value)}
                 id={`sec-input-${section.id}`}
-                className={`flex-1 px-3 py-1.5 border rounded-lg text-sm font-medium focus:border-indigo-400 outline-none ${searchQ && section.sectionName.toLowerCase().includes(searchQ) ? "border-yellow-300 bg-yellow-50" : "border-gray-200"}`}
+                disabled={isReadOnly}
+                className={`flex-1 px-3 py-1.5 border rounded-lg text-sm font-medium focus:border-indigo-400 outline-none disabled:bg-transparent disabled:border-transparent disabled:text-gray-700 ${searchQ && section.sectionName.toLowerCase().includes(searchQ) ? "border-yellow-300 bg-yellow-50" : "border-gray-200"}`}
                 placeholder="Section name" />
-              <div className="flex items-center gap-1">
+              {isReadOnly && (
+                <span className="text-[10px] text-gray-400 font-semibold">
+                  {section.stages?.length || 0} stages
+                </span>
+              )}
+              {!isReadOnly && <div className="flex items-center gap-1">
                 <IconBtn icon={FaCopy} onClick={() => duplicateSection(section.id)} title="Duplicate" color="blue" />
                 <IconBtn icon={FaArrowUp} onClick={() => moveSection(sIdx, "up")} disabled={sIdx === 0} title="Move up" />
                 <IconBtn icon={FaArrowDown} onClick={() => moveSection(sIdx, "down")} disabled={sIdx === filteredSections.length - 1} title="Move down" />
                 <IconBtn icon={FaTrash} onClick={() => deleteSection(section.id)} title="Delete" color="red" />
-              </div>
+              </div>}
             </div>
 
             {/* Stages */}
-            <div className="p-4 space-y-3">
-              {section.stages.map((stage, stIdx) => (
-                <div key={stage.id} className="border border-gray-200 rounded-lg overflow-hidden">
+            {!sectionCollapsed && <div className="p-4 space-y-3">
+              {section.stages.map((stage, stIdx) => {
+                const stageKey = `${sectionKey}-${stage.id || `stage-${stIdx}`}`;
+                const stageCollapsed = isReadOnly ? collapsedStages[stageKey] === true : false;
+
+                return (
+                <div key={stageKey} className="border border-gray-200 rounded-lg overflow-hidden">
                   {/* Stage header */}
                   <div className={`flex items-center gap-2 px-3 py-2 border-b border-gray-200 ${searchQ && stage.stageName.toLowerCase().includes(searchQ) ? "bg-yellow-50 border-yellow-100" : "bg-slate-50"}`}>
-                    <MdDragIndicator className="text-gray-300 text-sm" />
+                    {isReadOnly ? (
+                      <button
+                        type="button"
+                        onClick={() => setCollapsedStages((prev) => ({ ...prev, [stageKey]: !stageCollapsed }))}
+                        className="p-1 text-gray-400 hover:text-indigo-600 transition"
+                        title={stageCollapsed ? "Expand stage" : "Collapse stage"}
+                      >
+                        {stageCollapsed ? <FaChevronDown size={10} /> : <FaChevronUp size={10} />}
+                      </button>
+                    ) : (
+                      <MdDragIndicator className="text-gray-300 text-sm" />
+                    )}
                     <input type="text" value={stage.stageName} onChange={(e) => updateStageName(section.id, stage.id, e.target.value)}
                       id={`stage-input-${stage.id}`}
-                      className={`flex-1 px-2 py-1 border rounded text-sm focus:border-indigo-400 outline-none ${searchQ && stage.stageName.toLowerCase().includes(searchQ) ? "border-yellow-300 bg-yellow-50" : "border-gray-200"}`}
+                      disabled={isReadOnly}
+                      className={`flex-1 px-2 py-1 border rounded text-sm focus:border-indigo-400 outline-none disabled:bg-transparent disabled:border-transparent disabled:text-gray-700 ${searchQ && stage.stageName.toLowerCase().includes(searchQ) ? "border-yellow-300 bg-yellow-50" : "border-gray-200"}`}
                       placeholder="Stage name" />
-                    <div className="flex items-center gap-1">
+                    {isReadOnly && (
+                      <span className="text-[10px] text-gray-400 font-semibold">
+                        {stage.checkPoints?.length || 0} checkpoints
+                      </span>
+                    )}
+                    {!isReadOnly && <div className="flex items-center gap-1">
                       <IconBtn icon={FaCopy} onClick={() => duplicateStage(section.id, stage.id)} title="Duplicate" color="blue" size={10} />
                       <IconBtn icon={FaArrowUp} onClick={() => moveStage(section.id, stIdx, "up")} disabled={stIdx === 0} title="Move up" size={10} />
                       <IconBtn icon={FaArrowDown} onClick={() => moveStage(section.id, stIdx, "down")} disabled={stIdx === section.stages.length - 1} title="Move down" size={10} />
                       <IconBtn icon={FaTrash} onClick={() => deleteStage(section.id, stage.id)} title="Delete" color="red" size={10} />
-                    </div>
+                    </div>}
                   </div>
 
                   {/* Checkpoints table */}
-                  <div className="overflow-x-auto">
+                  {!stageCollapsed && <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-200">
@@ -1197,7 +1420,7 @@ const TemplateBuilder = () => {
                             <th key={col.id} className={`px-3 py-2 text-left text-xs font-semibold text-gray-600 ${col.width}`}>{col.name}</th>
                           ))}
                           <th className="px-3 py-2 w-20 text-center text-xs font-semibold text-gray-600">Required</th>
-                          <th className="px-3 py-2 w-24 text-right">Actions</th>
+                          {!isReadOnly && <th className="px-3 py-2 w-24 text-right">Actions</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -1205,19 +1428,31 @@ const TemplateBuilder = () => {
                           <tr key={cp.id} className={`border-b border-gray-100 hover:bg-indigo-50/30 transition-colors ${searchQ && cpMatches(cp) ? "bg-yellow-50 ring-1 ring-inset ring-yellow-300" : ""}`}>
                             {visibleColumns.map((col) => (
                               <td key={col.id} className={`px-3 py-2 ${col.width}`}>
-                                {col.id === "section" && <span className="text-gray-600">{section.sectionName || "-"}</span>}
-                                {col.id === "stage" && <span className="text-gray-600">{stage.stageName || "-"}</span>}
+                                {col.id === "section" && <span className="block text-gray-600 whitespace-normal break-words">{section.sectionName || "-"}</span>}
+                                {col.id === "stage" && <span className="block text-gray-600 whitespace-normal break-words">{stage.stageName || "-"}</span>}
                                 {col.id === "checkPoint" && (
-                                  <input type="text" value={cp.checkPoint} onChange={(e) => updateCheckpoint(section.id, stage.id, cp.id, "checkPoint", e.target.value)}
-                                    className="w-full px-2 py-1 border border-gray-200 rounded text-xs focus:border-indigo-400 outline-none" placeholder="Checkpoint" />
+                                  isReadOnly ? (
+                                    <span className="block text-xs leading-relaxed text-gray-700 whitespace-normal break-words">{cp.checkPoint || "-"}</span>
+                                  ) : (
+                                    <input type="text" value={cp.checkPoint} onChange={(e) => updateCheckpoint(section.id, stage.id, cp.id, "checkPoint", e.target.value)}
+                                      className="w-full px-2 py-1 border border-gray-200 rounded text-xs focus:border-indigo-400 outline-none" placeholder="Checkpoint" />
+                                  )
                                 )}
                                 {col.id === "method" && (
-                                  <input type="text" value={cp.method} onChange={(e) => updateCheckpoint(section.id, stage.id, cp.id, "method", e.target.value)}
-                                    className="w-full px-2 py-1 border border-gray-200 rounded text-xs focus:border-indigo-400 outline-none" placeholder="Method" />
+                                  isReadOnly ? (
+                                    <span className="block text-xs leading-relaxed text-gray-700 whitespace-normal break-words">{cp.method || "-"}</span>
+                                  ) : (
+                                    <input type="text" value={cp.method} onChange={(e) => updateCheckpoint(section.id, stage.id, cp.id, "method", e.target.value)}
+                                      className="w-full px-2 py-1 border border-gray-200 rounded text-xs focus:border-indigo-400 outline-none" placeholder="Method" />
+                                  )
                                 )}
                                 {col.id === "specification" && (
-                                  <input type="text" value={cp.specification} onChange={(e) => updateCheckpoint(section.id, stage.id, cp.id, "specification", e.target.value)}
-                                    className="w-full px-2 py-1 border border-gray-200 rounded text-xs focus:border-indigo-400 outline-none" placeholder="Spec" />
+                                  isReadOnly ? (
+                                    <span className="block text-xs leading-relaxed text-gray-700 whitespace-normal break-words">{cp.specification || "-"}</span>
+                                  ) : (
+                                    <input type="text" value={cp.specification} onChange={(e) => updateCheckpoint(section.id, stage.id, cp.id, "specification", e.target.value)}
+                                      className="w-full px-2 py-1 border border-gray-200 rounded text-xs focus:border-indigo-400 outline-none" placeholder="Spec" />
+                                  )
                                 )}
                               </td>
                             ))}
@@ -1225,6 +1460,7 @@ const TemplateBuilder = () => {
                               <button
                                 type="button"
                                 onClick={() => updateCheckpoint(section.id, stage.id, cp.id, "required", !cp.required)}
+                                disabled={isReadOnly}
                                 title={cp.required ? "Mark as optional" : "Mark as required"}
                                 className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold border transition-all ${
                                   cp.required
@@ -1235,37 +1471,39 @@ const TemplateBuilder = () => {
                                 {cp.required ? "Yes" : "No"}
                               </button>
                             </td>
-                            <td className="px-3 py-2 w-24 text-right">
+                            {!isReadOnly && <td className="px-3 py-2 w-24 text-right">
                               <div className="flex items-center justify-end gap-1">
                                 <IconBtn icon={FaArrowUp} onClick={() => moveCheckpoint(section.id, stage.id, cpIdx, "up")} disabled={cpIdx === 0} size={9} />
                                 <IconBtn icon={FaArrowDown} onClick={() => moveCheckpoint(section.id, stage.id, cpIdx, "down")} disabled={cpIdx === stage.checkPoints.length - 1} size={9} />
                                 <IconBtn icon={FaTrash} onClick={() => deleteCheckpoint(section.id, stage.id, cp.id)} color="red" size={9} />
                               </div>
-                            </td>
+                            </td>}
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                  </div>}
 
                   {/* Add checkpoint / bulk paste */}
-                  <div className="px-3 py-2 flex items-center gap-2 bg-gray-50 border-t border-gray-200">
+                  {!isReadOnly && <div className="px-3 py-2 flex items-center gap-2 bg-gray-50 border-t border-gray-200">
                     <button onClick={() => addCheckpoint(section.id, stage.id)} className="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs font-semibold hover:bg-indigo-700 transition flex items-center gap-1"><FaPlus size={10} /> Add Row</button>
                     <button onClick={() => {
                       const text = prompt("Paste multiple checkpoints (one per line):");
                       if (text) handleBulkPaste(section.id, stage.id, text);
                     }} className="px-3 py-1.5 bg-gray-600 text-white rounded text-xs font-semibold hover:bg-gray-700 transition flex items-center gap-1"><FaClipboardList size={10} /> Bulk Paste</button>
-                  </div>
+                  </div>}
                 </div>
-              ))}
+              );
+              })}
 
               {/* Add stage */}
-              <button onClick={() => addStage(section.id)} className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 text-sm font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2">
+              {!isReadOnly && <button onClick={() => addStage(section.id)} className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 text-sm font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2">
                 <MdAddCircle /> Add Stage
-              </button>
-            </div>
+              </button>}
+            </div>}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Rejection Modal */}
@@ -1297,10 +1535,9 @@ const TemplateBuilder = () => {
               </button>
               <button
                 onClick={() => {
-                  setShowRejectionModal(false);
                   handleReject();
                 }}
-                disabled={saving}
+                disabled={saving || !rejectionReasonInput.trim()}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? "Rejecting..." : "Reject"}

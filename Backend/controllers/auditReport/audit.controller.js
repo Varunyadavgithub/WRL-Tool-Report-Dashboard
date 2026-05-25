@@ -75,6 +75,17 @@ const safeJsonParse = (str, defaultVal) => {
   }
 };
 
+const getRequestUserIdentifier = (req) => {
+  const rawValue =
+    req.user?.usercode ||
+    req.user?.userCode ||
+    req.user?.name ||
+    req.user?.id ||
+    "SYSTEM";
+  const result = (rawValue != null && String(rawValue).trim()) ? String(rawValue).trim() : "SYSTEM";
+  return result;
+};
+
 // ==================== GET ALL AUDITS ====================
 export const getAllAudits = tryCatch(async (req, res) => {
   const {
@@ -88,6 +99,7 @@ export const getAllAudits = tryCatch(async (req, res) => {
   } = req.query;
 
   const offset = (parseInt(page) - 1) * parseInt(limit);
+  const userCode = getRequestUserIdentifier(req);
 
   let pool;
   try {
@@ -96,13 +108,16 @@ export const getAllAudits = tryCatch(async (req, res) => {
 
     const whereConditions = ["IsDeleted = 0"];
 
+    // When status is explicitly requested
+    if (status) {
+      request.input("status", sql.NVarChar(50), status);
+      whereConditions.push("Status = @status");
+    }
+    // Note: When no status specified, return all audits (frontend will filter)
+
     if (templateId) {
       request.input("templateId", sql.Int, templateId);
       whereConditions.push("TemplateId = @templateId");
-    }
-    if (status) {
-      request.input("status", sql.VarChar, status);
-      whereConditions.push("Status = @status");
     }
     if (search) {
       request.input("search", sql.NVarChar, `%${search}%`);
@@ -235,7 +250,7 @@ export const createAudit = tryCatch(async (req, res) => {
   }
 
   const auditCode = await generateAuditCode("AUD");
-  const createdBy = req.user?.userCode || "SYSTEM";
+  const createdBy = getRequestUserIdentifier(req);
 
   // Process images: extract base64 objects → save to disk → replace with filenames
   const { sections: processedSections, savedImages } = await processAuditImages(
@@ -275,15 +290,15 @@ export const createAudit = tryCatch(async (req, res) => {
 
     const result = await pool
       .request()
-      .input("auditCode", sql.VarChar, auditCode)
+      .input("auditCode", sql.NVarChar(50), auditCode)
       .input("templateId", sql.Int, templateId)
       .input("templateName", sql.NVarChar, finalTemplateName)
       .input("reportName", sql.NVarChar, reportName)
-      .input("formatNo", sql.VarChar, formatNo || null)
-      .input("revNo", sql.VarChar, revNo || null)
+      .input("formatNo", sql.NVarChar(50), formatNo || null)
+      .input("revNo", sql.NVarChar(50), revNo || null)
       .input("revDate", sql.Date, revDate ? new Date(revDate) : null)
       .input("notes", sql.NVarChar, notes || null)
-      .input("status", sql.VarChar, status)
+      .input("status", sql.NVarChar(50), status)
       .input("infoData", sql.NVarChar, JSON.stringify(infoData || {}))
       .input("sections", sql.NVarChar, JSON.stringify(processedSections || []))
       .input("columns", sql.NVarChar, JSON.stringify(finalColumns || []))
@@ -297,8 +312,8 @@ export const createAudit = tryCatch(async (req, res) => {
       .input("summary", sql.NVarChar, JSON.stringify(summary))
       .input("startedAt", sql.DateTime, startedAt ? new Date(startedAt) : null)
       .input("submittedAt", sql.DateTime, status === "submitted" ? new Date() : null)
-      .input("submittedBy", sql.VarChar, status === "submitted" ? createdBy : null)
-      .input("createdBy", sql.VarChar, createdBy).query(`
+      .input("submittedBy", sql.NVarChar(200), status === "submitted" ? createdBy : null)
+      .input("createdBy", sql.NVarChar(200), createdBy).query(`
         INSERT INTO Audits (
           AuditCode, TemplateId, TemplateName, ReportName, FormatNo, RevNo, RevDate,
           Notes, Status, InfoData, Sections, Columns, InfoFields, HeaderConfig,
@@ -319,8 +334,8 @@ export const createAudit = tryCatch(async (req, res) => {
     await pool
       .request()
       .input("auditId", sql.Int, audit.Id)
-      .input("action", sql.VarChar, "created")
-      .input("actionBy", sql.VarChar, createdBy)
+      .input("action", sql.NVarChar(50), "created")
+      .input("actionBy", sql.NVarChar(200), createdBy)
       .input("newData", sql.NVarChar, JSON.stringify(audit)).query(`
         INSERT INTO AuditHistory (AuditId, Action, ActionBy, ActionAt, NewData)
         VALUES (@auditId, @action, @actionBy, GETDATE(), @newData);
@@ -369,7 +384,7 @@ export const updateAudit = tryCatch(async (req, res) => {
 
   if (!id) throw new AppError("Audit ID is required", 400);
 
-  const updatedBy = req.user?.userCode || "SYSTEM";
+  const updatedBy = getRequestUserIdentifier(req);
   let savedImages = [];
 
   let pool;
@@ -415,12 +430,12 @@ export const updateAudit = tryCatch(async (req, res) => {
       .input("reportName", sql.NVarChar, reportName || currentAudit.ReportName)
       .input(
         "formatNo",
-        sql.VarChar,
+        sql.NVarChar(50),
         formatNo !== undefined ? formatNo : currentAudit.FormatNo,
       )
       .input(
         "revNo",
-        sql.VarChar,
+        sql.NVarChar(50),
         revNo !== undefined ? revNo : currentAudit.RevNo,
       )
       .input(
@@ -433,11 +448,11 @@ export const updateAudit = tryCatch(async (req, res) => {
         sql.NVarChar,
         notes !== undefined ? notes : currentAudit.Notes,
       )
-      .input("status", sql.VarChar, status || currentAudit.Status)
+      .input("status", sql.NVarChar(50), status || currentAudit.Status)
       .input("submittedAt", sql.DateTime,
         status === "submitted" && currentAudit.Status !== "submitted"
           ? new Date() : currentAudit.SubmittedAt || null)
-      .input("submittedBy", sql.VarChar,
+      .input("submittedBy", sql.NVarChar(200),
         status === "submitted" && currentAudit.Status !== "submitted"
           ? updatedBy : currentAudit.SubmittedBy || null)
       .input(
@@ -458,9 +473,9 @@ export const updateAudit = tryCatch(async (req, res) => {
         signatures ? JSON.stringify(signatures) : currentAudit.Signatures,
       )
       .input("summary", sql.NVarChar, JSON.stringify(summary))
-      .input("updatedBy", sql.VarChar, updatedBy).query(`
+      .input("updatedBy", sql.NVarChar(200), updatedBy).query(`
         UPDATE Audits
-        SET 
+        SET
           ReportName = @reportName, FormatNo = @formatNo, RevNo = @revNo,
           RevDate = @revDate, Notes = @notes, Status = @status,
           InfoData = @infoData, Sections = @sections, Signatures = @signatures,
@@ -475,8 +490,8 @@ export const updateAudit = tryCatch(async (req, res) => {
     await pool
       .request()
       .input("auditId", sql.Int, id)
-      .input("action", sql.VarChar, "updated")
-      .input("actionBy", sql.VarChar, updatedBy)
+      .input("action", sql.NVarChar(50), "updated")
+      .input("actionBy", sql.NVarChar(200), updatedBy)
       .input("previousData", sql.NVarChar, JSON.stringify(currentAudit))
       .input("newData", sql.NVarChar, JSON.stringify(audit)).query(`
         INSERT INTO AuditHistory (AuditId, Action, ActionBy, ActionAt, PreviousData, NewData)
@@ -513,7 +528,7 @@ export const deleteAudit = tryCatch(async (req, res) => {
   const { id } = req.params;
   if (!id) throw new AppError("Audit ID is required", 400);
 
-  const updatedBy = req.user?.userCode || "SYSTEM";
+  const updatedBy = getRequestUserIdentifier(req);
 
   let pool;
   try {
@@ -542,7 +557,7 @@ export const deleteAudit = tryCatch(async (req, res) => {
     await pool
       .request()
       .input("id", sql.Int, id)
-      .input("updatedBy", sql.VarChar, updatedBy).query(`
+      .input("updatedBy", sql.NVarChar(200), updatedBy).query(`
         UPDATE Audits
         SET IsDeleted = 1, UpdatedBy = @updatedBy, UpdatedAt = GETDATE()
         WHERE Id = @id;
@@ -551,8 +566,8 @@ export const deleteAudit = tryCatch(async (req, res) => {
     await pool
       .request()
       .input("auditId", sql.Int, id)
-      .input("action", sql.VarChar, "deleted")
-      .input("actionBy", sql.VarChar, updatedBy).query(`
+      .input("action", sql.NVarChar(50), "deleted")
+      .input("actionBy", sql.NVarChar(200), updatedBy).query(`
         INSERT INTO AuditHistory (AuditId, Action, ActionBy, ActionAt)
         VALUES (@auditId, @action, @actionBy, GETDATE());
       `);
@@ -574,7 +589,7 @@ export const approveAudit = tryCatch(async (req, res) => {
   if (!id) throw new AppError("Audit ID is required", 400);
   if (!approverName) throw new AppError("Approver name is required", 400);
 
-  const approvedBy = req.user?.userCode || approverName;
+  const approvedBy = String(req.user?.usercode || req.user?.userCode || approverName || "SYSTEM");
 
   let pool;
   try {
@@ -607,10 +622,10 @@ export const approveAudit = tryCatch(async (req, res) => {
     const result = await pool
       .request()
       .input("id", sql.Int, id)
-      .input("approvedBy", sql.VarChar, approverName)
+      .input("approvedBy", sql.NVarChar(200), approverName)
       .input("comments", sql.NVarChar, comments || null)
       .input("signatures", sql.NVarChar, JSON.stringify(updatedSignatures))
-      .input("updatedBy", sql.VarChar, approvedBy).query(`
+      .input("updatedBy", sql.NVarChar(200), approvedBy).query(`
         UPDATE Audits
         SET
           Status = 'approved', ApprovedBy = @approvedBy, ApprovedAt = GETDATE(),
@@ -625,8 +640,8 @@ export const approveAudit = tryCatch(async (req, res) => {
     await pool
       .request()
       .input("auditId", sql.Int, id)
-      .input("action", sql.VarChar, "approved")
-      .input("actionBy", sql.VarChar, approverName)
+      .input("action", sql.NVarChar(50), "approved")
+      .input("actionBy", sql.NVarChar(200), approverName)
       .input("comments", sql.NVarChar, comments || null).query(`
         INSERT INTO AuditHistory (AuditId, Action, ActionBy, ActionAt, Comments)
         VALUES (@auditId, @action, @actionBy, GETDATE(), @comments);
@@ -654,13 +669,15 @@ export const approveAudit = tryCatch(async (req, res) => {
 // ==================== REJECT AUDIT ====================
 export const rejectAudit = tryCatch(async (req, res) => {
   const { id } = req.params;
-  const { approverName, comments } = req.body;
+  const { approverName, comments, isRework } = req.body;
 
   if (!id) throw new AppError("Audit ID is required", 400);
   if (!approverName) throw new AppError("Approver name is required", 400);
   if (!comments) throw new AppError("Rejection reason is required", 400);
 
-  const rejectedBy = req.user?.userCode || approverName;
+  const rejectedBy = String(req.user?.usercode || req.user?.userCode || approverName || "SYSTEM");
+  const newStatus = isRework ? 'rework' : 'rejected';
+  const actionType = isRework ? 'rework' : 'rejected';
 
   let pool;
   try {
@@ -685,12 +702,13 @@ export const rejectAudit = tryCatch(async (req, res) => {
     const result = await pool
       .request()
       .input("id", sql.Int, id)
-      .input("approvedBy", sql.VarChar, approverName)
-      .input("comments", sql.NVarChar, comments)
-      .input("updatedBy", sql.VarChar, rejectedBy).query(`
+      .input("approvedBy", sql.NVarChar(200), approverName)
+      .input("comments", sql.NVarChar(sql.MAX), comments || null)
+      .input("updatedBy", sql.NVarChar(200), rejectedBy)
+      .input("status", sql.NVarChar(50), newStatus).query(`
         UPDATE Audits
-        SET 
-          Status = 'rejected', ApprovedBy = @approvedBy, ApprovedAt = GETDATE(),
+        SET
+          Status = @status, ApprovedBy = @approvedBy, ApprovedAt = GETDATE(),
           ApprovalComments = @comments, UpdatedBy = @updatedBy, UpdatedAt = GETDATE()
         OUTPUT INSERTED.*
         WHERE Id = @id AND IsDeleted = 0;
@@ -701,16 +719,16 @@ export const rejectAudit = tryCatch(async (req, res) => {
     await pool
       .request()
       .input("auditId", sql.Int, id)
-      .input("action", sql.VarChar, "rejected")
-      .input("actionBy", sql.VarChar, approverName)
-      .input("comments", sql.NVarChar, comments).query(`
+      .input("action", sql.NVarChar(50), actionType)
+      .input("actionBy", sql.NVarChar(200), approverName)
+      .input("comments", sql.NVarChar(sql.MAX), comments || null).query(`
         INSERT INTO AuditHistory (AuditId, Action, ActionBy, ActionAt, Comments)
         VALUES (@auditId, @action, @actionBy, GETDATE(), @comments);
       `);
 
     res.status(200).json({
       success: true,
-      message: "Audit rejected successfully",
+      message: isRework ? "Audit sent for rework successfully" : "Audit rejected successfully",
       data: {
         ...audit,
         InfoData: safeJsonParse(audit.InfoData, {}),

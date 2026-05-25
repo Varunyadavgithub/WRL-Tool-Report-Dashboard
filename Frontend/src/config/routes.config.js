@@ -48,6 +48,7 @@ const FPAHistory = lazy(() => import("../pages/Quality/FPAHistory"));
 const FPADefectReport = lazy(() => import("../pages/Quality/FPADefectReport"));
 const LPT = lazy(() => import("../pages/Quality/LPT"));
 const LPTReport = lazy(() => import("../pages/Quality/LPTReport"));
+const MassFlowReport = lazy(() => import("../pages/Quality/MassFlowReport"));
 const DispatchHold = lazy(() => import("../pages/Quality/DispatchHold"));
 const HoldCabinateDetails = lazy(
   () => import("../pages/Quality/HoldCabinateDetails"),
@@ -98,6 +99,9 @@ const TemplateBuilder = lazy(
 const TemplateList = lazy(
   () => import("../pages/AuditReport/Template/TemplateList"),
 );
+const TemplateView = lazy(
+  () => import("../pages/AuditReport/Template/TemplateView"),
+);
 const TemplateApproval = lazy(
   () => import("../pages/AuditReport/Template/TemplateApproval"),
 );
@@ -119,6 +123,14 @@ const ManpowerApproval = lazy(() => import("../pages/Forms/ManpowerApproval"));
 const SecurityManpowerList = lazy(
   () => import("../pages/Forms/SecurityManpowerList"),
 );
+const AttendanceRegister = lazy(() => import("../pages/Forms/AttendanceRegister"));
+const ApprenticeDashboard = lazy(() => import("../pages/Apprentice/Dashboard"));
+const ApprenticeUpload    = lazy(() => import("../pages/Apprentice/Upload"));
+const ApprenticeSlips     = lazy(() => import("../pages/Apprentice/SlipList"));
+const MyAttendance = lazy(() => import("../pages/Forms/MyAttendance"));
+const AttendanceDashboard = lazy(() => import("../pages/Forms/AttendanceDashboard"));
+const LeaveApplication = lazy(() => import("../pages/Forms/LeaveApplication"));
+const LeaveApproval = lazy(() => import("../pages/Forms/LeaveApproval"));
 const Monitoring = lazy(() => import("../pages/Display/Monitoring"));
 const Management = lazy(() => import("../pages/Display/Management"));
 const WIPCapture = lazy(() => import("../pages/Production/WIPCapture"));
@@ -329,6 +341,11 @@ export const ROUTE_CONFIG = [
         component: LPTReport,
       },
       {
+        path: "/quality/mass-flow-report",
+        label: "Mass Flow Report",
+        component: MassFlowReport,
+      },
+      {
         path: "/quality/lpt-recipe",
         label: "LPT Recipe",
         component: LPTRecipe,
@@ -521,6 +538,10 @@ export const ROUTE_CONFIG = [
         component: TemplateBuilder,
       },
       {
+        path: "/auditreport/templates/:id/view",
+        component: TemplateView,
+      },
+      {
         path: "/auditreport/templates/:id",
         component: TemplateBuilder,
       },
@@ -555,6 +576,19 @@ export const ROUTE_CONFIG = [
     ],
   },
 
+  // ── Apprentice Payroll ───────────────────────────────────────────────────
+  {
+    key: "apprentice",
+    icon: FileText,
+    label: "Apprentice Payroll",
+    basePath: "/apprentice",
+    items: [
+      { path: "/apprentice/dashboard", label: "Dashboard",     component: ApprenticeDashboard },
+      { path: "/apprentice/upload",    label: "Upload Files",  component: ApprenticeUpload    },
+      { path: "/apprentice/slips",     label: "Salary Slips",  component: ApprenticeSlips     },
+    ],
+  },
+
   // ── Forms ────────────────────────────────────────────────────────────────
   {
     key: "forms",
@@ -576,6 +610,31 @@ export const ROUTE_CONFIG = [
         path: "/forms/security-manpower",
         label: "Security Manpower List",
         component: SecurityManpowerList,
+      },
+      {
+        path: "/forms/attendance",
+        label: "Attendance Register",
+        component: AttendanceRegister,
+      },
+      {
+        path: "/forms/my-attendance",
+        label: "My Attendance",
+        component: MyAttendance,
+      },
+      {
+        path: "/forms/attendance-dashboard",
+        label: "Attendance Dashboard",
+        component: AttendanceDashboard,
+      },
+      {
+        path: "/forms/leave-application",
+        label: "Leave Application",
+        component: LeaveApplication,
+      },
+      {
+        path: "/forms/leave-approval",
+        label: "Leave Approval",
+        component: LeaveApproval,
       },
     ],
   },

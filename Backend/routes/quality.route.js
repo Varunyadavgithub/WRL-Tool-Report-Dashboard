@@ -22,6 +22,7 @@ import {
   getLptDefectCount, getLptDefectReport,
 } from "../controllers/quality/lpt.controller.js";
 import { getLptReport } from "../controllers/quality/lptReport.controller.js";
+import { getMassFlowReport } from "../controllers/quality/massFlowReport.controller.js";
 import {
   deleteLptRecipe, getLptRecipe, insertLptRecipe, updateLptRecipe,
 } from "../controllers/quality/lptRecipe.controller.js";
@@ -92,6 +93,9 @@ router.post("/add-lpt-defect", addLptDefect);
 router.get("/lpt-defect-report", getLptDefectReport);
 router.get("/lpt-defect-count", getLptDefectCount);
 router.get("/lpt-report", getLptReport);
+
+// Mass Flow
+router.get("/mass-flow-report", getMassFlowReport);
 
 // LPT Recipe
 router.get("/lpt-recipe", getLptRecipe);

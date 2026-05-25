@@ -14,6 +14,7 @@ import auditReport from "./auditReport.route.js";
 import readingRoute from "./reading.route.js";
 import manpowerRoute from "./manpower.routes.js";
 import dashboardRoute from "./display.route.js";
+import apprenticeRoute from "./apprentice.route.js";
 
 const routers = Router();
 
@@ -32,5 +33,6 @@ routers.use("/audit-report", auditReport);
 routers.use("/reading", readingRoute);
 routers.use("/manpower", manpowerRoute);
 routers.use("/dashboard", dashboardRoute);
+routers.use("/apprentice", apprenticeRoute);
 
 export default routers;

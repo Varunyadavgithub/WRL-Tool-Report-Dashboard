@@ -11,6 +11,7 @@ import {
   FaClipboardList,
   FaUserCheck,
   FaClipboardCheck,
+  FaTools,
 } from "react-icons/fa";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
 import useAuditData from "../../../hooks/useAuditData";
@@ -59,6 +60,9 @@ const AuditApproval = () => {
   // Reject modal
   const [rejectModal, setRejectModal]       = useState({ open: false, audit: null });
   const [rejectReason, setRejectReason]     = useState("");
+  // Rework modal
+  const [reworkModal, setReworkModal]       = useState({ open: false, audit: null });
+  const [reworkReason, setReworkReason]     = useState("");
   const [actionLoading, setActionLoading]   = useState(false);
 
   // ── Load ─────────────────────────────────────────────────────────────────────
@@ -124,11 +128,38 @@ const AuditApproval = () => {
         approverName: user?.name || user?.userCode || user?.usercode || "LQE",
         comments: rejectReason.trim(),
       });
-      toast.success(`Audit ${rejectModal.audit.auditCode} rejected — returned to operator`);
+      toast.success(`Audit ${rejectModal.audit.auditCode} rejected — audit failed`);
       setAudits((prev) => prev.filter((a) => a.id !== rejectModal.audit.id));
       setRejectModal({ open: false, audit: null });
     } catch (err) {
       toast.error("Rejection failed: " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReworkClick = (audit) => {
+    setReworkModal({ open: true, audit });
+    setReworkReason("");
+  };
+
+  const handleReworkConfirm = async () => {
+    if (!reworkReason.trim()) {
+      toast.error("Rework reason is required");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await rejectAudit(reworkModal.audit.id, {
+        approverName: user?.name || user?.userCode || user?.usercode || "LQE",
+        comments: reworkReason.trim(),
+        isRework: true,
+      });
+      toast.success(`Audit ${reworkModal.audit.auditCode} sent for rework — returned to quality auditor`);
+      setAudits((prev) => prev.filter((a) => a.id !== reworkModal.audit.id));
+      setReworkModal({ open: false, audit: null });
+    } catch (err) {
+      toast.error("Rework failed: " + err.message);
     } finally {
       setActionLoading(false);
     }
@@ -352,6 +383,14 @@ const AuditApproval = () => {
                           <FaCheckCircle size={13} />
                         </button>
                         <button
+                          onClick={() => handleReworkClick(audit)}
+                          disabled={actionLoading}
+                          title="Send for Rework"
+                          className="p-2 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-lg transition disabled:opacity-40"
+                        >
+                          <FaTools size={13} />
+                        </button>
+                        <button
                           onClick={() => handleRejectClick(audit)}
                           disabled={actionLoading}
                           title="Reject"
@@ -384,7 +423,7 @@ const AuditApproval = () => {
                 <FaTimesCircle /> Reject Audit
               </h3>
               <p className="text-xs text-red-200 mt-1">
-                Audit: <strong>{rejectModal.audit?.auditCode}</strong> — will be returned to the operator.
+                Audit: <strong>{rejectModal.audit?.auditCode}</strong> — audit will be marked as failed.
               </p>
             </div>
             <div className="p-6">
@@ -394,7 +433,7 @@ const AuditApproval = () => {
               <textarea
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Describe what needs to be corrected…"
+                placeholder="Describe why this audit failed…"
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
               />
@@ -412,6 +451,56 @@ const AuditApproval = () => {
                   className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   {actionLoading ? "Rejecting…" : "Confirm Reject"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Rework Modal ───────────────────────────────────────────────────── */}
+      {reworkModal.open && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
+          onClick={() => setReworkModal({ open: false, audit: null })}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+              <h3 className="text-base font-black flex items-center gap-2">
+                <FaTools /> Send for Rework
+              </h3>
+              <p className="text-xs text-orange-200 mt-1">
+                Audit: <strong>{reworkModal.audit?.auditCode}</strong> — will be returned to quality auditor for correction.
+              </p>
+            </div>
+            <div className="p-6">
+              <label className="block text-xs font-bold text-gray-700 mb-2">
+                Rework Instructions <span className="text-orange-500">*</span>
+              </label>
+              <textarea
+                value={reworkReason}
+                onChange={(e) => setReworkReason(e.target.value)}
+                placeholder="Describe what checkpoints need to be rechecked…"
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+              />
+              <div className="flex items-center justify-end gap-3 mt-4">
+                <button
+                  onClick={() => setReworkModal({ open: false, audit: null })}
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition disabled:opacity-50 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReworkConfirm}
+                  disabled={actionLoading || !reworkReason.trim()}
+                  className="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  {actionLoading ? "Sending…" : "Send for Rework"}
                 </button>
               </div>
             </div>

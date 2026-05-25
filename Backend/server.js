@@ -10,11 +10,12 @@ import {
   dbConfig1,
   dbConfig2,
   dbConfig3,
-  //dbConfig4,
+  dbConfig4,
 } from "./config/db.config.js";
 import { startCalibrationCron } from "./cron/calibrationEscalation.js";
 import { startManpowerCron } from "../Backend/cron/manpower.cron.js";
 import { globalErrorHandler } from "./middlewares/errorHandler.js";
+import { runMigrations } from "./config/migrations.js";
 // const _dirname = path.resolve();
 
 const app = express();
@@ -38,52 +39,10 @@ app.use("/uploads", express.static(path.resolve("uploads"))); // Static files
     global.pool1 = await connectToDB(dbConfig1);
     global.pool2 = await connectToDB(dbConfig2);
     global.pool3 = await connectToDB(dbConfig3);
-    //global.pool3 = await connectToDB(dbConfig4);
+    global.pool4 = await connectToDB(dbConfig4);
     console.log("Successfully connected to all databases.");
 
-    // ── Schema migrations (idempotent) ──────────────────────────────────────
-    await global.pool3.request().query(`
-      IF NOT EXISTS (
-        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_NAME = 'AuditTemplates' AND COLUMN_NAME = 'Models'
-      )
-      BEGIN
-        ALTER TABLE AuditTemplates ADD Models NVARCHAR(MAX) NULL;
-        PRINT 'Migration: Added Models column to AuditTemplates';
-      END
-    `);
-
-    await global.pool3.request().query(`
-      IF NOT EXISTS (
-        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_NAME = 'Audits' AND COLUMN_NAME = 'StartedAt'
-      )
-      BEGIN
-        ALTER TABLE Audits ADD StartedAt DATETIME NULL;
-        PRINT 'Migration: Added StartedAt column to Audits';
-      END
-    `);
-
-    await global.pool3.request().query(`
-      IF NOT EXISTS (
-        SELECT 1 FROM INFORMATION_SCHEMA.TABLES
-        WHERE TABLE_NAME = 'AuditTemplateHistory'
-      )
-      BEGIN
-        CREATE TABLE AuditTemplateHistory (
-          Id          INT IDENTITY(1,1) PRIMARY KEY,
-          TemplateId  INT           NOT NULL,
-          Action      NVARCHAR(50)  NOT NULL,
-          ActionBy    NVARCHAR(100) NULL,
-          ActionAt    DATETIME      NOT NULL DEFAULT GETDATE(),
-          Comments    NVARCHAR(MAX) NULL,
-          PreviousStatus NVARCHAR(50) NULL,
-          NewStatus      NVARCHAR(50) NULL,
-          FieldChanges   NVARCHAR(MAX) NULL
-        );
-        PRINT 'Migration: Created AuditTemplateHistory table';
-      END
-    `);
+    await runMigrations(global.pool3);
 
   } catch (error) {
     console.error("Database connection failed:", error);

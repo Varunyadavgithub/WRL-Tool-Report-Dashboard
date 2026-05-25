@@ -68,6 +68,21 @@ export default function Settings() {
   const [roleSearch, setRoleSearch] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
+  // ── Load permissions from backend ──────────────────────────────────────────
+  useEffect(() => {
+    if (userRole !== SUPER_ADMIN_ROLE) return;
+    dispatch(fetchRolePermissions(selectedRole));
+    setHasChanges(false);
+    setSaved(false);
+  }, [selectedRole, dispatch, userRole]);
+
+  // ── Sync permissions from Redux state ─────────────────────────────────────
+  useEffect(() => {
+    if (rolePermissions && Object.keys(rolePermissions).length > 0) {
+      setPermissions(rolePermissions);
+    }
+  }, [rolePermissions]);
+
   // ── Guard ─────────────────────────────────────────────────────────────────
   if (userRole !== SUPER_ADMIN_ROLE) {
     return (
@@ -82,20 +97,6 @@ export default function Settings() {
       </div>
     );
   }
-
-  // ── Load permissions from backend ──────────────────────────────────────────
-  useEffect(() => {
-    dispatch(fetchRolePermissions(selectedRole));
-    setHasChanges(false);
-    setSaved(false);
-  }, [selectedRole, dispatch]);
-
-  // ── Sync permissions from Redux state ─────────────────────────────────────
-  useEffect(() => {
-    if (rolePermissions && Object.keys(rolePermissions).length > 0) {
-      setPermissions(rolePermissions);
-    }
-  }, [rolePermissions]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const toggleSection = (key) =>
