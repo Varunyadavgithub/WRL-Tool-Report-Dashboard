@@ -1,55 +1,3 @@
-/**
- * permissionController.js
- *
- * ── BUGS FIXED ────────────────────────────────────────────────────────────────
- *  1. getAllRoles referenced undefined `dbConfig1` (never imported) → ReferenceError
- *     at runtime. Fixed: now uses dbConfig3.
- *  2. req.user?.roleName.toLowerCase() crashes when roleName is undefined.
- *     Fixed: optional chaining → req.user?.roleName?.toLowerCase().
- *  3. delete + insert were NOT wrapped in a transaction. If any INSERT failed
- *     mid-loop the role ended up with ZERO permissions (the DELETE had already
- *     committed). Fixed: applyPermissions() wraps everything in sql.Transaction
- *     with a rollback() on failure.
- *  4. updateRolePermissions (POST /admin/update) validated that permissions was
- *     an Array, but the frontend Redux slice sends an Object. The handler was
- *     effectively broken. Fixed: both update handlers now accept the same
- *     { [sectionKey]: { [path]: boolean } } shape.
- *  5. CanAccess BIT was forwarded as-is; MSSQL driver returns true/false OR 1/0
- *     depending on version. Fixed: Boolean() cast added everywhere.
- *
- * ── NEW ───────────────────────────────────────────────────────────────────────
- *  • copyRolePermissions  POST /admin/copy  { fromRole, toRole }
- *    Uses a single INSERT … SELECT on the DB — zero N+1 round-trips.
- *  • flattenPermissions() helper shared by both update handlers.
- *  • applyPermissions()   transactional helper shared by both update handlers.
- *  • UpdatedBy / UpdatedAt columns tracked on every write.
- *
- * ── RECOMMENDED DB SCHEMA ────────────────────────────────────────────────────
- *
- *  CREATE TABLE RolePermissions (
- *    Id         INT           IDENTITY(1,1) PRIMARY KEY,
- *    RoleName   VARCHAR(100)  NOT NULL,
- *    SectionKey VARCHAR(100)  NOT NULL,
- *    Path       VARCHAR(255)  NOT NULL,
- *    CanAccess  BIT           NOT NULL DEFAULT 0,
- *    UpdatedAt  DATETIME2     NOT NULL DEFAULT GETDATE(),
- *    UpdatedBy  VARCHAR(100)  NULL,
- *    -- Prevents duplicate rows; also makes the DELETE+INSERT idempotent:
- *    CONSTRAINT UQ_RolePermissions UNIQUE (RoleName, SectionKey, Path)
- *  );
- *  -- Query performance for the most common lookup pattern:
- *  CREATE INDEX IX_RolePermissions_Role ON RolePermissions (RoleName);
- *
- *  -- Optional: full audit trail of who changed what and when
- *  CREATE TABLE RolePermissionsAudit (
- *    Id        INT           IDENTITY(1,1) PRIMARY KEY,
- *    RoleName  VARCHAR(100)  NOT NULL,
- *    Action    VARCHAR(20)   NOT NULL,   -- 'UPDATE' | 'COPY' | 'RESET'
- *    ChangedBy VARCHAR(100)  NOT NULL,
- *    ChangedAt DATETIME2     NOT NULL DEFAULT GETDATE()
- *  );
- */
-
 import sql from "mssql";
 import { dbConfig3 } from "../config/db.config.js";
 import { tryCatch }  from "../utils/tryCatch.js";
@@ -79,20 +27,21 @@ const flattenPermissions = (obj) => {
  * and the role retains its previous permissions.
  */
 const applyPermissions = async (pool, role, rows, updatedBy = "system") => {
+  const safeUpdatedBy = String(updatedBy || "system");
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
   try {
     await new sql.Request(transaction)
-      .input("role", sql.VarChar, role.toLowerCase())
+      .input("role", sql.NVarChar(100), role.toLowerCase())
       .query(`DELETE FROM RolePermissions WHERE RoleName = @role`);
 
     for (const { sectionKey, path, canAccess } of rows) {
       await new sql.Request(transaction)
-        .input("role",      sql.VarChar, role.toLowerCase())
-        .input("section",   sql.VarChar, sectionKey)
-        .input("path",      sql.VarChar, path)
-        .input("access",    sql.Bit,     canAccess ? 1 : 0)
-        .input("updatedBy", sql.VarChar, updatedBy)
+        .input("role",      sql.NVarChar(100), role.toLowerCase())
+        .input("section",   sql.NVarChar(100), sectionKey)
+        .input("path",      sql.NVarChar(500), path)
+        .input("access",    sql.Bit,           canAccess ? 1 : 0)
+        .input("updatedBy", sql.NVarChar(100), safeUpdatedBy)
         .query(`
           INSERT INTO RolePermissions (RoleName, SectionKey, Path, CanAccess, UpdatedBy, UpdatedAt)
           VALUES (@role, @section, @path, @access, @updatedBy, GETDATE())
@@ -119,7 +68,7 @@ export const getMyPermissions = tryCatch(async (req, res) => {
   try {
     const result = await pool
       .request()
-      .input("role", sql.VarChar, role)
+      .input("role", sql.NVarChar(100), role)
       .query(`
         SELECT SectionKey, Path, CanAccess
         FROM   RolePermissions
@@ -151,7 +100,7 @@ export const getRolePermissions = tryCatch(async (req, res) => {
   try {
     const result = await pool
       .request()
-      .input("role", sql.VarChar, role.toLowerCase())
+      .input("role", sql.NVarChar(100), role.toLowerCase())
       .query(`
         SELECT SectionKey, Path, CanAccess
         FROM   RolePermissions
@@ -187,7 +136,7 @@ export const updateRolePermissionsByRole = tryCatch(async (req, res) => {
   }
 
   const rows      = flattenPermissions(permissionsObj);
-  const updatedBy = req.user?.email ?? "system";
+  const updatedBy = req.user?.name || req.user?.usercode || "system";
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
   try {
@@ -222,7 +171,7 @@ export const updateRolePermissions = tryCatch(async (req, res) => {
   }
 
   const rows      = flattenPermissions(permissionsObj);
-  const updatedBy = req.user?.email ?? "system";
+  const updatedBy = req.user?.name || req.user?.usercode || "system";
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
   try {
@@ -254,16 +203,18 @@ export const copyRolePermissions = tryCatch(async (req, res) => {
   try {
     await transaction.begin();
 
+    const copyUpdatedBy = String(req.user?.name || req.user?.usercode || "system");
+
     // 1. Wipe target role's permissions
     await new sql.Request(transaction)
-      .input("toRole", sql.VarChar, toRole.toLowerCase())
+      .input("toRole", sql.NVarChar(100), toRole.toLowerCase())
       .query(`DELETE FROM RolePermissions WHERE RoleName = @toRole`);
 
     // 2. Copy source → target in a single statement (no N+1)
     await new sql.Request(transaction)
-      .input("fromRole",  sql.VarChar, fromRole.toLowerCase())
-      .input("toRole",    sql.VarChar, toRole.toLowerCase())
-      .input("updatedBy", sql.VarChar, req.user?.email ?? "system")
+      .input("fromRole",  sql.NVarChar(100), fromRole.toLowerCase())
+      .input("toRole",    sql.NVarChar(100), toRole.toLowerCase())
+      .input("updatedBy", sql.NVarChar(100), copyUpdatedBy)
       .query(`
         INSERT INTO RolePermissions (RoleName, SectionKey, Path, CanAccess, UpdatedBy, UpdatedAt)
         SELECT @toRole, SectionKey, Path, CanAccess, @updatedBy, GETDATE()

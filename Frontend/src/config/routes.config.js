@@ -48,6 +48,7 @@ const FPAHistory = lazy(() => import("../pages/Quality/FPAHistory"));
 const FPADefectReport = lazy(() => import("../pages/Quality/FPADefectReport"));
 const LPT = lazy(() => import("../pages/Quality/LPT"));
 const LPTReport = lazy(() => import("../pages/Quality/LPTReport"));
+const MassFlowReport = lazy(() => import("../pages/Quality/MassFlowReport"));
 const DispatchHold = lazy(() => import("../pages/Quality/DispatchHold"));
 const HoldCabinateDetails = lazy(
   () => import("../pages/Quality/HoldCabinateDetails"),
@@ -98,6 +99,9 @@ const TemplateBuilder = lazy(
 const TemplateList = lazy(
   () => import("../pages/AuditReport/Template/TemplateList"),
 );
+const TemplateView = lazy(
+  () => import("../pages/AuditReport/Template/TemplateView"),
+);
 const TemplateApproval = lazy(
   () => import("../pages/AuditReport/Template/TemplateApproval"),
 );
@@ -120,6 +124,9 @@ const SecurityManpowerList = lazy(
   () => import("../pages/Forms/SecurityManpowerList"),
 );
 const AttendanceRegister = lazy(() => import("../pages/Forms/AttendanceRegister"));
+const ApprenticeDashboard = lazy(() => import("../pages/Apprentice/Dashboard"));
+const ApprenticeUpload    = lazy(() => import("../pages/Apprentice/Upload"));
+const ApprenticeSlips     = lazy(() => import("../pages/Apprentice/SlipList"));
 const MyAttendance = lazy(() => import("../pages/Forms/MyAttendance"));
 const AttendanceDashboard = lazy(() => import("../pages/Forms/AttendanceDashboard"));
 const LeaveApplication = lazy(() => import("../pages/Forms/LeaveApplication"));
@@ -334,6 +341,11 @@ export const ROUTE_CONFIG = [
         component: LPTReport,
       },
       {
+        path: "/quality/mass-flow-report",
+        label: "Mass Flow Report",
+        component: MassFlowReport,
+      },
+      {
         path: "/quality/lpt-recipe",
         label: "LPT Recipe",
         component: LPTRecipe,
@@ -526,6 +538,10 @@ export const ROUTE_CONFIG = [
         component: TemplateBuilder,
       },
       {
+        path: "/auditreport/templates/:id/view",
+        component: TemplateView,
+      },
+      {
         path: "/auditreport/templates/:id",
         component: TemplateBuilder,
       },
@@ -557,6 +573,19 @@ export const ROUTE_CONFIG = [
         label: "Utility Reading",
         component: DehumidifierDashboard,
       },
+    ],
+  },
+
+  // ── Apprentice Payroll ───────────────────────────────────────────────────
+  {
+    key: "apprentice",
+    icon: FileText,
+    label: "Apprentice Payroll",
+    basePath: "/apprentice",
+    items: [
+      { path: "/apprentice/dashboard", label: "Dashboard",     component: ApprenticeDashboard },
+      { path: "/apprentice/upload",    label: "Upload Files",  component: ApprenticeUpload    },
+      { path: "/apprentice/slips",     label: "Salary Slips",  component: ApprenticeSlips     },
     ],
   },
 

@@ -18,6 +18,7 @@ import {
   FaClock,
   FaFileAlt,
   FaEdit,
+  FaTools,
 } from "react-icons/fa";
 import { MdPendingActions } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
@@ -52,6 +53,10 @@ const STATUS_CFG = {
   rejected: {
     cls: "bg-red-50 text-red-600 border-red-200",
     icon: <FaTimesCircle size={9} />,
+  },
+  rework: {
+    cls: "bg-orange-50 text-orange-700 border-orange-200",
+    icon: <FaTools size={9} />,
   },
 };
 
@@ -104,6 +109,8 @@ const SerialScan = () => {
   const [recentLoading, setRecentLoading] = useState(false);
   const [myDrafts, setMyDrafts] = useState([]);
   const [draftsLoading, setDraftsLoading] = useState(false);
+  const [reworkAudits, setReworkAudits] = useState([]);
+  const [reworkLoading, setReworkLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState(null);
 
   // ── Load ─────────────────────────────────────────────────────────────────────
@@ -112,22 +119,25 @@ const SerialScan = () => {
     setSummaryLoading(true);
     setRecentLoading(true);
     setDraftsLoading(true);
+    setReworkLoading(true);
     try {
-      const [summaryRes, auditsRes, draftsRes] = await Promise.all([
+      const [summaryRes, auditsRes, draftsRes, reworkRes] = await Promise.all([
         fetchAuditModelSummary({}),
         loadAudits({ limit: 10, page: 1 }),
         loadAudits({ status: "draft", limit: 50, page: 1 }),
-        loadTemplates({ isActive: true }),
+        loadAudits({ status: "rework", limit: 50, page: 1 }),
       ]);
+      loadTemplates({ isActive: true });
       setSummary(summaryRes.data || []);
       setRecentAudits(auditsRes.data || []);
 
-      // Filter drafts to only this user's own drafts
       const userCode = user?.userCode || user?.usercode || user?.name;
       const ownDrafts = (draftsRes.data || []).filter(
         (a) => !userCode || a.createdBy === userCode,
       );
       setMyDrafts(ownDrafts);
+
+      setReworkAudits(reworkRes.data || []);
       setLastRefreshed(new Date());
     } catch (err) {
       toast.error("Failed to load data: " + err.message);
@@ -135,8 +145,9 @@ const SerialScan = () => {
       setSummaryLoading(false);
       setRecentLoading(false);
       setDraftsLoading(false);
+      setReworkLoading(false);
     }
-  }, [fetchAuditModelSummary, loadAudits, user]);
+  }, [fetchAuditModelSummary, loadAudits, loadTemplates, user]);
 
   useEffect(() => {
     loadAll();
@@ -392,8 +403,9 @@ const SerialScan = () => {
           </div>
         </div>
 
-        {/* ── Bottom grid: Model Summary | Recent Audits | My Drafts ─────── */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        {/* ── Bottom grid: Model Summary | Recent Audits | My Drafts | Rework ─── */}
+        <div className="overflow-x-auto pb-2">
+        <div className="grid grid-cols-1 gap-4 min-w-[1100px]">
           {/* ── Model Summary ─────────────────────────────────────────────── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
             <div className="px-5 py-3.5 border-b border-gray-50 flex items-center justify-between flex-shrink-0">
@@ -582,16 +594,14 @@ const SerialScan = () => {
                       <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-violet-500">
                         Created
                       </th>
-                      <th className="px-4 py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-violet-500">
-                        Open
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {recentAudits.map((audit, idx) => (
                       <tr
                         key={audit.id}
-                        className={`hover:bg-violet-50/30 transition-colors ${idx % 2 === 1 ? "bg-gray-50/40" : ""}`}
+                        onClick={() => navigate(`/auditreport/audits/${audit.id}`)}
+                        className={`hover:bg-violet-50/30 transition-colors cursor-pointer ${idx % 2 === 1 ? "bg-gray-50/40" : ""}`}
                       >
                         <td className="px-4 py-2.5 text-[11px] text-gray-400">
                           {idx + 1}
@@ -636,17 +646,6 @@ const SerialScan = () => {
                           <span className="text-[10px] text-gray-400">
                             {timeAgo(audit.createdAt)}
                           </span>
-                        </td>
-                        <td className="px-4 py-2.5 text-center">
-                          <button
-                            onClick={() =>
-                              navigate(`/auditreport/audits/${audit.id}`)
-                            }
-                            className="p-1.5 hover:bg-violet-100 rounded-lg transition text-violet-400 hover:text-violet-600"
-                            title="Open audit"
-                          >
-                            <FaExternalLinkAlt size={10} />
-                          </button>
                         </td>
                       </tr>
                     ))}
@@ -729,6 +728,80 @@ const SerialScan = () => {
             )}
           </div>
 
+          {/* ── Rework ─────────────────────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-orange-100 shadow-sm overflow-hidden flex flex-col">
+            <div className="px-5 py-3.5 border-b border-orange-50 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-orange-50 rounded-lg">
+                  <FaTools className="text-orange-500 text-sm" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-gray-800">Rework</h3>
+                  <p className="text-[10px] text-gray-400">Audits returned for correction</p>
+                </div>
+              </div>
+              {reworkAudits.length > 0 && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-bold border border-orange-200">
+                  {reworkAudits.length} pending
+                </span>
+              )}
+            </div>
+
+            {reworkLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="w-8 h-8 border-4 border-orange-100 border-t-orange-400 rounded-full animate-spin" />
+              </div>
+            ) : reworkAudits.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+                <FaCheckCircle className="text-3xl text-emerald-200 mb-3" />
+                <p className="text-sm font-semibold text-emerald-500">All clear!</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  No audits pending rework.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-auto flex-1 divide-y divide-gray-50">
+                {reworkAudits.map((audit, idx) => (
+                  <div
+                    key={audit.id}
+                    className={`px-4 py-3 flex items-start gap-3 hover:bg-orange-50/40 transition-colors ${idx % 2 === 1 ? "bg-gray-50/30" : ""}`}
+                  >
+                    <div className="p-1.5 bg-orange-50 rounded-lg flex-shrink-0 mt-0.5">
+                      <FaTools className="text-orange-400 text-sm" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <p className="text-xs font-black text-gray-800 truncate">
+                          {audit.auditCode || `#${audit.id}`}
+                        </p>
+                        <StatusBadge status={audit.status} />
+                      </div>
+                      <p className="text-[11px] text-gray-500 truncate">
+                        {audit.templateName || "—"}
+                      </p>
+                      {audit.approvalComments && (
+                        <p className="text-[10px] text-orange-600 mt-0.5 truncate" title={audit.approvalComments}>
+                          ↩ {audit.approvalComments}
+                        </p>
+                      )}
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {timeAgo(audit.updatedAt || audit.createdAt)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => navigate(`/auditreport/audits/${audit.id}`)}
+                      className="p-1.5 hover:bg-orange-100 rounded-lg transition text-orange-500 hover:text-orange-700 flex-shrink-0 mt-0.5"
+                      title="Fix & resubmit"
+                    >
+                      <FaEdit size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
         </div>
       </div>
     </div>

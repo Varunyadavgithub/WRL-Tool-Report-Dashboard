@@ -35,6 +35,8 @@ import {
   FaBan,
   FaFileAlt,
   FaHourglassHalf,
+  FaSync,
+  FaTools,
 } from "react-icons/fa";
 import {
   MdFormatListNumbered,
@@ -105,6 +107,15 @@ const STATUS_CONFIG = {
     border: "border-gray-200",
     text: "text-gray-500",
     badge: "bg-gray-100 text-gray-600",
+  },
+  rework: {
+    label: "Rework",
+    color: "orange",
+    icon: FaSync,
+    bg: "bg-orange-50",
+    border: "border-orange-200",
+    text: "text-orange-700",
+    badge: "bg-orange-100 text-orange-700",
   },
 };
 
@@ -392,10 +403,13 @@ const AuditEntry = () => {
     error,
   } = useAuditData();
 
-  const isAdmin          = [user?.role, user?.roleName].includes(ROLES.SUPER_ADMIN);
-  const isLQE            = [user?.role, user?.roleName].includes(ROLES.LINE_QUALITY_ENGINEER);
-  const isQualityOp      = [user?.role, user?.roleName].includes(ROLES.QUALITY_OPERATOR);
-  const isQualityAuditor = [user?.role, user?.roleName].includes(ROLES.QUALITY_AUDITOR);
+  const userRoles = [user?.role, user?.roleName]
+    .filter(Boolean)
+    .map((role) => String(role).trim().toLowerCase());
+  const isAdmin          = userRoles.includes(ROLES.SUPER_ADMIN);
+  const isLQE            = userRoles.includes(ROLES.LINE_QUALITY_ENGINEER);
+  const isQualityOp      = userRoles.includes(ROLES.QUALITY_OPERATOR);
+  const isQualityAuditor = userRoles.includes(ROLES.QUALITY_AUDITOR);
 
   const [saving, setSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState("idle");
@@ -797,12 +811,11 @@ const AuditEntry = () => {
      user?.usercode === auditData.createdBy);
 
   const canEdit =
-    !isQualityAuditor &&                                            // quality auditor = always read-only
-    auditData.status !== 'approved' &&                              // approved = read-only for everyone
+    !['approved', 'rejected'].includes(auditData.status) &&        // approved/rejected = read-only for everyone
     (
       !id ||                                                        // new audit
-      (isAdmin && auditData.status !== 'submitted') ||             // admin can edit draft/rejected only
-      (['draft', 'rejected'].includes(auditData.status) && (isOwner || isAdmin))
+      (isAdmin && auditData.status !== 'submitted') ||             // admin can edit draft/rework only
+      (['draft', 'rework'].includes(auditData.status) && (isOwner || isAdmin || isQualityAuditor))
     );
 
   // LQE or Super Admin reviewing a submitted audit (never the Quality Auditor)
@@ -817,8 +830,9 @@ const AuditEntry = () => {
   const handleAuditApproval = async () => {
     if (!id) return;
     const isApprove = approvalModal.action === 'approve';
+    const isRework  = approvalModal.action === 'rework';
     if (!isApprove && !approvalComments.trim()) {
-      toast.error("Rejection reason is required");
+      toast.error(isRework ? "Rework instructions are required" : "Rejection reason is required");
       return;
     }
     setApproving(true);
@@ -830,6 +844,9 @@ const AuditEntry = () => {
       if (isApprove) {
         await approveAudit(id, payload);
         toast.success("Audit approved successfully");
+      } else if (isRework) {
+        await rejectAudit(id, { ...payload, isRework: true });
+        toast.success("Audit sent for rework — returned to quality auditor for correction");
       } else {
         await rejectAudit(id, payload);
         toast.success("Audit rejected — returned to operator for correction");
@@ -1000,7 +1017,9 @@ const AuditEntry = () => {
 
   // Filter checkpoints
   const filterCheckpoint = (cp) => {
-    if (checkpointFilter !== "all" && cp.status !== checkpointFilter)
+    // When status is 'rework', automatically filter to show only failed checkpoints
+    const effectiveFilter = auditData.status === 'rework' ? 'fail' : checkpointFilter;
+    if (effectiveFilter !== "all" && cp.status !== effectiveFilter)
       return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -1648,7 +1667,7 @@ const AuditEntry = () => {
               </button>
             )}
 
-            {/* LQE: Approve / Reject buttons */}
+            {/* LQE: Reject / Rework / Approve buttons */}
             {isLQEReview && (
               <>
                 <button
@@ -1656,6 +1675,12 @@ const AuditEntry = () => {
                   className="flex items-center gap-2 px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold text-sm transition-all shadow-md shadow-red-200"
                 >
                   <FaTimesCircle size={12} /> Reject
+                </button>
+                <button
+                  onClick={() => { setApprovalComments(""); setApprovalModal({ open: true, action: 'rework' }); }}
+                  className="flex items-center gap-2 px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold text-sm transition-all shadow-md shadow-orange-200"
+                >
+                  <FaTools size={12} /> Rework
                 </button>
                 <button
                   onClick={() => { setApprovalComments(""); setApprovalModal({ open: true, action: 'approve' }); }}
@@ -1703,9 +1728,9 @@ const AuditEntry = () => {
       </div>
 
       {/* ==================== MAIN LAYOUT ==================== */}
-      <div className="w-full px-4 py-4 flex gap-4">
-        {/* ==================== LEFT SIDEBAR ==================== */}
-        <aside className="hidden xl:flex flex-col gap-4 w-64 flex-shrink-0">
+      <div className="w-full px-4 py-4 space-y-4">
+        {/* ==================== TOP SUMMARY PANELS ==================== */}
+        <div className="grid grid-cols-1 xl:grid-cols-[260px_minmax(420px,1fr)_minmax(260px,360px)] gap-4">
           <ProgressBar summary={summary} />
 
           {/* Filter Panel */}
@@ -1727,13 +1752,13 @@ const AuditEntry = () => {
                   className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:border-indigo-400 outline-none"
                 />
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-wrap gap-2">
                 {["all", "pending", "pass", "fail", "warning", "na"].map(
                   (f) => (
                     <button
                       key={f}
                       onClick={() => setCheckpointFilter(f)}
-                      className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-between ${
+                      className={`min-w-[116px] px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-between gap-3 ${
                         checkpointFilter === f
                           ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
                           : "text-gray-600 hover:bg-gray-50"
@@ -1759,7 +1784,7 @@ const AuditEntry = () => {
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">
               Sections
             </h3>
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2 max-h-28 overflow-y-auto pr-1">
               {sections.map((section) => {
                 const stats = getSectionStats(section);
                 const pct =
@@ -1792,12 +1817,22 @@ const AuditEntry = () => {
               })}
             </div>
           </div>
-        </aside>
+        </div>
 
         {/* ==================== MAIN CONTENT ==================== */}
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0">
 
           {/* ── Status Banner ─────────────────────────────────────────────── */}
+          {id && auditData.status === 'draft' && (
+            <div className="mb-3 flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm">
+              <FaFileAlt className="text-gray-500 flex-shrink-0" />
+              <div>
+                <p className="font-bold text-gray-800">Draft — Work in Progress</p>
+                <p className="text-xs text-gray-600 mt-0.5">This audit is saved as a draft. You can continue editing and submit for approval when ready.</p>
+              </div>
+            </div>
+          )}
+
           {id && auditData.status === 'submitted' && !isLQEReview && (
             <div className="mb-3 flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm">
               <FaHourglassHalf className="text-amber-500 flex-shrink-0" />
@@ -1829,6 +1864,21 @@ const AuditEntry = () => {
                 </div>
               )}
               <p className="text-xs text-red-500 mt-2 ml-5">Please make the necessary corrections and resubmit.</p>
+            </div>
+          )}
+          {id && auditData.status === 'rework' && (
+            <div className="mb-3 px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl text-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <FaSync className="text-orange-500 flex-shrink-0" />
+                <p className="font-bold text-orange-800">Rework Required — Failed Checkpoints Need Correction</p>
+              </div>
+              {auditData.approvalComments && (
+                <div className="mt-2 ml-5 px-3 py-2 bg-orange-100 border border-orange-200 rounded-lg">
+                  <p className="text-[10px] text-orange-500 font-bold uppercase tracking-wider mb-0.5">Rework Instructions</p>
+                  <p className="text-xs text-orange-700 font-medium">{auditData.approvalComments}</p>
+                </div>
+              )}
+              <p className="text-xs text-orange-500 mt-2 ml-5">Please recheck the failed checkpoints in the rework section below and resubmit.</p>
             </div>
           )}
           {id && auditData.status === 'approved' && (
@@ -2265,16 +2315,12 @@ const AuditEntry = () => {
                                               }`}
                                             >
                                               <option value="pending">
-                                                ? Pending
+                                                Pending
                                               </option>
-                                              <option value="pass">
-                                                ? Pass
-                                              </option>
-                                              <option value="fail">
-                                                ? Fail
-                                              </option>
+                                              <option value="pass">Pass</option>
+                                              <option value="fail">Fail</option>
                                               <option value="warning">
-                                                ? Warning
+                                                Warning
                                               </option>
                                               <option value="na">— N/A</option>
                                             </select>
@@ -2565,6 +2611,13 @@ const AuditEntry = () => {
                     <FaTimesCircle size={13} /> Reject Audit
                   </button>
                   <button
+                    onClick={() => setApprovalModal({ open: true, action: 'rework' })}
+                    disabled={approving}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-40 shadow-sm shadow-orange-200"
+                  >
+                    <FaTools size={13} /> Send for Rework
+                  </button>
+                  <button
                     onClick={() => setApprovalModal({ open: true, action: 'approve' })}
                     disabled={approving}
                     className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-40 shadow-sm shadow-emerald-200"
@@ -2616,6 +2669,12 @@ const AuditEntry = () => {
                     <FaTimesCircle size={13} /> Reject
                   </button>
                   <button
+                    onClick={() => { setApprovalComments(""); setApprovalModal({ open: true, action: 'rework' }); }}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-sm transition-all"
+                  >
+                    <FaTools size={13} /> Rework
+                  </button>
+                  <button
                     onClick={() => { setApprovalComments(""); setApprovalModal({ open: true, action: 'approve' }); }}
                     className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all"
                   >
@@ -2638,26 +2697,36 @@ const AuditEntry = () => {
             className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className={`px-6 py-4 text-white ${approvalModal.action === 'approve' ? 'bg-gradient-to-r from-emerald-600 to-emerald-700' : 'bg-gradient-to-r from-red-600 to-red-700'}`}>
+            <div className={`px-6 py-4 text-white ${
+              approvalModal.action === 'approve' ? 'bg-gradient-to-r from-emerald-600 to-emerald-700'
+              : approvalModal.action === 'rework'  ? 'bg-gradient-to-r from-orange-500 to-orange-600'
+              : 'bg-gradient-to-r from-red-600 to-red-700'
+            }`}>
               <h3 className="text-lg font-bold flex items-center gap-2">
-                {approvalModal.action === 'approve' ? <FaCheckCircle /> : <FaTimesCircle />}
-                {approvalModal.action === 'approve' ? 'Approve Audit' : 'Reject Audit'}
+                {approvalModal.action === 'approve' ? <FaCheckCircle /> : approvalModal.action === 'rework' ? <FaTools /> : <FaTimesCircle />}
+                {approvalModal.action === 'approve' ? 'Approve Audit' : approvalModal.action === 'rework' ? 'Send for Rework' : 'Reject Audit'}
               </h3>
               <p className="text-xs mt-1 opacity-80">
                 {approvalModal.action === 'approve'
                   ? 'Confirm approval. The audit will be marked as approved and locked.'
+                  : approvalModal.action === 'rework'
+                  ? 'Specify what needs to be corrected. The audit will be returned to the quality auditor.'
                   : 'Provide a reason. The audit will be returned to the operator for correction.'}
               </p>
             </div>
             <div className="p-6">
               <div className="mb-4">
                 <label className="block text-xs font-bold text-gray-700 mb-2">
-                  {approvalModal.action === 'approve' ? 'Comments (optional)' : 'Rejection Reason *'}
+                  {approvalModal.action === 'approve' ? 'Comments (optional)' : approvalModal.action === 'rework' ? 'Rework Instructions *' : 'Rejection Reason *'}
                 </label>
                 <textarea
                   value={approvalComments}
                   onChange={(e) => setApprovalComments(e.target.value)}
-                  placeholder={approvalModal.action === 'approve' ? 'Add any approval notes…' : 'Describe what needs to be corrected…'}
+                  placeholder={
+                    approvalModal.action === 'approve' ? 'Add any approval notes…'
+                    : approvalModal.action === 'rework' ? 'Describe which checkpoints need to be rechecked…'
+                    : 'Describe what needs to be corrected…'
+                  }
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                 />
@@ -2672,10 +2741,14 @@ const AuditEntry = () => {
                 </button>
                 <button
                   onClick={handleAuditApproval}
-                  disabled={approving || (approvalModal.action === 'reject' && !approvalComments.trim())}
-                  className={`px-5 py-2 text-white rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${approvalModal.action === 'approve' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
+                  disabled={approving || (['reject', 'rework'].includes(approvalModal.action) && !approvalComments.trim())}
+                  className={`px-5 py-2 text-white rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    approvalModal.action === 'approve' ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : approvalModal.action === 'rework' ? 'bg-orange-500 hover:bg-orange-600'
+                    : 'bg-red-600 hover:bg-red-700'
+                  }`}
                 >
-                  {approving ? 'Processing…' : approvalModal.action === 'approve' ? 'Confirm Approve' : 'Confirm Reject'}
+                  {approving ? 'Processing…' : approvalModal.action === 'approve' ? 'Confirm Approve' : approvalModal.action === 'rework' ? 'Send for Rework' : 'Confirm Reject'}
                 </button>
               </div>
             </div>

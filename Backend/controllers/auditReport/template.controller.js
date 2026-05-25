@@ -44,7 +44,7 @@ export const getAllTemplates = tryCatch(async (req, res) => {
   let whereConditions = ["IsDeleted=0"];
 
   if (category) {
-    request.input("category", sql.VarChar, category);
+    request.input("category", sql.NVarChar(100), category);
     whereConditions.push("Category = @category");
   }
 
@@ -215,6 +215,7 @@ export const createTemplate = tryCatch(async (req, res) => {
     infoFields,
     columns,
     defaultSections,
+    createdByUser,
   } = req.body;
 
   if (!name) {
@@ -222,8 +223,12 @@ export const createTemplate = tryCatch(async (req, res) => {
   }
 
   const templateCode = await generateTemplateCode();
-  // Store the creator's display name; fall back to usercode then SYSTEM
-  const createdBy = req.user?.name || req.user?.usercode || "SYSTEM";
+  // createdByUser lets the frontend pass the logged-in user's identity
+  // when auth middleware is disabled on the backend.
+  // Defensive string check — same pattern as updatedBy, prevents sql.VarChar "Invalid string"
+  // if userCode is stored as a number in the Redux store.
+  const rawCreatedBy = req.user?.userCode || req.user?.name || createdByUser;
+  const createdBy = (rawCreatedBy != null && String(rawCreatedBy).trim()) ? String(rawCreatedBy).trim() : "SYSTEM";
 
   // Save JSON config to file first
   const fileResult = await saveTemplateFile({
@@ -241,16 +246,16 @@ export const createTemplate = tryCatch(async (req, res) => {
   // Insert metadata into database with file reference
   const result = await pool
     .request()
-    .input("templateCode", sql.VarChar, templateCode)
-    .input("templateFileName", sql.VarChar, fileResult.fileName)
+    .input("templateCode", sql.NVarChar(50), templateCode)
+    .input("templateFileName", sql.NVarChar(500), fileResult.fileName)
     .input("name", sql.NVarChar, name)
     .input("description", sql.NVarChar, description || null)
-    .input("category", sql.VarChar, category || null)
-    .input("version", sql.VarChar, version || "01")
+    .input("category", sql.NVarChar(100), category || null)
+    .input("version", sql.NVarChar(20), version || "01")
     .input("isActive", sql.Bit, isActive !== false ? 1 : 0)
-    .input("approvalStatus", sql.VarChar, approvalStatus || "draft")
+    .input("approvalStatus", sql.NVarChar(50), approvalStatus || "draft")
     .input("models", sql.NVarChar, models ? JSON.stringify(models) : null)
-    .input("createdBy", sql.VarChar, createdBy).query(`
+    .input("createdBy", sql.NVarChar(200), createdBy).query(`
       INSERT INTO AuditTemplates (
         TemplateCode, TemplateFileName, Name, Description, Category, Version, IsActive,
         Models, ApprovalStatus, CreatedBy, CreatedAt, UpdatedBy, UpdatedAt
@@ -310,24 +315,39 @@ export const updateTemplate = tryCatch(async (req, res) => {
     throw new AppError("Template ID is required", 400);
   }
 
-  const updatedBy = req.user?.name || req.user?.usercode || "SYSTEM";
+  const rawUpdatedBy = req.user?.usercode || req.user?.name || req.user?.id || req.body?.createdByUser;
+  const updatedBy = (rawUpdatedBy != null && String(rawUpdatedBy).trim()) ? String(rawUpdatedBy).trim() : "SYSTEM";
+  console.log("[DEBUG updateTemplate] req.user =", JSON.stringify(req.user), "→ updatedBy =", updatedBy, typeof updatedBy);
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
 
-  // Get current template
-  const checkResult = await pool.request().input("id", sql.Int, id).query(`
-    SELECT Id, TemplateCode, TemplateFileName, Name, Version 
-    FROM AuditTemplates 
-    WHERE Id = @id AND IsDeleted = 0
-  `);
+  try {
+    // Get current template
+    const checkResult = await pool.request().input("id", sql.Int, id).query(`
+      SELECT
+        Id,
+        TemplateCode,
+        TemplateFileName,
+        Name,
+        Description,
+        Category,
+        Version,
+        ApprovalStatus,
+        IsActive,
+        ApprovedBy,
+        ApprovedAt,
+        RejectionReason,
+        Models
+      FROM AuditTemplates
+      WHERE Id = @id AND IsDeleted = 0
+    `);
 
-  if (checkResult.recordset.length === 0) {
-    await pool.close();
-    throw new AppError("Template not found", 404);
-  }
+    if (checkResult.recordset.length === 0) {
+      throw new AppError("Template not found", 404);
+    }
 
-  const currentTemplate = checkResult.recordset[0];
-  const oldFileName = currentTemplate.TemplateFileName;
+    const currentTemplate = checkResult.recordset[0];
+    const oldFileName = currentTemplate.TemplateFileName;
 
   // Only rewrite the JSON file when actual template content is included in the request.
   // Status-only updates (approve/reject/submit) must not overwrite sections/columns.
@@ -373,18 +393,18 @@ export const updateTemplate = tryCatch(async (req, res) => {
   const result = await pool
     .request()
     .input("id", sql.Int, id)
-    .input("templateFileName", sql.VarChar, resolvedFileName)
-    .input("name", sql.NVarChar, name || currentTemplate.Name)
-    .input("description", sql.NVarChar, description || null)
-    .input("category", sql.VarChar, category || null)
-    .input("version", sql.VarChar, version || "01")
-    .input("isActive", sql.Bit, isActive !== false ? 1 : 0)
-    .input("approvalStatus", sql.VarChar, approvalStatus || currentTemplate.approvalStatus || null)
-    .input("approvedBy", sql.VarChar, approvedBy || null)
-    .input("approvedAt", sql.DateTime, approvedAt ? new Date(approvedAt) : null)
-    .input("rejectionReason", sql.NVarChar, rejectionReason || null)
+    .input("templateFileName", sql.NVarChar(500), resolvedFileName)
+    .input("name", sql.NVarChar, name ?? currentTemplate.Name)
+    .input("description", sql.NVarChar, description !== undefined ? (description || null) : currentTemplate.Description)
+    .input("category", sql.NVarChar(100), category !== undefined ? (category || null) : currentTemplate.Category)
+    .input("version", sql.NVarChar(20), version || currentTemplate.Version || "01")
+    .input("isActive", sql.Bit, isActive !== undefined ? (isActive !== false ? 1 : 0) : (currentTemplate.IsActive ?? 1))
+    .input("approvalStatus", sql.NVarChar(50), approvalStatus || currentTemplate.ApprovalStatus || "draft")
+    .input("approvedBy", sql.NVarChar(200), approvedBy !== undefined ? (approvedBy || null) : currentTemplate.ApprovedBy)
+    .input("approvedAt", sql.DateTime, approvedAt !== undefined ? (approvedAt ? new Date(approvedAt) : null) : currentTemplate.ApprovedAt)
+    .input("rejectionReason", sql.NVarChar, rejectionReason !== undefined ? (rejectionReason || null) : currentTemplate.RejectionReason)
     .input("models", sql.NVarChar, models !== undefined ? JSON.stringify(models) : null)
-    .input("updatedBy", sql.VarChar, updatedBy).query(`
+    .input("updatedBy", sql.NVarChar(200), updatedBy).query(`
       UPDATE AuditTemplates
       SET
         TemplateFileName = @templateFileName,
@@ -508,8 +528,6 @@ export const updateTemplate = tryCatch(async (req, res) => {
     fieldChanges: fieldChanges.length > 0 ? fieldChanges : null,
   });
 
-  await pool.close();
-
   res.status(200).json({
     success: true,
     message: "Template updated successfully",
@@ -524,6 +542,9 @@ export const updateTemplate = tryCatch(async (req, res) => {
       }),
     },
   });
+  } finally {
+    await pool.close();
+  }
 });
 
 // Delete template (soft delete)
@@ -534,7 +555,8 @@ export const deleteTemplate = tryCatch(async (req, res) => {
     throw new AppError("Template ID is required", 400);
   }
 
-  const updatedBy = req.user?.name || req.user?.usercode || "SYSTEM";
+  const updatedBy = String(req.user?.usercode || req.user?.name || req.user?.id || "SYSTEM");
+  console.log("[DEBUG deleteTemplate] req.user =", JSON.stringify(req.user), "→ updatedBy =", updatedBy, typeof updatedBy);
 
   const pool = await new sql.ConnectionPool(dbConfig3).connect();
 
@@ -572,7 +594,7 @@ export const deleteTemplate = tryCatch(async (req, res) => {
   await pool
     .request()
     .input("id", sql.Int, id)
-    .input("updatedBy", sql.VarChar, updatedBy).query(`
+    .input("updatedBy", sql.NVarChar(200), updatedBy).query(`
       UPDATE AuditTemplates
       SET IsDeleted = 1, UpdatedBy = @updatedBy, UpdatedAt = GETDATE()
       WHERE Id = @id;
@@ -619,7 +641,8 @@ export const duplicateTemplate = tryCatch(async (req, res) => {
   const original = originalResult.recordset[0];
   const newTemplateCode = await generateTemplateCode();
   // Auth middleware is currently disabled — accept createdBy from request body as fallback
-  const createdBy = req.user?.name || req.user?.usercode || req.body?.createdBy || "SYSTEM";
+  const rawCreatedByDup = req.user?.userCode || req.user?.name || req.body?.createdBy || req.body?.createdByUser;
+  const createdBy = (rawCreatedByDup != null && String(rawCreatedByDup).trim()) ? String(rawCreatedByDup).trim() : "SYSTEM";
   const newName = `${original.Name} (Copy)`;
 
   // Load original template config from file
@@ -656,14 +679,14 @@ export const duplicateTemplate = tryCatch(async (req, res) => {
   // Create new template in database as draft so it goes through approval
   const result = await pool
     .request()
-    .input("templateCode", sql.VarChar, newTemplateCode)
-    .input("templateFileName", sql.VarChar, fileResult.fileName)
+    .input("templateCode", sql.NVarChar(50), newTemplateCode)
+    .input("templateFileName", sql.NVarChar(500), fileResult.fileName)
     .input("name", sql.NVarChar, newName)
     .input("description", sql.NVarChar, original.Description)
-    .input("category", sql.VarChar, original.Category)
-    .input("version", sql.VarChar, "01")
+    .input("category", sql.NVarChar(100), original.Category)
+    .input("version", sql.NVarChar(20), "01")
     .input("isActive", sql.Bit, 1)
-    .input("createdBy", sql.VarChar, createdBy).query(`
+    .input("createdBy", sql.NVarChar(200), createdBy).query(`
       INSERT INTO AuditTemplates (
         TemplateCode, TemplateFileName, Name, Description, Category, Version, IsActive,
         ApprovalStatus, CreatedBy, CreatedAt, UpdatedBy, UpdatedAt

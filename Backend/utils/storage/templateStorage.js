@@ -68,6 +68,8 @@ export const saveTemplateFile = async ({
   infoFields,
   columns,
   defaultSections,
+  approvalStatus = "draft",
+  createdByUser = null,
   existingFileName = null,
 }) => {
   const fileName =
@@ -89,6 +91,8 @@ export const saveTemplateFile = async ({
         infoFields: infoFields ?? [],
         columns: columns ?? [],
         defaultSections: defaultSections ?? [],
+        approvalStatus: approvalStatus ?? "draft",
+        createdByUser: createdByUser ?? null,
         savedAt: now,
         updatedAt: now,
       },

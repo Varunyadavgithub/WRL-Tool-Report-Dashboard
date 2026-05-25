@@ -9,9 +9,6 @@ import { setAuthUser } from "../../redux/slices/authSlice.js";
 import { assets, baseURL } from "../../assets/assets.js";
 import { FaEye, FaEyeSlash, FaUser, FaLock } from "react-icons/fa";
 
-// 👇 ADD THIS IMPORT (NEW)
-import { permissionApi } from "../../redux/api/permissionApi";
-
 const industrialBackgrounds = [
   assets.industrialBg1,
   assets.industrialBg2,
@@ -30,10 +27,6 @@ const Login = () => {
     empcod: "",
     password: "",
   });
-
-  // 👇 ADD THIS (lazy permission trigger)
-  const [triggerPermissions] =
-    permissionApi.endpoints.getMyPermissions.useLazyQuery();
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -74,17 +67,8 @@ const Login = () => {
       );
 
       if (res?.data?.success) {
-        // 1️⃣ Store user in redux
         dispatch(setAuthUser(res?.data?.user));
-
-        // 2️⃣ Immediately fetch permissions from backend
-        await triggerPermissions()
-          .unwrap()
-          .catch(() => {});
-
         toast.success("Login successful");
-
-        // 3️⃣ Navigate to dashboard
         navigate("/");
       } else {
         toast.error(res.data.message || "Login failed");

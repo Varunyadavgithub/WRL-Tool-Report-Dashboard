@@ -44,6 +44,7 @@ const STATUS_CLR = {
   approved:  { bg: "bg-emerald-50",  text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
   submitted: { bg: "bg-blue-50",     text: "text-blue-700",    border: "border-blue-200",    dot: "bg-blue-500"    },
   rejected:  { bg: "bg-red-50",      text: "text-red-600",     border: "border-red-200",     dot: "bg-red-500"     },
+  rework:    { bg: "bg-orange-50",   text: "text-orange-700",  border: "border-orange-200",  dot: "bg-orange-500"  },
   draft:     { bg: "bg-gray-100",    text: "text-gray-600",    border: "border-gray-200",    dot: "bg-gray-400"    },
 };
 
@@ -102,7 +103,7 @@ const AuditDashboard = () => {
       const [statsRes, modelRes, recentRes, cpRes] = await Promise.all([
         fetchAuditStats(),
         fetchAuditModelSummary({}),
-        loadAudits({ limit: 8, page: 1 }),
+        loadAudits({ limit: 10, page: 1 }),
         loadAudits({ limit: 200, page: 1 }),   // for checkpoint aggregation
       ]);
 
@@ -440,64 +441,73 @@ const AuditDashboard = () => {
                 <div className="p-1.5 bg-violet-50 rounded-lg"><FaClipboardList className="text-violet-500 text-sm" /></div>
                 <div>
                   <h3 className="text-sm font-black text-gray-800">Recent Audits</h3>
-                  <p className="text-[10px] text-gray-400">Last 8 entries</p>
+                  <p className="text-[10px] text-gray-400">Last 10 entries</p>
                 </div>
               </div>
-              <button
-                onClick={() => navigate("/auditreport/audits")}
-                className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 transition"
-              >
-                View all <FaArrowRight size={9} />
-              </button>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-bold px-2.5 py-1 bg-violet-50 text-violet-600 border border-violet-100 rounded-full">
+                  {recentAudits.length} records
+                </span>
+                <button
+                  onClick={() => navigate("/auditreport/audits")}
+                  className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 transition"
+                >
+                  View all <FaArrowRight size={9} />
+                </button>
+              </div>
             </div>
-            <div className="divide-y divide-gray-50">
-              {recentAudits.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-14 text-gray-400">
-                  <FaClipboardList className="text-3xl text-gray-200 mb-2" />
-                  <p className="text-sm font-semibold">No audits yet</p>
-                </div>
-              ) : (
-                recentAudits.map((audit) => {
-                  const clr = STATUS_CLR[audit.status] || STATUS_CLR.draft;
-                  const cpTotal = audit.summary?.total || 0;
-                  const cpPass  = audit.summary?.pass  || 0;
-                  const cpFail  = audit.summary?.fail  || 0;
-                  const rate    = pct(cpPass, cpTotal);
-                  return (
-                    <button
-                      key={audit.id}
-                      onClick={() => navigate(`/auditreport/audits/${audit.id}`)}
-                      className="w-full px-5 py-3 flex items-center gap-3 hover:bg-violet-50/30 transition-colors text-left"
-                    >
-                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${clr.dot}`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-black text-gray-800 truncate">{audit.auditCode || `#${audit.id}`}</p>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex-shrink-0 ${clr.bg} ${clr.text} ${clr.border}`}>
-                            {audit.status}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-gray-500 truncate">{audit.templateName || "—"}</p>
-                        <div className="flex items-center gap-3 mt-1">
-                          {cpTotal > 0 && (
-                            <>
-                              <span className="text-[10px] text-emerald-600 font-semibold">{cpPass} pass</span>
-                              {cpFail > 0 && <span className="text-[10px] text-red-500 font-semibold">{cpFail} fail</span>}
-                              <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full ${rate >= 80 ? "bg-emerald-400" : rate > 0 ? "bg-amber-400" : "bg-gray-300"}`} style={{ width: `${rate}%` }} />
-                              </div>
-                              <span className="text-[10px] text-gray-400">{rate}%</span>
-                            </>
-                          )}
-                          <span className="text-[10px] text-gray-400 flex-shrink-0">{relativeTime(audit.createdAt)}</span>
-                        </div>
-                      </div>
-                      <FaExternalLinkAlt size={9} className="text-gray-300 flex-shrink-0" />
-                    </button>
-                  );
-                })
-              )}
-            </div>
+
+            {recentAudits.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-14 text-gray-400">
+                <FaClipboardList className="text-3xl text-gray-200 mb-2" />
+                <p className="text-sm font-semibold">No audits yet</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-violet-50 border-b border-violet-100">
+                      {["REPORT", "STATUS", "BY", "CREATED"].map((h) => (
+                        <th
+                          key={h}
+                          className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-violet-500 text-left"
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {recentAudits.map((audit, idx) => {
+                      const clr = STATUS_CLR[audit.status] || STATUS_CLR.draft;
+                      return (
+                        <tr
+                          key={audit.id}
+                          onClick={() => navigate(`/auditreport/audits/${audit.id}`)}
+                          className={`hover:bg-violet-50/30 transition-colors cursor-pointer ${idx % 2 === 1 ? "bg-gray-50/40" : ""}`}
+                        >
+                          <td className="px-4 py-2.5 max-w-[140px]">
+                            <p className="font-black text-gray-800 truncate">{audit.auditCode || `#${audit.id}`}</p>
+                            <p className="text-[10px] text-gray-400 truncate">{audit.templateName || "—"}</p>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${clr.bg} ${clr.text} ${clr.border}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${clr.dot}`} />
+                              {audit.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-gray-600 font-semibold">{audit.createdBy || "—"}</td>
+                          <td className="px-4 py-2.5">
+                            <p className="text-gray-600">{fmtDate(audit.createdAt)}</p>
+                            <p className="text-[10px] text-gray-400">{relativeTime(audit.createdAt)}</p>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
 
