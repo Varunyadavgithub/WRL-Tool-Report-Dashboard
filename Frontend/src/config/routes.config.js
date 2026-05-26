@@ -23,6 +23,9 @@ const HourlyReport = lazy(() => import("../pages/Production/HourlyReport"));
 const LineHourlyReport = lazy(
   () => import("../pages/Production/LineHourlyReport"),
 );
+const LineWiseReport = lazy(
+  () => import("../pages/Production/LineWiseReport"),
+);
 const ConsolidatedReport = lazy(
   () => import("../pages/Production/ConsolidatedReport/ConsolidatedReport"),
 );
@@ -244,6 +247,11 @@ export const ROUTE_CONFIG = [
         path: "/production/line-hourly-report",
         label: "Line Hourly Report",
         component: LineHourlyReport,
+      },
+      {
+        path: "/production/line-wise-report",
+        label: "Line Wise Report",
+        component: LineWiseReport,
       },
       {
         path: "/production/consolidated-report",
