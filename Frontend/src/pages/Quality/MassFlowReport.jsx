@@ -347,7 +347,8 @@ const MassFlowTable = ({ data }) => {
     { label: "Model Code", key: "model_code" },
     { label: "Model Name", key: "model_name" },
     { label: "Serial No", key: "scan_data" },
-    { label: "Leak Value", key: "leak_value" },
+    { label: "Flow (l/h)", key: "leak_text" },
+    { label: "Flow Value", key: "leak_value" },
     { label: "Status", key: "status" },
     { label: "ATEQ PRG", key: "ateq_prg" },
     { label: "Created At", key: "created_at" },
@@ -426,10 +427,13 @@ const MassFlowTable = ({ data }) => {
                 <td className="px-3 py-2 border-b border-slate-100 font-bold text-slate-700">
                   {row.scan_data ?? "—"}
                 </td>
-
                 <td className="px-3 py-2 border-b border-slate-100 font-semibold text-slate-800">
-                  {row.leak_value != null ? `${row.leak_value} l/h` : "—"}
+                  {row.leak_value != null ? `${row.leak_value}` : "—"}
                 </td>
+                <td className="px-3 py-2 border-b border-slate-100 font-semibold text-slate-800">
+                  {row.leak_text != null ? `${row.leak_text}` : "—"}
+                </td>
+
                 <td className="px-3 py-2 border-b border-slate-100">
                   <StatusPill status={row.status} />
                 </td>
@@ -563,7 +567,8 @@ const MassFlowReport = () => {
         item.model_code?.toLowerCase().includes(q) ||
         item.model_name?.toLowerCase().includes(q) ||
         item.leak_text?.toLowerCase().includes(q) ||
-        (item.ateq_prg != null && String(item.ateq_prg).toLowerCase().includes(q)) ||
+        (item.ateq_prg != null &&
+          String(item.ateq_prg).toLowerCase().includes(q)) ||
         String(item.status).toLowerCase().includes(q),
     );
   }, [reportData, details]);
@@ -698,7 +703,30 @@ const MassFlowReport = () => {
                   </button>
                   {reportData.length > 0 && (
                     <ExportButton
-                      data={reportData}
+                      fetchData={() =>
+                        reportData.map((row) => ({
+                          ID: row.id,
+                          "Model Code": row.model_code,
+                          "Model Name": row.model_name,
+                          "Serial No": row.scan_data,
+                          "Flow (l/h)": row.leak_text,
+                          "Flow Value": row.leak_value,
+                          Status: row.status,
+                          "ATEQ PRG": row.ateq_prg,
+                          Timestamp: row.timestamp
+                            ? String(row.timestamp)
+                                .replace("T", " ")
+                                .replace("Z", "")
+                                .slice(0, 19)
+                            : "",
+                          "Created At": row.created_at
+                            ? String(row.created_at)
+                                .replace("T", " ")
+                                .replace("Z", "")
+                                .slice(0, 19)
+                            : "",
+                        }))
+                      }
                       filename="Mass_Flow_Report"
                     />
                   )}

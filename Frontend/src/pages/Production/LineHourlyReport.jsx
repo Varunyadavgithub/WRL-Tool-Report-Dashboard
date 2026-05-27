@@ -898,9 +898,6 @@ const LineHourlyReport = () => {
             {/* Auto-refresh toggle */}
             {!isMultiDay && (
               <div className="flex items-center gap-2 ml-auto shrink-0">
-                <span className="text-[11px] text-slate-400 font-medium">
-                  Auto (5m)
-                </span>
                 <div
                   className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
                     autoRefresh ? "translate-x-4" : "translate-x-0"
