@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SelectField from "../../components/ui/SelectField";
 import axios from "axios";
 import DateTimePicker from "../../components/ui/DateTimePicker";
@@ -10,7 +10,49 @@ import {
   useGetModelVariantsQuery,
   useGetStagesQuery,
 } from "../../redux/api/commonApi.js";
-import { Search, X, Loader2, PackageOpen, Zap } from "lucide-react";
+import { Search, X, Loader2, PackageOpen, Zap, ToggleLeft, ToggleRight } from "lucide-react";
+
+// ─── Line → Stage → codes mapping ────────────────────────────────────────────
+// linecodes maps to pa.Remark in ProcessActivity (same as HourlyReport)
+const LINE_STAGE_MAPPING = {
+  "Freezer Line": {
+    "FG Label":     { linecodes: [12501],         stationCodes: [1220010] },
+    MFT:            { linecodes: [12501],         stationCodes: [1220014] },
+    EST:            { linecodes: [12501],         stationCodes: [1220008] },
+    "Gas Charging": { linecodes: [12501],         stationCodes: [1220011] },
+    "Comp Scan":    { linecodes: [12501],         stationCodes: [1220005] },
+    "Post Foaming": { linecodes: [12301, 12302],  stationCodes: [1220003, 1220004] },
+    Foaming:        { linecodes: [12301, 12302],  stationCodes: [1220001, 1220002] },
+  },
+  "Chocolate Line": {
+    "FG Label":     { linecodes: [12305],         stationCodes: [1220010] },
+    MFT:            { linecodes: [12305],         stationCodes: [1220014] },
+    EST:            { linecodes: [12305],         stationCodes: [1220008] },
+    "Gas Charging": { linecodes: [12305],         stationCodes: [1220011] },
+    "Comp Scan":    { linecodes: [12305],         stationCodes: [1220005] },
+    "Post Foaming": { linecodes: [12305],         stationCodes: [1230007] },
+  },
+  "VISI Cooler Line": {
+    "FG Label":       { linecodes: [12605],       stationCodes: [1220010] },
+    MFT:              { linecodes: [12605],       stationCodes: [1220014] },
+    EST:              { linecodes: [12605],       stationCodes: [1220008] },
+    "Gas Charging":   { linecodes: [12605],       stationCodes: [1220011] },
+    "Comp Scan":      { linecodes: [12605],       stationCodes: [1220005] },
+    "Post Comp Scan": { linecodes: [12605],       stationCodes: [1240003] },
+    "Post Foaming":   { linecodes: [12605],       stationCodes: [1230012] },
+  },
+  "SUS Line": {
+    "FG Label":     { linecodes: [12304],         stationCodes: [1230017] },
+    MFT:            { linecodes: [12304],         stationCodes: [1230028] },
+    EST:            { linecodes: [12304],         stationCodes: [1230015] },
+    "Gas Charging": { linecodes: [12304],         stationCodes: [1260010] },
+    "Comp Scan 1":  { linecodes: [12304],         stationCodes: [1230013] },
+    "Comp Scan 2":  { linecodes: [12304],         stationCodes: [1230014] },
+    "Post Foaming": { linecodes: [12304],         stationCodes: [1230012] },
+  },
+};
+
+const SIMPLE_LINE_OPTIONS = Object.keys(LINE_STAGE_MAPPING).map((l) => ({ value: l, label: l }));
 
 /* ── Spinner using Lucide ── */
 const Spinner = ({ cls = "w-4 h-4" }) => (
@@ -49,6 +91,13 @@ const Overview = () => {
   const [todayLoading, setTodayLoading] = useState(false);
   const [monthLoading, setMonthLoading] = useState(false);
 
+  /* ── Mode toggle ── */
+  const [isDetailReport, setIsDetailReport] = useState(false);
+
+  /* ── Simple-mode state ── */
+  const [simpleLine, setSimpleLine] = useState("");
+  const [simpleStage, setSimpleStage] = useState("");
+
   /* ── Filter state ── */
   const [selectedModelVariant, setSelectedModelVariant] = useState(null);
   const [selectedStage, setSelectedStage] = useState(null);
@@ -81,6 +130,29 @@ const Overview = () => {
     if (stagesError) toast.error("Failed to load stages");
   }, [variantsError, stagesError]);
 
+  /* ── Simple mode: derive stage options from selected line ── */
+  const simpleStageOptions = useMemo(() => {
+    if (!simpleLine || !LINE_STAGE_MAPPING[simpleLine]) return [];
+    return Object.keys(LINE_STAGE_MAPPING[simpleLine]).map((s) => ({ value: s, label: s }));
+  }, [simpleLine]);
+
+  useEffect(() => { setSimpleStage(""); }, [simpleLine]);
+
+  /* ── Resolve stationCode + linecode based on mode ── */
+  const resolveParams = () => {
+    if (!isDetailReport) {
+      const mapping = LINE_STAGE_MAPPING[simpleLine]?.[simpleStage];
+      if (!mapping || !mapping.stationCodes.length) return null;
+      return {
+        stationCode: mapping.stationCodes.join(","),
+        linecode:    mapping.linecodes.join(","),
+      };
+    }
+    const sc = selectedStage?.value || null;
+    if (!sc) return null;
+    return { stationCode: sc, linecode: null };
+  };
+
   /* ── Infinite scroll observer ── */
   const observer = useRef();
   const lastRowRef = useCallback(
@@ -102,8 +174,11 @@ const Overview = () => {
 
   /* ── Paginated fetch ── */
   const fetchProductionData = async (pageNum = 1) => {
-    if (!startTime || !endTime || (!selectedModelVariant && !selectedStage)) {
-      toast.error("Please select a Stage and a Time Range.");
+    const resolved = resolveParams();
+    if (!startTime || !endTime || !resolved) {
+      toast.error(isDetailReport
+        ? "Please select a Stage and a Time Range."
+        : "Please select a Line, Stage, and Time Range.");
       return;
     }
     try {
@@ -113,7 +188,8 @@ const Overview = () => {
         endTime,
         page: pageNum,
         limit,
-        stationCode: selectedStage?.value || null,
+        stationCode: resolved.stationCode,
+        ...(resolved.linecode ? { linecode: resolved.linecode } : {}),
         model: selectedModelVariant ? Number(selectedModelVariant.value) : 0,
       };
       const res = await axios.get(`${baseURL}prod/fgdata`, { params });
@@ -133,8 +209,11 @@ const Overview = () => {
 
   /* ── Quick fetch ── */
   const fetchQuickData = async (url, start, end, setLoader) => {
-    if (!selectedStage) {
-      toast.error("Please select a Stage before using quick filters.");
+    const resolved = resolveParams();
+    if (!resolved) {
+      toast.error(isDetailReport
+        ? "Please select a Stage before using quick filters."
+        : "Please select a Line and Stage before using quick filters.");
       return;
     }
     try {
@@ -147,7 +226,8 @@ const Overview = () => {
       const params = {
         startTime: start,
         endTime: end,
-        stationCode: selectedStage?.value || null,
+        stationCode: resolved.stationCode,
+        ...(resolved.linecode ? { linecode: resolved.linecode } : {}),
         model: selectedModelVariant ? Number(selectedModelVariant.value) : 0,
       };
       const res = await axios.get(`${baseURL}${url}`, { params });
@@ -249,7 +329,8 @@ const Overview = () => {
 
   /* ── Export ── */
   const fetchExportData = async () => {
-    if (!startTime || !endTime || (!selectedModelVariant && !selectedStage)) {
+    const resolved = resolveParams();
+    if (!startTime || !endTime || !resolved) {
       toast.error("Please select Stage and Time Range.");
       return [];
     }
@@ -258,7 +339,8 @@ const Overview = () => {
         params: {
           startTime,
           endTime,
-          stationCode: selectedStage?.value || null,
+          stationCode: resolved.stationCode,
+          ...(resolved.linecode ? { linecode: resolved.linecode } : {}),
           model: selectedModelVariant
             ? parseInt(selectedModelVariant.value, 10)
             : 0,
@@ -341,9 +423,28 @@ const Overview = () => {
         <div className="flex gap-3 shrink-0">
           {/* Filters card */}
           <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
-              Filters
-            </p>
+            <div className="flex items-center gap-3 mb-3">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                Filters
+              </p>
+              {/* Mode toggle */}
+              <button
+                onClick={() => setIsDetailReport((v) => !v)}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                  isDetailReport
+                    ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600"
+                }`}
+              >
+                {isDetailReport ? <ToggleRight className="w-3.5 h-3.5" /> : <ToggleLeft className="w-3.5 h-3.5" />}
+                {isDetailReport ? "Detail Mode" : "Simple Mode"}
+              </button>
+              <span className="text-[11px] text-slate-400">
+                {isDetailReport
+                  ? "Manually select stage code"
+                  : "Pick a line and stage — codes resolved automatically"}
+              </span>
+            </div>
             <div className="flex flex-wrap gap-3 items-end">
               <div className="min-w-[190px] flex-1">
                 <SelectField
@@ -357,18 +458,41 @@ const Overview = () => {
                   }
                 />
               </div>
-              <div className="min-w-[190px] flex-1">
-                <SelectField
-                  label="Stage Name"
-                  options={stages}
-                  value={selectedStage?.value || ""}
-                  onChange={(e) =>
-                    setSelectedStage(
-                      stages.find((o) => o.value === e.target.value) || null,
-                    )
-                  }
-                />
-              </div>
+
+              {isDetailReport ? (
+                <div className="min-w-[190px] flex-1">
+                  <SelectField
+                    label="Stage Name"
+                    options={stages}
+                    value={selectedStage?.value || ""}
+                    onChange={(e) =>
+                      setSelectedStage(
+                        stages.find((o) => o.value === e.target.value) || null,
+                      )
+                    }
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="min-w-[170px] flex-1">
+                    <SelectField
+                      label="Line"
+                      value={simpleLine}
+                      options={[{ value: "", label: "Select Line" }, ...SIMPLE_LINE_OPTIONS]}
+                      onChange={(e) => setSimpleLine(e.target.value)}
+                    />
+                  </div>
+                  <div className="min-w-[170px] flex-1">
+                    <SelectField
+                      label="Stage"
+                      value={simpleStage}
+                      options={[{ value: "", label: simpleLine ? "Select Stage" : "Select a line first" }, ...simpleStageOptions]}
+                      onChange={(e) => setSimpleStage(e.target.value)}
+                      disabled={!simpleLine}
+                    />
+                  </div>
+                </>
+              )}
               <div className="min-w-[185px] flex-1">
                 <DateTimePicker
                   label="Start Time"
@@ -418,7 +542,7 @@ const Overview = () => {
               Quick Filters
             </p>
             <p className="text-[10px] text-slate-400 mb-3">
-              Select a stage first.
+              {isDetailReport ? "Select a stage first." : "Select a line & stage first."}
             </p>
             <div className="flex flex-col gap-2">
               <QuickBtn
@@ -510,6 +634,7 @@ const Overview = () => {
                         "User",
                         "FG Serial",
                         "Created On",
+                        "Remark",
                       ].map((h) => (
                         <th
                           key={h}
@@ -560,17 +685,17 @@ const Overview = () => {
                               {item.FG_SR}
                             </td>
                             <td className="px-3 py-2 border-b border-slate-100 text-slate-500 whitespace-nowrap font-mono text-[10px]">
-                              {item.CreatedOn?.replace("T", " ").replace(
-                                "Z",
-                                "",
-                              )}
+                              {item.CreatedOn?.replace("T", " ").replace("Z", "")}
+                            </td>
+                            <td className="px-3 py-2 border-b border-slate-100 text-slate-600 whitespace-nowrap">
+                              {item.Remark || "—"}
                             </td>
                           </tr>
                         );
                       })
                     ) : (
                       <tr>
-                        <td colSpan={10} className="py-16 text-center">
+                        <td colSpan={11} className="py-16 text-center">
                           <div className="flex flex-col items-center gap-3 text-slate-400">
                             <PackageOpen
                               className="w-12 h-12 opacity-20"

@@ -10,25 +10,54 @@ import { convertToIST } from "../../utils/convertToIST.js";
    Do NOT call pool.close() anywhere here — that would destroy the shared pool.
 ───────────────────────────────────────────────────────────────────────────── */
 
-/* ── Bind the 3 common params every endpoint needs ── */
-const bindBaseParams = (request, { istStart, istEnd, stationCode, model }) => {
+/**
+ * Parse a comma-separated integer param (stationCode or linecode).
+ */
+const parseIntList = (raw) =>
+  String(raw)
+    .split(",")
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => !isNaN(n));
+
+const parseStationCodes = parseIntList;
+
+/**
+ * Bind each station code as a numbered @sc0, @sc1, … parameter.
+ * Returns the IN-clause placeholder string, e.g. "@sc0, @sc1".
+ */
+const bindStationCodes = (request, codes) => {
+  codes.forEach((code, i) => {
+    request.input(`sc${i}`, sql.Int, code);
+  });
+  return codes.map((_, i) => `@sc${i}`).join(", ");
+};
+
+/**
+ * Bind each line code as @lc0, @lc1, … (stored in pa.Remark).
+ * Returns the IN-clause placeholder string, or null if no codes.
+ */
+const bindLineCodes = (request, codes) => {
+  codes.forEach((code, i) => {
+    request.input(`lc${i}`, sql.Int, code);
+  });
+  return codes.map((_, i) => `@lc${i}`).join(", ");
+};
+
+/** Bind the common time + model params shared by every query. */
+const bindBaseParams = (request, { istStart, istEnd, model }) => {
   request
-    .input("startTime",   sql.DateTime, istStart)
-    .input("endTime",     sql.DateTime, istEnd)
-    .input("stationCode", sql.VarChar,  stationCode)
-    .input("model",       sql.VarChar,  model && model !== "0" ? model : null);
+    .input("startTime", sql.DateTime, istStart)
+    .input("endTime",   sql.DateTime, istEnd)
+    .input("model",     sql.VarChar,  model && model !== "0" ? model : null);
   return request;
 };
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   SHARED FilteredData + ModelStats CTE
-   Optimisations vs. original:
-   • WorkCenter removed from FilteredData — was joined twice (once to filter
-     by stationCode, once in the main SELECT for wc.Name). Now the filter uses
-     pa.StationCode directly; WorkCenter is joined once in the outer SELECT.
-   • All predicates are SARGable (no functions wrapping indexed columns).
-───────────────────────────────────────────────────────────────────────────── */
-const FILTERED_DATA_CTE = `
+/**
+ * Build the shared FilteredData + ModelStats CTE.
+ * scPlaceholders — result of bindStationCodes(), e.g. "@sc0, @sc1"
+ * lcPlaceholders — result of bindLineCodes(), or null to skip linecode filter
+ */
+const buildFilteredDataCTE = (scPlaceholders, lcPlaceholders = null) => `
   FilteredData AS (
       SELECT
           mb.Material,
@@ -36,6 +65,7 @@ const FILTERED_DATA_CTE = `
           pa.ActivityOn,
           pa.StationCode,
           pa.Operator,
+          pa.Remark,
           mb.Serial,
           mb.VSerial,
           mb.Serial2
@@ -44,8 +74,9 @@ const FILTERED_DATA_CTE = `
       WHERE mb.PrintStatus  = 1
         AND mb.Status       <> 99
         AND pa.ActivityType  = 5
-        AND pa.StationCode   = @stationCode
-        AND pa.ActivityOn   BETWEEN @startTime AND @endTime
+        AND pa.StationCode  IN (${scPlaceholders})
+        AND pa.ActivityOn  BETWEEN @startTime AND @endTime
+        ${lcPlaceholders ? `AND pa.Remark IN (${lcPlaceholders})` : ""}
   ),
   ModelStats AS (
       SELECT
@@ -60,14 +91,6 @@ const FILTERED_DATA_CTE = `
 
 /* ═══════════════════════════════════════════════════════════════════════════
    1. fetchFGData — paginated query
-   Optimisations:
-   • Uses connectToDB singleton — zero connection overhead on subsequent calls
-   • COUNT separated into a lightweight query — no longer a correlated subquery
-     computed for every returned row (was the biggest performance killer)
-   • OFFSET…FETCH instead of ROW_NUMBER() + WHERE — SQL Server skips directly
-     to the requested page rather than materialising all preceding rows
-   • OPTION(RECOMPILE) — forces a fresh plan per call; prevents SQL Server from
-     reusing a plan optimised for a 1-hour range when querying 30 days (or vice versa)
 ═══════════════════════════════════════════════════════════════════════════ */
 export const fetchFGData = tryCatch(async (req, res) => {
   const {
@@ -75,6 +98,7 @@ export const fetchFGData = tryCatch(async (req, res) => {
     endTime,
     model,
     stationCode,
+    linecode,
     page  = 1,
     limit = 1000,
   } = req.query;
@@ -86,6 +110,12 @@ export const fetchFGData = tryCatch(async (req, res) => {
     );
   }
 
+  const stationCodes = parseStationCodes(stationCode);
+  if (!stationCodes.length) {
+    throw new AppError("Invalid stationCode value.", 400);
+  }
+
+  const lineCodes = linecode ? parseIntList(linecode) : [];
   const istStart  = convertToIST(startTime);
   const istEnd    = convertToIST(endTime);
   const pageNum   = parseInt(page,  10);
@@ -95,12 +125,15 @@ export const fetchFGData = tryCatch(async (req, res) => {
   const pool = await connectToDB(dbConfig1);
 
   try {
-    /* ── Step 1: cheap COUNT (separate request object, same pool) ── */
+    /* ── Step 1: cheap COUNT ── */
     const countReq = pool.request();
-    bindBaseParams(countReq, { istStart, istEnd, stationCode, model });
+    bindBaseParams(countReq, { istStart, istEnd, model });
+    const scPlaceholders  = bindStationCodes(countReq, stationCodes);
+    const lcPlaceholders  = lineCodes.length ? bindLineCodes(countReq, lineCodes) : null;
+    const countCTE = buildFilteredDataCTE(scPlaceholders, lcPlaceholders);
 
     const countResult = await countReq.query(`
-      WITH ${FILTERED_DATA_CTE}
+      WITH ${countCTE}
       SELECT COUNT(*) AS totalCount
       FROM   FilteredData
       WHERE  (@model IS NULL OR Material = @model)
@@ -110,13 +143,16 @@ export const fetchFGData = tryCatch(async (req, res) => {
 
     /* ── Step 2: paginated data ── */
     const dataReq = pool.request();
-    bindBaseParams(dataReq, { istStart, istEnd, stationCode, model });
+    bindBaseParams(dataReq, { istStart, istEnd, model });
+    const scPlaceholders2 = bindStationCodes(dataReq, stationCodes);
+    const lcPlaceholders2 = lineCodes.length ? bindLineCodes(dataReq, lineCodes) : null;
+    const dataCTE = buildFilteredDataCTE(scPlaceholders2, lcPlaceholders2);
     dataReq
       .input("offset", sql.Int, offset)
       .input("limit",  sql.Int, limitNum);
 
     const dataResult = await dataReq.query(`
-      WITH ${FILTERED_DATA_CTE}
+      WITH ${dataCTE}
       SELECT
           ROW_NUMBER() OVER (ORDER BY fd.ActivityOn ASC) AS SrNo,
           m.Name        AS Model_Name,
@@ -129,6 +165,7 @@ export const fetchFGData = tryCatch(async (req, res) => {
           CASE WHEN SUBSTRING(fd.Serial, 1, 1) IN ('S','F','L') THEN '' ELSE fd.Serial END AS FG_SR,
           fd.ActivityOn           AS CreatedOn,
           u.UserName,
+          ISNULL(fd.Remark, '')   AS Remark,
           ms.StartSerial,
           ms.EndSerial,
           ms.TotalCount
@@ -158,7 +195,7 @@ export const fetchFGData = tryCatch(async (req, res) => {
    2. productionReportExportData — full export (no pagination)
 ═══════════════════════════════════════════════════════════════════════════ */
 export const productionReportExportData = tryCatch(async (req, res) => {
-  const { startTime, endTime, model, stationCode } = req.query;
+  const { startTime, endTime, model, stationCode, linecode } = req.query;
 
   if (!startTime || !endTime || !stationCode) {
     throw new AppError(
@@ -167,17 +204,26 @@ export const productionReportExportData = tryCatch(async (req, res) => {
     );
   }
 
-  const istStart = convertToIST(startTime);
-  const istEnd   = convertToIST(endTime);
+  const stationCodes = parseStationCodes(stationCode);
+  if (!stationCodes.length) {
+    throw new AppError("Invalid stationCode value.", 400);
+  }
+
+  const lineCodes = linecode ? parseIntList(linecode) : [];
+  const istStart  = convertToIST(startTime);
+  const istEnd    = convertToIST(endTime);
 
   const pool = await connectToDB(dbConfig1);
 
   try {
     const request = pool.request();
-    bindBaseParams(request, { istStart, istEnd, stationCode, model });
+    bindBaseParams(request, { istStart, istEnd, model });
+    const scPlaceholders = bindStationCodes(request, stationCodes);
+    const lcPlaceholders = lineCodes.length ? bindLineCodes(request, lineCodes) : null;
+    const cte = buildFilteredDataCTE(scPlaceholders, lcPlaceholders);
 
     const result = await request.query(`
-      WITH ${FILTERED_DATA_CTE}
+      WITH ${cte}
       SELECT
           ROW_NUMBER() OVER (ORDER BY fd.ActivityOn ASC) AS SrNo,
           m.Name        AS Model_Name,
@@ -190,6 +236,7 @@ export const productionReportExportData = tryCatch(async (req, res) => {
           CASE WHEN SUBSTRING(fd.Serial, 1, 1) IN ('S','F','L') THEN '' ELSE fd.Serial END AS FG_SR,
           fd.ActivityOn           AS CreatedOn,
           u.UserName,
+          ISNULL(fd.Remark, '')   AS Remark,
           ms.StartSerial,
           ms.EndSerial
       FROM FilteredData fd
@@ -216,7 +263,7 @@ export const productionReportExportData = tryCatch(async (req, res) => {
    3. fetchQuickFiltersData — YDAY / TODAY / MTD shortcuts
 ═══════════════════════════════════════════════════════════════════════════ */
 export const fetchQuickFiltersData = tryCatch(async (req, res) => {
-  const { startTime, endTime, model, stationCode } = req.query;
+  const { startTime, endTime, model, stationCode, linecode } = req.query;
 
   if (!startTime || !endTime || !stationCode) {
     throw new AppError(
@@ -225,17 +272,26 @@ export const fetchQuickFiltersData = tryCatch(async (req, res) => {
     );
   }
 
-  const istStart = convertToIST(startTime);
-  const istEnd   = convertToIST(endTime);
+  const stationCodes = parseStationCodes(stationCode);
+  if (!stationCodes.length) {
+    throw new AppError("Invalid stationCode value.", 400);
+  }
+
+  const lineCodes = linecode ? parseIntList(linecode) : [];
+  const istStart  = convertToIST(startTime);
+  const istEnd    = convertToIST(endTime);
 
   const pool = await connectToDB(dbConfig1);
 
   try {
     const request = pool.request();
-    bindBaseParams(request, { istStart, istEnd, stationCode, model });
+    bindBaseParams(request, { istStart, istEnd, model });
+    const scPlaceholders = bindStationCodes(request, stationCodes);
+    const lcPlaceholders = lineCodes.length ? bindLineCodes(request, lineCodes) : null;
+    const cte = buildFilteredDataCTE(scPlaceholders, lcPlaceholders);
 
     const result = await request.query(`
-      WITH ${FILTERED_DATA_CTE}
+      WITH ${cte}
       SELECT
           m.Name        AS Model_Name,
           fd.Material   AS ModelName,
@@ -247,6 +303,7 @@ export const fetchQuickFiltersData = tryCatch(async (req, res) => {
           CASE WHEN SUBSTRING(fd.Serial, 1, 1) IN ('S','F','L') THEN '' ELSE fd.Serial END AS FG_SR,
           fd.ActivityOn           AS CreatedOn,
           u.UserName,
+          ISNULL(fd.Remark, '')   AS Remark,
           ms.StartSerial,
           ms.EndSerial,
           ms.TotalCount
