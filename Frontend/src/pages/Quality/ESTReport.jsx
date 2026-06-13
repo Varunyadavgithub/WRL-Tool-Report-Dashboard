@@ -628,7 +628,7 @@ const ESTReport = () => {
                         <td className="px-3 py-2 border-b border-slate-100">
                           <StatusBadge
                             status={
-                              item.ect_result == null ? "PASS" : item.ect_result
+                              item.ect_result
                             }
                             size="sm"
                           />

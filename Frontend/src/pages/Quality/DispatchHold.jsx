@@ -170,6 +170,9 @@ const DispatchHold = () => {
   const [assemblySerial, setAssemblySerial] = useState("");
   const [fgData, setFgData] = useState([]);
   const [defectName, setDefectName] = useState("");
+  const [responsibleDepartment, setResponsibleDepartment] = useState("");
+  const [responsibleHod, setResponsibleHod] = useState("");
+  const [targetReworkCompletion, setTargetReworkCompletion] = useState("");
   const [actionPlan, setActionPlan] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [newRowIndex, setNewRowIndex] = useState(null);
@@ -265,6 +268,11 @@ const DispatchHold = () => {
 
   const handleHold = async () => {
     if (!defectName.trim()) return toast.error("Enter a Defect Name");
+    if (!responsibleDepartment.trim())
+      return toast.error("Enter a Responsible Department");
+    if (!responsibleHod.trim()) return toast.error("Enter a Responsible HOD");
+    if (!targetReworkCompletion)
+      return toast.error("Select Target Date of Rework Completion");
     if (!fgData.length) return toast.error("No FG serials queued");
     setLoading(true);
     try {
@@ -274,6 +282,9 @@ const DispatchHold = () => {
         userName: user.usercode || "defaultUser",
         dispatchStatus: "hold",
         defect: defectName,
+        responsibleDepartment,
+        responsibleHod,
+        targetReworkCompletion,
         formattedDate: getFormattedISTDate(),
       }));
       const res = await axios.post(`${baseURL}quality/hold`, payload);
@@ -284,7 +295,12 @@ const DispatchHold = () => {
       setFgData((prev) =>
         prev.filter((item) => !held.includes(item.assemblySerial)),
       );
-      if (!skipped.length) setDefectName("");
+      if (!skipped.length) {
+        setDefectName("");
+        setResponsibleDepartment("");
+        setResponsibleHod("");
+        setTargetReworkCompletion("");
+      }
     } catch (err) {
       toast.error(err?.response?.data?.message || "Hold request failed");
     } finally {
@@ -327,6 +343,9 @@ const DispatchHold = () => {
     setAssemblySerial("");
     setFgData([]);
     setDefectName("");
+    setResponsibleDepartment("");
+    setResponsibleHod("");
+    setTargetReworkCompletion("");
     setActionPlan("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -483,6 +502,49 @@ const DispatchHold = () => {
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all disabled:opacity-50"
               />
             </div>
+
+            {isHold && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">
+                    Responsible Department
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Department..."
+                    value={responsibleDepartment}
+                    onChange={(e) => setResponsibleDepartment(e.target.value)}
+                    disabled={loading}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all disabled:opacity-50"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">
+                    Responsible HOD
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="HOD name..."
+                    value={responsibleHod}
+                    onChange={(e) => setResponsibleHod(e.target.value)}
+                    disabled={loading}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all disabled:opacity-50"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">
+                    Target Rework Completion
+                  </label>
+                  <input
+                    type="date"
+                    value={targetReworkCompletion}
+                    onChange={(e) => setTargetReworkCompletion(e.target.value)}
+                    disabled={loading}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all disabled:opacity-50"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* File Upload Panel */}
@@ -622,6 +684,19 @@ const DispatchHold = () => {
                         Serial No
                       </span>
                     </th>
+                    {isHold && (
+                      <>
+                        <th className="px-4 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-left whitespace-nowrap">
+                          Responsible Department
+                        </th>
+                        <th className="px-4 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-left whitespace-nowrap">
+                          Responsible HOD
+                        </th>
+                        <th className="px-4 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-left whitespace-nowrap">
+                          Target Rework Completion
+                        </th>
+                      </>
+                    )}
                     <th className="px-4 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-center whitespace-nowrap w-16">
                       Action
                     </th>
@@ -656,6 +731,19 @@ const DispatchHold = () => {
                           {item.assemblySerial}
                         </span>
                       </td>
+                      {isHold && (
+                        <>
+                          <td className="px-4 py-2.5 border-b border-slate-100 text-slate-700 font-medium whitespace-nowrap">
+                            {responsibleDepartment || "-"}
+                          </td>
+                          <td className="px-4 py-2.5 border-b border-slate-100 text-slate-700 font-medium whitespace-nowrap">
+                            {responsibleHod || "-"}
+                          </td>
+                          <td className="px-4 py-2.5 border-b border-slate-100 text-slate-700 font-mono whitespace-nowrap">
+                            {targetReworkCompletion || "-"}
+                          </td>
+                        </>
+                      )}
                       <td className="px-4 py-2.5 border-b border-slate-100 text-center">
                         <button
                           onClick={() => handleRemoveRow(index)}

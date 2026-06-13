@@ -6,180 +6,178 @@ import toast from "react-hot-toast";
 import { useSelector } from "react-redux";
 import {
   FaCloudUploadAlt, FaFileExcel, FaTimes, FaCheckCircle,
-  FaExclamationTriangle, FaEye, FaDatabase, FaArrowRight,
+  FaExclamationTriangle, FaEye, FaDatabase, FaArrowRight, FaEnvelope,
 } from "react-icons/fa";
-import { MdMergeType } from "react-icons/md";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
-// ── Excel parsers ─────────────────────────────────────────────────────────────
-const normalise = (k) => String(k || "").toLowerCase().replace(/[\s_\-\/\(\)]+/g, "");
+// ── Header normaliser (strips spaces, dots, slashes, punctuation) ─────────────
+const normalise = (k) =>
+  String(k || "").toLowerCase().replace(/[\s_\-\/().,]+/g, "");
 
-const COL_SALARY = {
-  empcode:      ["empcode","employeecode","empid","code"],
-  empname:      ["empname","employeename","name"],
-  department:   ["department","dept"],
-  category:     ["category","designation","grade"],
-  stipend:      ["stipend","basicpay","basic"],
-  otamount:     ["otamount","overtime","ot"],
-  bonus:        ["bonus"],
-  incentive:    ["incentive"],
-  grosspay:     ["grosspay","gross"],
-  hostel:       ["hostel"],
-  canteen:      ["canteen"],
-  electricity:  ["electricity","elect"],
-  uniform:      ["uniform"],
-  shoes:        ["shoes"],
-  otherdeductions:["other","otherdeduction"],
-  totaldeductions:["totaldeduction","totalded","deduction"],
-  netpay:       ["netpay","net"],
-  bankaccount:  ["bankaccount","bank","accountno"],
-  uan:          ["uan","pfno"],
+// Exact label -> field. Order matters only for the fallback `includes` pass.
+// Patterns MUST be pre-normalised (lowercase, no spaces/dots/punctuation),
+// because each sheet header is normalised before comparison.
+const FIELD_PATTERNS = {
+  srNo:           ["srno"],                        // SR NO.
+  empCode:        ["empcode", "employeecode", "code"], // EMP. CODE
+  labourId:       ["labourid"],                    // LABOUR ID
+  email:          ["emailid", "email"],            // Email ID
+  mobileNo:       ["mobileno", "mobile", "phoneno", "phone", "contactno", "mobilenumber"], // Mobile No
+  category:       ["category"],                    // Category
+  empName:        ["empname", "employeename", "name"], // EMP. NAME
+  department:     ["dept", "department"],          // DEPT
+  location:       ["location"],                    // LOCATION
+  doj:            ["dateofjoining", "doj"],        // DATE OF JOINING
+  presentDays:    ["pday", "presentday", "presentdays", "pdays"], // P DAY
+  lop:            ["lop", "lossofpay"],            // LOP
+  otherAllowance: ["otherallowance"],              // OTHER ALLOWANCE
+  arrear:         ["arrear"],                      // ARREAR
+  companyStipend: ["companystipend"],              // COMPANY STIPEND
+  governmentDBT:  ["governmentdbt", "govtdbt", "govdbt", "dbt"], // GOVERNMENT.DBT
+  totalStipend:   ["totalstipend"],                // TOTAL STIPEND
+  incentive:      ["incentive"],                   // INCENTIVE
+  grossAmount:    ["grossamount", "grosspay", "gross"], // GROSS AMOUNT
+  canteen:        ["canteen"],                     // CANTEEN
+  hostelRent:     ["hostelrent", "hostel"],        // HOSTEL RENT
+  electricity:    ["electricity", "elect"],        // ELECTRICITY
+  uniform:        ["uniformdeduction", "uniform"], // UNIFORM DEDUCTION
+  shoes:          ["shoesdeduction", "shoes"],     // Shoes Deduction
+  otherDed:       ["otherded", "otherdeduction"],  // Other Ded.
+  netDeduction:   ["netdeduction", "totaldeduction"], // NET DEDUCTION
+  netPayment:     ["netpayment", "netpay", "net"], // NET PAYMENT
 };
 
-const COL_ATTEND = {
-  empcode:      ["empcode","employeecode","empid","code"],
-  presentdays:  ["presentdays","present","pdays"],
-  weeklyoff:    ["weeklyoff","wo","weekly"],
-  halfdays:     ["halfdays","hd","half"],
-  absentdays:   ["absentdays","absent","adays"],
-  othours:      ["othours","ot","overtimehours"],
+const fmtDate = (v) => {
+  if (!v) return "";
+  const d = v instanceof Date ? v : new Date(v);
+  if (isNaN(d)) return String(v);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}-${mm}-${d.getFullYear()}`;
 };
 
-const matchCol = (header, mapEntry) => mapEntry.some((v) => normalise(header).includes(v));
+// ── Parser for the two-row merged header WRL apprentice format ─────────────────
+const parseMasterSheet = (sheet) => {
+  const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, blankrows: false });
+  if (!aoa.length) return { rows: [], unmapped: [] };
 
-const parseSalarySheet = (sheet) => {
-  const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-  if (!rows.length) return [];
-  const headers = Object.keys(rows[0]);
-
-  const colMap = {};
-  for (const [field, patterns] of Object.entries(COL_SALARY)) {
-    colMap[field] = headers.find((h) => matchCol(h, patterns)) || null;
+  // Find the header row (the one carrying "EMP CODE")
+  let hr = -1;
+  for (let i = 0; i < Math.min(aoa.length, 15); i++) {
+    const norm = (aoa[i] || []).map(normalise);
+    if (norm.some((c) => c === "empcode" || (c.includes("emp") && c.includes("code")))) { hr = i; break; }
   }
+  if (hr === -1) hr = 0;
 
-  return rows
-    .filter((r) => r[colMap.empcode])
-    .map((r) => {
-      const get = (f) => colMap[f] ? r[colMap[f]] : "";
-      const num = (f) => { const v = parseFloat(get(f)); return isNaN(v) ? 0 : v; };
-      const gross = num("grosspay") || (num("stipend") + num("otamount") + num("bonus") + num("incentive"));
-      const totalDed = num("totaldeductions") || (num("hostel") + num("canteen") + num("electricity") + num("uniform") + num("shoes") + num("otherdeductions"));
-      const net = num("netpay") || (gross - totalDed);
-      return {
-        empCode:        String(get("empcode")).trim().toUpperCase(),
-        empName:        String(get("empname")).trim(),
-        department:     String(get("department")).trim(),
-        category:       String(get("category")).trim(),
-        stipend:        num("stipend"),
-        otAmount:       num("otamount"),
-        bonus:          num("bonus"),
-        incentive:      num("incentive"),
-        grossPay:       gross,
-        hostel:         num("hostel"),
-        canteen:        num("canteen"),
-        electricity:    num("electricity"),
-        uniform:        num("uniform"),
-        shoes:          num("shoes"),
-        otherDeductions:num("otherdeductions"),
-        totalDeductions:totalDed,
-        netPay:         net,
-        bankAccount:    String(get("bankaccount")).trim(),
-        uan:            String(get("uan")).trim(),
-        _raw:           r,
-      };
-    });
-};
+  const row1 = aoa[hr] || [];
+  const row2 = aoa[hr + 1] || [];
+  const width = Math.max(row1.length, row2.length);
 
-const parseDayWise = (headers, row) => {
-  const days = {};
-  headers.forEach((h) => {
-    const n = parseInt(h);
-    if (n >= 1 && n <= 31) {
-      const v = String(row[h] || "").trim().toUpperCase();
-      if (v) days[n] = v;
+  // Map a labels[] -> { field: colIndex } (exact pass, then loose includes pass)
+  const buildMap = (labels) => {
+    const cbf = {}; const used = new Set();
+    for (const [field, pats] of Object.entries(FIELD_PATTERNS)) {
+      const idx = labels.findIndex((l, i) => !used.has(i) && pats.includes(l));
+      if (idx >= 0) { cbf[field] = idx; used.add(idx); }
     }
-  });
-  return Object.keys(days).length ? days : null;
-};
+    for (const [field, pats] of Object.entries(FIELD_PATTERNS)) {
+      if (cbf[field] != null) continue;
+      const idx = labels.findIndex((l, i) => !used.has(i) && l && pats.some((p) => l.includes(p)));
+      if (idx >= 0) { cbf[field] = idx; used.add(idx); }
+    }
+    return cbf;
+  };
 
-const parseAttendSheet = (sheet) => {
-  const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-  if (!rows.length) return [];
-  const headers = Object.keys(rows[0]);
+  const required = ["empCode", "empName", "grossAmount", "netPayment"];
+  const hit = (cbf) => required.filter((f) => cbf[f] != null).length;
 
-  const colMap = {};
-  for (const [field, patterns] of Object.entries(COL_ATTEND)) {
-    colMap[field] = headers.find((h) => matchCol(h, patterns)) || null;
+  // Attempt A: single-row header (labels = row1 only) -> data starts at hr+1
+  const labelsSingle = row1.map(normalise);
+  let colByField = buildMap(labelsSingle);
+  let dataStart = hr + 1;
+
+  // Attempt B: two-row merged header (sub-header wins, else top) -> data at hr+2
+  if (hit(colByField) < required.length) {
+    const labelsMerged = [];
+    for (let c = 0; c < width; c++) {
+      const sub = row2[c] != null && String(row2[c]).trim() !== "" ? row2[c] : null;
+      const top = row1[c] != null && String(row1[c]).trim() !== "" ? row1[c] : null;
+      labelsMerged[c] = normalise(sub || top || "");
+    }
+    const merged = buildMap(labelsMerged);
+    if (hit(merged) > hit(colByField)) { colByField = merged; dataStart = hr + 2; }
   }
 
-  return rows
-    .filter((r) => r[colMap.empcode])
-    .map((r) => {
-      const get = (f) => colMap[f] ? r[colMap[f]] : "";
-      const num = (f) => { const v = parseFloat(get(f)); return isNaN(v) ? 0 : v; };
+  const at  = (arr, f) => (colByField[f] != null ? arr[colByField[f]] : null);
+  const num = (arr, f) => { const v = parseFloat(at(arr, f)); return isNaN(v) ? 0 : v; };
+  const str = (arr, f) => String(at(arr, f) ?? "").trim();
 
-      // Auto-calculate from day-wise if summary cols missing
-      const dayWise = parseDayWise(headers, r);
-      let calcP = 0, calcWO = 0, calcHD = 0, calcA = 0;
-      if (dayWise) {
-        Object.values(dayWise).forEach((v) => {
-          if (v === "P") calcP++;
-          else if (v === "WO") calcWO++;
-          else if (v === "HD") { calcHD++; calcP += 0.5; }
-          else if (v === "A") calcA++;
-        });
-      }
+  const rows = [];
+  for (let r = dataStart; r < aoa.length; r++) {
+    const arr = aoa[r] || [];
+    const empCode = str(arr, "empCode");
+    if (!empCode) continue;
 
-      return {
-        empCode:     String(get("empcode")).trim().toUpperCase(),
-        presentDays: num("presentdays") || calcP,
-        weeklyOff:   parseInt(get("weeklyoff")) || calcWO,
-        halfDays:    num("halfdays") || calcHD,
-        absentDays:  num("absentdays") || calcA,
-        otHours:     num("othours"),
-        dayWiseData: dayWise,
-      };
+    const companyStipend = num(arr, "companyStipend");
+    const governmentDBT  = num(arr, "governmentDBT");
+    const otherAllowance = num(arr, "otherAllowance");
+    const arrear         = num(arr, "arrear");
+    const incentive      = num(arr, "incentive");
+    const totalStipend = num(arr, "totalStipend") || (companyStipend + governmentDBT);
+    const grossAmount  = num(arr, "grossAmount") || (otherAllowance + arrear + totalStipend + incentive);
+
+    const canteen     = num(arr, "canteen");
+    const hostelRent  = num(arr, "hostelRent");
+    const electricity = num(arr, "electricity");
+    const uniform     = num(arr, "uniform");
+    const shoes       = num(arr, "shoes");
+    const otherDed    = num(arr, "otherDed");
+    const netDeduction = num(arr, "netDeduction") ||
+      (canteen + hostelRent + electricity + uniform + shoes + otherDed);
+
+    const netPayment = num(arr, "netPayment") || (grossAmount - netDeduction);
+
+    rows.push({
+      srNo: num(arr, "srNo"),
+      empCode: empCode.toUpperCase(),
+      labourId: str(arr, "labourId"),
+      email: str(arr, "email").toLowerCase(),
+      mobileNo: str(arr, "mobileNo").replace(/\D/g, ""),
+      category: str(arr, "category"),
+      empName: str(arr, "empName"),
+      department: str(arr, "department"),
+      location: str(arr, "location"),
+      doj: fmtDate(at(arr, "doj")),
+      presentDays: num(arr, "presentDays"),
+      lop: num(arr, "lop"),
+      otherAllowance, arrear, companyStipend, governmentDBT,
+      totalStipend, incentive, grossAmount,
+      canteen, hostelRent, electricity, uniform, shoes, otherDed,
+      netDeduction, netPayment,
     });
-};
+  }
 
-const mergeData = (salaryRows, attendRows) => {
-  const attendMap = {};
-  attendRows.forEach((r) => { attendMap[r.empCode] = r; });
-
-  return salaryRows.map((s) => {
-    const a = attendMap[s.empCode] || {};
-    return {
-      ...s,
-      presentDays: a.presentDays ?? 0,
-      weeklyOff:   a.weeklyOff  ?? 0,
-      halfDays:    a.halfDays   ?? 0,
-      absentDays:  a.absentDays ?? 0,
-      otHours:     a.otHours    ?? 0,
-      dayWiseData: a.dayWiseData ?? null,
-      _hasAttend:  !!attendMap[s.empCode],
-    };
-  });
+  const unmapped = required.filter((f) => colByField[f] == null);
+  return { rows, unmapped };
 };
 
 // ── Drop Zone ─────────────────────────────────────────────────────────────────
 const DropZone = ({ label, file, onFile, accept = ".xlsx,.xls,.csv", icon: Icon }) => {
   const ref = useRef();
   const [drag, setDrag] = useState(false);
-
   const handle = (f) => {
     if (!f) return;
     if (!/\.(xlsx|xls|csv)$/i.test(f.name)) { toast.error("Upload Excel or CSV file only"); return; }
     onFile(f);
   };
-
   return (
     <div
       onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
       onDragLeave={() => setDrag(false)}
       onDrop={(e) => { e.preventDefault(); setDrag(false); handle(e.dataTransfer.files[0]); }}
       onClick={() => !file && ref.current?.click()}
-      className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer
+      className={`relative border-2 border-dashed rounded-2xl p-10 text-center transition-all cursor-pointer
         ${drag ? "border-indigo-400 bg-indigo-50" : file ? "border-green-400 bg-green-50 cursor-default" : "border-gray-300 bg-gray-50 hover:border-indigo-300 hover:bg-indigo-50/40"}`}
     >
       <input ref={ref} type="file" accept={accept} className="hidden" onChange={(e) => handle(e.target.files[0])} />
@@ -193,9 +191,9 @@ const DropZone = ({ label, file, onFile, accept = ".xlsx,.xls,.csv", icon: Icon 
         </div>
       ) : (
         <div>
-          <Icon className="text-4xl text-gray-300 mx-auto mb-3" />
+          <Icon className="text-5xl text-gray-300 mx-auto mb-3" />
           <p className="font-bold text-gray-600 text-sm">{label}</p>
-          <p className="text-xs text-gray-400 mt-1">Drag & drop or click to browse</p>
+          <p className="text-xs text-gray-400 mt-1">Drag &amp; drop or click to browse</p>
           <p className="text-[10px] text-gray-300 mt-1">.xlsx / .xls / .csv</p>
         </div>
       )}
@@ -210,49 +208,47 @@ const Upload = () => {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year,  setYear]  = useState(now.getFullYear());
 
-  const [salaryFile,  setSalaryFile]  = useState(null);
-  const [attendFile,  setAttendFile]  = useState(null);
-  const [salaryRows,  setSalaryRows]  = useState([]);
-  const [attendRows,  setAttendRows]  = useState([]);
-  const [merged,      setMerged]      = useState([]);
-  const [step,        setStep]        = useState(1); // 1=upload 2=preview 3=done
-  const [submitting,  setSubmitting]  = useState(false);
-  const [result,      setResult]      = useState(null);
+  const [file,   setFile]   = useState(null);
+  const [rows,   setRows]   = useState([]);
+  const [step,   setStep]   = useState(1);          // 1=upload 2=preview 3=done
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState(null);
 
-  const parseFile = useCallback((file, type) => {
+  const parseFile = useCallback((f) => {
     const reader = new FileReader();
     reader.onload = (e) => {
-      const wb = XLSX.read(e.target.result, { type: "array" });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      if (type === "salary") {
-        const rows = parseSalarySheet(sheet);
-        setSalaryRows(rows);
-        toast.success(`Parsed ${rows.length} salary rows`);
-      } else {
-        const rows = parseAttendSheet(sheet);
-        setAttendRows(rows);
-        toast.success(`Parsed ${rows.length} attendance rows`);
+      try {
+        const wb = XLSX.read(e.target.result, { type: "array", cellDates: true });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const { rows: parsed, unmapped } = parseMasterSheet(sheet);
+        if (unmapped.length) {
+          toast.error(`Could not find columns: ${unmapped.join(", ")}`);
+          return;
+        }
+        if (!parsed.length) { toast.error("No employee rows found in the sheet"); return; }
+        setRows(parsed);
+        toast.success(`Parsed ${parsed.length} apprentice records`);
+      } catch (err) {
+        toast.error("Failed to read Excel file");
       }
     };
-    reader.readAsArrayBuffer(file);
+    reader.readAsArrayBuffer(f);
   }, []);
 
-  const handleSalaryFile = (f) => { setSalaryFile(f); parseFile(f, "salary"); };
-  const handleAttendFile = (f) => { setAttendFile(f); parseFile(f, "attend"); };
+  const handleFile = (f) => { setFile(f); parseFile(f); };
+  const clearFile  = () => { setFile(null); setRows([]); };
 
   const handlePreview = () => {
-    if (!salaryRows.length) { toast.error("Upload salary master file first"); return; }
-    const m = mergeData(salaryRows, attendRows);
-    setMerged(m);
+    if (!rows.length) { toast.error("Upload the salary master file first"); return; }
     setStep(2);
   };
 
   const handleSubmit = async () => {
-    if (!merged.length) return;
+    if (!rows.length) return;
     setSubmitting(true);
     try {
       const res = await axios.post(`${baseURL}apprentice/upload`, {
-        month, year, slips: merged,
+        month, year, slips: rows,
         uploadedBy: user?.name || user?.userCode || "HR",
       });
       setResult(res.data);
@@ -265,13 +261,10 @@ const Upload = () => {
     }
   };
 
-  const reset = () => {
-    setSalaryFile(null); setAttendFile(null);
-    setSalaryRows([]); setAttendRows([]); setMerged([]);
-    setStep(1); setResult(null);
-  };
+  const reset = () => { clearFile(); setStep(1); setResult(null); };
 
-  const noAttend = merged.filter((r) => !r._hasAttend).length;
+  const noEmail = rows.filter((r) => !r.email).length;
+  const totalNet = rows.reduce((s, r) => s + (r.netPayment || 0), 0);
   const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 1 + i);
 
   return (
@@ -282,13 +275,12 @@ const Upload = () => {
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-50 rounded-xl"><FaCloudUploadAlt className="text-emerald-600 text-xl" /></div>
             <div>
-              <h1 className="text-base font-black text-gray-800 leading-none">Upload Salary Files</h1>
-              <p className="text-xs text-gray-400 mt-0.5">Upload Excel files to auto-generate salary slips</p>
+              <h1 className="text-base font-black text-gray-800 leading-none">Upload Apprentice Salary File</h1>
+              <p className="text-xs text-gray-400 mt-0.5">Upload the monthly pay-slip Excel to generate & e-mail slips</p>
             </div>
           </div>
-          {/* Step indicator */}
           <div className="flex items-center gap-2">
-            {[["1","Upload Files"],["2","Preview & Merge"],["3","Done"]].map(([n, label], i) => (
+            {[["1","Upload File"],["2","Preview"],["3","Done"]].map(([n, label], i) => (
               <div key={n} className="flex items-center gap-1.5">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black
                   ${step > i + 1 ? "bg-green-500 text-white" : step === i + 1 ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-500"}`}>{n}</div>
@@ -302,10 +294,9 @@ const Upload = () => {
 
       <div className="px-6 py-5 max-w-6xl mx-auto space-y-5">
 
-        {/* STEP 1: Upload */}
+        {/* STEP 1 */}
         {step === 1 && (
           <>
-            {/* Month / Year */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Salary Period</p>
               <div className="flex flex-wrap gap-4 items-end">
@@ -326,79 +317,53 @@ const Upload = () => {
               </div>
             </div>
 
-            {/* File uploads */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <FaFileExcel className="text-green-600 text-lg" />
-                  <div>
-                    <p className="text-sm font-black text-gray-800">Salary Slip Master</p>
-                    <p className="text-xs text-gray-400">EmpCode, Name, Stipend, Deductions, Net Pay…</p>
-                  </div>
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <FaFileExcel className="text-green-600 text-lg" />
+                <div>
+                  <p className="text-sm font-black text-gray-800">Pay-Slip Master (single file)</p>
+                  <p className="text-xs text-gray-400">EmpCode, Email, P Day, LOP, Stipend, Incentive, Deductions, Net Payment…</p>
                 </div>
-                <DropZone label="Drop Salary Master Excel here" file={salaryFile} onFile={handleSalaryFile} icon={FaFileExcel} />
-                {salaryRows.length > 0 && (
-                  <div className="mt-3 px-3 py-2 bg-green-50 rounded-xl border border-green-200 flex items-center gap-2">
-                    <FaCheckCircle className="text-green-500" size={12} />
-                    <span className="text-xs font-semibold text-green-700">{salaryRows.length} employees parsed</span>
-                    {salaryFile && <button onClick={() => { setSalaryFile(null); setSalaryRows([]); }} className="ml-auto text-gray-400 hover:text-red-500"><FaTimes size={11} /></button>}
-                  </div>
-                )}
               </div>
-
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <FaFileExcel className="text-blue-600 text-lg" />
-                  <div>
-                    <p className="text-sm font-black text-gray-800">Attendance & OT Statement</p>
-                    <p className="text-xs text-gray-400">Day-wise P/A/WO, OT Hours, Present Days…</p>
-                  </div>
+              <DropZone label="Drop Pay-Slip Master Excel here" file={file} onFile={handleFile} icon={FaFileExcel} />
+              {rows.length > 0 && (
+                <div className="mt-3 px-3 py-2 bg-green-50 rounded-xl border border-green-200 flex items-center gap-2">
+                  <FaCheckCircle className="text-green-500" size={12} />
+                  <span className="text-xs font-semibold text-green-700">{rows.length} apprentices parsed</span>
+                  {noEmail > 0 && <span className="text-xs font-semibold text-amber-600 ml-2">• {noEmail} missing e-mail</span>}
+                  <button onClick={clearFile} className="ml-auto text-gray-400 hover:text-red-500"><FaTimes size={11} /></button>
                 </div>
-                <DropZone label="Drop Attendance Excel here" file={attendFile} onFile={handleAttendFile} icon={FaFileExcel} />
-                {attendRows.length > 0 && (
-                  <div className="mt-3 px-3 py-2 bg-blue-50 rounded-xl border border-blue-200 flex items-center gap-2">
-                    <FaCheckCircle className="text-blue-500" size={12} />
-                    <span className="text-xs font-semibold text-blue-700">{attendRows.length} attendance rows parsed</span>
-                    {attendFile && <button onClick={() => { setAttendFile(null); setAttendRows([]); }} className="ml-auto text-gray-400 hover:text-red-500"><FaTimes size={11} /></button>}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
 
-            {/* Column mapping hints */}
             <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
-              <p className="text-xs font-black text-indigo-700 uppercase tracking-wider mb-2">Expected Column Names</p>
-              <div className="grid grid-cols-2 gap-4 text-[10px] text-indigo-600">
-                <div>
-                  <p className="font-bold mb-1">Salary Master:</p>
-                  <p>EmpCode/EmployeeCode • EmpName • Department • Category • Stipend • OT Amount • Bonus • Gross Pay • Hostel • Canteen • Electricity • Uniform • Shoes • Other • Net Pay</p>
-                </div>
-                <div>
-                  <p className="font-bold mb-1">Attendance:</p>
-                  <p>EmpCode • 1-31 (P/A/WO/HD) • Present Days • Weekly Off • Half Days • Absent Days • OT Hours</p>
-                </div>
-              </div>
+              <p className="text-xs font-black text-indigo-700 uppercase tracking-wider mb-2">Expected Columns (WRL Apprentice Pay-Slip Format)</p>
+              <p className="text-[11px] text-indigo-600 leading-relaxed">
+                SR NO. • EMP. CODE • LABOUR ID • Email ID • Category • EMP. NAME • DEPT • LOCATION • DATE OF JOINING • P DAY • LOP •
+                <span className="font-bold"> Earnings:</span> Other Allowance, Arrear, Company Stipend, Government DBT, Total Stipend, Incentive, Gross Amount •
+                <span className="font-bold"> Deductions:</span> Canteen, Hostel Rent, Electricity, Uniform, Shoes, Other Ded., Net Deduction • NET PAYMENT
+              </p>
+              <p className="text-[10px] text-indigo-400 mt-2">The two-row merged header is handled automatically.</p>
             </div>
 
             <div className="flex justify-end">
-              <button onClick={handlePreview} disabled={!salaryRows.length}
+              <button onClick={handlePreview} disabled={!rows.length}
                 className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition shadow-md shadow-indigo-200 disabled:opacity-40">
-                <FaEye size={13} /> Preview & Merge
+                <FaEye size={13} /> Preview
               </button>
             </div>
           </>
         )}
 
-        {/* STEP 2: Preview */}
+        {/* STEP 2 */}
         {step === 2 && (
           <>
-            {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: "Total Employees", val: merged.length, color: "text-indigo-700", bg: "bg-indigo-50" },
-                { label: "With Attendance", val: merged.filter((r) => r._hasAttend).length, color: "text-green-700", bg: "bg-green-50" },
-                { label: "Missing Attendance", val: noAttend, color: noAttend > 0 ? "text-amber-700" : "text-gray-500", bg: noAttend > 0 ? "bg-amber-50" : "bg-gray-50" },
-                { label: "Total Net Pay", val: `₹${merged.reduce((s, r) => s + (r.netPay || 0), 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`, color: "text-emerald-700", bg: "bg-emerald-50" },
+                { label: "Total Apprentices", val: rows.length, color: "text-indigo-700", bg: "bg-indigo-50" },
+                { label: "With E-mail", val: rows.length - noEmail, color: "text-green-700", bg: "bg-green-50" },
+                { label: "Missing E-mail", val: noEmail, color: noEmail > 0 ? "text-amber-700" : "text-gray-500", bg: noEmail > 0 ? "bg-amber-50" : "bg-gray-50" },
+                { label: "Total Net Payment", val: `₹${totalNet.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`, color: "text-emerald-700", bg: "bg-emerald-50" },
               ].map(({ label, val, color, bg }) => (
                 <div key={label} className={`${bg} rounded-2xl border border-gray-100 p-4 text-center`}>
                   <p className={`text-2xl font-black ${color}`}>{val}</p>
@@ -407,52 +372,50 @@ const Upload = () => {
               ))}
             </div>
 
-            {noAttend > 0 && (
+            {noEmail > 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
                 <FaExclamationTriangle className="text-amber-500 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-bold text-amber-700">{noAttend} employees have no attendance data</p>
-                  <p className="text-xs text-amber-600 mt-0.5">Attendance values will default to 0. You can still proceed.</p>
+                  <p className="text-sm font-bold text-amber-700">{noEmail} apprentices have no e-mail address</p>
+                  <p className="text-xs text-amber-600 mt-0.5">Their slips will still be saved, but cannot be mailed until an address is added.</p>
                 </div>
               </div>
             )}
 
-            {/* Preview table */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-                <MdMergeType className="text-indigo-400 text-lg" />
-                <span className="text-sm font-black text-gray-800">Merged Data Preview — {MONTHS[month-1]} {year}</span>
+                <FaDatabase className="text-indigo-400 text-base" />
+                <span className="text-sm font-black text-gray-800">Parsed Data Preview — {MONTHS[month-1]} {year}</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-[11px]">
                   <thead>
                     <tr className="bg-slate-800 text-white">
-                      {["Code","Name","Dept","P","WO","HD","A","OT Hrs","Stipend","OT Amt","Gross","Deductions","Net Pay","Attend?"].map((h) => (
+                      {["Code","Name","Dept","Category","P Day","LOP","Stipend","Incentive","Gross","Net Ded.","Net Pay","E-mail","Mobile"].map((h) => (
                         <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap text-[10px] uppercase tracking-wider">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {merged.map((r, i) => (
-                      <tr key={r.empCode} className={`${i % 2 === 0 ? "bg-white" : "bg-gray-50/40"} ${!r._hasAttend ? "bg-amber-50/50" : ""}`}>
+                    {rows.map((r, i) => (
+                      <tr key={r.empCode + i} className={`${i % 2 === 0 ? "bg-white" : "bg-gray-50/40"} ${!r.email ? "bg-amber-50/50" : ""}`}>
                         <td className="px-3 py-2 font-mono text-gray-700 font-semibold">{r.empCode}</td>
                         <td className="px-3 py-2 text-gray-800 font-medium whitespace-nowrap">{r.empName}</td>
-                        <td className="px-3 py-2 text-gray-500 whitespace-nowrap max-w-[100px] truncate">{r.department}</td>
+                        <td className="px-3 py-2 text-gray-500 whitespace-nowrap max-w-[120px] truncate">{r.department}</td>
+                        <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.category}</td>
                         <td className="px-3 py-2 font-bold text-green-700 text-center">{r.presentDays}</td>
-                        <td className="px-3 py-2 text-center text-blue-600">{r.weeklyOff}</td>
-                        <td className="px-3 py-2 text-center text-yellow-600">{r.halfDays}</td>
-                        <td className="px-3 py-2 text-center text-red-600">{r.absentDays}</td>
-                        <td className="px-3 py-2 text-center text-purple-600">{r.otHours}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">₹{(r.stipend||0).toLocaleString("en-IN")}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">₹{(r.otAmount||0).toLocaleString("en-IN")}</td>
-                        <td className="px-3 py-2 text-right font-bold text-gray-800">₹{(r.grossPay||0).toLocaleString("en-IN")}</td>
-                        <td className="px-3 py-2 text-right text-red-600">₹{(r.totalDeductions||0).toLocaleString("en-IN")}</td>
-                        <td className="px-3 py-2 text-right font-black text-emerald-700">₹{(r.netPay||0).toLocaleString("en-IN")}</td>
+                        <td className="px-3 py-2 text-center text-red-600">{r.lop}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">₹{(r.totalStipend||0).toLocaleString("en-IN")}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">₹{(r.incentive||0).toLocaleString("en-IN")}</td>
+                        <td className="px-3 py-2 text-right font-bold text-gray-800">₹{(r.grossAmount||0).toLocaleString("en-IN")}</td>
+                        <td className="px-3 py-2 text-right text-red-600">₹{(r.netDeduction||0).toLocaleString("en-IN")}</td>
+                        <td className="px-3 py-2 text-right font-black text-emerald-700">₹{(r.netPayment||0).toLocaleString("en-IN")}</td>
                         <td className="px-3 py-2 text-center">
-                          {r._hasAttend
+                          {r.email
                             ? <FaCheckCircle className="text-green-500 mx-auto" size={11} />
                             : <FaExclamationTriangle className="text-amber-400 mx-auto" size={11} />}
                         </td>
+                        <td className="px-3 py-2 text-gray-500 font-mono whitespace-nowrap">{r.mobileNo || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -461,20 +424,18 @@ const Upload = () => {
             </div>
 
             <div className="flex items-center justify-between">
-              <button onClick={reset} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-sm font-semibold transition">
-                ← Start Over
-              </button>
+              <button onClick={reset} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-sm font-semibold transition">← Start Over</button>
               <button onClick={handleSubmit} disabled={submitting}
                 className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition shadow-md disabled:opacity-50">
                 {submitting
                   ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
-                  : <><FaDatabase size={13} /> Save {merged.length} Salary Slips</>}
+                  : <><FaDatabase size={13} /> Save {rows.length} Salary Slips</>}
               </button>
             </div>
           </>
         )}
 
-        {/* STEP 3: Done */}
+        {/* STEP 3 */}
         {step === 3 && result && (
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-10 text-center">
             <FaCheckCircle className="text-emerald-500 text-6xl mx-auto mb-5" />
@@ -495,11 +456,9 @@ const Upload = () => {
               </div>
             </div>
             <div className="flex items-center justify-center gap-3">
-              <button onClick={reset} className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-sm transition">
-                Upload Another
-              </button>
-              <a href="/apprentice/slips" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition shadow-md shadow-indigo-200">
-                View Salary Slips →
+              <button onClick={reset} className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-sm transition">Upload Another</button>
+              <a href="/apprentice/slips" className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition shadow-md shadow-indigo-200">
+                <FaEnvelope size={12} /> View &amp; E-mail Slips →
               </a>
             </div>
           </div>

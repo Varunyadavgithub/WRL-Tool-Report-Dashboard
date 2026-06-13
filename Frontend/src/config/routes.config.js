@@ -12,6 +12,8 @@ import {
   ClipboardCheck,
   Gauge,
   FileText,
+  Cog,
+  Settings2,
 } from "lucide-react";
 
 // Lazy loaded components
@@ -137,6 +139,25 @@ const LeaveApproval = lazy(() => import("../pages/Forms/LeaveApproval"));
 const Monitoring = lazy(() => import("../pages/Display/Monitoring"));
 const Management = lazy(() => import("../pages/Display/Management"));
 const WIPCapture = lazy(() => import("../pages/Production/WIPCapture"));
+
+// ── Master Config ─────────────────────────────────────────────────────────────
+const MasterConfigOverview = lazy(() => import("../pages/MasterConfig/Overview"));
+const MaterialConfig       = lazy(() => import("../pages/MasterConfig/MaterialConfig"));
+const ShiftConfig          = lazy(() => import("../pages/MasterConfig/ShiftConfig"));
+const DowntimeConfig       = lazy(() => import("../pages/MasterConfig/DowntimeConfig"));
+const QualityConfig        = lazy(() => import("../pages/MasterConfig/QualityConfig"));
+const MachineConfig        = lazy(() => import("../pages/MasterConfig/MachineConfig"));
+const PlanningConfig       = lazy(() => import("../pages/MasterConfig/PlanningConfig"));
+const MailConfig           = lazy(() => import("../pages/MasterConfig/MailConfig"));
+const AuditTrail           = lazy(() => import("../pages/MasterConfig/AuditTrail"));
+
+// ── Part Process ──────────────────────────────────────────────────────────────
+const PartProcessDashboard     = lazy(() => import("../pages/PartProcess/Dashboard"));
+const PartProcessProductionReport = lazy(() => import("../pages/PartProcess/ProductionReport"));
+const PartProcessHourlyReport  = lazy(() => import("../pages/PartProcess/HourlyReport"));
+const PartProcessQualityReport = lazy(() => import("../pages/PartProcess/QualityReport"));
+const PartProcessDowntimeReport = lazy(() => import("../pages/PartProcess/DowntimeReport"));
+const FactoryMonitor           = lazy(() => import("../pages/PartProcess/FactoryMonitor"));
 
 // ─── Role Constants ───────────────────────────────────────────────────────────
 export const ROLES = {
@@ -287,6 +308,65 @@ export const ROUTE_CONFIG = [
         path: "/production/wip-capture",
         label: "WIP Capture",
         component: WIPCapture,
+      },
+    ],
+  },
+
+  // ── Master Config ────────────────────────────────────────────────────────
+  {
+    key: "masterConfig",
+    icon: Settings2,
+    label: "Master Config",
+    basePath: "/master-config",
+    items: [
+      { path: "/master-config/overview",  label: "Overview",                component: MasterConfigOverview },
+      { path: "/master-config/material",  label: "Material Configuration",  component: MaterialConfig       },
+      { path: "/master-config/shift",     label: "Shift Configuration",     component: ShiftConfig          },
+      { path: "/master-config/downtime",  label: "Downtime Configuration",  component: DowntimeConfig       },
+      { path: "/master-config/quality",   label: "Quality Configuration",   component: QualityConfig        },
+      { path: "/master-config/machine",   label: "Machine Configuration",   component: MachineConfig        },
+      { path: "/master-config/planning",  label: "Planning Configuration",  component: PlanningConfig       },
+      { path: "/master-config/mail",      label: "Mail & Notifications",    component: MailConfig           },
+      { path: "/master-config/audit",     label: "Audit Trail",             component: AuditTrail           },
+    ],
+  },
+
+  // ── Part Process ─────────────────────────────────────────────────────────
+  {
+    key: "partProcess",
+    icon: Cog,
+    label: "Part Process",
+    basePath: "/part-process",
+    items: [
+      {
+        path: "/part-process/dashboard",
+        label: "Dashboard",
+        component: PartProcessDashboard,
+      },
+      {
+        path: "/part-process/production-report",
+        label: "Production Report",
+        component: PartProcessProductionReport,
+      },
+      {
+        path: "/part-process/hourly-report",
+        label: "Hourly Report",
+        component: PartProcessHourlyReport,
+      },
+      {
+        path: "/part-process/quality-report",
+        label: "Quality Report",
+        component: PartProcessQualityReport,
+      },
+      {
+        path: "/part-process/downtime-report",
+        label: "Downtime Report",
+        component: PartProcessDowntimeReport,
+      },
+      {
+        path: "/part-process/factory-monitor",
+        label: "Factory Monitor",
+        component: FactoryMonitor,
       },
     ],
   },

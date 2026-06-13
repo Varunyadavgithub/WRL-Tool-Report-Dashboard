@@ -2,10 +2,13 @@ import { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import NavBar from "./Navbar";
 import Sidebar from "./Sidebar";
+import { useSyncMasterConfig } from "../hooks/useSyncMasterConfig.js";
 
 const Layout = () => {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+
+  useSyncMasterConfig();
 
   useEffect(() => {
     const handleResize = () => {
