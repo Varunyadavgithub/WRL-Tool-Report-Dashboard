@@ -1,7 +1,6 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
-dotenv.config();
 import path from "path";
 import cookieParser from "cookie-parser";
 import routes from "./routes/index.js";
@@ -14,6 +13,7 @@ import {
 } from "./config/db.config.js";
 import { startCalibrationCron } from "./cron/calibrationEscalation.js";
 import { startManpowerCron } from "../Backend/cron/manpower.cron.js";
+import { startPartProcessSync } from "./cron/partProcessSync.js";
 import { globalErrorHandler } from "./middlewares/errorHandler.js";
 import { runMigrations } from "./config/migrations.js";
 // const _dirname = path.resolve();
@@ -72,3 +72,4 @@ app.listen(PORT, () => {
 // START CRON AFTER SERVER START
 startCalibrationCron();
 startManpowerCron();
+startPartProcessSync();

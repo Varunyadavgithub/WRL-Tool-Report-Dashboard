@@ -50,6 +50,9 @@ export const getDispatchHoldDetails = tryCatch(async (req, res) => {
       m.Name                                              AS ModelNo,
       dh.Serial                                           AS FGSerialNo,
       dh.DefectCode                                       AS HoldReason,
+      dh.ResponsibleDepartment                            AS ResponsibleDepartment,
+      dh.ResponsibleHOD                                   AS ResponsibleHOD,
+      dh.TargetDateOfReworkCompletion                     AS TargetDateOfReworkCompletion,
       dh.HoldDatetime                                     AS HoldDate,
       u.UserName                                          AS HoldBy,
       DATEDIFF(

@@ -114,21 +114,45 @@ export const holdCabinet = tryCatch(async (req, res) => {
 
       try {
         for (const hold of valid) {
-          const { modelName, fgNo, userName, defect, formattedDate } = hold;
+          const {
+            modelName,
+            fgNo,
+            userName,
+            defect,
+            responsibleDepartment,
+            responsibleHod,
+            targetReworkCompletion,
+            formattedDate,
+          } = hold;
           const currDate = convertToIST(formattedDate);
 
           await new sql.Request(transaction)
             .input("ModelName", sql.VarChar, modelName)
             .input("UserCode", sql.Int, userName)
             .input("Defect", sql.VarChar, defect)
+            .input("ResponsibleDepartment", sql.VarChar, responsibleDepartment)
+            .input("ResponsibleHOD", sql.VarChar, responsibleHod)
+            .input("TargetDateOfReworkCompletion", sql.Date, targetReworkCompletion)
             .input("FGNo", sql.VarChar, fgNo)
             .input("HoldDateTime", sql.DateTime, currDate).query(`
               INSERT INTO DispatchHold
-                (material, HoldUserCode, DefectCode, serial, HoldDateTime)
+                (
+                  material,
+                  HoldUserCode,
+                  DefectCode,
+                  ResponsibleDepartment,
+                  ResponsibleHOD,
+                  TargetDateOfReworkCompletion,
+                  serial,
+                  HoldDateTime
+                )
               VALUES (
                 (SELECT TOP 1 MatCode FROM Material WHERE Name = @ModelName),
                 @UserCode,
                 @Defect,
+                @ResponsibleDepartment,
+                @ResponsibleHOD,
+                @TargetDateOfReworkCompletion,
                 @FGNo,
                 @HoldDateTime
               );

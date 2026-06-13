@@ -319,9 +319,7 @@ const ESTDetailModal = () => {
               <div className="flex justify-center mb-3">
                 {/* BUG FIX: Use actual data values, not hardcoded */}
                 <GaugeIndicator
-                  value={
-                    data.read_ect_ohms == null ? "0.119" : data.read_ect_ohms
-                  }
+                  value={data.read_ect_ohms}
                   max={data.set_ect_ohms}
                   label="Resistance"
                   unit="O"
@@ -331,9 +329,7 @@ const ESTDetailModal = () => {
               <ParamRow
                 label="Resistance (O)"
                 setValue={data.set_ect_ohms}
-                readValue={
-                  data.read_ect_ohms == null ? "0.119" : data.read_ect_ohms
-                }
+                readValue={data.read_ect_ohms}
                 icon={TbWaveSine}
               />
               <ParamRow

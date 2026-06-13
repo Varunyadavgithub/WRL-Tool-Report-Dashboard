@@ -44,6 +44,8 @@ const GROUP_OPTIONS = [
   { label: "Model No", value: "ModelNo" },
   { label: "FG Serial No", value: "FGSerialNo" },
   { label: "Hold Reason", value: "HoldReason" },
+  { label: "Responsible Department", value: "ResponsibleDepartment" },
+  { label: "Responsible HOD", value: "ResponsibleHOD" },
   { label: "Corrective Action", value: "CorrectiveAction" },
   { label: "Hold By", value: "HoldBy" },
   { label: "Status", value: "Status" },
@@ -290,6 +292,9 @@ const DetailTable = ({ data, loading }) => {
               { label: "Model No", icon: null },
               { label: "FG Serial No", icon: null },
               { label: "Hold Reason", icon: AlertTriangle },
+              { label: "Responsible Department", icon: null },
+              { label: "Responsible HOD", icon: User },
+              { label: "Target Rework Completion", icon: Calendar },
               { label: "Hold Date", icon: Calendar },
               { label: "Hold By", icon: User },
               { label: "Days on Hold", icon: Clock },
@@ -332,6 +337,21 @@ const DetailTable = ({ data, loading }) => {
                 title={item.HoldReason}
               >
                 {item.HoldReason}
+              </td>
+              <td
+                className="px-3 py-2.5 border-b border-slate-100 text-left max-w-[180px] truncate text-slate-600"
+                title={item.ResponsibleDepartment}
+              >
+                {item.ResponsibleDepartment || "—"}
+              </td>
+              <td
+                className="px-3 py-2.5 border-b border-slate-100 text-left max-w-[160px] truncate text-slate-600"
+                title={item.ResponsibleHOD}
+              >
+                {item.ResponsibleHOD || "—"}
+              </td>
+              <td className="px-3 py-2.5 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">
+                {fmtDisplay(item.TargetDateOfReworkCompletion)}
               </td>
               <td className="px-3 py-2.5 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">
                 {fmtDisplay(item.HoldDate)}
@@ -541,6 +561,9 @@ const HoldCabinateDetails = () => {
         item.ModelNo,
         item.FGSerialNo,
         item.HoldReason,
+        item.ResponsibleDepartment,
+        item.ResponsibleHOD,
+        item.TargetDateOfReworkCompletion,
         item.HoldBy,
         item.CorrectiveAction,
         item.Status,

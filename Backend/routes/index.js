@@ -15,6 +15,9 @@ import readingRoute from "./reading.route.js";
 import manpowerRoute from "./manpower.routes.js";
 import dashboardRoute from "./display.route.js";
 import apprenticeRoute from "./apprentice.route.js";
+import factoryOsRoute     from "./factoryOs.route.js";
+import partProcessRoute   from "./partProcess.route.js";
+import masterConfigRoute  from "./masterConfig.route.js";
 
 const routers = Router();
 
@@ -33,6 +36,9 @@ routers.use("/audit-report", auditReport);
 routers.use("/reading", readingRoute);
 routers.use("/manpower", manpowerRoute);
 routers.use("/dashboard", dashboardRoute);
-routers.use("/apprentice", apprenticeRoute);
+routers.use("/apprentice",  apprenticeRoute);
+routers.use("/factory-os",   factoryOsRoute);
+routers.use("/part-process", partProcessRoute);
+routers.use("/master-config", masterConfigRoute);
 
 export default routers;
