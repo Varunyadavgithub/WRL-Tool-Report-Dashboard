@@ -152,11 +152,13 @@ const MailConfig           = lazy(() => import("../pages/MasterConfig/MailConfig
 const AuditTrail           = lazy(() => import("../pages/MasterConfig/AuditTrail"));
 
 // ── Part Process ──────────────────────────────────────────────────────────────
+const PartProcessOverview      = lazy(() => import("../pages/PartProcess/Overview"));
 const PartProcessDashboard     = lazy(() => import("../pages/PartProcess/Dashboard"));
 const PartProcessProductionReport = lazy(() => import("../pages/PartProcess/ProductionReport"));
 const PartProcessHourlyReport  = lazy(() => import("../pages/PartProcess/HourlyReport"));
 const PartProcessQualityReport = lazy(() => import("../pages/PartProcess/QualityReport"));
 const PartProcessDowntimeReport = lazy(() => import("../pages/PartProcess/DowntimeReport"));
+const PartProcessAnalytics     = lazy(() => import("../pages/PartProcess/Analytics"));
 const FactoryMonitor           = lazy(() => import("../pages/PartProcess/FactoryMonitor"));
 
 // ─── Role Constants ───────────────────────────────────────────────────────────
@@ -339,9 +341,9 @@ export const ROUTE_CONFIG = [
     basePath: "/part-process",
     items: [
       {
-        path: "/part-process/dashboard",
-        label: "Dashboard",
-        component: PartProcessDashboard,
+        path: "/part-process/overview",
+        label: "Overview",
+        component: PartProcessOverview,
       },
       {
         path: "/part-process/production-report",
@@ -364,9 +366,20 @@ export const ROUTE_CONFIG = [
         component: PartProcessDowntimeReport,
       },
       {
+        path: "/part-process/analytics",
+        label: "Analytics",
+        component: PartProcessAnalytics,
+      },
+      {
         path: "/part-process/factory-monitor",
         label: "Factory Monitor",
         component: FactoryMonitor,
+      },
+    ],
+    hiddenItems: [
+      {
+        path: "/part-process/dashboard",
+        component: PartProcessDashboard,
       },
     ],
   },
