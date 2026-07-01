@@ -432,11 +432,23 @@ const TemplateView = () => {
   };
 
   const handleDuplicate = async () => {
+    const newName = window.prompt("Enter a name for the duplicated template:", `${template?.name || ""} (Copy)`);
+    if (!newName || !newName.trim()) return;
+
     setActing("duplicate");
     try {
-      const dup = await duplicateTemplate(id, { createdBy: createdByUser() });
+      const result = await duplicateTemplate(id, { newName: newName.trim(), createdBy: createdByUser() });
+      if (result.exists) {
+        const createVersion = window.confirm(
+          `A template named "${newName.trim()}" already exists. Create a new version of it instead?`,
+        );
+        if (createVersion) {
+          navigate(`/auditreport/templates/${result.existingTemplateId}`);
+        }
+        return;
+      }
       toast.success("Template duplicated");
-      navigate(`/auditreport/templates/${dup.id}/view`);
+      navigate(`/auditreport/templates/${result.data.id}/view`);
     } catch (err) {
       toast.error("Duplicate failed: " + err.message);
     } finally {

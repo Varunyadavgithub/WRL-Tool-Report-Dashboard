@@ -126,6 +126,27 @@ export const getMTDRange = () => {
 };
 
 /**
+ * Get a rolling N-day range ending now (local midnight N-1 days ago → now)
+ * Used for analytics dashboards ("Last 7 days" / "Last 30 days")
+ * @param {number} n - number of days to include (inclusive of today)
+ * @returns {{ startDate: string, endDate: string, startLocal: string, endLocal: string }}
+ * @example getLastNDaysRange(7) → { startDate: "2026-06-09T18:30:00.000Z", endDate: "2026-06-15T...Z", ... }
+ */
+export const getLastNDaysRange = (n) => {
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(start.getDate() - (n - 1));
+  start.setHours(0, 0, 0, 0);
+
+  return {
+    startDate: start.toISOString(),
+    endDate: now.toISOString(),
+    startLocal: toDateTimeLocal(start),
+    endLocal: toDateTimeLocal(now),
+  };
+};
+
+/**
  * Format a date string/object for datetime-local input value binding
  * Handles timezone offset to show correct local time
  * @param {string|Date} date - Date string or Date object

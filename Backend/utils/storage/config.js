@@ -13,7 +13,7 @@ export const DIRS = {
   calibration: path.resolve(UPLOADS_DIR, "Calibration"),
   auditImages: path.resolve(UPLOADS_DIR, "AuditImages"),
   auditTemplates: path.resolve(UPLOADS_DIR, "AuditTemplates"),
-  templateBackups: path.resolve(UPLOADS_DIR, "AuditTemplates", "backups"),
+  machineImages: path.resolve(UPLOADS_DIR, "MachineImages"),
 };
 
 /* ===================== ENSURE DIRS EXIST ===================== */
@@ -76,6 +76,12 @@ export const UPLOAD_CONFIGS = {
   },
 
   auditImage: {
+    ...FILE_TYPES.image,
+    errorMessage: "Only JPEG, JPG or PNG images are allowed",
+    maxSize: FILE_TYPES.image.maxSize, // 10MB
+  },
+
+  machineImage: {
     ...FILE_TYPES.image,
     errorMessage: "Only JPEG, JPG or PNG images are allowed",
     maxSize: FILE_TYPES.image.maxSize, // 10MB

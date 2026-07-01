@@ -68,6 +68,12 @@ export const uploadCalibrationFile = multer({
   limits: { fileSize: UPLOAD_CONFIGS.calibration.maxSize },
 });
 
+export const uploadMachineImage = multer({
+  storage: createStorage("MachineImages"),
+  fileFilter: createFileFilter("machineImage"),
+  limits: { fileSize: UPLOAD_CONFIGS.machineImage.maxSize },
+});
+
 /* ===================== ERROR HANDLER ===================== */
 
 export const handleMulterError = (err, _req, res, next) => {

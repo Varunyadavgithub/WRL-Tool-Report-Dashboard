@@ -30,7 +30,7 @@ export const StatusBadge = ({ active }) =>
 
 // Generic modal wrapper
 import { X } from "lucide-react";
-export const Modal = ({ title, onClose, onSave, children, wide = false }) => (
+export const Modal = ({ title, onClose, onSave, children, wide = false, saveLabel = "Save" }) => (
   <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
     <div className={`bg-white rounded-2xl shadow-2xl w-full ${wide ? "max-w-3xl" : "max-w-2xl"} max-h-[92vh] overflow-hidden flex flex-col`}>
       <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
@@ -45,7 +45,7 @@ export const Modal = ({ title, onClose, onSave, children, wide = false }) => (
           Cancel
         </button>
         <button onClick={onSave} className="px-5 py-2 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200 transition-colors">
-          Save
+          {saveLabel}
         </button>
       </div>
     </div>
@@ -53,9 +53,19 @@ export const Modal = ({ title, onClose, onSave, children, wide = false }) => (
 );
 
 // Table action buttons
-import { Pencil, Trash2 } from "lucide-react";
-export const TableActions = ({ onEdit, onDelete }) => (
+import { Pencil, Trash2, Send } from "lucide-react";
+export const TableActions = ({ onEdit, onDelete, onTest, testing }) => (
   <div className="flex items-center gap-1">
+    {onTest && (
+      <button
+        onClick={onTest}
+        disabled={testing}
+        className="p-1.5 rounded-lg text-emerald-500 hover:bg-emerald-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        title="Send Test Mail"
+      >
+        <Send className="w-3.5 h-3.5" />
+      </button>
+    )}
     <button
       onClick={onEdit}
       className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50 transition-colors"

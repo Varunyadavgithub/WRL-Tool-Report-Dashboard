@@ -1,29 +1,43 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useSelector } from "react-redux";
-import { Doughnut } from "react-chartjs-2";
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+import { Doughnut, Bar } from "react-chartjs-2";
+import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from "chart.js";
 import {
   Search, Calendar, Clock, Filter, Loader2, PackageOpen,
-  ShieldCheck, CheckCircle2, XCircle, AlertTriangle,
+  ShieldCheck, CheckCircle2, XCircle, AlertTriangle, BarChart2,
+  FileSpreadsheet, FileText,
 } from "lucide-react";
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets.js";
 
-import { mapFOsRecord } from "./FactoryMonitor";
-import fosClient, { FACTORY_OS_BASE, FACTORY_MACHINE_ID } from "../../utils/factoryOsClient";
+import axios from "axios";
+import { mapDbRecord } from "../../utils/mapDbRecord.js";
+import { PART_PROCESS_API } from "../../utils/factoryOsClient";
+import { componentQtyFromMachine, parseDurSecs } from "../../utils/productionLogic.js";
 import { selectMaterials, getMaterialByModel, extractSapCode, selectShifts, getShiftWindow, toMins } from "../../redux/slices/masterConfigSlice";
+import { exportSectionsToExcel, exportMultiSectionPDF } from "../../utils/reportExport.js";
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const pad = (n) => (n < 10 ? "0" + n : n);
 const fmtDate = (d) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const fmtYMD = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 
-const todayStr   = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
-const extractHHMM = (t) => { if (!t) return null; const s = String(t); if (s.includes("T")) return s.split("T")[1].substring(0,5); if (s.length > 10 && s.includes(" ")) return s.split(" ")[1].substring(0,5); return s.substring(0,5); };
-const offsetDate = (days) => { const d = new Date(); d.setDate(d.getDate()+days); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+const todayStr   = () => fmtYMD(new Date());
+const offsetDate = (days) => { const d = new Date(); d.setDate(d.getDate()+days); return fmtYMD(d); };
+
+const todSecs = (t) => {
+  if (!t) return null;
+  const s = String(t);
+  let tp = s;
+  if (s.includes("T")) tp = s.split("T")[1];
+  else if (s.length > 10 && s.includes(" ")) tp = s.split(" ")[1];
+  const [h, m, sec] = tp.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 3600 + m * 60 + (sec || 0);
+};
 
 const Spinner = ({ cls = "w-4 h-4" }) => <Loader2 className={`animate-spin ${cls}`} />;
 
@@ -48,46 +62,85 @@ const PartProcessQualityReport = () => {
   const [shiftLoading, setShiftLoading] = useState(null);
   const [records, setRecords]     = useState([]);
   const [rawRecords, setRawRecords] = useState([]);
+  const [dbQLogs, setDbQLogs]     = useState([]);
   const [showRaw, setShowRaw]     = useState(false);
+  const donutChartRef = useRef(null);
+  const modelBarChartRef = useRef(null);
 
   const fetchData = useCallback(async (start, end, setLoadFn) => {
+    const startMs = new Date(start.replace(" ", "T") + ":00").getTime();
+    const endMs   = new Date(end.replace(" ", "T") + ":00").getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) {
+      toast.error("Invalid time range."); return;
+    }
+
     setLoadFn(true); setRecords([]); setRawRecords([]);
     try {
-      const startDate = start.split(" ")[0];
-      const endDate   = end.split(" ")[0];
-      const startH    = (start.split(" ")[1] || "00:00").substring(0, 5);
-      const endH      = (end.split(" ")[1]   || "23:59").substring(0, 5);
+      const dayStartSec = configShifts.length
+        ? Math.min(...configShifts.map((s) => toMins(s.startTime))) * 60
+        : 0;
+
+      const prodDayOf = (ms) => {
+        const d = new Date(ms);
+        const tod = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+        const base = new Date(d); base.setHours(0, 0, 0, 0);
+        if (tod < dayStartSec) base.setDate(base.getDate() - 1);
+        return base;
+      };
+
       const dates = [];
-      const cur = new Date(startDate + "T00:00:00");
-      const fin = new Date(endDate   + "T00:00:00");
-      while (cur <= fin) { dates.push(`${cur.getFullYear()}-${pad(cur.getMonth()+1)}-${pad(cur.getDate())}`); cur.setDate(cur.getDate() + 1); }
+      const cur  = prodDayOf(startMs);
+      const last = prodDayOf(endMs - 1000);
+      while (cur <= last) { dates.push(fmtYMD(cur)); cur.setDate(cur.getDate() + 1); }
+
+      const res = await axios.get(`${PART_PROCESS_API}/records-range`, {
+        params: { startDate: dates[0], endDate: dates[dates.length - 1] },
+        withCredentials: true,
+      });
+      const allRows = res.data?.data ?? [];
+
       const allMapped = [];
       const allRaw    = [];
       for (const date of dates) {
-        const raw = [];
-        let url = `${FACTORY_OS_BASE}/monitoring/daily-summary/${FACTORY_MACHINE_ID}/?date=${date}&page=1`;
-        while (url) {
-          const res = await fosClient.get(url);
-          raw.push(...(res.data?.results ?? [])); url = res.data?.next || null;
-          if (raw.length >= 5000) break;
-        }
+        const raw = allRows.filter(r => String(r.EventDate).slice(0, 10) === date);
         raw.forEach(r => allRaw.push({ _fetchDate: date, ...r }));
-        const mapped = raw.map(mapFOsRecord).filter(r => {
-          const t = extractHHMM(r.startTime);
-          if (!t) return false;
-          if (date === startDate && date === endDate) return t >= startH && t <= endH;
-          if (date === startDate) return t >= startH;
-          if (date === endDate)   return t <= endH;
-          return true;
+
+        const midnight = new Date(date + "T00:00:00").getTime();
+        const mapped = raw.map((r, i) => ({ ...mapDbRecord(r, i), eventDate: date })).map((r) => {
+          const tod   = todSecs(r.startTime);
+          const absMs = tod === null ? null : midnight + (tod < dayStartSec ? 86400000 : 0) + tod * 1000;
+          return { ...r, _absMs: absMs };
         });
         allMapped.push(...mapped);
       }
-      setRecords(allMapped);
+
+      const filtered = allMapped
+        .filter(r =>
+          r._absMs !== null &&
+          r._absMs >= startMs &&
+          r._absMs < endMs &&
+          parseDurSecs(r.duration) <= 86400,
+        )
+        .sort((a, b) => a._absMs - b._absMs);
+
+      setRecords(filtered);
       setRawRecords(allRaw);
-      toast.success(`Quality data loaded — ${allMapped.length} records (${allRaw.length} raw)`);
-    } catch { toast.error("Failed to fetch data."); }
+
+      try {
+        const qRes = await axios.get(`${PART_PROCESS_API}/quality-log`, {
+          params: { startDate: dates[0], endDate: dates[dates.length - 1] },
+          withCredentials: true,
+        });
+        setDbQLogs(qRes.data?.data ?? []);
+      } catch {
+        setDbQLogs([]);
+      }
+
+      const prodCount = filtered.filter(r => r.state === "Production").length;
+      toast.success(`Quality data loaded — ${prodCount} production + ${filtered.length - prodCount} downtime records`);
+    } catch (err) { console.error("[QualityReport] fetchData:", err); toast.error("Failed to fetch data."); }
     finally { setLoadFn(false); }
-  }, []);
+  }, [configShifts]);
 
   const handleQuery     = () => { if (!startTime || !endTime) { toast.error("Please select a time range."); return; } fetchData(startTime, endTime, setLoading); };
   const handleToday     = () => { const s = `${todayStr()} 08:00`, e = `${offsetDate(1)} 08:00`; setStartTime(s); setEndTime(e); fetchData(s, e, setTodayLoading); };
@@ -108,37 +161,66 @@ const PartProcessQualityReport = () => {
   const analysis = useMemo(() => {
     const prodRecords = records.filter((r) => r.state === "Production");
     const totalQty    = prodRecords.reduce((s, r) => s + (r.qty ?? 0), 0);
-    const good        = prodRecords.filter((r) => r.quality === "GOOD");
-    const goodQty     = good.length;
-    const badQty      = prodRecords.length - goodQty;
-    const passRate    = prodRecords.length > 0 ? ((goodQty / prodRecords.length) * 100).toFixed(1) : 0;
+    const goodQty     = prodRecords.filter((r) => r.quality === "GOOD").reduce((s, r) => s + (r.qty ?? 0), 0);
+    const badQty      = totalQty - goodQty;
+    const passRate    = totalQty > 0 ? ((goodQty / totalQty) * 100).toFixed(1) : 0;
 
     // Model-wise quality breakdown — keyed on Part Name via SAP Code extraction
     const modelMap = {};
     prodRecords.forEach((r) => {
+      const qty = r.qty ?? 0;
       const sap = r.sapCode || extractSapCode(r.model);
       const mat = getMaterialByModel(materials, r.model);
-      // Display key: Part Name (master) > full program name > SAP code
       const key = mat?.partName || r.model || sap;
       if (!key) return;
-      if (!modelMap[key]) modelMap[key] = { model: key, sapCode: sap, rawModel: r.model, total: 0, good: 0 };
-      modelMap[key].total += 1;
-      if (r.quality === "GOOD") modelMap[key].good += 1;
+      if (!modelMap[key]) modelMap[key] = { model: key, sapCode: sap, rawModel: r.model, total: 0, good: 0, componentQty: 0 };
+      modelMap[key].total += qty;
+      modelMap[key].componentQty += Math.round(componentQtyFromMachine(qty, mat));
+      if (r.quality === "GOOD") modelMap[key].good += qty;
     });
     const modelBreakdown = Object.values(modelMap).sort((a, b) => b.total - a.total);
+    const totalComponentQty = Object.values(modelMap).reduce((s, m) => s + m.componentQty, 0);
 
-    // Shift-wise quality
-    const shiftMap = {};
-    prodRecords.forEach((r) => {
-      if (!shiftMap[r.shift]) shiftMap[r.shift] = { shift: r.shift, total: 0, good: 0 };
-      shiftMap[r.shift].total += 1;
-      if (r.quality === "GOOD") shiftMap[r.shift].good += 1;
-    });
-
-    return { prodRecords, totalQty, goodQty, badQty, passRate, modelBreakdown, shiftBreakdown: Object.values(shiftMap) };
+    return { prodRecords, totalQty, goodQty, badQty, passRate, modelBreakdown, totalComponentQty };
   }, [records, materials]);
 
+  // ── Quality log aggregated by part name ──────────────────────────────────
+  const qualityLogByModel = useMemo(() => {
+    const map = {};
+    dbQLogs.forEach((e) => {
+      const key = e.PartName || e.partName || e.Model || e.model || "";
+      if (!key) return;
+      if (!map[key]) map[key] = { inspected: 0, rejected: 0, defects: [] };
+      const insp = parseInt(e.InspectedQty ?? e.inspectedQty ?? 0, 10);
+      const rej  = parseInt(e.RejectedQty  ?? e.rejectedQty  ?? 0, 10);
+      map[key].inspected = Math.max(map[key].inspected, insp);
+      map[key].rejected  += rej;
+      const defName = e.DefectName || e.defectName;
+      if (defName) map[key].defects.push(defName);
+    });
+    return map;
+  }, [dbQLogs]);
+
+  const qualityLogTotals = useMemo(() => {
+    const vals = Object.values(qualityLogByModel);
+    const inspected = vals.reduce((s, v) => s + v.inspected, 0);
+    const rejected  = vals.reduce((s, v) => s + v.rejected,  0);
+    const accepted  = Math.max(0, analysis.totalComponentQty - rejected);
+    const passRate  = analysis.totalComponentQty > 0 ? ((accepted / analysis.totalComponentQty) * 100).toFixed(1) : "0.0";
+    return { inspected, accepted, rejected, passRate, hasData: inspected > 0 };
+  }, [qualityLogByModel, analysis.totalComponentQty]);
+
   const donutData = useMemo(() => {
+    if (qualityLogTotals.hasData) {
+      return {
+        labels: ["Accepted", "Rejected"],
+        datasets: [{
+          data: [qualityLogTotals.accepted, qualityLogTotals.rejected],
+          backgroundColor: ["#22c55e", "#f43f5e"],
+          borderWidth: 2, borderColor: "#fff",
+        }],
+      };
+    }
     if (!analysis.prodRecords.length) return null;
     return {
       labels: ["Good Quality", "No Quality Data"],
@@ -148,7 +230,97 @@ const PartProcessQualityReport = () => {
         borderWidth: 2, borderColor: "#fff",
       }],
     };
-  }, [analysis]);
+  }, [analysis, qualityLogTotals]);
+
+  const modelBarData = useMemo(() => {
+    const rows = analysis.modelBreakdown;
+    if (!rows.length) return null;
+    return {
+      labels: rows.map((r) => r.model),
+      datasets: [
+        {
+          label: "Accepted",
+          data: rows.map((r) => Math.max(0, r.componentQty - (qualityLogByModel[r.model]?.rejected ?? 0))),
+          backgroundColor: "#22c55e",
+          borderRadius: 4,
+        },
+        {
+          label: "Rejected",
+          data: rows.map((r) => qualityLogByModel[r.model]?.rejected ?? 0),
+          backgroundColor: "#f43f5e",
+          borderRadius: 4,
+        },
+      ],
+    };
+  }, [analysis.modelBreakdown, qualityLogByModel]);
+
+  const modelBarOptions = {
+    indexAxis: "y",
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: "top", labels: { font: { size: 10 }, boxWidth: 10 } },
+    },
+    scales: {
+      x: { stacked: true, ticks: { font: { size: 9 } } },
+      y: { stacked: true, ticks: { font: { size: 9 } } },
+    },
+  };
+
+  const exportMeta = () => `${startTime} to ${endTime}  |  Generated ${new Date().toLocaleString()}`;
+  const exportColumns = [
+    { label: "Model", align: "left", value: (r) => r.model },
+    { label: "Sheet Qty", align: "center", value: (r) => r.total },
+    { label: "Component Qty", align: "center", value: (r) => r.componentQty },
+    { label: "Rejected", align: "center", value: (r) => qualityLogByModel[r.model]?.rejected ?? 0 },
+    { label: "Accepted", align: "center", value: (r) => Math.max(0, r.componentQty - (qualityLogByModel[r.model]?.rejected ?? 0)) },
+  ];
+  const qLogColumns = [
+    { label: "Date", align: "left", value: (e) => String(e.EventDate ?? e.eventDate ?? "").slice(0, 10) },
+    { label: "Shift", align: "left", value: (e) => e.ShiftName || e.shiftName || "" },
+    { label: "Part Name", align: "left", value: (e) => e.PartName || e.partName || e.Model || e.model || "" },
+    { label: "Inspected", align: "center", value: (e) => parseInt(e.InspectedQty ?? e.inspectedQty ?? 0, 10) },
+    { label: "Accepted", align: "center", value: (e) => Math.max(0, parseInt(e.InspectedQty ?? e.inspectedQty ?? 0, 10) - parseInt(e.RejectedQty ?? e.rejectedQty ?? 0, 10)) },
+    { label: "Rejected", align: "center", value: (e) => parseInt(e.RejectedQty ?? e.rejectedQty ?? 0, 10) },
+    { label: "Defect Code", align: "left", value: (e) => e.DefectCode || e.defectCode || "" },
+    { label: "Defect Name", align: "left", value: (e) => e.DefectName || e.defectName || "" },
+    { label: "Severity", align: "left", value: (e) => e.Severity || e.severity || "" },
+    { label: "Disposition", align: "left", value: (e) => e.Disposition || e.disposition || "" },
+    { label: "Remarks", align: "left", value: (e) => e.Remarks || e.remarks || "" },
+  ];
+
+  const buildExportBlocks = () => {
+    const blocks = [
+      { type: "table", heading: "Model-wise Quality", columns: exportColumns, rows: analysis.modelBreakdown },
+    ];
+    if (donutData) {
+      blocks.push({
+        type: "image", heading: "Quality Split",
+        dataUrl: donutChartRef.current?.toBase64Image?.(),
+        width: 240, height: 240,
+      });
+    }
+    if (modelBarData) {
+      blocks.push({
+        type: "image", heading: "Accepted vs Rejected",
+        dataUrl: modelBarChartRef.current?.toBase64Image?.(),
+        width: 500, height: Math.max(160, modelBarData.labels.length * 36),
+      });
+    }
+    if (dbQLogs.length > 0) {
+      blocks.push({ type: "table", heading: "Quality Log Entries", columns: qLogColumns, rows: dbQLogs });
+    }
+    return blocks;
+  };
+
+  const handleExportExcel = () => exportSectionsToExcel({
+    blocks: buildExportBlocks(),
+    title: "Part Process — Quality Report", subtitle: exportMeta(), filename: "quality_report.xlsx",
+  });
+  const handleExportPDF = () => exportMultiSectionPDF({
+    blocks: buildExportBlocks(),
+    title: "Part Process - Quality Report", subtitle: exportMeta(), filename: "quality_report.pdf",
+  });
 
   return (
     <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
@@ -158,10 +330,23 @@ const PartProcessQualityReport = () => {
           <h1 className="text-lg font-bold text-slate-800 leading-tight">Part Process - Quality Report</h1>
           <p className="text-[11px] text-slate-400">Quality analysis from production records (GOOD / not-GOOD)</p>
         </div>
-        {analysis.prodRecords.length > 0 && (
-          <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100 min-w-[90px]">
-            <span className="text-xl font-bold font-mono text-emerald-700">{analysis.passRate}%</span>
-            <span className="text-[10px] text-emerald-500 font-semibold uppercase tracking-wide">Pass Rate</span>
+        {(qualityLogTotals.hasData || analysis.prodRecords.length > 0) && (
+          <div className="flex items-center gap-2">
+            {qualityLogTotals.hasData && (
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-200">From Log</span>
+            )}
+            <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100 min-w-[90px]">
+              <span className="text-xl font-bold font-mono text-emerald-700">
+                {qualityLogTotals.hasData ? qualityLogTotals.passRate : analysis.passRate}%
+              </span>
+              <span className="text-[10px] text-emerald-500 font-semibold uppercase tracking-wide">Pass Rate</span>
+            </div>
+            <button onClick={handleExportExcel} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-emerald-600">
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Excel
+            </button>
+            <button onClick={handleExportPDF} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-rose-600">
+              <FileText className="w-3.5 h-3.5" /> PDF
+            </button>
           </div>
         )}
       </div>
@@ -197,12 +382,22 @@ const PartProcessQualityReport = () => {
         </div>
 
         {/* KPIs */}
-        {analysis.prodRecords.length > 0 && (
+        {(qualityLogTotals.hasData || analysis.prodRecords.length > 0) && (
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-            <KpiCard icon={ShieldCheck}   label="Production Records"  value={analysis.prodRecords.length}  colorClass="bg-blue-50 text-blue-600"    />
-            <KpiCard icon={CheckCircle2}  label="Good Quality"        value={analysis.goodQty}              colorClass="bg-emerald-50 text-emerald-600" />
-            <KpiCard icon={XCircle}       label="No Quality Data"     value={analysis.badQty}               colorClass="bg-rose-50 text-rose-500"    />
-            <KpiCard icon={AlertTriangle} label="Pass Rate"           value={`${analysis.passRate}%`}       colorClass="bg-amber-50 text-amber-600"  />
+            {qualityLogTotals.hasData ? (
+              <>
+                <KpiCard icon={CheckCircle2}  label="Accepted"         value={qualityLogTotals.accepted}             colorClass="bg-emerald-50 text-emerald-600" />
+                <KpiCard icon={XCircle}       label="Rejected"         value={qualityLogTotals.rejected}             colorClass="bg-rose-50 text-rose-500"      />
+                <KpiCard icon={AlertTriangle} label="Pass Rate (Log)"  value={`${qualityLogTotals.passRate}%`}       colorClass="bg-amber-50 text-amber-600"    />
+              </>
+            ) : (
+              <>
+                <KpiCard icon={ShieldCheck}   label="Total Sheet Qty"  value={analysis.totalQty}             colorClass="bg-blue-50 text-blue-600"      />
+                <KpiCard icon={CheckCircle2}  label="Good Qty"         value={analysis.goodQty}             colorClass="bg-emerald-50 text-emerald-600" />
+                <KpiCard icon={XCircle}       label="No Quality Data"  value={analysis.badQty}              colorClass="bg-rose-50 text-rose-500"      />
+                <KpiCard icon={AlertTriangle} label="Pass Rate"        value={`${analysis.passRate}%`}      colorClass="bg-amber-50 text-amber-600"    />
+              </>
+            )}
           </div>
         )}
 
@@ -224,18 +419,18 @@ const PartProcessQualityReport = () => {
                 <table className="min-w-full text-xs border-separate border-spacing-0">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-50">
-                      {["Model","Total Records","Good Quality","Pass Rate","Shift"].map((h) => (
-                        <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap text-[11px]">{h}</th>
+                      {["Model","Sheet Qty","Component Qty","Rejected","Accepted"].map((h) => (
+                        <th key={h} className={`px-3 py-2.5 text-left font-semibold border-b border-slate-200 whitespace-nowrap text-[11px] ${h==="Accepted"?"text-emerald-600":h==="Rejected"?"text-rose-500":h==="Component Qty"?"text-violet-600":"text-slate-600"}`}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {analysis.modelBreakdown.map((row, idx) => {
-                      const pct = row.total > 0 ? ((row.good / row.total) * 100).toFixed(1) : 0;
+                      const pct  = row.total > 0 ? ((row.good / row.total) * 100).toFixed(1) : 0;
+                      const qLog = qualityLogByModel[row.model];
                       return (
                         <tr key={idx} className="hover:bg-blue-50/40 transition-colors even:bg-slate-50/40">
                           <td className="px-3 py-2 border-b border-slate-100">
-                            {/* row.model is partName if master matched, else SAP/barcode */}
                             {materials.some(m => m.partName === row.model) ? (
                               <span className="font-semibold text-blue-700 text-xs">{row.model}</span>
                             ) : (
@@ -246,17 +441,14 @@ const PartProcessQualityReport = () => {
                             )}
                           </td>
                           <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-600 text-center">{row.total}</td>
-                          <td className="px-3 py-2 border-b border-slate-100 font-bold text-emerald-600 font-mono text-center">{row.good}</td>
-                          <td className="px-3 py-2 border-b border-slate-100">
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full ${parseFloat(pct) >= 95 ? "bg-emerald-500" : parseFloat(pct) >= 80 ? "bg-amber-500" : "bg-rose-400"}`} style={{ width: `${pct}%` }} />
-                              </div>
-                              <span className={`text-[11px] font-bold font-mono ${parseFloat(pct) >= 95 ? "text-emerald-600" : parseFloat(pct) >= 80 ? "text-amber-600" : "text-rose-500"}`}>{pct}%</span>
-                            </div>
+                          <td className="px-3 py-2 border-b border-slate-100 font-bold font-mono text-violet-600 text-center">
+                            {row.componentQty}
                           </td>
-                          <td className="px-3 py-2 border-b border-slate-100 text-slate-500 text-[11px]">
-                            {analysis.shiftBreakdown.map((s) => s.shift).join(", ")}
+                          <td className="px-3 py-2 border-b border-slate-100 font-bold font-mono text-rose-500 text-center">
+                            {qLog?.rejected ?? 0}
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 font-bold font-mono text-emerald-600 text-center">
+                            {Math.max(0, row.componentQty - (qLog?.rejected ?? 0))}
                           </td>
                         </tr>
                       );
@@ -277,7 +469,7 @@ const PartProcessQualityReport = () => {
                   {donutData ? (
                     <>
                       <div className="w-40 h-40">
-                        <Doughnut data={donutData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
+                        <Doughnut ref={donutChartRef} data={donutData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
                       </div>
                       {donutData.labels.map((l, i) => (
                         <div key={l} className="flex items-center justify-between w-full text-xs">
@@ -298,29 +490,15 @@ const PartProcessQualityReport = () => {
                 </div>
               </div>
 
-              {/* Shift breakdown */}
-              {analysis.shiftBreakdown.length > 0 && (
+              {/* Model-wise Accepted/Rejected bar chart */}
+              {modelBarData && (
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                   <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100">
-                    <Clock className="w-3.5 h-3.5 text-blue-500" />
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Shift-wise</span>
+                    <BarChart2 className="w-3.5 h-3.5 text-blue-500" />
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Accepted vs Rejected</span>
                   </div>
-                  <div className="p-3 flex flex-col gap-2">
-                    {analysis.shiftBreakdown.map((s) => {
-                      const pct = s.total > 0 ? ((s.good / s.total) * 100).toFixed(1) : 0;
-                      return (
-                        <div key={s.shift} className="flex flex-col gap-1">
-                          <div className="flex justify-between text-[11px]">
-                            <span className="font-semibold text-slate-700">{s.shift}</span>
-                            <span className="font-bold font-mono text-emerald-600">{pct}%</span>
-                          </div>
-                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
-                          </div>
-                          <p className="text-[10px] text-slate-400">{s.good} good / {s.total} records</p>
-                        </div>
-                      );
-                    })}
+                  <div className="p-3" style={{ height: `${Math.max(160, modelBarData.labels.length * 36)}px` }}>
+                    <Bar ref={modelBarChartRef} data={modelBarData} options={modelBarOptions} />
                   </div>
                 </div>
               )}
@@ -337,6 +515,66 @@ const PartProcessQualityReport = () => {
           </div>
         )}
 
+        {/* ── QUALITY LOG ENTRIES ── */}
+        {dbQLogs.length > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden shrink-0">
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Quality Log Entries</span>
+              <span className="ml-1 text-[10px] text-slate-400">· {dbQLogs.length} entr{dbQLogs.length === 1 ? "y" : "ies"}</span>
+              <span className="ml-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-200">From Log</span>
+            </div>
+            <div className="overflow-auto">
+              <table className="min-w-full text-xs border-separate border-spacing-0">
+                <thead className="sticky top-0 z-10 bg-slate-50">
+                  <tr>
+                    {["Date","Shift","Part Name","Inspected","Accepted","Rejected","Defect Code","Defect Name","Severity","Disposition","Remarks"].map((h) => (
+                      <th key={h} className={`px-3 py-2.5 text-[11px] font-semibold border-b border-slate-200 whitespace-nowrap text-left ${h==="Accepted"?"text-emerald-600":h==="Rejected"?"text-rose-500":"text-slate-600"}`}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {dbQLogs.map((e, i) => {
+                    const insp = parseInt(e.InspectedQty ?? e.inspectedQty ?? 0, 10);
+                    const rej  = parseInt(e.RejectedQty  ?? e.rejectedQty  ?? 0, 10);
+                    const acc  = Math.max(0, insp - rej);
+                    const eventDate = String(e.EventDate ?? e.eventDate ?? "").slice(0, 10);
+                    return (
+                      <tr key={i} className="hover:bg-emerald-50/30 transition-colors even:bg-slate-50/30">
+                        <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">{eventDate || "—"}</td>
+                        <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                            {e.ShiftName || e.shiftName || "—"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100 font-semibold text-slate-700">
+                          {e.PartName || e.partName || e.Model || e.model || "—"}
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100 font-mono font-bold text-blue-600 text-center">{insp}</td>
+                        <td className="px-3 py-2 border-b border-slate-100 font-mono font-bold text-emerald-600 text-center">{acc}</td>
+                        <td className="px-3 py-2 border-b border-slate-100 font-mono font-bold text-center">
+                          <span className={rej > 0 ? "text-rose-500" : "text-slate-400"}>{rej}</span>
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100 font-mono text-violet-600">{e.DefectCode || e.defectCode || <span className="text-slate-300">—</span>}</td>
+                        <td className="px-3 py-2 border-b border-slate-100 text-slate-600">{e.DefectName || e.defectName || <span className="text-slate-300">—</span>}</td>
+                        <td className="px-3 py-2 border-b border-slate-100">
+                          {(e.Severity || e.severity) ? (
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${(e.Severity||e.severity)==="Critical"?"bg-rose-100 text-rose-700 border border-rose-200":(e.Severity||e.severity)==="Major"?"bg-orange-50 text-orange-700 border border-orange-200":(e.Severity||e.severity)==="Minor"?"bg-amber-50 text-amber-700 border border-amber-200":"bg-slate-100 text-slate-600 border border-slate-200"}`}>
+                              {e.Severity || e.severity}
+                            </span>
+                          ) : <span className="text-slate-300">—</span>}
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100 text-slate-500 text-[11px]">{e.Disposition || e.disposition || <span className="text-slate-300">—</span>}</td>
+                        <td className="px-3 py-2 border-b border-slate-100 text-slate-500 text-[11px] max-w-[160px] truncate" title={e.Remarks || e.remarks || ""}>{e.Remarks || e.remarks || <span className="text-slate-300">—</span>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* ── RAW DATA VERIFICATION ── */}
         {rawRecords.length > 0 && (
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden shrink-0">
@@ -344,7 +582,7 @@ const PartProcessQualityReport = () => {
               className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition-colors">
               <div className="flex items-center gap-2">
                 <Search className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Raw API Data — {rawRecords.length} records</span>
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Raw DB Data — {rawRecords.length} records</span>
                 <span className="text-[9px] text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded font-bold">Unprocessed</span>
               </div>
               <span className="text-[10px] text-slate-400">{showRaw ? "Hide ▲" : "Show ▼"}</span>
@@ -364,21 +602,21 @@ const PartProcessQualityReport = () => {
                       <tr key={i} className={`hover:bg-amber-50/30 ${i%2===0?"bg-white":"bg-slate-50/50"}`}>
                         <td className="px-2 py-1.5 border-b border-slate-100 text-slate-400 font-mono">{i+1}</td>
                         <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">{r._fetchDate}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 whitespace-nowrap text-slate-600">{r.shift?.shift_name||"—"}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 whitespace-nowrap text-slate-600">{r.ShiftName||"—"}</td>
                         <td className="px-2 py-1.5 border-b border-slate-100 whitespace-nowrap">
-                          <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] ${r.event_type==="Production"?"bg-emerald-50 text-emerald-700":"bg-rose-50 text-rose-600"}`}>{r.event_type}</span>
+                          <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] ${r.EventType==="Production"?"bg-emerald-50 text-emerald-700":"bg-rose-50 text-rose-600"}`}>{r.EventType}</span>
                         </td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-700 max-w-[200px] truncate" title={r.barcode||""}>{r.barcode||"—"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap">{r.start_time}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap">{r.end_time}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">{r.duration}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono font-bold text-slate-700">{r.parts_quantity??"-"}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-700 max-w-[200px] truncate" title={r.Barcode||""}>{r.Barcode||"—"}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap">{r.StartTime}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap">{r.EndTime}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">{r.Duration}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono font-bold text-slate-700">{r.PartsQty??"-"}</td>
                         <td className="px-2 py-1.5 border-b border-slate-100 whitespace-nowrap">
-                          {r.parts_quality?<span className={`text-[9px] font-bold px-1 rounded ${r.parts_quality==="GOOD"?"text-emerald-700 bg-emerald-50":"text-rose-600 bg-rose-50"}`}>{r.parts_quality}</span>:<span className="text-slate-300">—</span>}
+                          {r.PartsQuality?<span className={`text-[9px] font-bold px-1 rounded ${r.PartsQuality==="GOOD"?"text-emerald-700 bg-emerald-50":"text-rose-600 bg-rose-50"}`}>{r.PartsQuality}</span>:<span className="text-slate-300">—</span>}
                         </td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-rose-600 whitespace-nowrap">{r.downtime_reason||"—"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-500 whitespace-nowrap">{r.asset_name||"—"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-500 whitespace-nowrap">{r.line_name||"—"}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 text-rose-600 whitespace-nowrap">{r.DowntimeReason||"—"}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-500 whitespace-nowrap">{r.AssetName||"—"}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-500 whitespace-nowrap">{r.LineName||"—"}</td>
                       </tr>
                     ))}
                   </tbody>

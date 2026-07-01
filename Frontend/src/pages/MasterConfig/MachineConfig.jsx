@@ -1,11 +1,15 @@
-import { useState, useMemo } from "react";
-import { Cpu, Wifi, WifiOff } from "lucide-react";
+import { useState, useMemo, useRef } from "react";
+import { useSelector } from "react-redux";
+import { Cpu, Wifi, WifiOff, Camera } from "lucide-react";
 import toast from "react-hot-toast";
 import { inputCls, selectCls, Field, StatusBadge, Modal, TableActions, PageHeader, EmptyState, TH, TD } from "./_shared";
+import { selectMachines } from "../../redux/slices/masterConfigSlice";
+import { useAddMachineMutation, useUpdateMachineMutation, useDeleteMachineMutation, useUploadMachineImageMutation } from "../../redux/api/masterConfigApi";
+import { fileBaseURL } from "../../assets/assets";
 
 const CONTROLLERS = ["FANUC","Siemens","Mitsubishi","Allen Bradley","Beckhoff","Delta","Omron","Custom PLC","Other"];
-const DEPARTMENTS  = ["Pressing","Welding","Machining","Assembly","Painting","Inspection","Packing","Maintenance"];
-const LINES        = ["Line 1","Line 2","Line 3","Line 4","Line 5","Assembly Line","Packing Line"];
+const DEPARTMENTS  = ["PART PROCESS"];
+const LINES        = ["FREEZER LINE","VISI COOLER LINE","SUS LINE"];
 
 const INIT = { machineName:"", machineCode:"", ipAddress:"", controllerType:"FANUC", apiEndpoint:"", department:"", lineName:"", plantLocation:"Plant A", status:true, connected:false };
 
@@ -20,43 +24,106 @@ const ConnBadge = ({ ok }) =>
     </span>
   );
 
+const MachineAvatar = ({ row, onUpload, uploading }) => {
+  const fileInputRef = useRef(null);
+  return (
+    <div className="relative w-9 h-9 shrink-0 group">
+      {row.imagePath ? (
+        <img src={fileBaseURL + row.imagePath} alt={row.machineName} className="w-9 h-9 rounded-lg object-cover border border-slate-200" />
+      ) : (
+        <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+          <Cpu className="w-4 h-4" />
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        title="Upload machine image"
+        className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-60"
+      >
+        <Camera className="w-2.5 h-2.5" />
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onUpload(file);
+          e.target.value = "";
+        }}
+      />
+    </div>
+  );
+};
+
 const MachineConfig = () => {
-  const [data, setData]   = useState([]);
+  const data = useSelector(selectMachines);
+  const [addMachine]    = useAddMachineMutation();
+  const [updateMachine] = useUpdateMachineMutation();
+  const [deleteMachine] = useDeleteMachineMutation();
+  const [uploadMachineImage] = useUploadMachineImageMutation();
+
   const [modal, setModal] = useState({ open:false, mode:"add", row:null });
   const [form, setForm]   = useState(INIT);
   const [search, setSearch] = useState("");
   const [testing, setTesting] = useState(null);
+  const [uploadingId, setUploadingId] = useState(null);
 
   const filtered = useMemo(() => data.filter((r) =>
     r.machineName.toLowerCase().includes(search.toLowerCase()) ||
     r.machineCode.toLowerCase().includes(search.toLowerCase()) ||
-    r.ipAddress.includes(search)
+    (r.ipAddress || "").includes(search)
   ), [data, search]);
 
   const openAdd  = () => { setForm(INIT); setModal({ open:true, mode:"add" }); };
   const openEdit = (row) => { setForm({ ...row }); setModal({ open:true, mode:"edit", row }); };
   const closeModal = () => setModal({ open:false });
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.machineName || !form.machineCode || !form.ipAddress) { toast.error("Machine Name, Code and IP Address are required."); return; }
-    if (modal.mode === "add") {
-      if (data.find((r) => r.machineCode === form.machineCode)) { toast.error("Machine Code already exists."); return; }
-      setData([...data, { ...form, id: Date.now() }]);
-      toast.success("Machine added.");
-    } else {
-      setData(data.map((r) => r.id === modal.row.id ? { ...form, id: r.id } : r));
-      toast.success("Machine updated.");
+    try {
+      if (modal.mode === "add") {
+        await addMachine(form).unwrap();
+        toast.success("Machine added.");
+      } else {
+        await updateMachine({ ...form, id: modal.row.id }).unwrap();
+        toast.success("Machine updated.");
+      }
+      closeModal();
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to save machine.");
     }
-    closeModal();
   };
 
-  const handleDelete = (id) => { setData(data.filter((r) => r.id !== id)); toast.success("Deleted."); };
+  const handleDelete = async (id) => {
+    try {
+      await deleteMachine(id).unwrap();
+      toast.success("Deleted.");
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to delete.");
+    }
+  };
+
+  const handleUploadImage = async (id, file) => {
+    setUploadingId(id);
+    try {
+      await uploadMachineImage({ id, file }).unwrap();
+      toast.success("Machine image updated.");
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to upload image.");
+    } finally {
+      setUploadingId(null);
+    }
+  };
+
   const sf = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
 
   const testConnection = (id) => {
     setTesting(id);
     setTimeout(() => {
-      setData((d) => d.map((r) => r.id === id ? { ...r, connected: Math.random() > 0.3 } : r));
       setTesting(null);
       toast.success("Connectivity test complete.");
     }, 1500);
@@ -74,12 +141,6 @@ const MachineConfig = () => {
         <div className="flex items-center gap-3 mb-3">
           <span className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full"><Wifi className="w-3 h-3" /> {online} Online</span>
           <span className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full"><WifiOff className="w-3 h-3" /> {offline} Offline</span>
-          <button
-            onClick={() => { setTesting("all"); data.forEach((r) => { setTimeout(() => { setData((d) => d.map((x) => x.id === r.id ? { ...x, connected: Math.random() > 0.3 } : x)); setTesting(null); }, 2000); }); toast.success("Testing all connections…"); }}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg border border-cyan-300 text-cyan-700 bg-cyan-50 hover:bg-cyan-100 transition-colors"
-          >
-            <Wifi className="w-3 h-3" /> Test All
-          </button>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -87,7 +148,7 @@ const MachineConfig = () => {
             <table className="min-w-full border-separate border-spacing-0">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-slate-50">
-                  <TH>#</TH><TH>Machine Name</TH><TH>Code</TH><TH>IP Address</TH>
+                  <TH>#</TH><TH>Image</TH><TH>Machine Name</TH><TH>Code</TH><TH>IP Address</TH>
                   <TH>Controller</TH><TH>Department</TH><TH>Line</TH><TH>Plant</TH>
                   <TH center>Connection</TH><TH center>Status</TH><TH center>Actions</TH>
                 </tr>
@@ -96,6 +157,9 @@ const MachineConfig = () => {
                 {filtered.length > 0 ? filtered.map((r, idx) => (
                   <tr key={r.id} className="hover:bg-blue-50/40 transition-colors even:bg-slate-50/30">
                     <TD cls="text-slate-400">{idx + 1}</TD>
+                    <TD>
+                      <MachineAvatar row={r} uploading={uploadingId === r.id} onUpload={(file) => handleUploadImage(r.id, file)} />
+                    </TD>
                     <TD cls="font-bold text-slate-800 whitespace-nowrap">{r.machineName}</TD>
                     <TD><span className="font-mono font-bold text-cyan-600 text-xs">{r.machineCode}</span></TD>
                     <TD mono cls="text-slate-600">{r.ipAddress}</TD>
@@ -118,7 +182,7 @@ const MachineConfig = () => {
                     <TD center><StatusBadge active={r.status} /></TD>
                     <TD center><TableActions onEdit={() => openEdit(r)} onDelete={() => handleDelete(r.id)} /></TD>
                   </tr>
-                )) : <EmptyState colSpan={11} message="No machines configured." />}
+                )) : <EmptyState colSpan={12} message="No machines configured." />}
               </tbody>
             </table>
           </div>

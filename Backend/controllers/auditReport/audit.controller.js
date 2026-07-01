@@ -10,6 +10,8 @@ import {
   cleanupRemovedImages,
 } from "../../utils/auditImageProcessor.js";
 import { deleteMultipleImages } from "../../utils/storage/imageStorage.js";
+import { readTemplateFile } from "../../utils/storage/templateStorage.js";
+import { assembleContent } from "../../utils/storage/templateContent.js";
 
 // ==================== HELPERS ====================
 
@@ -264,27 +266,51 @@ export const createAudit = tryCatch(async (req, res) => {
   try {
     pool = await new sql.ConnectionPool(dbConfig3).connect();
 
-    // Load template defaults if not provided
+    // Load template defaults, and — always, regardless of what the client sent —
+    // the current version/hash/file/size, so Audits.Template* is exclusively
+    // server-derived and never trusts client input for that integrity metadata.
     let finalColumns = columns;
     let finalInfoFields = infoFields;
     let finalHeaderConfig = headerConfig;
     let finalTemplateName = templateName;
+    let finalTemplateVersion = null;
+    let finalTemplateFileName = null;
+    let finalTemplateHash = null;
+    let finalTemplateSize = null;
 
-    if (!columns || !infoFields || !headerConfig) {
-      const templateResult = await pool
-        .request()
-        .input("templateId", sql.Int, templateId)
-        .query(
-          "SELECT Name, Columns, InfoFields, HeaderConfig FROM AuditTemplates WHERE Id = @templateId",
-        );
+    // Columns/InfoFields/HeaderConfig live in the template's content (SQL-backed
+    // AuditTemplateContent for migrated templates, or the legacy JSON config
+    // file for not-yet-migrated rows) — not as AuditTemplates SQL columns
+    // directly. Only Name/Version/TemplateFileName/TemplateHash/TemplateSize/
+    // CurrentVersionContentId are real columns on AuditTemplates itself.
+    const templateResult = await pool
+      .request()
+      .input("templateId", sql.Int, templateId)
+      .query(
+        "SELECT Name, Version, TemplateFileName, TemplateHash, TemplateSize, CurrentVersionContentId FROM AuditTemplates WHERE Id = @templateId",
+      );
 
-      if (templateResult.recordset.length > 0) {
-        const tmpl = templateResult.recordset[0];
-        finalColumns = columns || safeJsonParse(tmpl.Columns, []);
-        finalInfoFields = infoFields || safeJsonParse(tmpl.InfoFields, []);
-        finalHeaderConfig =
-          headerConfig || safeJsonParse(tmpl.HeaderConfig, {});
-        finalTemplateName = templateName || tmpl.Name;
+    if (templateResult.recordset.length > 0) {
+      const tmpl = templateResult.recordset[0];
+      finalTemplateName = templateName || tmpl.Name;
+      finalTemplateVersion = tmpl.Version;
+      finalTemplateFileName = tmpl.TemplateFileName;
+      finalTemplateHash = tmpl.TemplateHash;
+      finalTemplateSize = tmpl.TemplateSize;
+
+      if (!columns || !infoFields || !headerConfig) {
+        let config = null;
+        if (tmpl.CurrentVersionContentId) {
+          const contentResult = await pool.request()
+            .input("contentId", sql.Int, tmpl.CurrentVersionContentId)
+            .query("SELECT * FROM AuditTemplateContent WHERE Id = @contentId");
+          if (contentResult.recordset.length) config = assembleContent(contentResult.recordset[0]);
+        } else if (tmpl.TemplateFileName) {
+          config = await readTemplateFile(tmpl.TemplateFileName).catch(() => null);
+        }
+        finalColumns = columns || config?.columns || [];
+        finalInfoFields = infoFields || config?.infoFields || [];
+        finalHeaderConfig = headerConfig || config?.headerConfig || {};
       }
     }
 
@@ -293,6 +319,10 @@ export const createAudit = tryCatch(async (req, res) => {
       .input("auditCode", sql.NVarChar(50), auditCode)
       .input("templateId", sql.Int, templateId)
       .input("templateName", sql.NVarChar, finalTemplateName)
+      .input("templateVersion", sql.NVarChar(20), finalTemplateVersion)
+      .input("templateFileName", sql.NVarChar(500), finalTemplateFileName)
+      .input("templateHash", sql.NVarChar(64), finalTemplateHash)
+      .input("templateSize", sql.Int, finalTemplateSize)
       .input("reportName", sql.NVarChar, reportName)
       .input("formatNo", sql.NVarChar(50), formatNo || null)
       .input("revNo", sql.NVarChar(50), revNo || null)
@@ -315,14 +345,16 @@ export const createAudit = tryCatch(async (req, res) => {
       .input("submittedBy", sql.NVarChar(200), status === "submitted" ? createdBy : null)
       .input("createdBy", sql.NVarChar(200), createdBy).query(`
         INSERT INTO Audits (
-          AuditCode, TemplateId, TemplateName, ReportName, FormatNo, RevNo, RevDate,
+          AuditCode, TemplateId, TemplateName, TemplateVersion, TemplateFileName, TemplateHash, TemplateSize,
+          ReportName, FormatNo, RevNo, RevDate,
           Notes, Status, InfoData, Sections, Columns, InfoFields, HeaderConfig,
           Signatures, Summary, StartedAt, SubmittedAt, SubmittedBy,
           CreatedBy, CreatedAt, UpdatedBy, UpdatedAt
         )
         OUTPUT INSERTED.*
         VALUES (
-          @auditCode, @templateId, @templateName, @reportName, @formatNo, @revNo, @revDate,
+          @auditCode, @templateId, @templateName, @templateVersion, @templateFileName, @templateHash, @templateSize,
+          @reportName, @formatNo, @revNo, @revDate,
           @notes, @status, @infoData, @sections, @columns, @infoFields, @headerConfig,
           @signatures, @summary, @startedAt, @submittedAt, @submittedBy,
           @createdBy, GETDATE(), @createdBy, GETDATE()

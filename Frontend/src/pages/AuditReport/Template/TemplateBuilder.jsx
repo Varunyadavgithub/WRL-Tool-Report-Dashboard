@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
   FaFileAlt,
@@ -32,14 +32,18 @@ import {
   FaUpload,
   FaTable,
   FaHistory,
+  FaLock,
+  FaBook,
 } from "react-icons/fa";
-import * as XLSX from "xlsx";
 import { MdAddCircle, MdOutlineFactCheck, MdDragIndicator } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
 import { BiSolidFactory } from "react-icons/bi";
 import useAuditData from "../../../hooks/useAuditData";
 import toast from "react-hot-toast";
 import { ROLES } from "../../../config/routes.config";
+import TemplateHistoryPanel from "./components/TemplateHistoryPanel";
+import { selectCheckpointLibrary } from "../../../redux/slices/masterConfigSlice";
+import { useAddCheckpointLibraryEntryMutation, useIncrementCheckpointUsageMutation } from "../../../redux/api/masterConfigApi";
 
 // ── Highlight matching text in search results ─────────────────────────────────
 const Highlight = ({ text = "", query = "" }) => {
@@ -56,9 +60,9 @@ const Highlight = ({ text = "", query = "" }) => {
 };
 
 // ==================== STABLE ID GENERATOR ====================
-// Fixes the Date.now() collision bug when multiple IDs are created synchronously
-let _idSeq = 0;
-const genId = () => `${Date.now()}_${++_idSeq}`;
+// UUIDs are permanent across edits/versions — never regenerated for existing
+// sections/stages/checkpoints, only assigned to brand-new ones.
+const genId = () => crypto.randomUUID();
 
 // ==================== DEFAULT STATE FACTORIES ====================
 const makeCheckpoint = () => ({
@@ -171,29 +175,16 @@ const IconBtn = ({ icon: Icon, onClick, title, disabled, color = "gray", size = 
   );
 };
 
-const formatHistoryDate = (date) =>
-  date ? new Date(date).toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  }) : "—";
-
-const historyActionLabel = (action = "") =>
-  action
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ") || "Updated";
-
 // ==================== MAIN COMPONENT ====================
 const TemplateBuilder = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const location = useLocation();
   const { user } = useSelector((store) => store.auth);
-  const { createTemplate, updateTemplate, getTemplateById, getTemplateHistory } = useAuditData();
+  const checkpointLibrary = useSelector(selectCheckpointLibrary);
+  const [addCheckpointLibraryEntry] = useAddCheckpointLibraryEntryMutation();
+  const [incrementCheckpointUsage] = useIncrementCheckpointUsageMutation();
+  const { createTemplate, createTemplateVersion, updateTemplate, getTemplateById } = useAuditData();
 
   const [showColumnManager, setShowColumnManager] = useState(false);
   const [showInfoFieldManager, setShowInfoFieldManager] = useState(false);
@@ -208,9 +199,11 @@ const TemplateBuilder = () => {
   const [hasDraft, setHasDraft] = useState(false);
   const [showExcelModal, setShowExcelModal] = useState(false);
   const [excelPreview, setExcelPreview]     = useState(null); // { sections, totalCPs }
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [templateHistory, setTemplateHistory] = useState([]);
   const [showReviewHistory, setShowReviewHistory] = useState(false);
+  const [unlockedForEdit, setUnlockedForEdit] = useState(false);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [libraryPicker, setLibraryPicker] = useState(null); // { sectionId, stageId } | null
+  const [librarySearch, setLibrarySearch] = useState("");
   const newColInputRef  = useRef(null);
   const excelInputRef   = useRef(null);
 
@@ -234,7 +227,6 @@ const TemplateBuilder = () => {
     ROLES.QUALITY_MANAGER,
   ].includes(user?.roleName);
 
-  const isAdmin = user?.roleName === ROLES.SUPER_ADMIN;
   const [headerConfig, setHeaderConfig] = useState({
     showFormatNo: true, showRevNo: true, showRevDate: true,
     defaultFormatNo: "", defaultRevNo: "", defaultRevDate: "",
@@ -243,7 +235,8 @@ const TemplateBuilder = () => {
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
   const [defaultSections, setDefaultSections] = useState([makeSection()]);
   const isApprovalReview = Boolean(id && templateMeta.approvalStatus === APPROVAL_STATUS.PENDING_APPROVAL);
-  const isReadOnly = isApprovalReview;
+  const isApprovedLocked = Boolean(id && templateMeta.approvalStatus === APPROVAL_STATUS.APPROVED && !unlockedForEdit);
+  const isReadOnly = isApprovalReview || isApprovedLocked;
 
   // ==================== Keyboard shortcuts ====================
   useEffect(() => {
@@ -261,6 +254,9 @@ const TemplateBuilder = () => {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
+    // handleSaveAsDraft is declared later in this component (temporal-dead-zone hazard
+    // if added here); the effect already re-binds on every relevant state change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateMeta, headerConfig, infoFields, columns, defaultSections, isReadOnly]);
 
   // ==================== Auto-draft to localStorage ====================
@@ -270,30 +266,7 @@ const TemplateBuilder = () => {
       localStorage.setItem(`template_draft_${id || "new"}`, JSON.stringify(draft));
       setHasDraft(true);
     }
-  }, [templateMeta, headerConfig, infoFields, columns, defaultSections, isReadOnly]);
-
-  useEffect(() => {
-    if (!isReadOnly || !id) {
-      setTemplateHistory([]);
-      return;
-    }
-
-    let alive = true;
-    const loadHistory = async () => {
-      setHistoryLoading(true);
-      try {
-        const data = await getTemplateHistory(id);
-        if (alive) setTemplateHistory(data);
-      } catch (err) {
-        if (alive) toast.error("Failed to load template history: " + err.message);
-      } finally {
-        if (alive) setHistoryLoading(false);
-      }
-    };
-
-    loadHistory();
-    return () => { alive = false; };
-  }, [isReadOnly, id, getTemplateHistory]);
+  }, [templateMeta, headerConfig, infoFields, columns, defaultSections, isReadOnly, id, initialLoading]);
 
   const clearDraft = () => {
     localStorage.removeItem(`template_draft_${id || "new"}`);
@@ -305,6 +278,13 @@ const TemplateBuilder = () => {
   useEffect(() => {
     const loadTemplate = async () => {
       if (!id) {
+        // Name was already checked for uniqueness by the Template List's
+        // name-prompt before navigating here — prefill it so the user
+        // doesn't have to retype it.
+        const presetName = location.state?.presetName;
+        if (presetName) {
+          setTemplateMeta((prev) => (prev.name ? prev : { ...prev, name: presetName }));
+        }
         const draft = localStorage.getItem("template_draft_new");
         if (draft) {
           try {
@@ -313,11 +293,14 @@ const TemplateBuilder = () => {
             if (age < 24 * 60 * 60 * 1000) {
               setHasDraft(true);
             }
-          } catch {}
+          } catch {
+            // ignore corrupt/stale draft JSON
+          }
         }
         return;
       }
       setInitialLoading(true);
+      setUnlockedForEdit(false);
       try {
         const tmpl = await getTemplateById(id);
         if (tmpl) {
@@ -480,6 +463,46 @@ const TemplateBuilder = () => {
     }));
   };
 
+  // ==================== Checkpoint Library ====================
+  const openLibraryPicker = (sectionId, stageId) => {
+    setLibrarySearch("");
+    setLibraryPicker({ sectionId, stageId });
+  };
+
+  const insertFromLibrary = (libEntry) => {
+    if (!libraryPicker) return;
+    const { sectionId, stageId } = libraryPicker;
+    const cp = {
+      id: genId(),
+      checkPoint: libEntry.checkPoint,
+      method: libEntry.method || "",
+      specification: libEntry.specification || "",
+      required: !!libEntry.required,
+    };
+    setDefaultSections((prev) => prev.map((s) => s.id !== sectionId ? s : {
+      ...s, stages: s.stages.map((st) => st.id !== stageId ? st : { ...st, checkPoints: [...st.checkPoints, cp] }),
+    }));
+    incrementCheckpointUsage(libEntry.id).catch(() => {});
+    toast.success(`"${libEntry.checkPoint}" inserted`);
+  };
+
+  const saveCheckpointToLibrary = async (cp) => {
+    if (!cp.checkPoint?.trim()) { toast.error("Checkpoint text is empty — nothing to save"); return; }
+    try {
+      await addCheckpointLibraryEntry({
+        checkPoint: cp.checkPoint,
+        method: cp.method,
+        specification: cp.specification,
+        required: cp.required,
+        category: templateMeta.category,
+        createdBy: user?.name || String(user?.userCode ?? user?.usercode ?? "SYSTEM"),
+      }).unwrap();
+      toast.success("Saved to Checkpoint Library");
+    } catch (err) {
+      toast.error("Failed to save to library: " + (err?.data?.message || err.message));
+    }
+  };
+
   const updateCheckpoint = (sectionId, stageId, cpId, field, value) => {
     setDefaultSections((prev) => prev.map((s) => s.id !== sectionId ? s : {
       ...s, stages: s.stages.map((st) => st.id !== stageId ? st : {
@@ -489,7 +512,8 @@ const TemplateBuilder = () => {
   };
 
   // ==================== Excel Download Template ====================
-  const handleDownloadExcelTemplate = () => {
+  const handleDownloadExcelTemplate = async () => {
+    const XLSX = await import("xlsx");
     const headers = ["Section Name", "Stage Name", "Check Point", "Method of Inspection", "Specification"];
     const samples = [
       ["Surface Quality", "Visual Inspection", "Check paint finish",         "Visual",             "No scratches, dents or blemishes"],
@@ -561,8 +585,9 @@ const TemplateBuilder = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
+        const XLSX = await import("xlsx");
         const wb   = XLSX.read(evt.target.result, { type: "binary" });
         const ws   = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
@@ -636,8 +661,6 @@ const TemplateBuilder = () => {
       return arr;
     });
   };
-  const updateColumn = (id, updates) => setColumns((prev) => prev.map((c) => c.id === id ? { ...c, ...updates } : c));
-
   // ==================== Info field management ====================
   const addInfoField = () => setInfoFields((prev) => [...prev, { id: `field_${genId()}`, name: "New Field", type: "text", required: false, visible: true }]);
   const updateInfoField = (id, updates) => setInfoFields((prev) => prev.map((f) => f.id === id ? { ...f, ...updates } : f));
@@ -653,16 +676,15 @@ const TemplateBuilder = () => {
   };
 
   const visibleColumns = columns.filter((c) => c.visible);
-  const editableColumns = visibleColumns.filter((c) => !c.entryField && c.id !== "section" && c.id !== "stage");
 
   // ==================== Search / Filter ====================
   const searchQ = sectionSearch.trim().toLowerCase();
 
-  const cpMatches = (cp) =>
+  const cpMatches = useCallback((cp) =>
     searchQ &&
     (cp.checkPoint?.toLowerCase().includes(searchQ) ||
      cp.method?.toLowerCase().includes(searchQ) ||
-     cp.specification?.toLowerCase().includes(searchQ));
+     cp.specification?.toLowerCase().includes(searchQ)), [searchQ]);
 
   // Only filter at section level — all stages/checkpoints stay visible within a matched section
   const filteredSections = useMemo(() => {
@@ -688,25 +710,27 @@ const TemplateBuilder = () => {
       });
     });
     return n;
-  }, [filteredSections, searchQ]);
+  }, [filteredSections, searchQ, cpMatches]);
 
   // ==================== Save as Draft ====================
-  // Always saves as draft — the only way to advance status is Submit for Approval.
+  // New template (no id): createTemplate. Name was already uniqueness-checked
+  // by the Template List's name-prompt before this page opened, so `exists`
+  // here should only happen on a race (someone else took the name in the
+  // meantime) — surfaced as an error, never silently treated as success.
+  // Existing template (id present): createTemplateVersion — never mutates the
+  // version being edited, always creates a new one and deactivates the old.
   const handleSaveAsDraft = async () => {
     if (!templateMeta.name.trim()) { toast.error("Template name is required"); return; }
+    if (!templateMeta.models || templateMeta.models.length === 0) { toast.error("At least one applicable model is required"); return; }
     setSaving(true);
     try {
       const payload = {
         name: templateMeta.name,
         description: templateMeta.description,
         category: templateMeta.category,
-        version: templateMeta.version,
         isActive: templateMeta.isActive,
         models: templateMeta.models,
         approvalStatus: "draft",
-        rejectionReason: "",
-        approvedBy: "",
-        approvedAt: "",
         // Pass user identity so backend can store correct CreatedBy when auth is disabled.
         // String() coercion prevents "Invalid string" if userCode is stored as a number.
         createdByUser: user?.name || String(user?.userCode ?? user?.usercode ?? "SYSTEM"),
@@ -716,16 +740,24 @@ const TemplateBuilder = () => {
         defaultSections,
       };
       if (id) {
-        await updateTemplate(id, payload);
-        toast.success("Draft saved");
+        await createTemplateVersion(id, { ...payload, basedOnVersion: templateMeta.version });
+        toast.success("Draft saved as a new version");
       } else {
-        await createTemplate(payload);
+        const result = await createTemplate(payload);
+        if (result.exists) {
+          toast.error(`A template named "${templateMeta.name}" was just created by someone else. Please reload and try again.`);
+          return;
+        }
         toast.success("Draft saved");
         localStorage.removeItem("template_draft_new");
       }
       navigate("/auditreport/templates");
     } catch (err) {
-      toast.error("Save failed: " + err.message);
+      if (err.errors?.length) {
+        toast.error(`Validation failed: ${err.errors[0].message}${err.errors.length > 1 ? ` (+${err.errors.length - 1} more)` : ""}`);
+      } else {
+        toast.error("Save failed: " + err.message);
+      }
     } finally {
       setSaving(false);
     }
@@ -734,19 +766,16 @@ const TemplateBuilder = () => {
   // ==================== Approval Handlers ====================
   const handleSubmitForApproval = async () => {
     if (!templateMeta.name.trim()) { toast.error("Template name is required"); return; }
+    if (!templateMeta.models || templateMeta.models.length === 0) { toast.error("At least one applicable model is required"); return; }
     setSaving(true);
     try {
       const payload = {
         name: templateMeta.name,
         description: templateMeta.description,
         category: templateMeta.category,
-        version: templateMeta.version,
         isActive: templateMeta.isActive,
         models: templateMeta.models,
         approvalStatus: APPROVAL_STATUS.PENDING_APPROVAL,
-        rejectionReason: "",
-        approvedBy: "",
-        approvedAt: "",
         createdByUser: user?.name || String(user?.userCode ?? user?.usercode ?? "SYSTEM"),
         headerConfig,
         infoFields,
@@ -754,20 +783,23 @@ const TemplateBuilder = () => {
         defaultSections,
       };
       if (id) {
-        await updateTemplate(id, payload);
+        await createTemplateVersion(id, { ...payload, basedOnVersion: templateMeta.version });
       } else {
         const result = await createTemplate(payload);
-        if (result?.id) {
-          toast.success("Template submitted for approval");
-          localStorage.removeItem("template_draft_new");
-          navigate("/auditreport/templates");
+        if (result.exists) {
+          toast.error(`A template named "${templateMeta.name}" was just created by someone else. Please reload and try again.`);
           return;
         }
+        localStorage.removeItem("template_draft_new");
       }
       toast.success("Template submitted for approval");
       navigate("/auditreport/templates");
     } catch (err) {
-      toast.error("Submission failed: " + err.message);
+      if (err.errors?.length) {
+        toast.error(`Validation failed: ${err.errors[0].message}${err.errors.length > 1 ? ` (+${err.errors.length - 1} more)` : ""}`);
+      } else {
+        toast.error("Submission failed: " + err.message);
+      }
     } finally {
       setSaving(false);
     }
@@ -992,7 +1024,7 @@ const TemplateBuilder = () => {
           />
           
           {/* Approval buttons */}
-          {!isReadOnly && templateMeta.approvalStatus === APPROVAL_STATUS.DRAFT && canCreateEdit && (
+          {!isReadOnly && (templateMeta.approvalStatus === APPROVAL_STATUS.DRAFT || unlockedForEdit) && canCreateEdit && (
             <button onClick={handleSubmitForApproval} disabled={saving} className="px-4 py-2 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
               {saving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FaCheckDouble />}
               {saving ? "Submitting..." : "Submit for Approval"}
@@ -1010,6 +1042,13 @@ const TemplateBuilder = () => {
                 {saving ? "Rejecting..." : "Reject"}
               </button>
             </>
+          )}
+
+          {/* Approved templates are locked — must be explicitly unlocked to edit */}
+          {id && templateMeta.approvalStatus === APPROVAL_STATUS.APPROVED && !unlockedForEdit && canCreateEdit && (
+            <button onClick={() => setShowUnlockModal(true)} className="px-4 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition flex items-center gap-2">
+              <FaLock size={12} /> Edit (requires re-approval)
+            </button>
           )}
 
           {/* Admin can resubmit rejected templates */}
@@ -1057,9 +1096,13 @@ const TemplateBuilder = () => {
           </div>
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Version</label>
-            <input type="text" value={templateMeta.version} onChange={(e) => setTemplateMeta({ ...templateMeta, version: e.target.value })}
-              disabled={isReadOnly}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none disabled:bg-gray-50 disabled:text-gray-600" placeholder="1.0" />
+            <input
+              type="text"
+              value={id ? templateMeta.version : "01 (on save)"}
+              readOnly
+              title="Version numbers are assigned automatically — editing creates a new version on Save, it never overwrites this one."
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-600 outline-none cursor-not-allowed"
+            />
           </div>
           <div className="flex items-center gap-2 pt-5">
             <label className="flex items-center gap-2 text-sm text-gray-600">
@@ -1074,7 +1117,9 @@ const TemplateBuilder = () => {
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none resize-none disabled:bg-gray-50 disabled:text-gray-600" rows="2" placeholder="Brief description..." />
           </div>
           <div className="md:col-span-2 lg:col-span-4">
-            <label className="text-xs text-gray-500 mb-1 block">Applicable Models</label>
+            <label className="text-xs text-gray-500 mb-1 block">
+              Applicable Models <span className="text-red-500">*</span>
+            </label>
             {!isReadOnly && <div className="flex gap-2 mb-2">
               <input type="text" id="modelInput" placeholder="Add model (e.g., D525H223)"
                 className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-400 outline-none" />
@@ -1087,7 +1132,7 @@ const TemplateBuilder = () => {
                 input.value = "";
               }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition">Add</button>
             </div>}
-            <div className="flex flex-wrap gap-2">
+            <div className={`flex flex-wrap gap-2 min-h-[2rem] px-2 py-1.5 rounded-lg border ${templateMeta.models.length === 0 ? "border-red-200 bg-red-50/40" : "border-transparent"}`}>
               {templateMeta.models.map((model, idx) => (
                 <span key={idx} className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium border border-indigo-200">
                   {model}
@@ -1096,7 +1141,7 @@ const TemplateBuilder = () => {
                   }
                 </span>
               ))}
-              {templateMeta.models.length === 0 && <span className="text-xs text-gray-400 italic">No models added yet</span>}
+              {templateMeta.models.length === 0 && <span className="text-xs text-red-400 italic">At least one model is required</span>}
             </div>
           </div>
           {id && (
@@ -1189,104 +1234,11 @@ const TemplateBuilder = () => {
               <FaHistory /> Change Log
             </h2>
             <span className="flex items-center gap-2 text-[10px] text-indigo-400 font-semibold">
-              {historyLoading ? "Loading..." : `${templateHistory.length} entries`}
               {showReviewHistory ? <FaChevronUp size={10} /> : <FaChevronDown size={10} />}
             </span>
           </button>
 
-          {showReviewHistory && (historyLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-6 h-6 border-4 border-indigo-100 border-t-indigo-500 rounded-full animate-spin" />
-            </div>
-          ) : templateHistory.length === 0 ? (
-            <div className="px-5 py-6 text-center text-xs text-gray-400">
-              No history recorded for this template yet.
-            </div>
-          ) : (
-            <div className="p-5">
-              <div className="relative border-l-2 border-indigo-100 ml-3 space-y-3">
-                {templateHistory.map((entry, idx) => {
-                  const changes = Array.isArray(entry.FieldChanges)
-                    ? entry.FieldChanges
-                    : (() => {
-                        try { return entry.FieldChanges ? JSON.parse(entry.FieldChanges) : []; }
-                        catch { return []; }
-                      })();
-                  const action = entry.Action?.toLowerCase() || "updated";
-                  const tone =
-                    action === "approved" ? "green" :
-                    action === "rejected" ? "red" :
-                    action === "submitted_for_approval" ? "amber" : "indigo";
-                  const toneCls = {
-                    green: "bg-green-100 text-green-700 border-green-200",
-                    red: "bg-red-100 text-red-700 border-red-200",
-                    amber: "bg-amber-100 text-amber-700 border-amber-200",
-                    indigo: "bg-indigo-100 text-indigo-700 border-indigo-200",
-                  }[tone];
-                  const dotCls = {
-                    green: "bg-green-500",
-                    red: "bg-red-500",
-                    amber: "bg-amber-400",
-                    indigo: "bg-indigo-400",
-                  }[tone];
-
-                  return (
-                    <div key={entry.Id || idx} className="relative pl-5">
-                      <span className={`absolute -left-[5px] top-3 w-2.5 h-2.5 rounded-full ring-2 ring-white ${dotCls}`} />
-                      <div className="border border-gray-100 rounded-xl overflow-hidden">
-                        <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-black ${toneCls}`}>
-                              {historyActionLabel(entry.Action)}
-                            </span>
-                            {(entry.PreviousStatus || entry.NewStatus) && (
-                              <span className="text-[10px] text-gray-500">
-                                {entry.PreviousStatus || "—"} → {entry.NewStatus || "—"}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[10px] text-gray-400 flex items-center gap-2">
-                            <span>{entry.ActionBy || "System"}</span>
-                            <span>{formatHistoryDate(entry.ActionAt)}</span>
-                          </div>
-                        </div>
-
-                        {entry.Comments && (
-                          <div className="px-4 py-2 bg-red-50 border-b border-red-100">
-                            <span className="text-[9px] font-bold text-red-500 uppercase tracking-wider mr-2">Remarks:</span>
-                            <span className="text-[10px] text-red-600">{entry.Comments}</span>
-                          </div>
-                        )}
-
-                        {changes.length > 0 && (
-                          <div className="px-4 py-2.5 flex flex-wrap gap-2">
-                            {changes.map((change, ci) => (
-                              <div key={ci} className="rounded-lg border border-gray-100 overflow-hidden text-[10px] bg-white min-w-[150px] max-w-full">
-                                <div className="px-2.5 py-1.5 bg-gray-50 font-bold text-gray-600 uppercase tracking-wide">
-                                  {change.field || "Field"}
-                                  {change.note && <span className="ml-1 text-gray-400 normal-case">({change.note})</span>}
-                                </div>
-                                <div className="grid grid-cols-2 gap-1 p-1.5">
-                                  <div className="bg-red-50 rounded px-1.5 py-1 border border-red-100">
-                                    <p className="text-red-400 font-bold uppercase mb-0.5">Before</p>
-                                    <p className="text-red-700 font-semibold break-words">{change.from ?? "—"}</p>
-                                  </div>
-                                  <div className="bg-green-50 rounded px-1.5 py-1 border border-green-100">
-                                    <p className="text-green-400 font-bold uppercase mb-0.5">After</p>
-                                    <p className="text-green-700 font-semibold break-words">{change.to ?? "—"}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+          <TemplateHistoryPanel templateId={id} isOpen={showReviewHistory} variant="panel" />
         </div>
       )}
 
@@ -1420,7 +1372,7 @@ const TemplateBuilder = () => {
                             <th key={col.id} className={`px-3 py-2 text-left text-xs font-semibold text-gray-600 ${col.width}`}>{col.name}</th>
                           ))}
                           <th className="px-3 py-2 w-20 text-center text-xs font-semibold text-gray-600">Required</th>
-                          {!isReadOnly && <th className="px-3 py-2 w-24 text-right">Actions</th>}
+                          {!isReadOnly && <th className="px-3 py-2 w-32 text-right">Actions</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -1471,8 +1423,9 @@ const TemplateBuilder = () => {
                                 {cp.required ? "Yes" : "No"}
                               </button>
                             </td>
-                            {!isReadOnly && <td className="px-3 py-2 w-24 text-right">
+                            {!isReadOnly && <td className="px-3 py-2 w-32 text-right">
                               <div className="flex items-center justify-end gap-1">
+                                <IconBtn icon={FaBook} onClick={() => saveCheckpointToLibrary(cp)} title="Save to Library" color="purple" size={9} />
                                 <IconBtn icon={FaArrowUp} onClick={() => moveCheckpoint(section.id, stage.id, cpIdx, "up")} disabled={cpIdx === 0} size={9} />
                                 <IconBtn icon={FaArrowDown} onClick={() => moveCheckpoint(section.id, stage.id, cpIdx, "down")} disabled={cpIdx === stage.checkPoints.length - 1} size={9} />
                                 <IconBtn icon={FaTrash} onClick={() => deleteCheckpoint(section.id, stage.id, cp.id)} color="red" size={9} />
@@ -1491,6 +1444,7 @@ const TemplateBuilder = () => {
                       const text = prompt("Paste multiple checkpoints (one per line):");
                       if (text) handleBulkPaste(section.id, stage.id, text);
                     }} className="px-3 py-1.5 bg-gray-600 text-white rounded text-xs font-semibold hover:bg-gray-700 transition flex items-center gap-1"><FaClipboardList size={10} /> Bulk Paste</button>
+                    <button onClick={() => openLibraryPicker(section.id, stage.id)} className="px-3 py-1.5 bg-purple-600 text-white rounded text-xs font-semibold hover:bg-purple-700 transition flex items-center gap-1"><FaBook size={10} /> Insert from Library</button>
                   </div>}
                 </div>
               );
@@ -1546,6 +1500,107 @@ const TemplateBuilder = () => {
           </div>
         </div>
       )}
+
+      {/* ── Unlock Approved Template Modal ─────────────────────────────────── */}
+      {showUnlockModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={() => setShowUnlockModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4 bg-gradient-to-r from-orange-600 to-orange-700 text-white">
+              <h3 className="text-base font-black flex items-center gap-2"><FaLock size={13} /> Unlock for Editing</h3>
+            </div>
+            <div className="p-6 space-y-3">
+              <p className="text-sm text-gray-600">
+                This template is <strong>approved</strong> and currently in use. Editing it will move it back to{" "}
+                <strong>Draft</strong> status — it must be re-submitted and re-approved before any new audit can use the updated version.
+              </p>
+              <p className="text-xs text-gray-400">Audits already created against the current approved version are not affected.</p>
+            </div>
+            <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
+              <button onClick={() => setShowUnlockModal(false)} className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-sm font-semibold transition-all">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setUnlockedForEdit(true);
+                  setShowUnlockModal(false);
+                  toast.success("Unlocked — remember to save to apply changes");
+                }}
+                className="px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-sm font-bold transition-all"
+              >
+                Unlock & Edit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Checkpoint Library Picker Modal ─────────────────────────────────── */}
+      {libraryPicker && (() => {
+        const q = librarySearch.trim().toLowerCase();
+        const activeEntries = checkpointLibrary.filter((c) => c.status !== false);
+        const matches = !q
+          ? activeEntries
+          : activeEntries.filter((c) =>
+              [c.checkPoint, c.method, c.specification, c.category].some((f) => f?.toLowerCase().includes(q)),
+            );
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={() => setLibraryPicker(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="px-5 py-4 bg-gradient-to-r from-purple-600 to-purple-700 text-white flex items-center justify-between gap-3 flex-shrink-0">
+                <h3 className="text-base font-black flex items-center gap-2"><FaBook size={13} /> Insert Checkpoint from Library</h3>
+                <button onClick={() => setLibraryPicker(null)} className="p-1.5 hover:bg-white/10 rounded-lg transition"><FaTimes size={14} /></button>
+              </div>
+              <div className="p-4 border-b border-gray-100 flex-shrink-0">
+                <input
+                  autoFocus
+                  type="text"
+                  value={librarySearch}
+                  onChange={(e) => setLibrarySearch(e.target.value)}
+                  placeholder="Search checkpoints…"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-purple-400 outline-none"
+                />
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {activeEntries.length === 0 ? (
+                  <div className="text-center py-10 text-sm text-gray-400">
+                    No checkpoints in the library yet — go to{" "}
+                    <a href="/master-config/checkpoint-library" target="_blank" rel="noreferrer" className="text-purple-600 underline">Master Config &gt; Checkpoint Library</a>{" "}
+                    to add some.
+                  </div>
+                ) : matches.length === 0 ? (
+                  <div className="text-center py-10 text-sm text-gray-400">No matches for "{librarySearch}"</div>
+                ) : (
+                  matches.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => insertFromLibrary(c)}
+                      className="w-full text-left p-3 border border-gray-200 rounded-xl hover:border-purple-300 hover:bg-purple-50/50 transition-all"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-sm text-gray-800">{c.checkPoint}</span>
+                        {c.required && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 flex-shrink-0">Required</span>}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-400">
+                        {c.method && <span>{c.method}</span>}
+                        {c.specification && <span>· {c.specification}</span>}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        {c.category && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 capitalize">{c.category}</span>}
+                        <span className="text-[9px] text-gray-400">Used {c.usageCount || 0}x</span>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+              <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end flex-shrink-0">
+                <button onClick={() => setLibraryPicker(null)} className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-bold transition-all">
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Excel Import Preview Modal ─────────────────────────────────────── */}
       {showExcelModal && excelPreview && (

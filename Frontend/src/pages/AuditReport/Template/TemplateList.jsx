@@ -2,7 +2,6 @@ import React, {
   useEffect,
   useState,
   useMemo,
-  useCallback,
   useRef,
 } from "react";
 import { useNavigate } from "react-router-dom";
@@ -28,6 +27,7 @@ import {
   FaChevronRight,
   FaExclamationTriangle,
   FaHistory,
+  FaCodeBranch,
 } from "react-icons/fa";
 import { MdOutlineFactCheck } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
@@ -35,6 +35,10 @@ import useAuditData from "../../../hooks/useAuditData";
 import toast from "react-hot-toast";
 import { useSelector } from "react-redux";
 import { ROLES } from "../../../config/routes.config";
+import TemplateHistoryPanel from "./components/TemplateHistoryPanel";
+import NewTemplateNamePrompt from "./components/NewTemplateNamePrompt";
+import { useTemplateSearch } from "../../../hooks/useTemplateSearch";
+import { Modal, ConfirmModal, StatusBadge as SharedStatusBadge, ModalCloseBtn, TD } from "../_shared.jsx";
 
 // ==================== CONSTANTS ====================
 const CATEGORIES = [
@@ -98,8 +102,11 @@ const relativeTime = (dateStr) => {
   }
 };
 
-// FIX: original only counted section.checkPoints (flat), missed stages?checkPoints hierarchy
+// Prefer the precomputed SQL stat columns (set once at save time) — only walk
+// defaultSections for legacy templates saved before those columns existed.
+// FIX: the defaultSections walk only counted section.checkPoints (flat), missed stages?checkPoints hierarchy
 const getTotalCheckpoints = (template) => {
+  if (template?.checkpointCount != null) return template.checkpointCount;
   if (!template?.defaultSections) return 0;
   let total = 0;
   template.defaultSections.forEach((section) => {
@@ -115,6 +122,7 @@ const getTotalCheckpoints = (template) => {
 };
 
 const getTotalStages = (template) => {
+  if (template?.stageCount != null) return template.stageCount;
   if (!template?.defaultSections) return 0;
   return template.defaultSections.reduce(
     (t, s) => t + (s.stages?.length || 1),
@@ -122,107 +130,30 @@ const getTotalStages = (template) => {
   );
 };
 
+const getTotalSections = (template) => {
+  if (template?.sectionCount != null) return template.sectionCount;
+  return template?.defaultSections?.length || 0;
+};
+
 const getCategoryConfig = (category) =>
   CATEGORIES.find((c) => c.value === category) ||
   CATEGORIES[CATEGORIES.length - 1];
 
-const fmtDate = (d) => {
-  if (!d) return "—";
-  return new Date(d).toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
+// Approval-status badge palettes — light variant for the table-view row, dark/translucent
+// variant for the gradient grid-card header (both rendered via shared StatusBadge below).
+const APPROVAL_STATUS_LABELS = {
+  approved:         { label: "Approved", cls: "flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-700 border border-green-300" },
+  pending_approval: { label: "Pending",  cls: "flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-700 border border-amber-300" },
+  rejected:         { label: "Rejected", cls: "flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-700 border border-red-300" },
+  draft:            { label: "Draft",    cls: "flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-600 border border-gray-300" },
 };
 
-const ACTION_CFG = {
-  created: {
-    label: "Created",
-    color: "text-indigo-600",
-    dot: "bg-indigo-400",
-    type: "new",
-  },
-  updated: {
-    label: "Updated",
-    color: "text-blue-600",
-    dot: "bg-blue-400",
-    type: "edit",
-  },
-  submitted_for_approval: {
-    label: "Submitted for Approval",
-    color: "text-amber-600",
-    dot: "bg-amber-400",
-    type: "edit",
-  },
-  status_changed: {
-    label: "Status Changed",
-    color: "text-violet-600",
-    dot: "bg-violet-400",
-    type: "edit",
-  },
-  approved: {
-    label: "Approved",
-    color: "text-green-600",
-    dot: "bg-green-500",
-    type: "edit",
-  },
-  rejected: {
-    label: "Rejected",
-    color: "text-red-600",
-    dot: "bg-red-500",
-    type: "edit",
-  },
-  deleted: {
-    label: "Deleted",
-    color: "text-gray-500",
-    dot: "bg-gray-400",
-    type: "edit",
-  },
+const APPROVAL_STATUS_LABELS_DARK = {
+  approved:         { label: "Approved", cls: "flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-bold bg-green-500/20 text-green-300 border border-green-500/30" },
+  pending_approval: { label: "Pending",  cls: "flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30" },
+  rejected:         { label: "Rejected", cls: "flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-bold bg-red-500/20 text-red-300 border border-red-500/30" },
+  draft:            { label: "Draft",    cls: "flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-bold bg-gray-500/20 text-gray-300 border border-gray-500/30" },
 };
-
-const STATUS_LABELS = {
-  draft: { label: "Draft", cls: "bg-gray-100 text-gray-700 border-gray-300" },
-  pending_approval: {
-    label: "Pending",
-    cls: "bg-amber-100 text-amber-700 border-amber-300",
-  },
-  approved: {
-    label: "Approved",
-    cls: "bg-green-100 text-green-700 border-green-300",
-  },
-  rejected: {
-    label: "Rejected",
-    cls: "bg-red-100 text-red-700 border-red-300",
-  },
-};
-
-const HistoryStatusBadge = ({ status }) => {
-  const cfg = STATUS_LABELS[status] || {
-    label: "Not Set",
-    cls: "bg-slate-100 text-slate-600 border-slate-200",
-  };
-  return (
-    <span
-      className={`inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${cfg.cls}`}
-    >
-      {cfg.label}
-    </span>
-  );
-};
-
-const TypeBadge = ({ type }) =>
-  type === "new" ? (
-    <span className="inline-flex items-center text-[9px] font-black px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 uppercase tracking-wide">
-      New Template
-    </span>
-  ) : (
-    <span className="inline-flex items-center text-[9px] font-black px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-wide">
-      Template Edit
-    </span>
-  );
 
 // ==================== SUB-COMPONENTS ====================
 const StatCard = ({ icon: Icon, label, value, sub, iconBg, iconColor }) => (
@@ -244,20 +175,14 @@ const StatCard = ({ icon: Icon, label, value, sub, iconBg, iconColor }) => (
 
 // Template preview modal
 const PreviewModal = ({ template, onClose, onUse, onEdit, canEdit }) => {
+  const navigate = useNavigate();
   if (!template) return null;
   const catCfg = getCategoryConfig(template.category);
   const checkpoints = getTotalCheckpoints(template);
   const stages = getTotalStages(template);
 
   return (
-    <div
-      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Modal onClose={onClose}>
         {/* Header */}
         <div className="px-5 py-4 bg-gradient-to-br from-slate-800 to-indigo-900 text-white flex items-start justify-between gap-3 flex-shrink-0">
           <div>
@@ -276,12 +201,7 @@ const PreviewModal = ({ template, onClose, onUse, onEdit, canEdit }) => {
               </p>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 hover:bg-white/10 rounded-lg transition flex-shrink-0"
-          >
-            <FaTimes size={14} />
-          </button>
+          <ModalCloseBtn onClick={onClose} />
         </div>
 
         {/* Meta badges */}
@@ -293,11 +213,15 @@ const PreviewModal = ({ template, onClose, onUse, onEdit, canEdit }) => {
               {catCfg.label}
             </span>
           )}
-          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
-            v{template.version || "1.0"}
-          </span>
+          <button
+            onClick={() => navigate(`/auditreport/templates/${template.id}/compare`)}
+            title="Compare versions"
+            className="px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-700 border border-gray-200 hover:border-indigo-200 transition-colors flex items-center gap-1"
+          >
+            v{template.version || "1.0"} <FaCodeBranch size={9} />
+          </button>
           <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-            {template.defaultSections?.length || 0} sections
+            {getTotalSections(template)} sections
           </span>
           <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200">
             {stages} stages
@@ -415,8 +339,7 @@ const PreviewModal = ({ template, onClose, onUse, onEdit, canEdit }) => {
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 
@@ -430,9 +353,9 @@ const TemplateList = () => {
     templates,
     deleteTemplate,
     duplicateTemplate,
+    checkTemplateName,
     loadTemplates,
     updateTemplate,
-    getTemplateHistory,
   } = useAuditData();
 
   const [initialLoading, setInitialLoading] = useState(true);
@@ -448,12 +371,12 @@ const TemplateList = () => {
   const [dupLoadingId, setDupLoadingId] = useState(null);
   const [submitLoadingId, setSubmitLoadingId] = useState(null);
   const [previewTemplate, setPreviewTemplate] = useState(null);
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [duplicateSource, setDuplicateSource] = useState(null); // template being duplicated, or null
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
 
-  // History inline expansion
+  // History inline expansion — fetching/caching now lives in TemplateHistoryPanel
   const [expandedHistoryId, setExpandedHistoryId] = useState(null);
-  const [historyCache, setHistoryCache] = useState({});
-  const [historyLoadingId, setHistoryLoadingId] = useState(null);
-  const [expandedChanges, setExpandedChanges] = useState(new Set());
 
   const canCreateEdit = [
     ROLES.SUPER_ADMIN,
@@ -461,14 +384,8 @@ const TemplateList = () => {
     ROLES.LINE_QUALITY_ENGINEER,
   ].includes(user?.roleName);
 
-  const canApprove = [ROLES.SUPER_ADMIN, ROLES.QUALITY_MANAGER].includes(
-    user?.roleName,
-  );
-
   const isAdmin = user?.roleName === ROLES.SUPER_ADMIN;
   const isLineOperator = user?.roleName === ROLES.QUALITY_OPERATOR;
-  const isQualityManager = user?.roleName === ROLES.QUALITY_MANAGER;
-  const isLineQualityEngineer = user?.roleName === ROLES.LINE_QUALITY_ENGINEER;
 
   // Keyboard shortcut — Ctrl+F ? focus search
   useEffect(() => {
@@ -486,12 +403,13 @@ const TemplateList = () => {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // Load templates on mount
+  // Load templates on mount, and re-fetch when the version-history toggle
+  // flips (includeHistory=true reveals inactive/old versions per template).
   useEffect(() => {
     const fetchTemplates = async () => {
       setInitialLoading(true);
       try {
-        await loadTemplates();
+        await loadTemplates(showVersionHistory ? { includeHistory: true } : {});
       } catch (err) {
         toast.error("Failed to load templates: " + err.message);
       } finally {
@@ -500,12 +418,12 @@ const TemplateList = () => {
     };
     fetchTemplates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [showVersionHistory]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await loadTemplates();
+      await loadTemplates(showVersionHistory ? { includeHistory: true } : {});
       toast.success("Refreshed");
     } catch {
       toast.error("Refresh failed");
@@ -530,22 +448,62 @@ const TemplateList = () => {
     }
   };
 
-  // FIX: per-template duplicate loading (original shared one actionLoading blocked all buttons)
-  const handleDuplicate = async (template) => {
-    setDupLoadingId(template.id);
+  // Duplicate always prompts for a new name (never silently auto-names
+  // "(Copy)") — opens the same two-step name-collision dialog used for "New
+  // Template", just with "Create Version" instead of "Edit Existing" on a
+  // collision.
+  const handleDuplicate = (template) => setDuplicateSource(template);
+
+  const duplicateCreatedBy = () =>
+    user?.name || String(user?.userCode ?? user?.usercode ?? "SYSTEM");
+
+  // duplicateTemplate's single call both checks the name AND performs the
+  // duplication when it's unique — so the prompt's "check" step IS the
+  // create. onUnique then just finalizes the UI (the row is already in
+  // `templates` via the hook's optimistic update).
+  const handleDuplicateCheck = async (newName) => {
+    setDupLoadingId(duplicateSource.id);
     try {
-      // Pass the current user so the duplicate is tagged with the correct createdBy
-      // (needed while auth middleware is disabled on the backend)
-      await duplicateTemplate(template.id, {
-        createdBy:
-          user?.name || String(user?.userCode ?? user?.usercode ?? "SYSTEM"),
-      });
-      toast.success(`"${template.name}" duplicated!`);
-    } catch (err) {
-      toast.error("Duplicate failed: " + err.message);
+      return await duplicateTemplate(duplicateSource.id, { newName, createdBy: duplicateCreatedBy() });
     } finally {
       setDupLoadingId(null);
     }
+  };
+
+  const handleDuplicateUnique = async (newName) => {
+    toast.success(`"${newName}" created from "${duplicateSource.name}"`);
+    setDuplicateSource(null);
+  };
+
+  const handleDuplicateConfirmVersion = async (existing) => {
+    setDupLoadingId(duplicateSource.id);
+    try {
+      await duplicateTemplate(duplicateSource.id, {
+        newName: existing.name,
+        createdBy: duplicateCreatedBy(),
+        confirmCreateVersion: true,
+      });
+      toast.success(`New version created on "${existing.name}"`);
+      setDuplicateSource(null);
+    } finally {
+      setDupLoadingId(null);
+    }
+  };
+
+  // New Template: name-uniqueness is checked BEFORE the builder ever opens.
+  // Unique -> builder opens pre-filled, brand new (v01 on first Save).
+  // Collision -> "Edit Existing" opens the builder against that template's
+  // current content; Save there creates a new version, never overwrites.
+  const handleNewTemplateCheck = async (name) => checkTemplateName(name);
+
+  const handleNewTemplateUnique = (name) => {
+    setShowNamePrompt(false);
+    navigate("/auditreport/templates/new", { state: { presetName: name } });
+  };
+
+  const handleNewTemplateConfirmExisting = (existing) => {
+    setShowNamePrompt(false);
+    navigate(`/auditreport/templates/${existing.id}`, { state: { editMode: true } });
   };
 
   const confirmDelete = (template) => {
@@ -570,30 +528,8 @@ const TemplateList = () => {
   };
 
   // ==================== HISTORY ====================
-  const toggleChange = (key) =>
-    setExpandedChanges((prev) => {
-      const s = new Set(prev);
-      s.has(key) ? s.delete(key) : s.add(key);
-      return s;
-    });
-
-  const openHistory = async (template) => {
-    if (expandedHistoryId === template.id) {
-      setExpandedHistoryId(null);
-      return;
-    }
-    setExpandedHistoryId(template.id);
-    if (historyCache[template.id]) return;
-    setHistoryLoadingId(template.id);
-    try {
-      const data = await getTemplateHistory(template.id);
-      setHistoryCache((prev) => ({ ...prev, [template.id]: data }));
-    } catch (err) {
-      toast.error("Failed to load history: " + err.message);
-    } finally {
-      setHistoryLoadingId(null);
-    }
-  };
+  const openHistory = (template) =>
+    setExpandedHistoryId((prev) => (prev === template.id ? null : template.id));
 
   // ==================== FILTER + SORT ====================
   const enriched = useMemo(
@@ -602,6 +538,7 @@ const TemplateList = () => {
         ...t,
         _checkpoints: getTotalCheckpoints(t),
         _stages: getTotalStages(t),
+        _sections: getTotalSections(t),
       })),
     [templates],
   );
@@ -628,21 +565,13 @@ const TemplateList = () => {
     return nonDraft;
   }, [enriched, isLineOperator]);
 
-  const filtered = useMemo(() => {
+  const categoryFiltered = useMemo(() => {
     const base = activeTab === "draft" ? myDrafts : filteredTemplates;
-    const q = searchTerm.trim().toLowerCase();
-    return base.filter((t) => {
-      if (
-        q &&
-        !["name", "description", "category"].some((k) =>
-          t[k]?.toLowerCase().includes(q),
-        )
-      )
-        return false;
-      if (filterCategory && t.category !== filterCategory) return false;
-      return true;
-    });
-  }, [activeTab, myDrafts, filteredTemplates, searchTerm, filterCategory]);
+    if (!filterCategory) return base;
+    return base.filter((t) => t.category === filterCategory);
+  }, [activeTab, myDrafts, filteredTemplates, filterCategory]);
+
+  const filtered = useTemplateSearch(categoryFiltered, searchTerm);
 
   const sorted = useMemo(() => {
     const [field, dir] = sortKey.split("_");
@@ -653,10 +582,7 @@ const TemplateList = () => {
       if (field === "checkpoints")
         return mult * ((a._checkpoints || 0) - (b._checkpoints || 0));
       if (field === "sections")
-        return (
-          mult *
-          ((a.defaultSections?.length || 0) - (b.defaultSections?.length || 0))
-        );
+        return mult * ((a._sections || 0) - (b._sections || 0));
       const da = new Date(a[field] || a.createdAt || 0);
       const db = new Date(b[field] || b.createdAt || 0);
       return mult * (da - db);
@@ -717,73 +643,69 @@ const TemplateList = () => {
         />
       )}
 
+      {/* ==================== NEW TEMPLATE NAME PROMPT ==================== */}
+      {showNamePrompt && (
+        <NewTemplateNamePrompt
+          title="New Template"
+          inputLabel="Template Name"
+          onClose={() => setShowNamePrompt(false)}
+          onCheck={handleNewTemplateCheck}
+          onUnique={handleNewTemplateUnique}
+          onConfirmExisting={handleNewTemplateConfirmExisting}
+          existingActionLabel="Edit Existing"
+        />
+      )}
+
+      {/* ==================== DUPLICATE NAME PROMPT ==================== */}
+      {duplicateSource && (
+        <NewTemplateNamePrompt
+          title={`Duplicate "${duplicateSource.name}"`}
+          inputLabel="New Template Name"
+          initialValue={`${duplicateSource.name} (Copy)`}
+          onClose={() => setDuplicateSource(null)}
+          onCheck={handleDuplicateCheck}
+          onUnique={handleDuplicateUnique}
+          onConfirmExisting={handleDuplicateConfirmVersion}
+          existingActionLabel="Create Version"
+        />
+      )}
+
       {/* ==================== DELETE MODAL ==================== */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="px-5 py-4 bg-gradient-to-r from-red-600 to-red-700 text-white">
-              <h3 className="text-base font-black flex items-center gap-2">
-                <FaTrash size={13} /> Delete Template
-              </h3>
-              <p className="text-red-200 text-xs mt-1">
-                This action cannot be undone.
+        <ConfirmModal
+          onClose={() => { setShowDeleteModal(false); setTemplateToDelete(null); }}
+          onConfirm={handleDelete}
+          confirming={deleteLoading}
+          icon={FaTrash}
+          title="Delete Template"
+          subtitle="This action cannot be undone."
+          confirmLabel={<><FaTrash size={11} /> Delete Template</>}
+          confirmingLabel={<><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{" "}Deleting…</>}
+        >
+          <p className="text-sm text-gray-600 mb-3">
+            You are about to permanently delete:
+          </p>
+          <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+            <p className="font-bold text-gray-800">
+              {templateToDelete?.name}
+            </p>
+            {templateToDelete?.category && (
+              <p className="text-xs text-gray-400 mt-1 capitalize">
+                {templateToDelete.category} audit
               </p>
-            </div>
-            <div className="p-6">
-              <p className="text-sm text-gray-600 mb-3">
-                You are about to permanently delete:
-              </p>
-              <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-                <p className="font-bold text-gray-800">
-                  {templateToDelete?.name}
-                </p>
-                {templateToDelete?.category && (
-                  <p className="text-xs text-gray-400 mt-1 capitalize">
-                    {templateToDelete.category} audit
-                  </p>
-                )}
-              </div>
-              <div className="mt-4 flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3">
-                <FaExclamationTriangle
-                  className="text-red-500 mt-0.5 flex-shrink-0"
-                  size={12}
-                />
-                <p className="text-xs text-red-600 font-medium">
-                  All sections, stages, and checkpoint configurations will be
-                  permanently removed.
-                </p>
-              </div>
-            </div>
-            <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setTemplateToDelete(null);
-                }}
-                disabled={deleteLoading}
-                className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleteLoading}
-                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center gap-2 transition-all shadow-md shadow-red-200"
-              >
-                {deleteLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{" "}
-                    Deleting…
-                  </>
-                ) : (
-                  <>
-                    <FaTrash size={11} /> Delete Template
-                  </>
-                )}
-              </button>
-            </div>
+            )}
           </div>
-        </div>
+          <div className="mt-4 flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3">
+            <FaExclamationTriangle
+              className="text-red-500 mt-0.5 flex-shrink-0"
+              size={12}
+            />
+            <p className="text-xs text-red-600 font-medium">
+              All sections, stages, and checkpoint configurations will be
+              permanently removed.
+            </p>
+          </div>
+        </ConfirmModal>
       )}
 
       {/* ==================== STICKY HEADER ==================== */}
@@ -849,9 +771,22 @@ const TemplateList = () => {
               </span>
             </button>
 
+            <button
+              onClick={() => setShowVersionHistory((v) => !v)}
+              title="Show all versions, including inactive/old ones"
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all border ${
+                showVersionHistory
+                  ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                  : "bg-white border-gray-200 hover:border-gray-300 text-gray-600"
+              }`}
+            >
+              <FaCodeBranch size={11} />
+              <span className="hidden sm:inline">Version History</span>
+            </button>
+
             {canCreateEdit && (
               <button
-                onClick={() => navigate("/auditreport/templates/new")}
+                onClick={() => setShowNamePrompt(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-200"
               >
                 <FaPlus size={11} /> New Template
@@ -939,7 +874,7 @@ const TemplateList = () => {
             icon={FaClipboardList}
             label="Total Sections"
             value={templates.reduce(
-              (t, tmpl) => t + (tmpl.defaultSections?.length || 0),
+              (t, tmpl) => t + getTotalSections(tmpl),
               0,
             )}
             iconBg="bg-indigo-50"
@@ -1067,7 +1002,7 @@ const TemplateList = () => {
               )}
               {canCreateEdit && (
                 <button
-                  onClick={() => navigate("/auditreport/templates/new")}
+                  onClick={() => setShowNamePrompt(true)}
                   className="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-indigo-200"
                 >
                   <FaPlus size={11} /> Create Template
@@ -1096,25 +1031,9 @@ const TemplateList = () => {
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {template.approvalStatus && (
-                          <span
-                            className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-bold ${
-                              template.approvalStatus === "approved"
-                                ? "bg-green-500/20 text-green-300 border border-green-500/30"
-                                : template.approvalStatus === "pending_approval"
-                                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                                  : template.approvalStatus === "rejected"
-                                    ? "bg-red-500/20 text-red-300 border border-red-500/30"
-                                    : "bg-gray-500/20 text-gray-300 border border-gray-500/30"
-                            }`}
-                          >
-                            {template.approvalStatus === "approved"
-                              ? "Approved"
-                              : template.approvalStatus === "pending_approval"
-                                ? "Pending"
-                                : template.approvalStatus === "rejected"
-                                  ? "Rejected"
-                                  : "Draft"}
-                          </span>
+                          <SharedStatusBadge
+                            config={APPROVAL_STATUS_LABELS_DARK[template.approvalStatus] || APPROVAL_STATUS_LABELS_DARK.draft}
+                          />
                         )}
                         <span
                           className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-bold ${isActive ? "bg-green-500/20 text-green-300 border border-green-500/30" : "bg-white/10 text-white/50 border border-white/20"}`}
@@ -1147,11 +1066,18 @@ const TemplateList = () => {
                         {catCfg.label}
                       </span>
                     )}
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
-                      v{template.version || "1.0"}
-                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/auditreport/templates/${template.id}/compare`);
+                      }}
+                      title="Compare versions"
+                      className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 hover:bg-indigo-100 text-gray-500 hover:text-indigo-700 border border-gray-200 hover:border-indigo-200 transition-colors flex items-center gap-1"
+                    >
+                      v{template.version || "1.0"} <FaCodeBranch size={8} />
+                    </button>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                      {template.defaultSections?.length || 0} sections
+                      {template._sections} sections
                     </span>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
                       {template._checkpoints} checkpoints
@@ -1297,151 +1223,11 @@ const TemplateList = () => {
                       </button>
                     </div>
 
-                    {/* Grid inline history */}
-                    {expandedHistoryId === template.id && (
-                      <div className="mt-3 border-t border-indigo-100 pt-3">
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <FaHistory className="text-indigo-400" size={10} />
-                          <span className="text-[9px] font-black text-indigo-700 uppercase tracking-wider">
-                            Change Log
-                          </span>
-                        </div>
-                        {historyLoadingId === template.id ? (
-                          <div className="flex justify-center py-4">
-                            <div className="w-5 h-5 border-4 border-indigo-100 border-t-indigo-400 rounded-full animate-spin" />
-                          </div>
-                        ) : (historyCache[template.id] || []).length === 0 ? (
-                          <p className="text-center py-3 text-gray-400 text-[10px]">
-                            No history recorded yet.
-                          </p>
-                        ) : (
-                          <div className="relative border-l-2 border-indigo-100 ml-2 space-y-1.5">
-                            {(historyCache[template.id] || []).map((entry) => {
-                              const cfg =
-                                ACTION_CFG[entry.Action?.toLowerCase()] ||
-                                ACTION_CFG.updated;
-                              return (
-                                <div key={entry.Id} className="relative pl-4">
-                                  <div
-                                    className={`absolute -left-[5px] top-2 w-2 h-2 rounded-full ring-1 ring-white ${cfg.dot}`}
-                                  />
-                                  <div className="bg-white border border-gray-100 rounded-lg overflow-hidden">
-                                    <div className="px-2.5 py-1.5 flex flex-wrap items-center justify-between gap-1">
-                                      <div className="flex items-center gap-1 flex-wrap">
-                                        <TypeBadge type={cfg.type} />
-                                        <span
-                                          className={`text-[9px] font-black ${cfg.color}`}
-                                        >
-                                          {cfg.label}
-                                        </span>
-                                        {(entry.PreviousStatus ||
-                                          entry.NewStatus) && (
-                                          <div className="flex items-center gap-0.5">
-                                            {entry.PreviousStatus && (
-                                              <HistoryStatusBadge
-                                                status={entry.PreviousStatus}
-                                              />
-                                            )}
-                                            {entry.PreviousStatus &&
-                                              entry.NewStatus && (
-                                                <FaChevronRight
-                                                  size={6}
-                                                  className="text-gray-400"
-                                                />
-                                              )}
-                                            {entry.NewStatus && (
-                                              <HistoryStatusBadge
-                                                status={entry.NewStatus}
-                                              />
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                      <span className="text-[9px] text-gray-400">
-                                        {entry.ActionBy || "System"} ·{" "}
-                                        {fmtDate(entry.ActionAt)}
-                                      </span>
-                                    </div>
-                                    {entry.Comments && (
-                                      <div className="px-2.5 py-1 bg-red-50 border-t border-red-100">
-                                        <span className="text-[9px] font-bold text-red-500 mr-1">
-                                          Remarks:
-                                        </span>
-                                        <span className="text-[9px] text-red-600">
-                                          {entry.Comments}
-                                        </span>
-                                      </div>
-                                    )}
-                                    {entry.FieldChanges?.length > 0 && (
-                                      <div className="px-2.5 py-1.5 border-t border-gray-50 flex flex-wrap gap-1">
-                                        {entry.FieldChanges.map((fc, fi) => {
-                                          const changeKey = `g_${template.id}_${entry.Id}_${fi}`;
-                                          const isChangeOpen =
-                                            expandedChanges.has(changeKey);
-                                          const isRm = !fc.to || fc.to === "";
-                                          const isAdd =
-                                            !fc.from || fc.from === "";
-                                          const dotClr = isRm
-                                            ? "bg-red-400"
-                                            : isAdd
-                                              ? "bg-green-400"
-                                              : "bg-amber-400";
-                                          return (
-                                            <div
-                                              key={fi}
-                                              className="border border-gray-100 rounded overflow-hidden text-[9px]"
-                                            >
-                                              <button
-                                                type="button"
-                                                onClick={() =>
-                                                  toggleChange(changeKey)
-                                                }
-                                                className="flex items-center gap-1 px-2 py-1 bg-gray-50 hover:bg-gray-100 transition-colors w-full"
-                                              >
-                                                <span
-                                                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotClr}`}
-                                                />
-                                                <span className="font-bold text-gray-600 uppercase">
-                                                  {fc.field}
-                                                </span>
-                                                <FaChevronRight
-                                                  size={6}
-                                                  className={`text-gray-400 ml-auto transition-transform ${isChangeOpen ? "rotate-90" : ""}`}
-                                                />
-                                              </button>
-                                              {isChangeOpen && (
-                                                <div className="grid grid-cols-2 gap-0.5 p-1 bg-white">
-                                                  <div className="bg-red-50 rounded px-1 py-0.5 border border-red-100">
-                                                    <p className="text-red-400 font-bold uppercase text-[8px]">
-                                                      Before
-                                                    </p>
-                                                    <p className="text-red-700 font-semibold break-all">
-                                                      {fc.from ?? "—"}
-                                                    </p>
-                                                  </div>
-                                                  <div className="bg-green-50 rounded px-1 py-0.5 border border-green-100">
-                                                    <p className="text-green-400 font-bold uppercase text-[8px]">
-                                                      After
-                                                    </p>
-                                                    <p className="text-green-700 font-semibold break-all">
-                                                      {fc.to ?? "—"}
-                                                    </p>
-                                                  </div>
-                                                </div>
-                                              )}
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    <TemplateHistoryPanel
+                      templateId={template.id}
+                      isOpen={expandedHistoryId === template.id}
+                      variant="inline-grid"
+                    />
                   </div>
                 </div>
               );
@@ -1482,8 +1268,6 @@ const TemplateList = () => {
                   const isActive = template.isActive !== false;
                   const isDuplicating = dupLoadingId === template.id;
                   const isHistoryOpen = expandedHistoryId === template.id;
-                  const tHistory = historyCache[template.id] || [];
-                  const isHistoryLoading = historyLoadingId === template.id;
 
                   return (
                     <React.Fragment key={template.id}>
@@ -1502,28 +1286,9 @@ const TemplateList = () => {
                                   {template.name}
                                 </p>
                                 {template.approvalStatus && (
-                                  <span
-                                    className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                                      template.approvalStatus === "approved"
-                                        ? "bg-green-100 text-green-700 border border-green-300"
-                                        : template.approvalStatus ===
-                                            "pending_approval"
-                                          ? "bg-amber-100 text-amber-700 border border-amber-300"
-                                          : template.approvalStatus ===
-                                              "rejected"
-                                            ? "bg-red-100 text-red-700 border border-red-300"
-                                            : "bg-gray-100 text-gray-600 border border-gray-300"
-                                    }`}
-                                  >
-                                    {template.approvalStatus === "approved"
-                                      ? "Approved"
-                                      : template.approvalStatus ===
-                                          "pending_approval"
-                                        ? "Pending"
-                                        : template.approvalStatus === "rejected"
-                                          ? "Rejected"
-                                          : "Draft"}
-                                  </span>
+                                  <SharedStatusBadge
+                                    config={APPROVAL_STATUS_LABELS[template.approvalStatus] || APPROVAL_STATUS_LABELS.draft}
+                                  />
                                 )}
                               </div>
                               {template.description && (
@@ -1550,22 +1315,34 @@ const TemplateList = () => {
 
                         {/* Structure */}
                         <td className="px-4 py-3 hidden lg:table-cell">
-                          <div className="flex items-center justify-center gap-3 text-xs text-gray-500">
-                            <span className="flex items-center gap-1">
-                              <FaLayerGroup
-                                size={10}
-                                className="text-slate-400"
-                              />{" "}
-                              {template.defaultSections?.length || 0}
-                            </span>
-                            <span className="text-gray-200">|</span>
-                            <span className="flex items-center gap-1">
-                              <FaClipboardList
-                                size={10}
-                                className="text-indigo-400"
-                              />{" "}
-                              {template._checkpoints}
-                            </span>
+                          <div className="flex flex-col items-center gap-1.5">
+                            <div className="flex items-center justify-center gap-3 text-xs text-gray-500">
+                              <span className="flex items-center gap-1" title="Sections">
+                                <FaLayerGroup
+                                  size={10}
+                                  className="text-slate-400"
+                                />{" "}
+                                {template._sections}
+                              </span>
+                              <span className="text-gray-200">|</span>
+                              <span className="flex items-center gap-1" title="Checkpoints">
+                                <FaClipboardList
+                                  size={10}
+                                  className="text-indigo-400"
+                                />{" "}
+                                {template._checkpoints}
+                              </span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/auditreport/templates/${template.id}/compare`);
+                              }}
+                              title="Compare versions"
+                              className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 hover:bg-indigo-100 text-gray-500 hover:text-indigo-700 border border-gray-200 hover:border-indigo-200 transition-colors flex items-center gap-1"
+                            >
+                              v{template.version || "1.0"} <FaCodeBranch size={8} />
+                            </button>
                           </div>
                         </td>
 
@@ -1715,172 +1492,42 @@ const TemplateList = () => {
                             colSpan={7}
                             className="px-6 py-4 bg-indigo-50/20 border-t border-indigo-100"
                           >
-                            <div className="flex items-center gap-2 mb-3">
-                              <FaHistory
-                                className="text-indigo-400"
-                                size={12}
-                              />
-                              <span className="text-xs font-black text-indigo-700 uppercase tracking-wider">
-                                Change Log — {template.name}
-                              </span>
+                            <TemplateHistoryPanel
+                              templateId={template.id}
+                              isOpen={isHistoryOpen}
+                              variant="inline-list"
+                              title={`Change Log — ${template.name}`}
+                            />
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Version history row — shown when the "Version History" toggle
+                          is on and the backend returned this template's other versions */}
+                      {showVersionHistory && template.versions?.length > 1 && (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-4 bg-blue-50/20 border-t border-blue-100">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                              <FaCodeBranch size={10} /> All Versions — {template.name}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {template.versions.map((v) => (
+                                <button
+                                  key={v.Version}
+                                  onClick={() => navigate(`/auditreport/templates/${template.id}/compare?to=${v.Version}`)}
+                                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border transition-colors ${
+                                    v.IsActiveVersion
+                                      ? "bg-green-50 border-green-200 text-green-700"
+                                      : "bg-white border-gray-200 text-gray-600 hover:border-indigo-200 hover:text-indigo-700"
+                                  }`}
+                                  title={`Created by ${v.CreatedBy || "—"} on ${v.CreatedAt ? new Date(v.CreatedAt).toLocaleString() : "—"}`}
+                                >
+                                  <span className="font-bold">v{v.Version}</span>
+                                  <span>{v.ApprovalStatus}</span>
+                                  {v.IsActiveVersion && <FaCheckCircle size={9} />}
+                                </button>
+                              ))}
                             </div>
-                            {isHistoryLoading ? (
-                              <div className="flex items-center justify-center py-8">
-                                <div className="w-6 h-6 border-4 border-indigo-100 border-t-indigo-400 rounded-full animate-spin" />
-                              </div>
-                            ) : tHistory.length === 0 ? (
-                              <div className="text-center py-6 text-gray-400 text-xs">
-                                No history recorded yet.
-                              </div>
-                            ) : (
-                              <div className="relative border-l-2 border-indigo-100 ml-3 space-y-2">
-                                {tHistory.map((entry) => {
-                                  const cfg =
-                                    ACTION_CFG[entry.Action?.toLowerCase()] ||
-                                    ACTION_CFG.updated;
-                                  return (
-                                    <div
-                                      key={entry.Id}
-                                      className="relative pl-5"
-                                    >
-                                      <div
-                                        className={`absolute -left-[5px] top-2.5 w-2.5 h-2.5 rounded-full ring-2 ring-white ${cfg.dot}`}
-                                      />
-                                      <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-                                        <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-100">
-                                          <div className="flex items-center gap-2 flex-wrap">
-                                            <TypeBadge type={cfg.type} />
-                                            <span
-                                              className={`text-[10px] font-black ${cfg.color}`}
-                                            >
-                                              {cfg.label}
-                                            </span>
-                                            {(entry.PreviousStatus ||
-                                              entry.NewStatus) && (
-                                              <div className="flex items-center gap-1">
-                                                {entry.PreviousStatus && (
-                                                  <HistoryStatusBadge
-                                                    status={
-                                                      entry.PreviousStatus
-                                                    }
-                                                  />
-                                                )}
-                                                {entry.PreviousStatus &&
-                                                  entry.NewStatus && (
-                                                    <FaChevronRight
-                                                      size={7}
-                                                      className="text-gray-400"
-                                                    />
-                                                  )}
-                                                {entry.NewStatus && (
-                                                  <HistoryStatusBadge
-                                                    status={entry.NewStatus}
-                                                  />
-                                                )}
-                                              </div>
-                                            )}
-                                          </div>
-                                          <div className="flex items-center gap-3 text-[10px] text-gray-400">
-                                            <span>
-                                              {entry.ActionBy || "System"}
-                                            </span>
-                                            <span>
-                                              {fmtDate(entry.ActionAt)}
-                                            </span>
-                                          </div>
-                                        </div>
-                                        {entry.Comments && (
-                                          <div className="px-4 py-2 bg-red-50 border-b border-red-100">
-                                            <span className="text-[9px] font-bold text-red-500 uppercase tracking-wider mr-2">
-                                              Remarks:
-                                            </span>
-                                            <span className="text-[10px] text-red-600">
-                                              {entry.Comments}
-                                            </span>
-                                          </div>
-                                        )}
-                                        {entry.FieldChanges?.length > 0 && (
-                                          <div className="px-4 py-2.5 flex flex-wrap gap-2">
-                                            {entry.FieldChanges.map(
-                                              (fc, fi) => {
-                                                const changeKey = `${entry.Id}_${fi}`;
-                                                const isChangeOpen =
-                                                  expandedChanges.has(
-                                                    changeKey,
-                                                  );
-                                                const isRm =
-                                                  !fc.to || fc.to === "";
-                                                const isAdd =
-                                                  !fc.from || fc.from === "";
-                                                const dotClr = isRm
-                                                  ? "bg-red-400"
-                                                  : isAdd
-                                                    ? "bg-green-400"
-                                                    : "bg-amber-400";
-                                                return (
-                                                  <div
-                                                    key={fi}
-                                                    className="border border-gray-100 rounded-lg overflow-hidden text-[9px] min-w-[120px]"
-                                                  >
-                                                    <button
-                                                      type="button"
-                                                      onClick={() =>
-                                                        toggleChange(changeKey)
-                                                      }
-                                                      className="w-full flex items-center justify-between px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 transition-colors"
-                                                    >
-                                                      <div className="flex items-center gap-1.5">
-                                                        <span
-                                                          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotClr}`}
-                                                        />
-                                                        <span className="font-bold text-gray-600 uppercase tracking-wide">
-                                                          {fc.field}
-                                                        </span>
-                                                        {fc.note && (
-                                                          <span
-                                                            className={`px-1.5 py-0.5 rounded-full font-bold ${isRm ? "bg-red-100 text-red-600" : isAdd ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}
-                                                          >
-                                                            {fc.note}
-                                                          </span>
-                                                        )}
-                                                      </div>
-                                                      <FaChevronRight
-                                                        size={7}
-                                                        className={`text-gray-400 transition-transform ${isChangeOpen ? "rotate-90" : ""}`}
-                                                      />
-                                                    </button>
-                                                    {isChangeOpen && (
-                                                      <div className="grid grid-cols-2 gap-1 p-1.5 bg-white">
-                                                        <div className="bg-red-50 rounded px-1.5 py-1 border border-red-100">
-                                                          <p className="text-red-400 font-bold uppercase mb-0.5">
-                                                            Before
-                                                          </p>
-                                                          <p className="text-red-700 font-semibold break-all">
-                                                            {fc.from ?? "—"}
-                                                          </p>
-                                                        </div>
-                                                        <div className="bg-green-50 rounded px-1.5 py-1 border border-green-100">
-                                                          <p className="text-green-400 font-bold uppercase mb-0.5">
-                                                            After
-                                                          </p>
-                                                          <p className="text-green-700 font-semibold break-all">
-                                                            {fc.to ?? "—"}
-                                                          </p>
-                                                        </div>
-                                                      </div>
-                                                    )}
-                                                  </div>
-                                                );
-                                              },
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
                           </td>
                         </tr>
                       )}

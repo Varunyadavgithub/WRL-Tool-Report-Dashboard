@@ -2,14 +2,55 @@ import path from "path";
 import fs from "fs";
 import { promisify } from "util";
 import { DIRS } from "./config.js";
+import { AppError } from "../AppError.js";
+import { computeTemplateHash, computeTemplateStats } from "./templateIntegrity.js";
 
 const writeFileAsync = promisify(fs.writeFile);
 const readFileAsync = promisify(fs.readFile);
 const unlinkAsync = promisify(fs.unlink);
 const readdirAsync = promisify(fs.readdir);
 
+// Legacy flat directory — pre-Phase-5 files lived here; all content now in SQL.
 const TEMPLATES_DIR = DIRS.auditTemplates;
-const BACKUPS_DIR = DIRS.templateBackups;
+const BACKUPS_DIR = DIRS.templateBackups ?? null;
+
+// Filter out undefined entries — active/archive subdirs were removed in Phase 5
+// once all template content moved to AuditTemplateContent (SQL). Only the flat
+// dir remains for any future emergency reads, though no files exist there now.
+const SEARCH_DIRS = [DIRS.templatesActive, DIRS.templatesArchive, TEMPLATES_DIR].filter(Boolean);
+
+const MAX_TEMPLATE_JSON_BYTES = 5 * 1024 * 1024; // 5MB — generous for any realistic audit template
+
+/* ===================== PATH SAFETY (item 21) ===================== */
+
+// Single chokepoint for every fs path this module builds — blocks directory
+// traversal / path injection regardless of where the filename string came from.
+const isSafeFileName = (fileName) =>
+  typeof fileName === "string" &&
+  fileName.length > 0 &&
+  !fileName.includes("..") &&
+  !fileName.includes("/") &&
+  !fileName.includes("\\") &&
+  path.basename(fileName) === fileName &&
+  /^[a-zA-Z0-9_-]+\.json$/.test(fileName);
+
+const assertSafeFileName = (fileName) => {
+  if (!isSafeFileName(fileName)) {
+    throw new AppError(`Invalid template filename: ${fileName}`, 400);
+  }
+  return fileName;
+};
+
+const assertSizeOk = (jsonString) => {
+  const bytes = Buffer.byteLength(jsonString, "utf8");
+  if (bytes > MAX_TEMPLATE_JSON_BYTES) {
+    throw new AppError(
+      `Template JSON exceeds maximum allowed size (${MAX_TEMPLATE_JSON_BYTES} bytes)`,
+      413,
+    );
+  }
+  return bytes;
+};
 
 /* ===================== HELPERS ===================== */
 
@@ -24,11 +65,42 @@ const sanitizeForFilename = (str) =>
 const generateTemplateFileName = (templateName, version = "01") => {
   const name = sanitizeForFilename(templateName);
   if (!name)
-    throw new Error("Template name is required for filename generation");
+    throw new AppError("Template name is required for filename generation", 400);
   return `${name}_${sanitizeForFilename(version)}.json`;
 };
 
-const getTemplateFilePath = (fileName) => path.join(TEMPLATES_DIR, fileName);
+// Phase 1: filename also embeds templateCode so two templates that happen to
+// share a sanitized name can never collide on the same version file.
+const generateVersionedFileName = (templateName, templateCode, version) => {
+  const name = sanitizeForFilename(templateName);
+  if (!name)
+    throw new AppError("Template name is required for filename generation", 400);
+  const code = sanitizeForFilename(templateCode || "NOCODE");
+  const ver = sanitizeForFilename(version || "01");
+  return `${name}_${code}_${ver}.json`;
+};
+
+// "01" -> "02", "09" -> "10" ... falls back gracefully for non-numeric legacy values.
+const nextVersion = (currentVersion) => {
+  const n = parseInt(currentVersion, 10);
+  if (Number.isNaN(n)) return "02";
+  return String(n + 1).padStart(2, "0");
+};
+
+const getTemplateFilePath = (fileName, baseDir = TEMPLATES_DIR) =>
+  path.join(baseDir, assertSafeFileName(fileName));
+
+// Read-oriented lookup: searches active -> archive -> legacy flat dir, so
+// every historical version and every pre-Phase-1 file remains loadable
+// forever without ever being moved or rewritten.
+const findExistingTemplateFilePath = (fileName) => {
+  if (!isSafeFileName(fileName)) return null;
+  for (const dir of SEARCH_DIRS) {
+    const candidate = path.join(dir, fileName);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+};
 
 /**
  * Returns a filename that doesn't already exist on disk, appending _1, _2… if needed.
@@ -47,14 +119,17 @@ const getUniqueFileName = async (
     fs.existsSync(getTemplateFilePath(candidate)) &&
     candidate !== excludeFileName
   ) {
-    if (counter > 100) throw new Error("Too many duplicate template names");
+    if (counter > 100) throw new AppError("Too many duplicate template names", 500);
     candidate = `${base.replace(".json", "")}_${counter++}.json`;
   }
 
   return candidate;
 };
 
-/* ===================== SAVE ===================== */
+/* ===================== SAVE (legacy, overwrite-in-place) ===================== */
+// Retained for backward compatibility. New code (createTemplate/updateTemplate/
+// duplicateTemplate) uses saveNewTemplateVersion below instead, which never
+// overwrites an existing file.
 
 /**
  * Saves (or overwrites) a template JSON file.
@@ -80,30 +155,109 @@ export const saveTemplateFile = async ({
   const filePath = getTemplateFilePath(fileName);
   const now = new Date().toISOString();
 
-  await writeFileAsync(
-    filePath,
-    JSON.stringify(
-      {
-        templateCode: templateCode ?? null,
-        templateName,
-        version,
-        headerConfig: headerConfig ?? {},
-        infoFields: infoFields ?? [],
-        columns: columns ?? [],
-        defaultSections: defaultSections ?? [],
-        approvalStatus: approvalStatus ?? "draft",
-        createdByUser: createdByUser ?? null,
-        savedAt: now,
-        updatedAt: now,
-      },
-      null,
-      2,
-    ),
-    "utf8",
+  const jsonString = JSON.stringify(
+    {
+      templateCode: templateCode ?? null,
+      templateName,
+      version,
+      headerConfig: headerConfig ?? {},
+      infoFields: infoFields ?? [],
+      columns: columns ?? [],
+      defaultSections: defaultSections ?? [],
+      approvalStatus: approvalStatus ?? "draft",
+      createdByUser: createdByUser ?? null,
+      savedAt: now,
+      updatedAt: now,
+    },
+    null,
+    2,
   );
+  assertSizeOk(jsonString);
+
+  await writeFileAsync(filePath, jsonString, "utf8");
 
   console.log(`Template file saved: ${fileName}`);
   return { success: true, fileName, filePath };
+};
+
+/* ===================== SAVE (Phase 1, immutable versioned) ===================== */
+
+/**
+ * Writes a brand-new, never-reused version file into the active templates
+ * folder. Returns the file info plus the hash/stats computed from the exact
+ * string written to disk, so callers can persist them to SQL without a
+ * separate read-back (which would risk a non-byte-identical re-serialization).
+ */
+export const saveNewTemplateVersion = async ({
+  templateName,
+  templateCode,
+  version = "01",
+  headerConfig,
+  infoFields,
+  columns,
+  defaultSections,
+  approvalStatus = "draft",
+  createdByUser = null,
+}) => {
+  let fileName = generateVersionedFileName(templateName, templateCode, version);
+  let counter = 1;
+  while (fs.existsSync(getTemplateFilePath(fileName, DIRS.templatesActive))) {
+    if (counter > 100) throw new AppError("Too many filename collisions for this version", 500);
+    fileName = generateVersionedFileName(templateName, templateCode, version).replace(
+      ".json",
+      `_${counter++}.json`,
+    );
+  }
+
+  const now = new Date().toISOString();
+  const payload = {
+    templateCode: templateCode ?? null,
+    templateName,
+    version,
+    headerConfig: headerConfig ?? {},
+    infoFields: infoFields ?? [],
+    columns: columns ?? [],
+    defaultSections: defaultSections ?? [],
+    approvalStatus: approvalStatus ?? "draft",
+    createdByUser: createdByUser ?? null,
+    jsonSchemaVersion: "1",
+    savedAt: now,
+    updatedAt: now,
+  };
+  const jsonString = JSON.stringify(payload, null, 2);
+  assertSizeOk(jsonString);
+
+  const filePath = getTemplateFilePath(fileName, DIRS.templatesActive);
+  await writeFileAsync(filePath, jsonString, "utf8");
+
+  console.log(`Template version file saved: ${fileName}`);
+
+  return {
+    success: true,
+    fileName,
+    filePath,
+    sizeBytes: Buffer.byteLength(jsonString, "utf8"),
+    hash: computeTemplateHash(jsonString),
+    stats: computeTemplateStats(payload),
+  };
+};
+
+/**
+ * Moves the previous active-version file into the archive folder, fully
+ * intact. Must only be called after the new version file is written and the
+ * SQL update has committed, so a mid-failure never leaves a template with no
+ * active file. No-op (returns null) for files outside templatesActive —
+ * i.e. legacy pre-Phase-1 files are never moved.
+ */
+export const archivePreviousVersion = async (fileName) => {
+  if (!fileName || !isSafeFileName(fileName)) return null;
+  const activePath = path.join(DIRS.templatesActive, fileName);
+  if (!fs.existsSync(activePath)) return null;
+
+  const archivePath = path.join(DIRS.templatesArchive, fileName);
+  await fs.promises.rename(activePath, archivePath);
+  console.log(`Template version archived: ${fileName}`);
+  return archivePath;
 };
 
 /* ===================== READ ===================== */
@@ -114,14 +268,26 @@ export const readTemplateFile = async (fileName) => {
     return null;
   }
 
-  const filePath = getTemplateFilePath(fileName);
-  if (!fs.existsSync(filePath)) {
+  const filePath = findExistingTemplateFilePath(fileName);
+  if (!filePath) {
     console.warn(`Template not found: ${fileName}`);
     return null;
   }
 
   const content = await readFileAsync(filePath, "utf8");
   return JSON.parse(content);
+};
+
+/**
+ * Returns the raw file string (not parsed) for byte-exact hash verification.
+ * A parsed-then-restringified object will NOT necessarily byte-match the
+ * original file, so hash checks must always go through this function.
+ */
+export const readTemplateFileRaw = async (fileName) => {
+  if (!fileName) return null;
+  const filePath = findExistingTemplateFilePath(fileName);
+  if (!filePath) return null;
+  return readFileAsync(filePath, "utf8");
 };
 
 /* ===================== DELETE ===================== */
@@ -132,8 +298,8 @@ export const deleteTemplateFile = async (fileName) => {
     return false;
   }
 
-  const filePath = getTemplateFilePath(fileName);
-  if (!fs.existsSync(filePath)) {
+  const filePath = findExistingTemplateFilePath(fileName);
+  if (!filePath) {
     console.warn(`Template not found: ${fileName}`);
     return false;
   }
@@ -143,7 +309,7 @@ export const deleteTemplateFile = async (fileName) => {
   return true;
 };
 
-/* ===================== UPDATE (with rename support) ===================== */
+/* ===================== UPDATE (legacy, with rename support) ===================== */
 
 export const updateTemplateFile = async ({
   oldFileName,
@@ -178,10 +344,13 @@ export const updateTemplateFile = async ({
 /* ===================== BACKUP & RENAME ===================== */
 
 export const backupTemplateFile = async (fileName) => {
-  if (!fileName) throw new Error("Filename is required for backup");
-  const filePath = getTemplateFilePath(fileName);
-  if (!fs.existsSync(filePath))
-    throw new Error(`Template not found: ${fileName}`);
+  if (!fileName) throw new AppError("Filename is required for backup", 400);
+  const filePath = findExistingTemplateFilePath(fileName);
+  if (!filePath) throw new AppError(`Template not found: ${fileName}`, 404);
+  if (!BACKUPS_DIR) {
+    console.warn(`backupTemplateFile: backups directory not configured, skipping backup of ${fileName}`);
+    return null;
+  }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const backupName = `${fileName.replace(".json", "")}_backup_${timestamp}.json`;
@@ -201,9 +370,8 @@ export const renameTemplateFile = async (
   newTemplateName,
   newVersion,
 ) => {
-  const oldPath = getTemplateFilePath(oldFileName);
-  if (!fs.existsSync(oldPath))
-    throw new Error(`Template not found: ${oldFileName}`);
+  const oldPath = findExistingTemplateFilePath(oldFileName);
+  if (!oldPath) throw new AppError(`Template not found: ${oldFileName}`, 404);
 
   const content = await readFileAsync(oldPath, "utf8");
   const config = JSON.parse(content);
@@ -231,7 +399,7 @@ export const renameTemplateFile = async (
 /* ===================== LIST ===================== */
 
 export const templateFileExists = (fileName) =>
-  !!fileName && fs.existsSync(getTemplateFilePath(fileName));
+  !!findExistingTemplateFilePath(fileName);
 
 export const listTemplateFiles = async () => {
   try {
@@ -256,13 +424,21 @@ export const listTemplateFiles = async () => {
   }
 };
 
+export { nextVersion, generateVersionedFileName, isSafeFileName };
+
 export default {
   saveTemplateFile,
+  saveNewTemplateVersion,
+  archivePreviousVersion,
   readTemplateFile,
+  readTemplateFileRaw,
   deleteTemplateFile,
   updateTemplateFile,
   backupTemplateFile,
   renameTemplateFile,
   templateFileExists,
   listTemplateFiles,
+  nextVersion,
+  generateVersionedFileName,
+  isSafeFileName,
 };

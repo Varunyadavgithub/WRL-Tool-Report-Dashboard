@@ -4,6 +4,10 @@
  * and Quality Defects (pool3 / DB3).
  */
 import sql from "mssql";
+import { sendTestMail } from "../emailTemplates/PartProcess_System/testMail.template.js";
+import { sendShiftEndReportMail } from "../emailTemplates/PartProcess_System/shiftEndReport.template.js";
+import { buildShiftReport } from "../services/shiftReport.service.js";
+import { buildReportAttachments, REPORT_NAMES } from "../services/reportAttachments.service.js";
 
 const numOrNull = (v) => (v === "" || v === null || v === undefined ? null : Number(v));
 const strOrNull = (v) => (v === "" || v === null || v === undefined ? null : String(v));
@@ -511,6 +515,611 @@ export const deleteQualityDefect = async (req, res) => {
   try {
     const { id } = req.params;
     await global.pool3.request().input("id", sql.Int, id).query(`DELETE FROM QualityDefects WHERE Id = @id`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── Mail Subscribers ─────────────────────────────────────────────────────────
+const MAIL_SUBSCRIBER_SELECT = `
+  SELECT
+    Id AS id, EmpName AS empName, EmpId AS empId, Department AS department, Designation AS designation,
+    Email AS email, Mobile AS mobile, Subscriptions AS subscriptions, Frequency AS frequency,
+    Whatsapp AS whatsapp, Sms AS sms, Status AS status
+  FROM MailSubscribers`;
+
+const mapMailSubscriber = (row) => ({
+  ...row,
+  subscriptions: row.subscriptions ? row.subscriptions.split("|").map((s) => s.trim()).filter(Boolean) : [],
+});
+
+export const getMailSubscribers = async (req, res) => {
+  try {
+    const result = await global.pool3.request().query(`${MAIL_SUBSCRIBER_SELECT} ORDER BY Id`);
+    res.json({ success: true, data: result.recordset.map(mapMailSubscriber) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const createMailSubscriber = async (req, res) => {
+  try {
+    const m = req.body;
+    if (!m.empName || !m.email) return res.status(400).json({ success: false, message: "empName and email are required" });
+
+    const result = await global.pool3.request()
+      .input("empName",       sql.NVarChar(200), m.empName)
+      .input("empId",         sql.NVarChar(50),  strOrNull(m.empId))
+      .input("department",    sql.NVarChar(200), strOrNull(m.department))
+      .input("designation",   sql.NVarChar(200), strOrNull(m.designation))
+      .input("email",         sql.NVarChar(200), m.email)
+      .input("mobile",        sql.NVarChar(20),  strOrNull(m.mobile))
+      .input("subscriptions", sql.NVarChar(sql.MAX), Array.isArray(m.subscriptions) ? m.subscriptions.join("|") : strOrNull(m.subscriptions))
+      .input("frequency",     sql.NVarChar(50),  strOrNull(m.frequency) || "Shift-wise")
+      .input("whatsapp",      sql.Bit, toBit(m.whatsapp))
+      .input("sms",           sql.Bit, toBit(m.sms))
+      .input("status",        sql.Bit, toBit(m.status ?? true))
+      .query(`
+        INSERT INTO MailSubscribers (EmpName, EmpId, Department, Designation, Email, Mobile, Subscriptions, Frequency, Whatsapp, Sms, Status)
+        OUTPUT
+          INSERTED.Id AS id, INSERTED.EmpName AS empName, INSERTED.EmpId AS empId, INSERTED.Department AS department, INSERTED.Designation AS designation,
+          INSERTED.Email AS email, INSERTED.Mobile AS mobile, INSERTED.Subscriptions AS subscriptions, INSERTED.Frequency AS frequency,
+          INSERTED.Whatsapp AS whatsapp, INSERTED.Sms AS sms, INSERTED.Status AS status
+        VALUES (@empName, @empId, @department, @designation, @email, @mobile, @subscriptions, @frequency, @whatsapp, @sms, @status)
+      `);
+
+    res.json({ success: true, data: mapMailSubscriber(result.recordset[0]) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const updateMailSubscriber = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const m = req.body;
+    const result = await global.pool3.request()
+      .input("id",            sql.Int, id)
+      .input("empName",       sql.NVarChar(200), m.empName)
+      .input("empId",         sql.NVarChar(50),  strOrNull(m.empId))
+      .input("department",    sql.NVarChar(200), strOrNull(m.department))
+      .input("designation",   sql.NVarChar(200), strOrNull(m.designation))
+      .input("email",         sql.NVarChar(200), m.email)
+      .input("mobile",        sql.NVarChar(20),  strOrNull(m.mobile))
+      .input("subscriptions", sql.NVarChar(sql.MAX), Array.isArray(m.subscriptions) ? m.subscriptions.join("|") : strOrNull(m.subscriptions))
+      .input("frequency",     sql.NVarChar(50),  strOrNull(m.frequency) || "Shift-wise")
+      .input("whatsapp",      sql.Bit, toBit(m.whatsapp))
+      .input("sms",           sql.Bit, toBit(m.sms))
+      .input("status",        sql.Bit, toBit(m.status ?? true))
+      .query(`
+        UPDATE MailSubscribers SET
+          EmpName = @empName, EmpId = @empId, Department = @department, Designation = @designation,
+          Email = @email, Mobile = @mobile, Subscriptions = @subscriptions, Frequency = @frequency,
+          Whatsapp = @whatsapp, Sms = @sms, Status = @status, UpdatedAt = GETDATE()
+        OUTPUT
+          INSERTED.Id AS id, INSERTED.EmpName AS empName, INSERTED.EmpId AS empId, INSERTED.Department AS department, INSERTED.Designation AS designation,
+          INSERTED.Email AS email, INSERTED.Mobile AS mobile, INSERTED.Subscriptions AS subscriptions, INSERTED.Frequency AS frequency,
+          INSERTED.Whatsapp AS whatsapp, INSERTED.Sms AS sms, INSERTED.Status AS status
+        WHERE Id = @id
+      `);
+
+    if (!result.recordset.length) return res.status(404).json({ success: false, message: "Subscriber not found" });
+    res.json({ success: true, data: mapMailSubscriber(result.recordset[0]) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const deleteMailSubscriber = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await global.pool3.request().input("id", sql.Int, id).query(`DELETE FROM MailSubscribers WHERE Id = @id`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+const toMinsOfDay = (hhmm) => {
+  if (!hhmm) return null;
+  const [h, m] = String(hhmm).split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+const dateOnly = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+// Given a test start/end window picked in the UI, resolve which configured
+// shift's window the start time falls into and which production day it
+// belongs to — same overnight-shift rule the cron and report pages use
+// (PartProcessEvents.EventDate is the day the shift STARTED on).
+const resolveTestShift = async (pool, startDate, endDate) => {
+  const start = new Date(String(startDate).replace(" ", "T"));
+  if (Number.isNaN(start.getTime())) throw Object.assign(new Error("Invalid start date/time"), { status: 400 });
+  if (endDate) {
+    const end = new Date(String(endDate).replace(" ", "T"));
+    if (!Number.isNaN(end.getTime()) && end <= start) {
+      throw Object.assign(new Error("End date/time must be after start date/time"), { status: 400 });
+    }
+  }
+
+  const shiftsRes = await pool.request().query(`SELECT ShiftName, StartTime, EndTime FROM ShiftConfigs WHERE Status = 1`);
+  const curMins = start.getHours() * 60 + start.getMinutes();
+  const matched = shiftsRes.recordset.find((s) => {
+    const s0 = toMinsOfDay(s.StartTime);
+    let e0 = toMinsOfDay(s.EndTime);
+    if (s0 === null || e0 === null) return false;
+    if (e0 <= s0) e0 += 1440; // overnight shift
+    const tc = curMins < s0 ? curMins + 1440 : curMins;
+    return tc >= s0 && tc < e0;
+  });
+  if (!matched) throw Object.assign(new Error("No configured shift covers that start time."), { status: 400 });
+
+  const s0 = toMinsOfDay(matched.StartTime);
+  const e0 = toMinsOfDay(matched.EndTime);
+  const isOvernight = e0 <= s0;
+  let dateStr;
+  if (isOvernight && curMins < s0) {
+    const prev = new Date(start); prev.setDate(prev.getDate() - 1);
+    dateStr = dateOnly(prev);
+  } else {
+    dateStr = dateOnly(start);
+  }
+  return { shiftName: matched.ShiftName, dateStr };
+};
+
+// Sends the real shift production report (same content/format the shift-end
+// cron sends), so "Send Test Mail" verifies the full pipeline — not just SMTP
+// connectivity. By default uses the most recent shift that has data; pass
+// startDate/endDate (from the Test modal) to target a specific shift/date
+// instead, e.g. to verify a shift that has quality/downtime logs attached.
+// Falls back to a plain confirmation email when there's no production data.
+export const testMailSubscriber = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { startDate, endDate } = req.body || {};
+    const result = await global.pool3.request()
+      .input("id", sql.Int, id)
+      .query(`${MAIL_SUBSCRIBER_SELECT} WHERE Id = @id`);
+
+    if (!result.recordset.length) return res.status(404).json({ success: false, message: "Subscriber not found" });
+    const subscriber = mapMailSubscriber(result.recordset[0]);
+
+    console.log(`[TestMail] subscriber=${subscriber.email} startDate=${startDate || "(none)"} endDate=${endDate || "(none)"}`);
+
+    let shiftName, dateStr;
+    if (startDate) {
+      ({ shiftName, dateStr } = await resolveTestShift(global.pool3, startDate, endDate));
+      console.log(`[TestMail] resolved shift="${shiftName}" date=${dateStr}`);
+    } else {
+      const latest = await global.pool3.request().query(`
+        SELECT TOP 1 EventDate, ShiftName
+        FROM PartProcessEvents
+        WHERE ShiftName IS NOT NULL
+        ORDER BY EventDate DESC, StartTime DESC
+      `);
+      if (!latest.recordset.length) {
+        await sendTestMail({ to: subscriber.email, empName: subscriber.empName, subscriptions: subscriber.subscriptions });
+        return res.json({ success: true, message: `No production data found yet — sent a basic test email to ${subscriber.email}` });
+      }
+      shiftName = latest.recordset[0].ShiftName;
+      dateStr = new Date(latest.recordset[0].EventDate).toISOString().slice(0, 10);
+    }
+
+    const report = await buildShiftReport(global.pool3, { shiftName }, dateStr);
+    console.log(`[TestMail] buildShiftReport(${shiftName}, ${dateStr}) -> ${report ? `${report.rows.length} row(s)` : "null (no data)"}`);
+    if (!report) {
+      await sendTestMail({ to: subscriber.email, empName: subscriber.empName, subscriptions: subscriber.subscriptions });
+      return res.json({ success: true, message: `No production data for ${shiftName} on ${dateStr} — sent a basic test email to ${subscriber.email}` });
+    }
+
+    const reportNames = subscriber.subscriptions.filter((r) => REPORT_NAMES.includes(r));
+    const attachmentsByReport = reportNames.length
+      ? await buildReportAttachments(global.pool3, { shiftName }, dateStr, reportNames)
+      : {};
+    const attachments = reportNames.map((r) => attachmentsByReport[r]).filter(Boolean);
+
+    await sendShiftEndReportMail({ to: subscriber.email, ...report, attachments, attachedReportNames: reportNames });
+
+    const builtNames = reportNames.filter((r) => attachmentsByReport[r]);
+    const missingNames = reportNames.filter((r) => !attachmentsByReport[r]);
+    const attachNote = reportNames.length === 0
+      ? " — no reports ticked for this subscriber, so no PDF was attached (edit the subscriber and pick report(s) under Report Subscriptions)"
+      : builtNames.length === 0
+        ? ` — ${reportNames.join(", ")} selected but no PDF could be built (likely no data for that shift)`
+        : missingNames.length
+          ? ` with ${builtNames.length} PDF attachment(s): ${builtNames.join(", ")} (skipped ${missingNames.join(", ")} — no data)`
+          : ` with ${builtNames.length} PDF attachment(s): ${builtNames.join(", ")}`;
+    res.json({ success: true, message: `Sent ${shiftName} (${dateStr}) report to ${subscriber.email}${attachNote}` });
+  } catch (err) {
+    res.status(err.status || 500).json({ success: false, message: err.message });
+  }
+};
+
+// ── Machines ─────────────────────────────────────────────────────────────────
+const MACHINE_SELECT = `
+  SELECT
+    Id AS id, MachineName AS machineName, MachineCode AS machineCode, IpAddress AS ipAddress,
+    ControllerType AS controllerType, ApiEndpoint AS apiEndpoint, Department AS department,
+    LineName AS lineName, PlantLocation AS plantLocation, ImagePath AS imagePath,
+    Connected AS connected, Status AS status
+  FROM Machines`;
+
+export const getMachines = async (req, res) => {
+  try {
+    const result = await global.pool3.request().query(`${MACHINE_SELECT} ORDER BY Id`);
+    res.json({ success: true, data: result.recordset });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const createMachine = async (req, res) => {
+  try {
+    const m = req.body;
+    if (!m.machineName || !m.machineCode) return res.status(400).json({ success: false, message: "machineName and machineCode are required" });
+
+    const result = await global.pool3.request()
+      .input("machineName",    sql.NVarChar(200), m.machineName)
+      .input("machineCode",    sql.NVarChar(50),  m.machineCode)
+      .input("ipAddress",      sql.NVarChar(50),  strOrNull(m.ipAddress))
+      .input("controllerType", sql.NVarChar(50),  strOrNull(m.controllerType))
+      .input("apiEndpoint",    sql.NVarChar(300), strOrNull(m.apiEndpoint))
+      .input("department",     sql.NVarChar(200), strOrNull(m.department))
+      .input("lineName",       sql.NVarChar(100), strOrNull(m.lineName))
+      .input("plantLocation",  sql.NVarChar(100), strOrNull(m.plantLocation))
+      .input("connected",      sql.Bit, toBit(m.connected))
+      .input("status",         sql.Bit, toBit(m.status ?? true))
+      .query(`
+        INSERT INTO Machines (MachineName, MachineCode, IpAddress, ControllerType, ApiEndpoint, Department, LineName, PlantLocation, Connected, Status)
+        OUTPUT
+          INSERTED.Id AS id, INSERTED.MachineName AS machineName, INSERTED.MachineCode AS machineCode, INSERTED.IpAddress AS ipAddress,
+          INSERTED.ControllerType AS controllerType, INSERTED.ApiEndpoint AS apiEndpoint, INSERTED.Department AS department,
+          INSERTED.LineName AS lineName, INSERTED.PlantLocation AS plantLocation, INSERTED.ImagePath AS imagePath,
+          INSERTED.Connected AS connected, INSERTED.Status AS status
+        VALUES (@machineName, @machineCode, @ipAddress, @controllerType, @apiEndpoint, @department, @lineName, @plantLocation, @connected, @status)
+      `);
+
+    res.json({ success: true, data: result.recordset[0] });
+  } catch (err) {
+    if (err.number === 2627 || err.number === 2601) {
+      return res.status(409).json({ success: false, message: `Machine Code "${req.body.machineCode}" already exists` });
+    }
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const updateMachine = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const m = req.body;
+    const result = await global.pool3.request()
+      .input("id",             sql.Int, id)
+      .input("machineName",    sql.NVarChar(200), m.machineName)
+      .input("machineCode",    sql.NVarChar(50),  m.machineCode)
+      .input("ipAddress",      sql.NVarChar(50),  strOrNull(m.ipAddress))
+      .input("controllerType", sql.NVarChar(50),  strOrNull(m.controllerType))
+      .input("apiEndpoint",    sql.NVarChar(300), strOrNull(m.apiEndpoint))
+      .input("department",     sql.NVarChar(200), strOrNull(m.department))
+      .input("lineName",       sql.NVarChar(100), strOrNull(m.lineName))
+      .input("plantLocation",  sql.NVarChar(100), strOrNull(m.plantLocation))
+      .input("connected",      sql.Bit, toBit(m.connected))
+      .input("status",         sql.Bit, toBit(m.status ?? true))
+      .query(`
+        UPDATE Machines SET
+          MachineName = @machineName, MachineCode = @machineCode, IpAddress = @ipAddress,
+          ControllerType = @controllerType, ApiEndpoint = @apiEndpoint, Department = @department,
+          LineName = @lineName, PlantLocation = @plantLocation, Connected = @connected, Status = @status,
+          UpdatedAt = GETDATE()
+        OUTPUT
+          INSERTED.Id AS id, INSERTED.MachineName AS machineName, INSERTED.MachineCode AS machineCode, INSERTED.IpAddress AS ipAddress,
+          INSERTED.ControllerType AS controllerType, INSERTED.ApiEndpoint AS apiEndpoint, INSERTED.Department AS department,
+          INSERTED.LineName AS lineName, INSERTED.PlantLocation AS plantLocation, INSERTED.ImagePath AS imagePath,
+          INSERTED.Connected AS connected, INSERTED.Status AS status
+        WHERE Id = @id
+      `);
+
+    if (!result.recordset.length) return res.status(404).json({ success: false, message: "Machine not found" });
+    res.json({ success: true, data: result.recordset[0] });
+  } catch (err) {
+    if (err.number === 2627 || err.number === 2601) {
+      return res.status(409).json({ success: false, message: `Machine Code "${req.body.machineCode}" already exists` });
+    }
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const deleteMachine = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await global.pool3.request().input("id", sql.Int, id).query(`DELETE FROM Machines WHERE Id = @id`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const uploadMachineImage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.file) return res.status(400).json({ success: false, message: "image file is required" });
+
+    const imagePath = `/uploads/MachineImages/${req.file.filename}`;
+    const result = await global.pool3.request()
+      .input("id", sql.Int, id)
+      .input("imagePath", sql.NVarChar(300), imagePath)
+      .query(`
+        UPDATE Machines SET ImagePath = @imagePath, UpdatedAt = GETDATE()
+        OUTPUT
+          INSERTED.Id AS id, INSERTED.MachineName AS machineName, INSERTED.MachineCode AS machineCode, INSERTED.IpAddress AS ipAddress,
+          INSERTED.ControllerType AS controllerType, INSERTED.ApiEndpoint AS apiEndpoint, INSERTED.Department AS department,
+          INSERTED.LineName AS lineName, INSERTED.PlantLocation AS plantLocation, INSERTED.ImagePath AS imagePath,
+          INSERTED.Connected AS connected, INSERTED.Status AS status
+        WHERE Id = @id
+      `);
+
+    if (!result.recordset.length) return res.status(404).json({ success: false, message: "Machine not found" });
+    res.json({ success: true, data: result.recordset[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── Production Plans ─────────────────────────────────────────────────────────
+const PLAN_SELECT = `
+  SELECT
+    Id AS id, MachineName AS machineName, SapCode AS sapCode, PartName AS partName, ModelCode AS modelCode,
+    TargetQty AS targetQty, Shift AS shift, CONVERT(varchar(10), PlanDate, 23) AS planDate,
+    Priority AS priority, Customer AS customer, PlannedCycleTime AS plannedCycleTime, Status AS status
+  FROM ProductionPlans`;
+
+export const getPlans = async (req, res) => {
+  try {
+    const result = await global.pool3.request().query(`${PLAN_SELECT} ORDER BY PlanDate DESC, Id DESC`);
+    res.json({ success: true, data: result.recordset });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const createPlan = async (req, res) => {
+  try {
+    const p = req.body;
+    if (!p.machineName || !p.sapCode || !p.targetQty || !p.planDate) {
+      return res.status(400).json({ success: false, message: "machineName, sapCode, targetQty and planDate are required" });
+    }
+
+    const result = await global.pool3.request()
+      .input("machineName",      sql.NVarChar(200), p.machineName)
+      .input("sapCode",          sql.NVarChar(50),  p.sapCode)
+      .input("partName",         sql.NVarChar(300), strOrNull(p.partName))
+      .input("modelCode",        sql.NVarChar(100), strOrNull(p.modelCode))
+      .input("targetQty",        sql.Decimal(14, 2), numOrNull(p.targetQty) ?? 0)
+      .input("shift",            sql.NVarChar(50),  p.shift || "All Shifts")
+      .input("planDate",         sql.Date, p.planDate)
+      .input("priority",         sql.NVarChar(20),  p.priority || "Medium")
+      .input("customer",         sql.NVarChar(200), strOrNull(p.customer))
+      .input("plannedCycleTime", sql.Decimal(12, 3), numOrNull(p.plannedCycleTime))
+      .input("status",           sql.Bit, toBit(p.status ?? true))
+      .query(`
+        INSERT INTO ProductionPlans (
+          MachineName, SapCode, PartName, ModelCode, TargetQty, Shift, PlanDate, Priority, Customer, PlannedCycleTime, Status
+        )
+        OUTPUT
+          INSERTED.Id AS id, INSERTED.MachineName AS machineName, INSERTED.SapCode AS sapCode, INSERTED.PartName AS partName,
+          INSERTED.ModelCode AS modelCode, INSERTED.TargetQty AS targetQty, INSERTED.Shift AS shift,
+          CONVERT(varchar(10), INSERTED.PlanDate, 23) AS planDate, INSERTED.Priority AS priority,
+          INSERTED.Customer AS customer, INSERTED.PlannedCycleTime AS plannedCycleTime, INSERTED.Status AS status
+        VALUES (
+          @machineName, @sapCode, @partName, @modelCode, @targetQty, @shift, @planDate, @priority, @customer, @plannedCycleTime, @status
+        )
+      `);
+
+    res.json({ success: true, data: result.recordset[0] });
+  } catch (err) {
+    if (err.number === 2627 || err.number === 2601) {
+      return res.status(409).json({ success: false, message: `A plan for SAP Code "${req.body.sapCode}" on this machine/date/shift already exists` });
+    }
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const updatePlan = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const p = req.body;
+
+    const result = await global.pool3.request()
+      .input("id",                sql.Int, id)
+      .input("machineName",      sql.NVarChar(200), p.machineName)
+      .input("sapCode",          sql.NVarChar(50),  p.sapCode)
+      .input("partName",         sql.NVarChar(300), strOrNull(p.partName))
+      .input("modelCode",        sql.NVarChar(100), strOrNull(p.modelCode))
+      .input("targetQty",        sql.Decimal(14, 2), numOrNull(p.targetQty) ?? 0)
+      .input("shift",            sql.NVarChar(50),  p.shift || "All Shifts")
+      .input("planDate",         sql.Date, p.planDate)
+      .input("priority",         sql.NVarChar(20),  p.priority || "Medium")
+      .input("customer",         sql.NVarChar(200), strOrNull(p.customer))
+      .input("plannedCycleTime", sql.Decimal(12, 3), numOrNull(p.plannedCycleTime))
+      .input("status",           sql.Bit, toBit(p.status ?? true))
+      .query(`
+        UPDATE ProductionPlans SET
+          MachineName = @machineName, SapCode = @sapCode, PartName = @partName, ModelCode = @modelCode,
+          TargetQty = @targetQty, Shift = @shift, PlanDate = @planDate, Priority = @priority,
+          Customer = @customer, PlannedCycleTime = @plannedCycleTime, Status = @status,
+          UpdatedAt = GETDATE()
+        OUTPUT
+          INSERTED.Id AS id, INSERTED.MachineName AS machineName, INSERTED.SapCode AS sapCode, INSERTED.PartName AS partName,
+          INSERTED.ModelCode AS modelCode, INSERTED.TargetQty AS targetQty, INSERTED.Shift AS shift,
+          CONVERT(varchar(10), INSERTED.PlanDate, 23) AS planDate, INSERTED.Priority AS priority,
+          INSERTED.Customer AS customer, INSERTED.PlannedCycleTime AS plannedCycleTime, INSERTED.Status AS status
+        WHERE Id = @id
+      `);
+
+    if (!result.recordset.length) return res.status(404).json({ success: false, message: "Plan not found" });
+    res.json({ success: true, data: result.recordset[0] });
+  } catch (err) {
+    if (err.number === 2627 || err.number === 2601) {
+      return res.status(409).json({ success: false, message: `A plan for SAP Code "${req.body.sapCode}" on this machine/date/shift already exists` });
+    }
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const deletePlan = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await global.pool3.request().input("id", sql.Int, id).query(`DELETE FROM ProductionPlans WHERE Id = @id`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Bulk upsert (Excel import) — match existing rows by SapCode + MachineName + PlanDate + Shift.
+export const bulkUpsertPlans = async (req, res) => {
+  try {
+    const plans = Array.isArray(req.body?.plans) ? req.body.plans : [];
+    let inserted = 0, updated = 0, skipped = 0;
+
+    for (const p of plans) {
+      if (!p.machineName || !p.sapCode || !p.planDate) { skipped++; continue; }
+
+      const request = global.pool3.request()
+        .input("machineName",      sql.NVarChar(200), p.machineName)
+        .input("sapCode",          sql.NVarChar(50),  p.sapCode)
+        .input("partName",         sql.NVarChar(300), strOrNull(p.partName))
+        .input("modelCode",        sql.NVarChar(100), strOrNull(p.modelCode))
+        .input("targetQty",        sql.Decimal(14, 2), numOrNull(p.targetQty) ?? 0)
+        .input("shift",            sql.NVarChar(50),  p.shift || "All Shifts")
+        .input("planDate",         sql.Date, p.planDate)
+        .input("priority",         sql.NVarChar(20),  p.priority || "Medium")
+        .input("customer",         sql.NVarChar(200), strOrNull(p.customer))
+        .input("plannedCycleTime", sql.Decimal(12, 3), numOrNull(p.plannedCycleTime))
+        .input("status",           sql.Bit, toBit(p.status ?? true));
+
+      const result = await request.query(`
+        MERGE ProductionPlans AS target
+        USING (SELECT @sapCode AS SapCode, @machineName AS MachineName, @planDate AS PlanDate, @shift AS Shift) AS src
+        ON target.SapCode = src.SapCode AND target.MachineName = src.MachineName
+           AND target.PlanDate = src.PlanDate AND target.Shift = src.Shift
+        WHEN MATCHED THEN UPDATE SET
+          PartName = @partName, ModelCode = @modelCode, TargetQty = @targetQty,
+          Priority = @priority, Customer = @customer, PlannedCycleTime = @plannedCycleTime, Status = @status,
+          UpdatedAt = GETDATE()
+        WHEN NOT MATCHED THEN INSERT (
+          MachineName, SapCode, PartName, ModelCode, TargetQty, Shift, PlanDate, Priority, Customer, PlannedCycleTime, Status
+        ) VALUES (
+          @machineName, @sapCode, @partName, @modelCode, @targetQty, @shift, @planDate, @priority, @customer, @plannedCycleTime, @status
+        )
+        OUTPUT $action AS action;
+      `);
+
+      const action = result.recordset?.[0]?.action;
+      if (action === "INSERT") inserted++;
+      else if (action === "UPDATE") updated++;
+    }
+
+    const all = await global.pool3.request().query(`${PLAN_SELECT} ORDER BY PlanDate DESC, Id DESC`);
+    res.json({ success: true, inserted, updated, skipped, data: all.recordset });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// -- Checkpoint Library -------------------------------------------------------
+// "CheckPoint" collides with the reserved CHECKPOINT keyword in T-SQL, so the
+// SQL column is CheckPointText -- aliased back to checkPoint for the JS side.
+const CHECKPOINT_LIBRARY_SELECT = `
+  SELECT
+    Id AS id, CheckPointText AS [checkPoint], Method AS method, Specification AS specification,
+    Category AS category, Required AS required, UsageCount AS usageCount, Status AS status,
+    CreatedBy AS createdBy, CreatedAt AS createdAt
+  FROM CheckpointLibrary`;
+
+export const getCheckpointLibrary = async (req, res) => {
+  try {
+    const result = await global.pool3.request().query(`${CHECKPOINT_LIBRARY_SELECT} ORDER BY Id DESC`);
+    res.json({ success: true, data: result.recordset });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const createCheckpointLibraryEntry = async (req, res) => {
+  try {
+    const c = req.body;
+    if (!c.checkPoint?.trim()) return res.status(400).json({ success: false, message: "checkPoint is required" });
+    const result = await global.pool3.request()
+      .input("checkPoint",    sql.NVarChar(500), c.checkPoint.trim())
+      .input("method",        sql.NVarChar(300), strOrNull(c.method))
+      .input("specification", sql.NVarChar(500), strOrNull(c.specification))
+      .input("category",      sql.NVarChar(100), strOrNull(c.category))
+      .input("required",      sql.Bit, toBit(c.required))
+      .input("status",        sql.Bit, toBit(c.status ?? true))
+      .input("createdBy",     sql.NVarChar(200), strOrNull(c.createdBy))
+      .query(`
+        INSERT INTO CheckpointLibrary (CheckPointText, Method, Specification, Category, Required, Status, CreatedBy)
+        OUTPUT
+          INSERTED.Id AS id, INSERTED.CheckPointText AS [checkPoint], INSERTED.Method AS method,
+          INSERTED.Specification AS specification, INSERTED.Category AS category,
+          INSERTED.Required AS required, INSERTED.UsageCount AS usageCount, INSERTED.Status AS status,
+          INSERTED.CreatedBy AS createdBy, INSERTED.CreatedAt AS createdAt
+        VALUES (@checkPoint, @method, @specification, @category, @required, @status, @createdBy)
+      `);
+    res.json({ success: true, data: result.recordset[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const updateCheckpointLibraryEntry = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const c = req.body;
+    const result = await global.pool3.request()
+      .input("id",            sql.Int, id)
+      .input("checkPoint",    sql.NVarChar(500), c.checkPoint)
+      .input("method",        sql.NVarChar(300), strOrNull(c.method))
+      .input("specification", sql.NVarChar(500), strOrNull(c.specification))
+      .input("category",      sql.NVarChar(100), strOrNull(c.category))
+      .input("required",      sql.Bit, toBit(c.required))
+      .input("status",        sql.Bit, toBit(c.status ?? true))
+      .query(`
+        UPDATE CheckpointLibrary SET
+          CheckPointText = @checkPoint, Method = @method, Specification = @specification,
+          Category = @category, Required = @required, Status = @status, UpdatedAt = GETDATE()
+        OUTPUT
+          INSERTED.Id AS id, INSERTED.CheckPointText AS [checkPoint], INSERTED.Method AS method,
+          INSERTED.Specification AS specification, INSERTED.Category AS category,
+          INSERTED.Required AS required, INSERTED.UsageCount AS usageCount, INSERTED.Status AS status,
+          INSERTED.CreatedBy AS createdBy, INSERTED.CreatedAt AS createdAt
+        WHERE Id = @id
+      `);
+    if (!result.recordset.length) return res.status(404).json({ success: false, message: "Checkpoint not found" });
+    res.json({ success: true, data: result.recordset[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const deleteCheckpointLibraryEntry = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await global.pool3.request().input("id", sql.Int, id).query(`DELETE FROM CheckpointLibrary WHERE Id = @id`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Fire-and-forget usage counter -- called by the AuditReport module when a
+// library checkpoint is inserted into a template. Failures are non-fatal
+// (counter is informational only, never blocks template editing).
+export const incrementCheckpointUsage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await global.pool3.request().input("id", sql.Int, id)
+      .query(`UPDATE CheckpointLibrary SET UsageCount = UsageCount + 1 WHERE Id = @id`);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

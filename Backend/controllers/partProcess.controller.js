@@ -2,7 +2,6 @@
  * PartProcess Controller
  * Serves data from the local PartProcessEvents table (pool3 / DB3).
  */
-import { syncRange, syncStatus } from "../cron/partProcessSync.js";
 
 // ── GET /api/v1/part-process/records ──────────────────────────────────────────
 export const getRecords = async (req, res) => {
@@ -44,71 +43,279 @@ export const getRecords = async (req, res) => {
   }
 };
 
-// ── GET /api/v1/part-process/sync-status ─────────────────────────────────────
-export const getSyncStatus = async (req, res) => {
+// ── GET /api/v1/part-process/records-range ────────────────────────────────────
+// Multi-day fetch for analytics/dashboards. EventDate is inclusive on both ends.
+export const getRecordsRange = async (req, res) => {
   try {
-    const dbStats = await global.pool3.request().query(`
-      SELECT
-        EventDate,
-        COUNT(*)   AS TotalRecords,
-        MAX(SyncedAt) AS LastSynced,
-        SUM(CASE WHEN EventType = 'Production' THEN 1 ELSE 0 END) AS ProductionCount,
-        SUM(CASE WHEN EventType = 'Downtime'   THEN 1 ELSE 0 END) AS DowntimeCount,
-        SUM(PartsQty) AS TotalQty
-      FROM PartProcessEvents
-      WHERE EventDate >= CAST(GETDATE() - 7 AS DATE)
-      GROUP BY EventDate
-      ORDER BY EventDate DESC
-    `);
-
-    // Overall DB stats
-    const overall = await global.pool3.request().query(`
-      SELECT
-        MIN(EventDate) AS EarliestDate,
-        MAX(EventDate) AS LatestDate,
-        COUNT(*)       AS TotalRecords
-      FROM PartProcessEvents
-    `);
-
-    res.json({
-      success: true,
-      sync:    syncStatus,           // live progress from cron
-      last7:   dbStats.recordset,    // per-date breakdown
-      overall: overall.recordset[0],
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-// ── POST /api/v1/part-process/sync ───────────────────────────────────────────
-// Body/query: { startDate: "YYYY-MM-DD", endDate: "YYYY-MM-DD" }
-// Triggers a manual re-sync for the given date range (runs in background).
-export const triggerSync = async (req, res) => {
-  try {
-    if (syncStatus.running) {
-      return res.json({
-        success: false,
-        message: `Sync already running (${syncStatus.phase}) — ${syncStatus.currentDate}`,
-        sync: syncStatus,
-      });
-    }
-
-    const { startDate, endDate } = { ...req.query, ...req.body };
+    const { startDate, endDate, shift } = req.query;
     if (!startDate || !endDate) {
       return res.status(400).json({ success: false, message: "startDate and endDate are required" });
     }
 
-    // Fire-and-forget — returns immediately, client polls /sync-status
-    syncRange(startDate, endDate, "manual")
-      .catch(err => console.error("[PPSync] Manual sync failed:", err));
+    const result = await global.pool3.request()
+      .input("startDate", startDate)
+      .input("endDate",   endDate)
+      .input("shift",     shift || null)
+      .query(`
+        SELECT
+          EventId, EventDate, ShiftName, EventType, Barcode,
+          StartTime, EndTime, Duration, PartsQty, PartsQuality,
+          OperatorName, DowntimeReason, DowntimeComment,
+          AssetName, LineName, Energy, SyncedAt
+        FROM PartProcessEvents
+        WHERE EventDate BETWEEN @startDate AND @endDate
+          AND (@shift IS NULL OR ShiftName = @shift)
+        ORDER BY EventDate ASC, StartTime ASC
+      `);
 
-    res.json({
-      success: true,
-      message: `Manual sync started: ${startDate} → ${endDate}`,
-      sync:    syncStatus,
-    });
+    res.json({ success: true, data: result.recordset });
   } catch (err) {
+    console.error("[PartProcess] getRecordsRange:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── PartProcessDowntimeLog table helpers ─────────────────────────────────────
+
+const ensureDowntimeLogTable = async () => {
+  await global.pool3.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+      WHERE TABLE_NAME = 'PartProcessDowntimeLog'
+    )
+    BEGIN
+      CREATE TABLE PartProcessDowntimeLog (
+        Id           INT IDENTITY(1,1) PRIMARY KEY,
+        SrNo         NVARCHAR(20)   NULL,
+        EventId      INT            NULL,
+        ShiftName    NVARCHAR(50)   NULL,
+        EventDate    DATE           NULL,
+        StartTime    NVARCHAR(20)   NULL,
+        EndTime      NVARCHAR(20)   NULL,
+        Duration     NVARCHAR(20)   NULL,
+        Model        NVARCHAR(255)  NULL,
+        FromModel    NVARCHAR(255)  NULL,
+        IsChangeover BIT            NOT NULL DEFAULT 0,
+        ReasonCode   NVARCHAR(50)   NULL,
+        ReasonName   NVARCHAR(255)  NULL,
+        Category     NVARCHAR(100)  NULL,
+        Planned      BIT            NOT NULL DEFAULT 0,
+        Remarks      NVARCHAR(MAX)  NULL,
+        LoggedAt     DATETIME2      NOT NULL DEFAULT GETDATE(),
+        CreatedAt    DATETIME2      NOT NULL DEFAULT GETDATE()
+      )
+    END;
+    IF NOT EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'PartProcessDowntimeLog' AND COLUMN_NAME = 'EventId'
+    )
+    BEGIN
+      ALTER TABLE PartProcessDowntimeLog ADD EventId INT NULL
+    END
+  `);
+};
+
+// ── POST /api/v1/part-process/downtime-log ────────────────────────────────────
+export const createDowntimeLog = async (req, res) => {
+  try {
+    await ensureDowntimeLogTable();
+    const {
+      srNo, eventId, shift, eventDate, startTime, endTime, duration,
+      model, fromModel, isChangeover, reasonCode, reasonName,
+      category, planned, remarks, loggedAt,
+    } = req.body;
+
+    const result = await global.pool3.request()
+      .input("srNo",         srNo                              || null)
+      .input("eventId",      eventId ? parseInt(eventId, 10)  : null)
+      .input("shiftName",    shift                             || null)
+      .input("eventDate",    eventDate                         || null)
+      .input("startTime",    startTime                         || null)
+      .input("endTime",      endTime                           || null)
+      .input("duration",     duration                          || null)
+      .input("model",        model                             || null)
+      .input("fromModel",    fromModel                         || null)
+      .input("isChangeover", isChangeover ? 1 : 0)
+      .input("reasonCode",   reasonCode   || null)
+      .input("reasonName",   reasonName   || null)
+      .input("category",     category     || null)
+      .input("planned",      planned      ? 1 : 0)
+      .input("remarks",      remarks      || null)
+      .input("loggedAt",     loggedAt     || new Date().toISOString())
+      .query(`
+        INSERT INTO PartProcessDowntimeLog
+          (SrNo, EventId, ShiftName, EventDate, StartTime, EndTime, Duration,
+           Model, FromModel, IsChangeover, ReasonCode, ReasonName,
+           Category, Planned, Remarks, LoggedAt)
+        OUTPUT INSERTED.Id
+        VALUES
+          (@srNo, @eventId, @shiftName, @eventDate, @startTime, @endTime, @duration,
+           @model, @fromModel, @isChangeover, @reasonCode, @reasonName,
+           @category, @planned, @remarks, @loggedAt)
+      `);
+
+    res.json({ success: true, data: { id: result.recordset[0].Id } });
+  } catch (err) {
+    console.error("[PartProcess] createDowntimeLog:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── GET /api/v1/part-process/downtime-log ────────────────────────────────────
+export const getDowntimeLogs = async (req, res) => {
+  try {
+    await ensureDowntimeLogTable();
+    const { startDate, endDate, shift } = req.query;
+
+    const result = await global.pool3.request()
+      .input("startDate", startDate || null)
+      .input("endDate",   endDate   || null)
+      .input("shift",     shift     || null)
+      .query(`
+        SELECT Id, SrNo, EventId, ShiftName, EventDate, StartTime, EndTime, Duration,
+               Model, FromModel, IsChangeover, ReasonCode, ReasonName,
+               Category, Planned, Remarks, LoggedAt, CreatedAt
+        FROM PartProcessDowntimeLog
+        WHERE (@startDate IS NULL OR EventDate >= @startDate)
+          AND (@endDate   IS NULL OR EventDate <= @endDate)
+          AND (@shift     IS NULL OR ShiftName = @shift)
+        ORDER BY LoggedAt DESC
+      `);
+
+    res.json({ success: true, data: result.recordset });
+  } catch (err) {
+    console.error("[PartProcess] getDowntimeLogs:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── DELETE /api/v1/part-process/downtime-log/:id ─────────────────────────────
+export const deleteDowntimeLog = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await global.pool3.request()
+      .input("id", parseInt(id, 10))
+      .query("DELETE FROM PartProcessDowntimeLog WHERE Id = @id");
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[PartProcess] deleteDowntimeLog:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── PartProcessQualityLog table helpers ──────────────────────────────────────
+
+const ensureQualityLogTable = async () => {
+  await global.pool3.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+      WHERE TABLE_NAME = 'PartProcessQualityLog'
+    )
+    BEGIN
+      CREATE TABLE PartProcessQualityLog (
+        Id             INT IDENTITY(1,1) PRIMARY KEY,
+        ShiftName      NVARCHAR(50)   NULL,
+        EventDate      DATE           NULL,
+        Model          NVARCHAR(255)  NULL,
+        PartName       NVARCHAR(255)  NULL,
+        SapCode        NVARCHAR(100)  NULL,
+        InspectedQty   INT            NOT NULL DEFAULT 0,
+        RejectedQty    INT            NOT NULL DEFAULT 0,
+        DefectCode     NVARCHAR(50)   NULL,
+        DefectName     NVARCHAR(255)  NULL,
+        Severity       NVARCHAR(50)   NULL,
+        Disposition    NVARCHAR(50)   NULL,
+        Inspector      NVARCHAR(255)  NULL,
+        Remarks        NVARCHAR(MAX)  NULL,
+        LoggedAt       DATETIME2      NOT NULL DEFAULT GETDATE(),
+        CreatedAt      DATETIME2      NOT NULL DEFAULT GETDATE()
+      )
+    END
+  `);
+};
+
+// ── POST /api/v1/part-process/quality-log ─────────────────────────────────────
+export const createQualityLog = async (req, res) => {
+  try {
+    await ensureQualityLogTable();
+    const {
+      shift, eventDate, model, partName, sapCode,
+      inspectedQty, rejectedQty, defectCode, defectName,
+      severity, disposition, inspector, remarks, loggedAt,
+    } = req.body;
+
+    const result = await global.pool3.request()
+      .input("shiftName",    shift        || null)
+      .input("eventDate",    eventDate    || null)
+      .input("model",        model        || null)
+      .input("partName",     partName     || null)
+      .input("sapCode",      sapCode      || null)
+      .input("inspectedQty", parseInt(inspectedQty, 10) || 0)
+      .input("rejectedQty",  parseInt(rejectedQty,  10) || 0)
+      .input("defectCode",   defectCode   || null)
+      .input("defectName",   defectName   || null)
+      .input("severity",     severity     || null)
+      .input("disposition",  disposition  || null)
+      .input("inspector",    inspector    || null)
+      .input("remarks",      remarks      || null)
+      .input("loggedAt",     loggedAt     || new Date().toISOString())
+      .query(`
+        INSERT INTO PartProcessQualityLog
+          (ShiftName, EventDate, Model, PartName, SapCode,
+           InspectedQty, RejectedQty, DefectCode, DefectName,
+           Severity, Disposition, Inspector, Remarks, LoggedAt)
+        OUTPUT INSERTED.Id
+        VALUES
+          (@shiftName, @eventDate, @model, @partName, @sapCode,
+           @inspectedQty, @rejectedQty, @defectCode, @defectName,
+           @severity, @disposition, @inspector, @remarks, @loggedAt)
+      `);
+
+    res.json({ success: true, data: { id: result.recordset[0].Id } });
+  } catch (err) {
+    console.error("[PartProcess] createQualityLog:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── GET /api/v1/part-process/quality-log ─────────────────────────────────────
+export const getQualityLogs = async (req, res) => {
+  try {
+    await ensureQualityLogTable();
+    const { startDate, endDate, shift } = req.query;
+
+    const result = await global.pool3.request()
+      .input("startDate", startDate || null)
+      .input("endDate",   endDate   || null)
+      .input("shift",     shift     || null)
+      .query(`
+        SELECT Id, ShiftName, EventDate, Model, PartName, SapCode,
+               InspectedQty, RejectedQty, DefectCode, DefectName,
+               Severity, Disposition, Inspector, Remarks, LoggedAt, CreatedAt
+        FROM PartProcessQualityLog
+        WHERE (@startDate IS NULL OR EventDate >= @startDate)
+          AND (@endDate   IS NULL OR EventDate <= @endDate)
+          AND (@shift     IS NULL OR ShiftName = @shift)
+        ORDER BY LoggedAt DESC
+      `);
+
+    res.json({ success: true, data: result.recordset });
+  } catch (err) {
+    console.error("[PartProcess] getQualityLogs:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── DELETE /api/v1/part-process/quality-log/:id ───────────────────────────────
+export const deleteQualityLog = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await global.pool3.request()
+      .input("id", parseInt(id, 10))
+      .query("DELETE FROM PartProcessQualityLog WHERE Id = @id");
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[PartProcess] deleteQualityLog:", err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 };

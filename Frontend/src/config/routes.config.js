@@ -110,6 +110,9 @@ const TemplateView = lazy(
 const TemplateApproval = lazy(
   () => import("../pages/AuditReport/Template/TemplateApproval"),
 );
+const TemplateCompare = lazy(
+  () => import("../pages/AuditReport/Template/TemplateCompare"),
+);
 const SerialScan = lazy(
   () => import("../pages/AuditReport/Template/SerialScan"),
 );
@@ -143,6 +146,7 @@ const WIPCapture = lazy(() => import("../pages/Production/WIPCapture"));
 // ── Master Config ─────────────────────────────────────────────────────────────
 const MasterConfigOverview = lazy(() => import("../pages/MasterConfig/Overview"));
 const MaterialConfig       = lazy(() => import("../pages/MasterConfig/MaterialConfig"));
+const CheckpointLibraryConfig = lazy(() => import("../pages/MasterConfig/CheckpointLibraryConfig"));
 const ShiftConfig          = lazy(() => import("../pages/MasterConfig/ShiftConfig"));
 const DowntimeConfig       = lazy(() => import("../pages/MasterConfig/DowntimeConfig"));
 const QualityConfig        = lazy(() => import("../pages/MasterConfig/QualityConfig"));
@@ -152,6 +156,7 @@ const MailConfig           = lazy(() => import("../pages/MasterConfig/MailConfig
 const AuditTrail           = lazy(() => import("../pages/MasterConfig/AuditTrail"));
 
 // ── Part Process ──────────────────────────────────────────────────────────────
+const PartProcessOverview      = lazy(() => import("../pages/PartProcess/Overview"));
 const PartProcessDashboard     = lazy(() => import("../pages/PartProcess/Dashboard"));
 const PartProcessProductionReport = lazy(() => import("../pages/PartProcess/ProductionReport"));
 const PartProcessHourlyReport  = lazy(() => import("../pages/PartProcess/HourlyReport"));
@@ -321,6 +326,7 @@ export const ROUTE_CONFIG = [
     items: [
       { path: "/master-config/overview",  label: "Overview",                component: MasterConfigOverview },
       { path: "/master-config/material",  label: "Material Configuration",  component: MaterialConfig       },
+      { path: "/master-config/checkpoint-library", label: "Checkpoint Library", component: CheckpointLibraryConfig },
       { path: "/master-config/shift",     label: "Shift Configuration",     component: ShiftConfig          },
       { path: "/master-config/downtime",  label: "Downtime Configuration",  component: DowntimeConfig       },
       { path: "/master-config/quality",   label: "Quality Configuration",   component: QualityConfig        },
@@ -339,9 +345,9 @@ export const ROUTE_CONFIG = [
     basePath: "/part-process",
     items: [
       {
-        path: "/part-process/dashboard",
-        label: "Dashboard",
-        component: PartProcessDashboard,
+        path: "/part-process/overview",
+        label: "Overview",
+        component: PartProcessOverview,
       },
       {
         path: "/part-process/production-report",
@@ -367,6 +373,12 @@ export const ROUTE_CONFIG = [
         path: "/part-process/factory-monitor",
         label: "Factory Monitor",
         component: FactoryMonitor,
+      },
+    ],
+    hiddenItems: [
+      {
+        path: "/part-process/dashboard",
+        component: PartProcessDashboard,
       },
     ],
   },
@@ -628,6 +640,10 @@ export const ROUTE_CONFIG = [
       {
         path: "/auditreport/templates/:id/view",
         component: TemplateView,
+      },
+      {
+        path: "/auditreport/templates/:id/compare",
+        component: TemplateCompare,
       },
       {
         path: "/auditreport/templates/:id",

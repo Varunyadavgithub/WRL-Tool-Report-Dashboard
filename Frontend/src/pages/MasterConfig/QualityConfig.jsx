@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
-import { useSelector } from "react-redux";
-import { ShieldCheck } from "lucide-react";
+import { useSelector, useDispatch } from "react-redux";
+import { ShieldCheck, Lock, Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
 import { inputCls, selectCls, Field, StatusBadge, Modal, TableActions, PageHeader, EmptyState, TH, TD } from "./_shared";
-import { selectQualityDefects } from "../../redux/slices/masterConfigSlice";
+import { selectQualityDefects, selectQualityPassword, setQualityPassword } from "../../redux/slices/masterConfigSlice";
 import { useAddQualityDefectMutation, useUpdateQualityDefectMutation, useDeleteQualityDefectMutation } from "../../redux/api/masterConfigApi";
 
 const DEF_CATS = ["Dimensional","Surface Finish","Assembly","Material","Process","Cosmetic","Functional","Documentation"];
@@ -24,13 +24,22 @@ const TypeBadge = ({ t }) => {
 };
 
 const QualityConfig = () => {
+  const dispatch = useDispatch();
   const data     = useSelector(selectQualityDefects);
+  const savedPwd = useSelector(selectQualityPassword);
   const [addQualityDefect]    = useAddQualityDefectMutation();
   const [updateQualityDefect] = useUpdateQualityDefectMutation();
   const [deleteQualityDefect] = useDeleteQualityDefectMutation();
   const [modal, setModal] = useState({ open:false, mode:"add", row:null });
   const [form, setForm]   = useState(INIT);
   const [search, setSearch] = useState("");
+  const [pwdInput, setPwdInput]   = useState(savedPwd);
+  const [showPwd,  setShowPwd]    = useState(false);
+
+  const handleSavePwd = () => {
+    dispatch(setQualityPassword(pwdInput.trim()));
+    toast.success(pwdInput.trim() ? "Log Quality password saved." : "Password cleared — no password required.");
+  };
 
   const filtered = useMemo(() => data.filter((r) => r.qCode.toLowerCase().includes(search.toLowerCase()) || r.defectName.toLowerCase().includes(search.toLowerCase())), [data, search]);
 
@@ -69,7 +78,41 @@ const QualityConfig = () => {
     <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
       <PageHeader title="Quality Configuration" subtitle="Manage defect codes, severity levels, CAPA requirements and inspection stages" icon={ShieldCheck} onAdd={openAdd} addLabel="Add Defect Code" search={search} onSearch={setSearch} />
 
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto p-4 flex flex-col gap-4">
+        {/* ── Log Quality Password ── */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Lock className="w-4 h-4 text-violet-500" />
+            <span className="text-sm font-semibold text-slate-700">Log Quality Password</span>
+            {savedPwd ? (
+              <span className="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">Protected</span>
+            ) : (
+              <span className="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">No Password</span>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-400 mb-3">When set, operators must enter this password before logging a quality entry from the Dashboard. Leave blank to allow unrestricted access.</p>
+          <div className="flex items-center gap-2 max-w-sm">
+            <div className="relative flex-1">
+              <input
+                type={showPwd ? "text" : "password"}
+                value={pwdInput}
+                onChange={(e) => setPwdInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSavePwd()}
+                placeholder="Enter password (leave blank for no restriction)"
+                className={`${inputCls} pr-9`}
+              />
+              <button type="button" onClick={() => setShowPwd(v => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <button onClick={handleSavePwd}
+              className="px-4 py-2 text-sm font-semibold rounded-lg bg-violet-600 hover:bg-violet-700 text-white whitespace-nowrap">
+              Save Password
+            </button>
+          </div>
+        </div>
+
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="overflow-auto">
             <table className="min-w-full border-separate border-spacing-0">

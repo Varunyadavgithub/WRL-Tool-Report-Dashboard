@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Package2, Clock, TimerOff, ShieldCheck, Cpu, CalendarRange,
   Mail, Users, FileText, Plug, BarChart2, ChevronRight,
-  CheckCircle2, AlertCircle, Settings2,
+  CheckCircle2, AlertCircle, Settings2, ListChecks,
 } from "lucide-react";
 
 // ── Section card definitions ───────────────────────────────────────────────────
@@ -89,6 +89,18 @@ const SECTIONS = [
     countLabel: "Subscribers",
     color: { bg: "bg-sky-50", icon: "text-sky-600", border: "border-sky-200", badge: "bg-sky-100 text-sky-700" },
     tags: ["Email", "WhatsApp", "Schedule", "Groups"],
+    status: "configured",
+  },
+  {
+    key: "checkpoint-library",
+    icon: ListChecks,
+    title: "Checkpoint Library",
+    desc: "Reusable checkpoints that can be inserted into any audit template",
+    path: "/master-config/checkpoint-library",
+    count: 0,
+    countLabel: "Checkpoints",
+    color: { bg: "bg-indigo-50", icon: "text-indigo-600", border: "border-indigo-200", badge: "bg-indigo-100 text-indigo-700" },
+    tags: ["Reusable", "Audit Templates", "Search"],
     status: "configured",
   },
   {
