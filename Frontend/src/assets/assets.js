@@ -11,4 +11,5 @@ export const assets = {
 };
 
 export const baseURL = import.meta.env.VITE_API_BASE_URL;
+export const fileBaseURL = baseURL.replace(/\/api\/v1\/?$/, "");
 

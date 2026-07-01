@@ -233,13 +233,17 @@ const AutoSaveIndicator = ({ status }) => {
   );
 };
 
+const canUseGetUserMedia = () =>
+  window.isSecureContext && !!navigator.mediaDevices?.getUserMedia;
+
 const ImageZone = ({ onFile, uploadRef }) => {
   const [open, setOpen]         = useState(false);
   const [dragging, setDragging] = useState(false);
   const [showCam, setShowCam]   = useState(false);
-  const zoneRef   = useRef(null);
-  const videoRef  = useRef(null);
-  const streamRef = useRef(null);
+  const zoneRef       = useRef(null);
+  const videoRef      = useRef(null);
+  const streamRef     = useRef(null);
+  const nativeCamRef  = useRef(null);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -269,6 +273,12 @@ const ImageZone = ({ onFile, uploadRef }) => {
 
   const startCamera = async () => {
     setOpen(false);
+
+    if (!canUseGetUserMedia()) {
+      nativeCamRef.current?.click();
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -276,7 +286,7 @@ const ImageZone = ({ onFile, uploadRef }) => {
       streamRef.current = stream;
       setShowCam(true);
     } catch {
-      toast.error("Camera access denied or not available on this device.");
+      nativeCamRef.current?.click();
     }
   };
 
@@ -332,6 +342,7 @@ const ImageZone = ({ onFile, uploadRef }) => {
               <FaCloudUploadAlt size={13} className="text-indigo-500 flex-shrink-0" />
               <span className="text-xs font-semibold text-gray-700">Upload File</span>
               <input ref={uploadRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={onFile} />
+              <input ref={nativeCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} />
             </label>
             <div className="h-px bg-gray-100 mx-3" />
             {/* Open camera via getUserMedia */}
@@ -399,8 +410,6 @@ const AuditEntry = () => {
     updateAudit,
     approveAudit,
     rejectAudit,
-    loading,
-    error,
   } = useAuditData();
 
   const userRoles = [user?.role, user?.roleName]
@@ -408,7 +417,6 @@ const AuditEntry = () => {
     .map((role) => String(role).trim().toLowerCase());
   const isAdmin          = userRoles.includes(ROLES.SUPER_ADMIN);
   const isLQE            = userRoles.includes(ROLES.LINE_QUALITY_ENGINEER);
-  const isQualityOp      = userRoles.includes(ROLES.QUALITY_OPERATOR);
   const isQualityAuditor = userRoles.includes(ROLES.QUALITY_AUDITOR);
 
   const [saving, setSaving] = useState(false);
@@ -922,13 +930,6 @@ const AuditEntry = () => {
     [],
   );
 
-  const handleSignatureChange = useCallback((role, field, value) => {
-    setSignatures((prev) => ({
-      ...prev,
-      [role]: { ...prev[role], [field]: value },
-    }));
-  }, []);
-
   // Bulk status for entire section
   const handleBulkStatus = (sectionId, status) => {
     setSections((prev) =>
@@ -1005,14 +1006,6 @@ const AuditEntry = () => {
     });
     const total = pass + fail + warning + pending + na;
     return { pass, fail, warning, pending, na, total };
-  };
-
-  const getSectionTotalCheckpoints = (section) => {
-    if (!section.stages) return 0;
-    return section.stages.reduce(
-      (total, stage) => total + (stage.checkPoints?.length || 0),
-      0,
-    );
   };
 
   // Filter checkpoints

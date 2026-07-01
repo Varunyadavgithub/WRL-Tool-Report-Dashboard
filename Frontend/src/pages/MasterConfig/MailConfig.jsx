@@ -1,16 +1,31 @@
 import { useState, useMemo } from "react";
-import { Mail, Bell } from "lucide-react";
+import { useSelector } from "react-redux";
+import { Mail } from "lucide-react";
 import toast from "react-hot-toast";
 import { inputCls, selectCls, Field, StatusBadge, Modal, TableActions, PageHeader, EmptyState, TH, TD } from "./_shared";
+import DateTimePicker from "../../components/ui/DateTimePicker";
+import { selectMailSubscribers } from "../../redux/slices/masterConfigSlice";
+import { useAddMailSubscriberMutation, useUpdateMailSubscriberMutation, useDeleteMailSubscriberMutation, useTestMailSubscriberMutation } from "../../redux/api/masterConfigApi";
 
-const DEPTS       = ["Production","Quality","Maintenance","Management","Store","HR","Logistics","Engineering"];
+const DEPTS       = ["Production","Quality","Maintenance","Operations","Store","HR","Logistics","Manufacturing Engineering"];
 const FREQUENCIES = ["Hourly","Shift-wise","Daily","Weekly","Monthly"];
-const REPORTS     = ["Shift Production Report","Hourly Production Report","OEE Report","Downtime Report","Quality Report","Plan vs Actual Report","Machine Utilization Report","Rejection Report","Daily Management Report (DMR)"];
+const REPORTS = ["Production Report","Quality Report","Downtime Report","Hourly Report"];
 
 const INIT = { empName:"", empId:"", department:"Production", designation:"", email:"", mobile:"", subscriptions:[], frequency:"Shift-wise", whatsapp:false, sms:false, status:true };
 
+const pad = (n) => (n < 10 ? "0" + n : n);
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+
 const MailConfig = () => {
-  const [data, setData]   = useState([]);
+  const data = useSelector(selectMailSubscribers);
+  const [addMailSubscriber]    = useAddMailSubscriberMutation();
+  const [updateMailSubscriber] = useUpdateMailSubscriberMutation();
+  const [deleteMailSubscriber] = useDeleteMailSubscriberMutation();
+  const [testMailSubscriber, { isLoading: testing }] = useTestMailSubscriberMutation();
+  const [testingId, setTestingId] = useState(null);
+  const [testModal, setTestModal] = useState({ open: false, row: null });
+  const [testRange, setTestRange] = useState({ start: "", end: "" });
+
   const [modal, setModal] = useState({ open:false, mode:"add", row:null });
   const [form, setForm]   = useState(INIT);
   const [search, setSearch] = useState("");
@@ -20,26 +35,57 @@ const MailConfig = () => {
     data.filter((r) =>
       r.empName.toLowerCase().includes(search.toLowerCase()) ||
       r.email.toLowerCase().includes(search.toLowerCase()) ||
-      r.department.toLowerCase().includes(search.toLowerCase())
+      (r.department || "").toLowerCase().includes(search.toLowerCase())
     ), [data, search]);
 
   const openAdd  = () => { setForm(INIT); setModal({ open:true, mode:"add" }); };
   const openEdit = (row) => { setForm({ ...row }); setModal({ open:true, mode:"edit", row }); };
   const closeModal = () => setModal({ open:false });
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.empName || !form.email) { toast.error("Name and Email are required."); return; }
-    if (modal.mode === "add") {
-      setData([...data, { ...form, id: Date.now() }]);
-      toast.success("Subscriber added.");
-    } else {
-      setData(data.map((r) => r.id === modal.row.id ? { ...form, id: r.id } : r));
-      toast.success("Subscriber updated.");
+    try {
+      if (modal.mode === "add") {
+        await addMailSubscriber(form).unwrap();
+        toast.success("Subscriber added.");
+      } else {
+        await updateMailSubscriber({ ...form, id: modal.row.id }).unwrap();
+        toast.success("Subscriber updated.");
+      }
+      closeModal();
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to save subscriber.");
     }
-    closeModal();
   };
 
-  const handleDelete = (id) => { setData(data.filter((r) => r.id !== id)); toast.success("Deleted."); };
+  const handleDelete = async (id) => {
+    try {
+      await deleteMailSubscriber(id).unwrap();
+      toast.success("Deleted.");
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to delete.");
+    }
+  };
+
+  const openTest = (row) => {
+    setTestRange({ start: `${todayStr()} 08:00`, end: `${todayStr()} 20:00` });
+    setTestModal({ open: true, row });
+  };
+  const closeTest = () => setTestModal({ open: false, row: null });
+
+  const handleTest = async () => {
+    const row = testModal.row;
+    setTestingId(row.id);
+    try {
+      const res = await testMailSubscriber({ id: row.id, startDate: testRange.start, endDate: testRange.end }).unwrap();
+      toast.success(res?.message || `Test email sent to ${row.email}`, { duration: 6000 });
+      closeTest();
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to send test email.");
+    } finally {
+      setTestingId(null);
+    }
+  };
   const sf = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
 
   const toggleReport = (rep) =>
@@ -94,7 +140,14 @@ const MailConfig = () => {
                       <TD center>{r.whatsapp ? <span className="text-emerald-600 text-xs font-bold">✓</span> : <span className="text-slate-300">—</span>}</TD>
                       <TD center>{r.sms ? <span className="text-emerald-600 text-xs font-bold">✓</span> : <span className="text-slate-300">—</span>}</TD>
                       <TD center><StatusBadge active={r.status} /></TD>
-                      <TD center><TableActions onEdit={() => openEdit(r)} onDelete={() => handleDelete(r.id)} /></TD>
+                      <TD center>
+                        <TableActions
+                          onEdit={() => openEdit(r)}
+                          onDelete={() => handleDelete(r.id)}
+                          onTest={() => openTest(r)}
+                          testing={testing && testingId === r.id}
+                        />
+                      </TD>
                     </tr>
                   )) : <EmptyState colSpan={13} message="No subscribers configured." />}
                 </tbody>
@@ -167,6 +220,21 @@ const MailConfig = () => {
               ))}
             </div>
           </div>
+        </Modal>
+      )}
+
+      {testModal.open && (
+        <Modal title={`Send Test Mail — ${testModal.row.empName}`} onClose={closeTest} onSave={handleTest} saveLabel={testing ? "Sending…" : "Send Test"}>
+          <p className="text-xs text-slate-500 mb-4">
+            Pick the shift window to test against — the report PDFs attached will reflect whatever production/quality/downtime data exists for that shift and date. Defaults to today's 08:00–20:00 window.
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <DateTimePicker label="Start Date/Time" name="start" value={testRange.start} onChange={(e) => setTestRange((r) => ({ ...r, start: e.target.value }))} />
+            <DateTimePicker label="End Date/Time" name="end" value={testRange.end} onChange={(e) => setTestRange((r) => ({ ...r, end: e.target.value }))} />
+          </div>
+          <p className="text-[11px] text-slate-400 mt-3">
+            Reports attached: {testModal.row.subscriptions.filter((r) => REPORTS.includes(r)).join(", ") || "none ticked — edit the subscriber to pick reports"}
+          </p>
         </Modal>
       )}
     </div>

@@ -16,10 +16,16 @@ const masterConfigSlice = createSlice({
     downtimeReasons:  [],
     departments:      INIT_DEPARTMENTS,
     qualityDefects:   [],
+    mailSubscribers:  [],
+    machines:         [],
+    plans:            [],
+    checkpointLibrary: [],
     shifts:           INIT_SHIFTS,
     // Logged entries captured from production reports
     downtimeEntries:  [],
     qualityEntries:   [],
+    // Password required to open Log Quality modal (managed from Quality Config)
+    qualityPassword:  "",
   },
   reducers: {
     // ── Materials ─────────────────────────────────────────────────────────────
@@ -52,6 +58,18 @@ const masterConfigSlice = createSlice({
     updateQualityDefect: (s, { payload }) => { s.qualityDefects = s.qualityDefects.map((q) => q.id === payload.id ? payload : q); },
     deleteQualityDefect: (s, { payload }) => { s.qualityDefects = s.qualityDefects.filter((q) => q.id !== payload); },
 
+    // ── Mail Subscribers ──────────────────────────────────────────────────────
+    setMailSubscribers: (s, { payload }) => { s.mailSubscribers = payload; },
+
+    // ── Machines ──────────────────────────────────────────────────────────────
+    setMachines: (s, { payload }) => { s.machines = payload; },
+
+    // ── Production Plans ──────────────────────────────────────────────────────
+    setPlans: (s, { payload }) => { s.plans = payload; },
+
+    // ── Checkpoint Library ───────────────────────────────────────────────────
+    setCheckpointLibrary: (s, { payload }) => { s.checkpointLibrary = payload; },
+
     // ── Shifts ────────────────────────────────────────────────────────────────
     // Guard against undefined s.shifts (happens when redux-persist rehydrates
     // an older stored state that was saved before the shifts field was added).
@@ -70,10 +88,19 @@ const masterConfigSlice = createSlice({
     },
 
     // ── Logged entries (captured from production monitoring) ──────────────────
-    logDowntimeEntry: (s, { payload }) => { s.downtimeEntries.unshift({ ...payload, id: Date.now() }); },
-    logQualityEntry:  (s, { payload }) => { s.qualityEntries.unshift({ ...payload, id: Date.now() }); },
-    deleteDowntimeEntry: (s, { payload }) => { s.downtimeEntries = s.downtimeEntries.filter((e) => e.id !== payload); },
-    deleteQualityEntry:  (s, { payload }) => { s.qualityEntries  = s.qualityEntries.filter((e) => e.id !== payload); },
+    setQualityPassword: (s, { payload }) => { s.qualityPassword = payload; },
+
+    // ── Logged entries (captured from production monitoring) ──────────────────
+    logDowntimeEntry: (s, { payload }) => {
+      if (!Array.isArray(s.downtimeEntries)) s.downtimeEntries = [];
+      s.downtimeEntries.unshift({ ...payload, id: Date.now() });
+    },
+    logQualityEntry: (s, { payload }) => {
+      if (!Array.isArray(s.qualityEntries)) s.qualityEntries = [];
+      s.qualityEntries.unshift({ ...payload, id: Date.now() });
+    },
+    deleteDowntimeEntry: (s, { payload }) => { s.downtimeEntries = (s.downtimeEntries ?? []).filter((e) => e.id !== payload); },
+    deleteQualityEntry:  (s, { payload }) => { s.qualityEntries  = (s.qualityEntries  ?? []).filter((e) => e.id !== payload); },
   },
   extraReducers: (builder) => {
     // When redux-persist rehydrates an old stored state that has no `shifts`
@@ -86,6 +113,12 @@ const masterConfigSlice = createSlice({
       }
       if (mc && !Array.isArray(mc.departments)) {
         state.departments = INIT_DEPARTMENTS.map(x => ({ ...x }));
+      }
+      if (mc && !Array.isArray(mc.downtimeEntries)) {
+        state.downtimeEntries = [];
+      }
+      if (mc && !Array.isArray(mc.qualityEntries)) {
+        state.qualityEntries = [];
       }
       // Default noOfSheet and actualComponentsPerSheet to 1 for any material
       // that was saved without these fields (or with 0 / empty string).
@@ -105,7 +138,12 @@ export const {
   setDowntimeReasons, addDowntimeReason, updateDowntimeReason, deleteDowntimeReason,
   setDepartments, addDepartment, updateDepartment, deleteDepartment,
   setQualityDefects, addQualityDefect, updateQualityDefect, deleteQualityDefect,
+  setMailSubscribers,
+  setMachines,
+  setPlans,
+  setCheckpointLibrary,
   setShifts, addShift, updateShift, deleteShift,
+  setQualityPassword,
   logDowntimeEntry, logQualityEntry, deleteDowntimeEntry, deleteQualityEntry,
 } = masterConfigSlice.actions;
 
@@ -116,9 +154,14 @@ export const selectMaterials       = (s) => s.masterConfig?.materials ?? [];
 export const selectDowntimeReasons = (s) => s.masterConfig?.downtimeReasons ?? [];
 export const selectDepartments      = (s) => s.masterConfig?.departments ?? [];
 export const selectQualityDefects  = (s) => s.masterConfig?.qualityDefects ?? [];
+export const selectMailSubscribers = (s) => s.masterConfig?.mailSubscribers ?? [];
+export const selectMachines        = (s) => s.masterConfig?.machines ?? [];
+export const selectPlans           = (s) => s.masterConfig?.plans ?? [];
+export const selectCheckpointLibrary = (s) => s.masterConfig?.checkpointLibrary ?? [];
 export const selectShifts          = (s) => s.masterConfig?.shifts ?? INIT_SHIFTS;
 export const selectDowntimeEntries = (s) => s.masterConfig?.downtimeEntries ?? [];
 export const selectQualityEntries  = (s) => s.masterConfig?.qualityEntries ?? [];
+export const selectQualityPassword = (s) => s.masterConfig?.qualityPassword ?? "";
 
 // ── Shift utilities ────────────────────────────────────────────────────────────
 // Convert "HH:MM" → minutes since midnight

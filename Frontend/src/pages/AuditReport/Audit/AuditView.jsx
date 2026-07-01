@@ -46,9 +46,6 @@ import {
   formatDateForDisplay,
   formatDateTimeForDisplay,
 } from "../../../utils/dateUtils.js";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
 
 // ==================== CONSTANTS ====================
 const STATUS_CONFIG = {
@@ -626,8 +623,10 @@ const AuditView = () => {
   }, [summary, passRate]);
 
   // ==================== Export PDF ====================
-  const handleExportPDF = useCallback(() => {
+  const handleExportPDF = useCallback(async () => {
     try {
+      const { default: jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
       const doc = new jsPDF("l", "mm", "a4");
       const pw = doc.internal.pageSize.getWidth();
       let y = 15;
@@ -864,8 +863,9 @@ const AuditView = () => {
   ]);
 
   // ==================== Export Excel ====================
-  const handleExportExcel = useCallback(() => {
+  const handleExportExcel = useCallback(async () => {
     try {
+      const XLSX = await import("xlsx");
       const wb = XLSX.utils.book_new();
       const sigs = audit.signatures || {};
 
@@ -1501,8 +1501,13 @@ const AuditView = () => {
                     <h1 className="text-2xl font-black text-white leading-tight truncate">
                       {audit.reportName || "Audit Report"}
                     </h1>
-                    <p className="text-indigo-300 text-sm mt-1">
+                    <p className="text-indigo-300 text-sm mt-1 flex items-center gap-2">
                       Template: {audit.templateName}
+                      {audit.templateVersion && (
+                        <span className="text-[10px] bg-white/10 text-indigo-200 px-2 py-0.5 rounded-full font-semibold">
+                          v{audit.templateVersion}
+                        </span>
+                      )}
                     </p>
                     {audit.auditCode && (
                       <div className="flex items-center gap-2 mt-2">

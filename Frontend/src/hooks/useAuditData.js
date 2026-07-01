@@ -20,6 +20,10 @@ const transformTemplate = (template) => {
     infoFields: template.InfoFields ?? template.infoFields ?? [],
     columns: template.Columns ?? template.columns ?? [],
     defaultSections: template.DefaultSections ?? template.defaultSections ?? [],
+    sectionCount: template.SectionCount ?? template.sectionCount ?? null,
+    stageCount: template.StageCount ?? template.stageCount ?? null,
+    checkpointCount: template.CheckpointCount ?? template.checkpointCount ?? null,
+    requiredCheckpointCount: template.RequiredCheckpointCount ?? template.requiredCheckpointCount ?? null,
     models: (() => {
       const raw = template.Models ?? template.models;
       if (!raw) return [];
@@ -44,6 +48,10 @@ const transformAudit = (audit) => {
     auditCode: audit.AuditCode ?? audit.auditCode,
     templateId: audit.TemplateId ?? audit.templateId,
     templateName: audit.TemplateName ?? audit.templateName,
+    templateVersion: audit.TemplateVersion ?? audit.templateVersion,
+    templateFileName: audit.TemplateFileName ?? audit.templateFileName,
+    templateHash: audit.TemplateHash ?? audit.templateHash,
+    templateSize: audit.TemplateSize ?? audit.templateSize,
     reportName: audit.ReportName ?? audit.reportName,
     formatNo: audit.FormatNo ?? audit.formatNo,
     revNo: audit.RevNo ?? audit.revNo,
@@ -121,20 +129,64 @@ export const useAuditData = () => {
     }
   }, []);
 
+  // Pre-flight name-uniqueness check, used before opening the builder for a
+  // brand-new template. Returns { exists, data } — never throws on a
+  // collision, that's a normal outcome the caller branches on.
+  const checkTemplateName = useCallback(async (name) => {
+    try {
+      const response = await axios.get(`${API_BASE}/templates/check-name`, { params: { name } });
+      return { exists: !!response.data.exists, data: transformTemplate(response.data.data) };
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to check template name";
+      console.error("Check template name error:", err);
+      throw new Error(message);
+    }
+  }, []);
+
+  // Returns { exists, data }. exists:true means the name collided with an
+  // active template — no row was created; data is the existing template the
+  // caller can offer to "Edit Existing" or "Cancel".
   const createTemplate = useCallback(async (templateData) => {
     setLoading(true);
     setError(null);
     try {
       const response = await axios.post(`${API_BASE}/templates`, templateData);
-      const newTemplate = transformTemplate(response.data.data);
-      setTemplates((prev) => [newTemplate, ...prev]);
-      return newTemplate;
+      const template = transformTemplate(response.data.data);
+      if (!response.data.exists) {
+        setTemplates((prev) => [template, ...prev]);
+      }
+      return { exists: !!response.data.exists, data: template };
     } catch (err) {
       const message =
         err.response?.data?.message || "Failed to create template";
       setError(message);
       console.error("Create template error:", err);
-      throw new Error(message);
+      const thrown = new Error(message);
+      if (err.response?.data?.errors) thrown.errors = err.response.data.errors;
+      thrown.status = err.response?.status;
+      throw thrown;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Creates a new version of an existing template — never mutates the
+  // previous version. Old version is deactivated server-side atomically.
+  const createTemplateVersion = useCallback(async (id, templateData) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.post(`${API_BASE}/templates/${id}/version`, templateData);
+      const updatedTemplate = transformTemplate(response.data.data);
+      setTemplates((prev) => prev.map((t) => (t.id == id ? updatedTemplate : t)));
+      return updatedTemplate;
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to create template version";
+      setError(message);
+      console.error("Create template version error:", err);
+      const thrown = new Error(message);
+      thrown.status = err.response?.status;
+      throw thrown;
     } finally {
       setLoading(false);
     }
@@ -158,7 +210,10 @@ export const useAuditData = () => {
         err.response?.data?.message || "Failed to update template";
       setError(message);
       console.error("Update template error:", err);
-      throw new Error(message);
+      const thrown = new Error(message);
+      if (err.response?.data?.errors) thrown.errors = err.response.data.errors;
+      thrown.status = err.response?.status;
+      throw thrown;
     } finally {
       setLoading(false);
     }
@@ -182,17 +237,34 @@ export const useAuditData = () => {
     }
   }, []);
 
+  // options must include { newName }, and optionally { confirmCreateVersion: true }
+  // once the caller has confirmed turning a name collision into a new version
+  // of the existing template. Returns { exists, existingTemplateId?, data }.
+  // exists:true (without confirmCreateVersion) means newName collided with an
+  // active template and nothing was written yet — the caller should offer
+  // "Create Version" (re-call with confirmCreateVersion:true) or "Cancel".
   const duplicateTemplate = useCallback(async (id, options = {}) => {
     setLoading(true);
     setError(null);
     try {
       const response = await axios.post(
         `${API_BASE}/templates/${id}/duplicate`,
-        options,   // forwards { createdBy } so backend can tag the duplicate correctly
+        options,   // forwards { newName, createdBy, confirmCreateVersion }
       );
-      const newTemplate = transformTemplate(response.data.data);
-      setTemplates((prev) => [newTemplate, ...prev]);
-      return newTemplate;
+      const template = transformTemplate(response.data.data);
+      if (!response.data.exists) {
+        // Either a brand-new template, or an existing one that just got a new
+        // version via confirmCreateVersion — upsert either way.
+        setTemplates((prev) => {
+          const exists = prev.some((t) => t.id == template.id);
+          return exists ? prev.map((t) => (t.id == template.id ? template : t)) : [template, ...prev];
+        });
+      }
+      return {
+        exists: !!response.data.exists,
+        existingTemplateId: response.data.existingTemplateId ?? null,
+        data: template,
+      };
     } catch (err) {
       const message =
         err.response?.data?.message || "Failed to duplicate template";
@@ -362,6 +434,30 @@ export const useAuditData = () => {
     }
   }, []);
 
+  const getTemplateVersions = useCallback(async (id) => {
+    try {
+      const response = await axios.get(`${API_BASE}/templates/${id}/versions`);
+      return response.data.data || [];
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to load template versions";
+      console.error("Template versions error:", err);
+      throw new Error(message);
+    }
+  }, []);
+
+  const compareTemplateVersions = useCallback(async (id, from, to) => {
+    try {
+      const response = await axios.get(`${API_BASE}/templates/${id}/compare`, {
+        params: { from, to },
+      });
+      return response.data.data;
+    } catch (err) {
+      const message = err.response?.data?.message || "Failed to compare template versions";
+      console.error("Template compare error:", err);
+      throw new Error(message);
+    }
+  }, []);
+
   const fetchAuditStats = useCallback(async (params = {}) => {
     try {
       const response = await axios.get(`${API_BASE}/audits/stats`, { params });
@@ -382,7 +478,9 @@ export const useAuditData = () => {
     // Template methods
     loadTemplates,
     getTemplateById,
+    checkTemplateName,
     createTemplate,
+    createTemplateVersion,
     updateTemplate,
     deleteTemplate,
     duplicateTemplate,
@@ -397,6 +495,8 @@ export const useAuditData = () => {
     fetchAuditModelSummary,
     fetchAuditStats,
     getTemplateHistory,
+    getTemplateVersions,
+    compareTemplateVersions,
   };
 };
 

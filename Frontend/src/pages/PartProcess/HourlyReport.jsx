@@ -1,18 +1,20 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { Bar } from "react-chartjs-2";
 import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from "chart.js";
 import {
   Search, Calendar, Clock, Filter, Loader2, PackageOpen,
-  BarChart2, List, AlertTriangle, CheckCircle2,
+  BarChart2, List, AlertTriangle, CheckCircle2, FileSpreadsheet, FileText,
 } from "lucide-react";
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets.js";
 import { useSelector } from "react-redux";
-import { mapFOsRecord } from "./FactoryMonitor";
-import fosClient, { FACTORY_OS_BASE, FACTORY_MACHINE_ID } from "../../utils/factoryOsClient";
+import axios from "axios";
+import { mapDbRecord } from "../../utils/mapDbRecord.js";
+import { PART_PROCESS_API } from "../../utils/factoryOsClient";
 import { selectMaterials, selectShifts, getMaterialByModel, extractSapCode, toMins, getShiftWindow } from "../../redux/slices/masterConfigSlice";
 import { componentQtyFromMachine } from "../../utils/productionLogic.js";
+import { exportSectionsToExcel, exportMultiSectionPDF } from "../../utils/reportExport.js";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -31,6 +33,29 @@ const parseDurationSecs = (dur = "00:00:00") => {
   const [h, m, s] = (dur || "00:00:00").split(":").map(Number);
   return (h || 0) * 3600 + (m || 0) * 60 + (s || 0);
 };
+
+const EXPORT_COLUMNS = [
+  { label: "Shift",            align: "left",   value: (r) => r.shift },
+  { label: "Hour",             align: "center", value: (r) => r.label },
+  { label: "Sheet Qty",        align: "center", value: (r) => r.qty },
+  { label: "Component Qty",   align: "center", value: (r) => r.componentQty },
+  { label: "Production Events", align: "center", value: (r) => r.prodCount },
+  { label: "Downtime Events",  align: "center", value: (r) => r.downtimeCount },
+  { label: "Downtime (min)",   align: "center", value: (r) => Math.round(r.downtimeSecs / 60) },
+];
+
+const MODEL_BREAKDOWN_COLUMNS = [
+  { label: "Time",       align: "left",   value: (r) => r.time },
+  { label: "Model Name", align: "left",   value: (r) => r.modelName },
+  { label: "Count",      align: "center", value: (r) => r.count },
+];
+
+const PART_TOTAL_COLUMNS = [
+  { label: "Part Name", align: "left",   value: (r) => r.name },
+  { label: "Total",     align: "center", value: (r) => r.total },
+  { label: "Accepted",  align: "center", value: (r) => r.accepted },
+  { label: "Rejected",  align: "center", value: (r) => r.rejected },
+];
 
 const secsToMMSS = (secs) => `${pad(Math.floor(secs / 60))}:${pad(secs % 60)}`;
 
@@ -62,7 +87,10 @@ const PartProcessHourlyReport = () => {
   const [shiftLoading, setShiftLoading] = useState(null);
   const [records, setRecords]           = useState([]);
   const [rawRecords, setRawRecords]     = useState([]);
+  const [dbQLogs, setDbQLogs]           = useState([]);
   const [showRaw, setShowRaw]           = useState(false);
+  const trendChartRef     = useRef(null);
+  const partCountChartRef = useRef(null);
 
   const fetchData = useCallback(async (start, end, setLoadFn) => {
     setLoadFn(true); setRecords([]); setRawRecords([]);
@@ -72,24 +100,40 @@ const PartProcessHourlyReport = () => {
       const startH    = (start.split(" ")[1] || "00:00").substring(0, 5);
       const endH      = (end.split(" ")[1]   || "23:59").substring(0, 5);
 
+      const res = await axios.get(`${PART_PROCESS_API}/records-range`, {
+        params: { startDate, endDate },
+        withCredentials: true,
+      });
+      const allRows = res.data?.data ?? [];
+
       const dates = [];
       const cur   = new Date(startDate + "T00:00:00");
       const fin   = new Date(endDate   + "T00:00:00");
       while (cur <= fin) { dates.push(`${cur.getFullYear()}-${pad(cur.getMonth()+1)}-${pad(cur.getDate())}`); cur.setDate(cur.getDate() + 1); }
 
+      // Overnight correction: records with StartTime before the production-day start
+      // belong to the next calendar date (post-midnight portion of overnight shifts).
+      const [sHH, sMM] = startH.split(":").map(Number);
+      const dayStartMins = sHH * 60 + sMM;
+      const bumpDate = (d) => {
+        const [y, mo, dy] = d.split("-").map(Number);
+        const dt = new Date(y, mo - 1, dy + 1);
+        return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+      };
+      const calDateOf = (r) => {
+        const evDate = String(r.EventDate).slice(0, 10);
+        const hhmm = extractHHMM(r.StartTime);
+        if (!hhmm || dayStartMins === 0) return evDate;
+        const [h, m] = hhmm.split(":").map(Number);
+        return (h * 60 + m) < dayStartMins ? bumpDate(evDate) : evDate;
+      };
+
       const allMapped = [];
       const allRaw    = [];
       for (const date of dates) {
-        const raw = [];
-        let url = `${FACTORY_OS_BASE}/monitoring/daily-summary/${FACTORY_MACHINE_ID}/?date=${date}&page=1`;
-        while (url) {
-          const res = await fosClient.get(url);
-          raw.push(...(res.data?.results ?? []));
-          url = res.data?.next || null;
-          if (raw.length >= 5000) break;
-        }
+        const raw = allRows.filter(r => calDateOf(r) === date);
         raw.forEach(r => allRaw.push({ _fetchDate: date, ...r }));
-        const mapped = raw.map(mapFOsRecord);
+        const mapped = raw.map((r, i) => ({ ...mapDbRecord(r, i), eventDate: date }));
         const filtered = mapped.filter(r => {
           const t = extractHHMM(r.startTime);
           if (!t) return false;
@@ -103,6 +147,17 @@ const PartProcessHourlyReport = () => {
 
       setRecords(allMapped);
       setRawRecords(allRaw);
+
+      try {
+        const qRes = await axios.get(`${PART_PROCESS_API}/quality-log`, {
+          params: { startDate, endDate },
+          withCredentials: true,
+        });
+        setDbQLogs(qRes.data?.data ?? []);
+      } catch {
+        setDbQLogs([]);
+      }
+
       toast.success(`${allMapped.length} records loaded (${allRaw.length} raw)`);
     } catch {
       toast.error("Failed to fetch data.");
@@ -157,11 +212,12 @@ const PartProcessHourlyReport = () => {
         const rQty = r.qty ?? 0;
         map[key].qty += rQty;
         map[key].prodCount += 1;
-        const mat  = getMaterialByModel(materials, r.model);
-        map[key].componentQty += componentQtyFromMachine(rQty, mat);
+        const mat      = getMaterialByModel(materials, r.model);
+        const rCompQty = Math.round(componentQtyFromMachine(rQty, mat));
+        map[key].componentQty += rCompQty;
         const name = mat?.partName || r.model || extractSapCode(r.model) || "Unknown";
         const prev = map[key].models.get(name) || { matched: !!mat, qty: 0 };
-        map[key].models.set(name, { matched: !!mat, qty: prev.qty + rQty });
+        map[key].models.set(name, { matched: !!mat, qty: prev.qty + rCompQty });
       } else if (r.state === "Downtime") {
         map[key].downtimeCount += 1;
         map[key].downtimeSecs += parseDurationSecs(r.duration);
@@ -177,6 +233,21 @@ const PartProcessHourlyReport = () => {
   }, [records, materials, configShifts]);
 
   const totalQty = useMemo(() => hourlyData.reduce((s, r) => s + r.qty, 0), [hourlyData]);
+
+  // ── Quality log aggregated by part name (MAX inspected, SUM rejected) ─────
+  const qualityByPartName = useMemo(() => {
+    const map = {};
+    dbQLogs.forEach((e) => {
+      const key = e.PartName || e.partName || e.Model || e.model || "";
+      if (!key) return;
+      if (!map[key]) map[key] = { inspected: 0, rejected: 0 };
+      const insp = parseInt(e.InspectedQty ?? e.inspectedQty ?? 0, 10);
+      const rej  = parseInt(e.RejectedQty  ?? e.rejectedQty  ?? 0, 10);
+      map[key].inspected = Math.max(map[key].inspected, insp);
+      map[key].rejected  += rej;
+    });
+    return map;
+  }, [dbQLogs]);
 
   // ── Parts × Hour matrix for the dedicated breakdown section ──────────────
   const partsMatrix = useMemo(() => {
@@ -293,6 +364,37 @@ const PartProcessHourlyReport = () => {
     };
   }, [hourlyData]);
 
+  // Builds the full ordered set of export blocks (tables + chart images) so
+  // Excel/PDF exports mirror every section visible on screen, not just the
+  // Hourly Summary table.
+  const buildExportBlocks = () => {
+    const modelRows = hourlyData.flatMap((row) =>
+      [...row.models.entries()]
+        .sort((a, b) => b[1].qty - a[1].qty)
+        .map(([name, info]) => ({ time: row.label, modelName: name, count: info.qty })));
+
+    const partRows = partsMatrix.parts.map(([name, info]) => {
+      const qLog = qualityByPartName[name];
+      return {
+        name,
+        total: info.total,
+        accepted: Math.max(0, info.total - (qLog?.rejected ?? 0)),
+        rejected: qLog?.rejected ?? 0,
+      };
+    });
+
+    const blocks = [
+      { type: "table", heading: "Hourly Summary", columns: EXPORT_COLUMNS, rows: hourlyData },
+    ];
+    const trendImg = trendChartRef.current?.toBase64Image?.();
+    if (trendImg) blocks.push({ type: "image", heading: "Hourly Trend", dataUrl: trendImg, width: 480, height: 230 });
+    if (modelRows.length) blocks.push({ type: "table", heading: "Model-wise Hourly Breakdown", columns: MODEL_BREAKDOWN_COLUMNS, rows: modelRows });
+    if (partRows.length) blocks.push({ type: "table", heading: "Part Total Count", columns: PART_TOTAL_COLUMNS, rows: partRows });
+    const partImg = partCountChartRef.current?.toBase64Image?.();
+    if (partImg) blocks.push({ type: "image", heading: "Part Count Chart", dataUrl: partImg, width: 480, height: Math.max(200, partsMatrix.parts.length * 28) });
+    return blocks;
+  };
+
   return (
     <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
       {/* HEADER */}
@@ -302,9 +404,31 @@ const PartProcessHourlyReport = () => {
           <p className="text-[11px] text-slate-400">Hour-by-hour part production &amp; downtime breakdown</p>
         </div>
         {totalQty > 0 && (
-          <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-blue-50 border border-blue-100 min-w-[90px]">
-            <span className="text-xl font-bold font-mono text-blue-700">{totalQty.toLocaleString()}</span>
-            <span className="text-[10px] text-blue-500 font-semibold uppercase tracking-wide">Total Qty</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex flex-col items-center px-4 py-1.5 rounded-lg bg-blue-50 border border-blue-100 min-w-[90px]">
+              <span className="text-xl font-bold font-mono text-blue-700">{totalQty.toLocaleString()}</span>
+              <span className="text-[10px] text-blue-500 font-semibold uppercase tracking-wide">Total Qty</span>
+            </div>
+            <button
+              onClick={() => exportSectionsToExcel({
+                title: "Part Process — Hourly Report",
+                subtitle: `${startTime} to ${endTime}  |  Generated ${new Date().toLocaleString()}`,
+                blocks: buildExportBlocks(),
+                filename: "hourly_report.xlsx",
+              })}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-emerald-600 transition-colors">
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Excel
+            </button>
+            <button
+              onClick={() => exportMultiSectionPDF({
+                title: "Part Process - Hourly Report",
+                subtitle: `${startTime} to ${endTime}  |  Generated ${new Date().toLocaleString()}`,
+                blocks: buildExportBlocks(),
+                filename: "hourly_report.pdf",
+              })}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-rose-600 transition-colors">
+              <FileText className="w-3.5 h-3.5" /> PDF
+            </button>
           </div>
         )}
       </div>
@@ -370,18 +494,16 @@ const PartProcessHourlyReport = () => {
                 <table className="min-w-full text-xs border-separate border-spacing-0">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-50">
-                      {["Shift","Hour","Machine Qty","Components Produced","Prod. Events","Downtime Events","Downtime (m:s)","Parts","Total Part Count"].map((h) => (
+                      {["Shift","Hour","Components Produced","No of Downtime","Downtime (m:s)","No of Components"].map((h) => (
                         <th key={h} className="px-3 py-2.5 text-center font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap text-[11px]">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {hourlyData.length > 0 ? (() => {
-                      // Pre-compute per-shift totals for the "Total Part Count" column
-                      const shiftTotals = {};
+                      // Pre-compute per-shift component totals for subtotal rows
                       const shiftComponentTotals = {};
                       hourlyData.forEach(r => {
-                        shiftTotals[r.shift] = (shiftTotals[r.shift] || 0) + r.qty;
                         shiftComponentTotals[r.shift] = (shiftComponentTotals[r.shift] || 0) + r.componentQty;
                       });
 
@@ -407,29 +529,12 @@ const PartProcessHourlyReport = () => {
                               )}
                             </td>
                             <td className="px-3 py-2 border-b border-slate-100 font-mono font-semibold text-slate-700">{row.label}</td>
-                            <td className="px-3 py-2 border-b border-slate-100 font-bold text-blue-600 font-mono">{row.qty}</td>
                             <td className="px-3 py-2 border-b border-slate-100 font-bold text-violet-600 font-mono">
                               {row.componentQty !== row.qty ? row.componentQty : <span className="text-slate-400">—</span>}
                             </td>
-                            <td className="px-3 py-2 border-b border-slate-100 text-emerald-600 font-semibold">{row.prodCount}</td>
                             <td className="px-3 py-2 border-b border-slate-100 font-bold text-amber-600">{row.downtimeCount}</td>
                             <td className="px-3 py-2 border-b border-slate-100 font-mono text-rose-500">{secsToMMSS(row.downtimeSecs)}</td>
                             <td className="px-3 py-2 border-b border-slate-100 text-center font-bold text-violet-600 font-mono">{row.models.size}</td>
-                            {/* Total Part Count — show only on last row of each shift */}
-                            <td className="px-3 py-2 border-b border-slate-100 text-center">
-                              {isLastInShift ? (
-                                <div className="flex flex-col items-center gap-0.5">
-                                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-blue-600 text-white text-[11px] font-bold font-mono shadow-sm">
-                                    {shiftTotals[row.shift].toLocaleString()}
-                                  </span>
-                                  {shiftComponentTotals[row.shift] !== shiftTotals[row.shift] && (
-                                    <span className="text-[9px] font-semibold text-violet-600">
-                                      {shiftComponentTotals[row.shift].toLocaleString()} comp
-                                    </span>
-                                  )}
-                                </div>
-                              ) : null}
-                            </td>
                           </tr>
                         );
 
@@ -445,12 +550,8 @@ const PartProcessHourlyReport = () => {
                               <td colSpan={2} className="px-3 py-1.5 border-b-2 border-slate-300 text-left text-slate-600 italic text-[10px]">
                                 {row.shift} — Subtotal
                               </td>
-                              <td className="px-3 py-1.5 border-b-2 border-slate-300 text-blue-700">{shiftTotals[row.shift]}</td>
                               <td className="px-3 py-1.5 border-b-2 border-slate-300 text-violet-700">
-                                {shiftComponentTotals[row.shift] !== shiftTotals[row.shift] ? shiftComponentTotals[row.shift] : "—"}
-                              </td>
-                              <td className="px-3 py-1.5 border-b-2 border-slate-300 text-emerald-700">
-                                {hourlyData.filter(r => r.shift === row.shift).reduce((s,r) => s + r.prodCount, 0)}
+                                {shiftComponentTotals[row.shift]}
                               </td>
                               <td className="px-3 py-1.5 border-b-2 border-slate-300 text-amber-700">
                                 {hourlyData.filter(r => r.shift === row.shift).reduce((s,r) => s + r.downtimeCount, 0)}
@@ -458,14 +559,14 @@ const PartProcessHourlyReport = () => {
                               <td className="px-3 py-1.5 border-b-2 border-slate-300 text-rose-600 font-mono">
                                 {secsToMMSS(hourlyData.filter(r => r.shift === row.shift).reduce((s,r) => s + r.downtimeSecs, 0))}
                               </td>
-                              <td colSpan={2} className="px-3 py-1.5 border-b-2 border-slate-300" />
+                              <td className="px-3 py-1.5 border-b-2 border-slate-300" />
                             </tr>
                           );
                         }
                       });
                       return rows;
                     })() : (
-                      <tr><td colSpan={9} className="py-10 text-center">
+                      <tr><td colSpan={6} className="py-10 text-center">
                         <div className="flex flex-col items-center gap-2 text-slate-300">
                           <PackageOpen className="w-8 h-8 opacity-50" strokeWidth={1.2} />
                           <p className="text-xs text-slate-400">No data. Run a query.</p>
@@ -478,19 +579,12 @@ const PartProcessHourlyReport = () => {
                       <tr className="bg-slate-200 font-bold text-center text-[11px]">
                         <td className="px-3 py-2 border-t-2 border-slate-400" />
                         <td className="px-3 py-2 border-t-2 border-slate-400 text-slate-700">Grand Total</td>
-                        <td className="px-3 py-2 border-t-2 border-slate-400 text-blue-700 font-mono">{totalQty}</td>
                         <td className="px-3 py-2 border-t-2 border-slate-400 text-violet-700 font-mono">
                           {(() => { const tot = hourlyData.reduce((s,r)=>s+r.componentQty,0); return tot !== totalQty ? tot.toLocaleString() : "—"; })()}
                         </td>
-                        <td className="px-3 py-2 border-t-2 border-slate-400 text-emerald-700">{hourlyData.reduce((s,r)=>s+r.prodCount,0)}</td>
                         <td className="px-3 py-2 border-t-2 border-slate-400 text-amber-700">{hourlyData.reduce((s,r)=>s+r.downtimeCount,0)}</td>
                         <td className="px-3 py-2 border-t-2 border-slate-400 text-rose-600 font-mono">{secsToMMSS(hourlyData.reduce((s,r)=>s+r.downtimeSecs,0))}</td>
                         <td className="px-3 py-2 border-t-2 border-slate-400" />
-                        <td className="px-3 py-2 border-t-2 border-slate-400">
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-slate-700 text-white text-[11px] font-bold font-mono">
-                            {totalQty.toLocaleString()}
-                          </span>
-                        </td>
                       </tr>
                     </tfoot>
                   )}
@@ -508,7 +602,7 @@ const PartProcessHourlyReport = () => {
               </div>
               <div className="p-4 h-[40vh] min-h-[280px]">
                 {chartData ? (
-                  <Bar data={chartData.data} options={chartData.options} />
+                  <Bar ref={trendChartRef} data={chartData.data} options={chartData.options} />
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-300">
                     <BarChart2 className="w-8 h-8 opacity-50" strokeWidth={1.2} />
@@ -591,38 +685,61 @@ const PartProcessHourlyReport = () => {
                       <tr>
                         <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-500 border-b border-slate-200">Part Name</th>
                         <th className="px-4 py-2.5 text-center text-[11px] font-semibold text-slate-500 border-b border-slate-200 w-20">Total</th>
+                        <th className="px-4 py-2.5 text-center text-[11px] font-semibold text-emerald-600 border-b border-slate-200 w-20">Accepted</th>
+                        <th className="px-4 py-2.5 text-center text-[11px] font-semibold text-rose-500 border-b border-slate-200 w-20">Rejected</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {partsMatrix.parts.map(([name, info], idx) => (
-                        <tr key={name}
-                          className={`transition-colors ${info.matched ? "hover:bg-emerald-50/30" : "hover:bg-rose-50/20"} ${idx % 2 === 0 ? "" : "bg-slate-50/40"}`}>
-                          <td className="px-4 py-2.5 border-b border-slate-100">
-                            {info.matched ? (
-                              <span className="text-[12px] font-semibold text-emerald-700 leading-snug block">{name}</span>
-                            ) : (
-                              <div>
-                                <span className="text-[11px] font-mono text-slate-600 leading-snug block">{name}</span>
-                                <span className="text-[9px] font-bold text-rose-500">⚠ Master not exist</span>
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 border-b border-slate-100 text-center">
-                            <span className="text-[14px] font-bold font-mono text-blue-600">{info.total}</span>
-                          </td>
-                        </tr>
-                      ))}
+                      {partsMatrix.parts.map(([name, info], idx) => {
+                        const qLog = qualityByPartName[name];
+                        return (
+                          <tr key={name}
+                            className={`transition-colors ${info.matched ? "hover:bg-emerald-50/30" : "hover:bg-rose-50/20"} ${idx % 2 === 0 ? "" : "bg-slate-50/40"}`}>
+                            <td className="px-4 py-2.5 border-b border-slate-100">
+                              {info.matched ? (
+                                <span className="text-[12px] font-semibold text-emerald-700 leading-snug block">{name}</span>
+                              ) : (
+                                <div>
+                                  <span className="text-[11px] font-mono text-slate-600 leading-snug block">{name}</span>
+                                  <span className="text-[9px] font-bold text-rose-500">⚠ Master not exist</span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 border-b border-slate-100 text-center">
+                              <span className="text-[14px] font-bold font-mono text-blue-600">{info.total}</span>
+                            </td>
+                            <td className="px-4 py-2.5 border-b border-slate-100 text-center font-bold font-mono text-emerald-600">
+                              {Math.max(0, info.total - (qLog?.rejected ?? 0))}
+                            </td>
+                            <td className="px-4 py-2.5 border-b border-slate-100 text-center font-bold font-mono text-rose-500">
+                              {qLog?.rejected ?? 0}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                     {/* Footer total */}
                     <tfoot className="sticky bottom-0">
-                      <tr className="bg-slate-100 font-bold">
-                        <td className="px-4 py-2 border-t-2 border-slate-300 text-[11px] text-slate-600">Total</td>
-                        <td className="px-4 py-2 border-t-2 border-slate-300 text-center">
-                          <span className="text-[13px] font-bold font-mono text-blue-700">
-                            {partsMatrix.parts.reduce((s, [, i]) => s + i.total, 0)}
-                          </span>
-                        </td>
-                      </tr>
+                      {(() => {
+                        const qTotAcc = partsMatrix.parts.reduce((s, [name, info]) => s + Math.max(0, info.total - (qualityByPartName[name]?.rejected ?? 0)), 0);
+                        const qTotRej = partsMatrix.parts.reduce((s, [name]) => s + (qualityByPartName[name]?.rejected ?? 0), 0);
+                        return (
+                          <tr className="bg-slate-100 font-bold">
+                            <td className="px-4 py-2 border-t-2 border-slate-300 text-[11px] text-slate-600">Total</td>
+                            <td className="px-4 py-2 border-t-2 border-slate-300 text-center">
+                              <span className="text-[13px] font-bold font-mono text-blue-700">
+                                {partsMatrix.parts.reduce((s, [, i]) => s + i.total, 0)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2 border-t-2 border-slate-300 text-center font-mono text-emerald-700">
+                              {qTotAcc}
+                            </td>
+                            <td className="px-4 py-2 border-t-2 border-slate-300 text-center font-mono text-rose-500">
+                              {qTotRej}
+                            </td>
+                          </tr>
+                        );
+                      })()}
                     </tfoot>
                   </table>
                 </div>
@@ -649,7 +766,7 @@ const PartProcessHourlyReport = () => {
                 </div>
                 {/* Height scales with number of parts (44px per bar, min 200px) */}
                 <div className="p-4" style={{ height: Math.max(200, partsMatrix.parts.length * 44) }}>
-                  <Bar data={partCountChart.data} options={partCountChart.options} />
+                  <Bar ref={partCountChartRef} data={partCountChart.data} options={partCountChart.options} />
                 </div>
               </div>
             )}
@@ -665,7 +782,7 @@ const PartProcessHourlyReport = () => {
               className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition-colors">
               <div className="flex items-center gap-2">
                 <Search className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Raw API Data — {rawRecords.length} records</span>
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Raw DB Data — {rawRecords.length} records</span>
                 <span className="text-[9px] text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded font-bold">Unprocessed</span>
               </div>
               <span className="text-[10px] text-slate-400">{showRaw ? "Hide ▲" : "Show ▼"}</span>
@@ -685,21 +802,21 @@ const PartProcessHourlyReport = () => {
                       <tr key={i} className={`hover:bg-amber-50/30 ${i%2===0?"bg-white":"bg-slate-50/50"}`}>
                         <td className="px-2 py-1.5 border-b border-slate-100 text-slate-400 font-mono">{i+1}</td>
                         <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">{r._fetchDate}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 whitespace-nowrap text-slate-600">{r.shift?.shift_name||"—"}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 whitespace-nowrap text-slate-600">{r.ShiftName||"—"}</td>
                         <td className="px-2 py-1.5 border-b border-slate-100 whitespace-nowrap">
-                          <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] ${r.event_type==="Production"?"bg-emerald-50 text-emerald-700":"bg-rose-50 text-rose-600"}`}>{r.event_type}</span>
+                          <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] ${r.EventType==="Production"?"bg-emerald-50 text-emerald-700":"bg-rose-50 text-rose-600"}`}>{r.EventType}</span>
                         </td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-700 max-w-[200px] truncate" title={r.barcode||""}>{r.barcode||"—"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap">{r.start_time}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap">{r.end_time}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">{r.duration}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono font-bold text-slate-700">{r.parts_quantity??"-"}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-700 max-w-[200px] truncate" title={r.Barcode||""}>{r.Barcode||"—"}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap">{r.StartTime}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap">{r.EndTime}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">{r.Duration}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono font-bold text-slate-700">{r.PartsQty??"-"}</td>
                         <td className="px-2 py-1.5 border-b border-slate-100 whitespace-nowrap">
-                          {r.parts_quality?<span className={`text-[9px] font-bold px-1 rounded ${r.parts_quality==="GOOD"?"text-emerald-700 bg-emerald-50":"text-rose-600 bg-rose-50"}`}>{r.parts_quality}</span>:<span className="text-slate-300">—</span>}
+                          {r.PartsQuality?<span className={`text-[9px] font-bold px-1 rounded ${r.PartsQuality==="GOOD"?"text-emerald-700 bg-emerald-50":"text-rose-600 bg-rose-50"}`}>{r.PartsQuality}</span>:<span className="text-slate-300">—</span>}
                         </td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-rose-600 whitespace-nowrap">{r.downtime_reason||"—"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-500 whitespace-nowrap">{r.asset_name||"—"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-500 whitespace-nowrap">{r.line_name||"—"}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 text-rose-600 whitespace-nowrap">{r.DowntimeReason||"—"}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-500 whitespace-nowrap">{r.AssetName||"—"}</td>
+                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-500 whitespace-nowrap">{r.LineName||"—"}</td>
                       </tr>
                     ))}
                   </tbody>

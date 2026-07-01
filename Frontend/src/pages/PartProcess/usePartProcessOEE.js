@@ -5,8 +5,9 @@ import {
   selectMaterials, selectShifts, getMaterialByModel,
   isActiveShift, shiftElapsedMins, shiftDurationMins, toMins as sliceToMins,
 } from "../../redux/slices/masterConfigSlice";
-import { mapFOsRecord } from "./FactoryMonitor";
-import fosClient, { FACTORY_OS_BASE, FACTORY_MACHINE_ID } from "../../utils/factoryOsClient";
+import axios from "axios";
+import { mapDbRecord } from "../../utils/mapDbRecord.js";
+import { PART_PROCESS_API } from "../../utils/factoryOsClient";
 import { enrichRecords, detectChangeovers, changeoverStats, isPunchingPart } from "../../utils/productionLogic.js";
 import { getTodayRange, getYesterdayRange, formatDateTimeLocal } from "../../utils/dateUtils.js";
 
@@ -236,61 +237,66 @@ export const usePartProcessOEE = () => {
     () => shifts.find(isActiveShift) ?? null
   );
 
-  // ── Fetch all pages for a datetime range ────────────────────────────────
-  // The FactoryOS API only supports ?date=YYYY-MM-DD pagination.
-  // We derive which calendar dates to fetch from the ISO range, fetch all of
-  // them, then filter client-side to [rangeStart, rangeEnd].
+  // ── Fetch records for a datetime range from the local DB ────────────────
+  // PartProcessEvents (DB3) is kept in sync with FactoryOS by the backend
+  // cron (partProcessSync.js). We query EventDate from the UTC day of
+  // startISO through the day after endISO (extra day catches overnight-shift
+  // records tagged under the previous calendar date), then filter
+  // client-side to the exact [rangeStart, rangeEnd] window.
   const loadForRange = useCallback(async (startISO, endISO) => {
     setLoading(true);
     setRecords([]);
     setLoadProgress({ loaded: 0, total: 0 });
 
-    // Collect all calendar dates between startISO and endISO (IST-aware)
-    // e.g. "2026-06-10T14:30Z" → fetch dates "2026-06-10" and "2026-06-11"
-    const startDate = new Date(startISO);
-    const endDate   = new Date(endISO);
-    const datesToFetch = [];
-    const cur = new Date(startDate);
-    cur.setUTCHours(0, 0, 0, 0);
-    const endDay = new Date(endDate);
+    const startDay = new Date(startISO);
+    startDay.setUTCHours(0, 0, 0, 0);
+    const endDay = new Date(endISO);
     endDay.setUTCHours(0, 0, 0, 0);
-    endDay.setUTCDate(endDay.getUTCDate() + 1); // include end day
-    while (cur <= endDay) {
-      datesToFetch.push(cur.toISOString().slice(0, 10));
-      cur.setUTCDate(cur.getUTCDate() + 1);
-    }
-    // Deduplicate (safety)
-    const uniqueDates = [...new Set(datesToFetch)];
+    endDay.setUTCDate(endDay.getUTCDate() + 1); // include day after end
 
-    const allTagged = [];
+    const startDate = startDay.toISOString().slice(0, 10);
+    const endDate   = endDay.toISOString().slice(0, 10);
+
     try {
-      for (const date of uniqueDates) {
-        let url = `${FACTORY_OS_BASE}/monitoring/daily-summary/${FACTORY_MACHINE_ID}/?date=${date}&page=1`;
-        while (url) {
-          const res = await fosClient.get(url);
-          const d   = res.data;
-          (d.results ?? []).forEach(r => allTagged.push({ ...r, _eventDate: date }));
-          setLoadProgress({ loaded: allTagged.length, total: (d.count || 0) * uniqueDates.length });
-          url = d.next || null;
-          if (allTagged.length >= 10000) break;
-        }
-      }
+      const res  = await axios.get(`${PART_PROCESS_API}/records-range`, {
+        params: { startDate, endDate },
+        withCredentials: true,
+      });
+      const rows = res.data?.data ?? [];
 
-      if (allTagged.length > 0) {
+      if (rows.length > 0) {
         // Client-side filter: keep only records whose startTime falls in [rangeStart, rangeEnd]
         const rStart = new Date(startISO).getTime();
         const rEnd   = new Date(endISO).getTime();
-        const filtered = allTagged.filter(r => {
-          if (!r.start_time) return true; // keep if no time (let downstream handle)
-          // start_time from API is "HH:MM:SS" or full datetime — combine with eventDate
-          const timeStr = r.start_time.includes("T") || r.start_time.length > 8
-            ? r.start_time
-            : `${r._eventDate}T${r.start_time}`;
-          const ts = new Date(timeStr).getTime();
+
+        // Production-day boundary: StartTime before this (in minutes) belongs to the
+        // NEXT calendar date (post-midnight portion of an overnight shift).
+        const _rsDt       = new Date(startISO);
+        const dayStartMins = _rsDt.getHours() * 60 + _rsDt.getMinutes();
+        const bumpDate = (d) => {
+          const [y, mo, dy] = d.split("-").map(Number);
+          const dt = new Date(y, mo - 1, dy + 1);
+          return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+        };
+
+        const filtered = rows.filter(r => {
+          if (!r.StartTime) return true; // keep if no time (let downstream handle)
+          const eventDate = String(r.EventDate).slice(0, 10);
+          const timeStr   = String(r.StartTime);
+          let ts;
+          if (timeStr.includes("T") || timeStr.length > 8) {
+            ts = new Date(timeStr).getTime();
+          } else {
+            // Overnight correction: StartTime before day-start means next calendar date
+            const [hh, mm] = timeStr.split(":").map(Number);
+            const todMins  = (hh || 0) * 60 + (mm || 0);
+            const calDate  = todMins < dayStartMins ? bumpDate(eventDate) : eventDate;
+            ts = new Date(`${calDate}T${timeStr}`).getTime();
+          }
           return ts >= rStart && ts <= rEnd;
         });
-        const mapped = (filtered.length > 0 ? filtered : allTagged)
-          .map((r, i) => ({ ...mapFOsRecord(r, i), eventDate: r._eventDate }));
+        const mapped = (filtered.length > 0 ? filtered : rows)
+          .map((r, i) => ({ ...mapDbRecord(r, i), eventDate: String(r.EventDate).slice(0, 10) }));
         setRecords(enrichRecords(mapped));
       } else {
         setRecords([]);

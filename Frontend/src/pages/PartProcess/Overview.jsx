@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
   Clock, RefreshCw, Loader2, ShieldCheck, Timer, ArrowRightLeft,
-  LayoutDashboard, ClipboardList, AlertTriangle, Search, Factory,
+  LayoutDashboard, ClipboardList, AlertTriangle, Search, Factory, Cpu,
   Wifi, WifiOff, Gauge, X,
 } from "lucide-react";
 import { usePartProcessOEE, oeeColor, p2 } from "./usePartProcessOEE";
-import { isActiveShift } from "../../redux/slices/masterConfigSlice";
+import { isActiveShift, selectMachines } from "../../redux/slices/masterConfigSlice";
+import { fileBaseURL } from "../../assets/assets";
 
 const RingProgress = ({ value, max, size = 84, stroke = 8, color = "#3b82f6" }) => {
   const r = (size - stroke * 2) / 2;
@@ -51,10 +53,28 @@ const PartProcessOverview = () => {
     displayGood, displayBad, passR, dMins,
     curModel, curMat, isRunning,
     coStats, shiftProgress,
+    records,
   } = usePartProcessOEE();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // all | online | offline
+
+  // Match the configured Machine for this card's header, same approach as
+  // the full Dashboard: use the most recent record's assetName/lineName.
+  const configuredMachines = useSelector(selectMachines);
+  const currentMachine = useMemo(() => {
+    if (!configuredMachines.length) return null;
+    const latest = records?.[0];
+    if (!latest) return configuredMachines.find((m) => m.status) || null;
+    const norm = (s) => (s || "").trim().toLowerCase();
+    const byAsset = norm(latest.assetName);
+    const byLine  = norm(latest.lineName);
+    return (
+      configuredMachines.find((m) => byAsset && norm(m.machineName) === byAsset) ||
+      configuredMachines.find((m) => byLine && norm(m.lineName) === byLine) ||
+      null
+    );
+  }, [configuredMachines, records]);
 
   const statTiles = [
     { label: "Good Parts", value: displayGood,     color: "#0069b4" },
@@ -65,7 +85,7 @@ const PartProcessOverview = () => {
 
   // Scaffolding for a future multi-machine grid — each machine becomes one
   // entry here and gets its own card below, filtered by search/status.
-  const machineName = curMat?.partName || curModel || "Part Process Machine";
+  const machineName = currentMachine?.machineName || curMat?.partName || curModel || "Part Process Machine";
   const machines = [
     { id: "part-process", name: machineName, model: curModel, isRunning, oee: activeOEE },
   ];
@@ -156,9 +176,23 @@ const PartProcessOverview = () => {
             {/* ── HEADER ── */}
             <div className="p-4 pb-3 border-b border-slate-100">
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h2 className="text-base font-extrabold text-slate-800 leading-tight truncate">Part Process</h2>
-                  <p className="text-[11px] text-slate-500 truncate">{curMat?.partName || curModel || "Production Monitoring"}</p>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="relative w-9 h-9 shrink-0 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
+                    {currentMachine?.imagePath ? (
+                      <img src={fileBaseURL + currentMachine.imagePath} alt={currentMachine.machineName} className="w-full h-full object-cover" />
+                    ) : (
+                      <Cpu className="w-4 h-4 text-slate-400" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-base font-extrabold text-slate-800 leading-tight truncate">
+                      {currentMachine?.machineCode || "Part Process"}
+                      {currentMachine?.machineName && (
+                        <span className="ml-1.5 text-[10px] font-mono font-bold text-cyan-600">({currentMachine.machineName})</span>
+                      )}
+                    </h2>
+                    <p className="text-[11px] text-slate-500 truncate">{curMat?.partName || curModel || "Production Monitoring"}</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] font-extrabold tracking-wider ${isRunning ? "border-emerald-600 bg-emerald-50 text-emerald-700" : "border-rose-500 bg-rose-50 text-rose-600"}`}>

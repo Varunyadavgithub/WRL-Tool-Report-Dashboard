@@ -1,27 +1,37 @@
-import { useState, useCallback, useMemo } from "react";
+/**
+ * Part Process – Production Report
+ */
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useSelector } from "react-redux";
 import axios from "axios";
 import {
-  Search, Calendar, Clock, Filter, Loader2, Download,
-  PackageOpen, BarChart2, List, TrendingUp, TrendingDown,
-  ChevronDown, Zap,
-} from "lucide-react";
+  FiSearch, FiCalendar, FiClock, FiFilter, FiLoader, FiDownload,
+  FiPackage, FiBarChart2, FiList,
+  FiChevronDown, FiGrid, FiFile, FiFileText, FiColumns,
+  FiChevronLeft, FiChevronRight, FiChevronsLeft, FiChevronsRight,
+  FiActivity, FiAlertTriangle, FiArrowUp, FiArrowDown,
+} from "react-icons/fi";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import toast from "react-hot-toast";
-import { baseURL } from "../../assets/assets.js";
-import { selectMaterials, getMaterialByModel, selectShifts, toMins } from "../../redux/slices/masterConfigSlice";
-import { enrichRecords, detectChangeovers, changeoverStats, parseDurSecs, IDLE_THRESHOLD_MINS, STD_CHANGEOVER_MINS, isPunchingPart } from "../../utils/productionLogic.js";
-import { mapFOsRecord } from "./FactoryMonitor";
-import fosClient, { FACTORY_OS_BASE, FACTORY_MACHINE_ID } from "../../utils/factoryOsClient";
+import {
+  selectMaterials, getMaterialByModel, selectShifts, toMins, selectPlans,
+} from "../../redux/slices/masterConfigSlice";
+import {
+  enrichRecords, detectChangeovers, changeoverStats, parseDurSecs,
+  STD_CHANGEOVER_MINS, isPunchingPart,
+} from "../../utils/productionLogic.js";
+import { mapDbRecord } from "../../utils/mapDbRecord.js";
+import { PART_PROCESS_API } from "../../utils/factoryOsClient";
+import { getWrlLogoBase64 } from "../../utils/reportLogo.js";
 
-// --- Helpers ----------------------------------------------------------------
-const pad = (n) => (n < 10 ? "0" + n : n);
-const fmtDate = (d) =>
-  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-// "YYYY-MM-DD" from a Date
+/* ==================================================================
+ * 1. Date / time helpers
+ * ================================================================== */
+const pad = (n) => (n < 10 ? "0" + n : "" + n);
 const fmtYMD = (d) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-// "YYYY-MM-DD HH:MM:SS" from an absolute timestamp + the original time string
 const fmtAbs = (ms, timeStr) =>
   ms ? `${fmtYMD(new Date(ms))} ${timeStr || ""}`.trim() : timeStr || "—";
 const toDisplayDate = (isoDate) => {
@@ -30,8 +40,11 @@ const toDisplayDate = (isoDate) => {
   return `${d}-${m}-${y}`;
 };
 const todayStr = () => fmtYMD(new Date());
-const extractHHMM = (t) => { if (!t) return null; const s = String(t); if (s.includes("T")) return s.split("T")[1].substring(0,5); if (s.length > 10 && s.includes(" ")) return s.split(" ")[1].substring(0,5); return s.substring(0,5); };
-const offsetDate = (days) => { const d = new Date(); d.setDate(d.getDate()+days); return fmtYMD(d); };
+const offsetDate = (days) => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return fmtYMD(d);
+};
 
 // seconds-of-day from "HH:MM:SS" / "...THH:MM:SS" / "... HH:MM:SS"
 const todSecs = (t) => {
@@ -45,30 +58,67 @@ const todSecs = (t) => {
   return h * 3600 + m * 60 + (sec || 0);
 };
 
-const Spinner = ({ cls = "w-4 h-4" }) => <Loader2 className={`animate-spin ${cls}`} />;
-
-
-// OEE colour helpers
-const oeeTextColor = (v) =>
-  v >= 85 ? "text-emerald-600" : v >= 65 ? "text-amber-600" : "text-rose-500";
-const oeeBgColor  = (v) =>
-  v >= 85 ? "bg-emerald-50 border-emerald-200" : v >= 65 ? "bg-amber-50 border-amber-200" : "bg-rose-50 border-rose-200";
-
-// Delta badge
-const Delta = ({ actual, plan }) => {
-  if (!plan) return null;
-  const diff = actual - plan;
-  return (
-    <span className={`text-[9px] font-bold ${diff >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
-      {diff >= 0 ? "▲" : "▼"}{Math.abs(diff)}
-    </span>
-  );
-};
-
-// --- Aggregation: raw records -> summary rows -------------------------------
 const MACHINE_POWER_KW = 5; // default machine power assumption
 
-const aggregateRecords = (records, materials, queryDateStr) => {
+/* ==================================================================
+ * 2. Tailwind-SAFE colour tokens
+ * ------------------------------------------------------------------
+ * CHANGE: the original used `bg-${color}-50` style template strings.
+ * Tailwind's JIT scanner can't see runtime-built class names, so those
+ * colours were silently purged in production builds. We map to full,
+ * statically-analysable class strings instead.
+ * ================================================================== */
+const TONE = {
+  slate:   { card: "bg-slate-50 border-slate-200",     text: "text-slate-700",   sub: "text-slate-400",   accent: "bg-slate-400" },
+  blue:    { card: "bg-blue-50 border-blue-200",       text: "text-blue-600",    sub: "text-blue-400",    accent: "bg-blue-500" },
+  violet:  { card: "bg-violet-50 border-violet-200",   text: "text-violet-600",  sub: "text-violet-400",  accent: "bg-violet-500" },
+  indigo:  { card: "bg-indigo-50 border-indigo-200",   text: "text-indigo-600",  sub: "text-indigo-400",  accent: "bg-indigo-500" },
+  cyan:    { card: "bg-cyan-50 border-cyan-200",       text: "text-cyan-600",    sub: "text-cyan-400",    accent: "bg-cyan-500" },
+  emerald: { card: "bg-emerald-50 border-emerald-200", text: "text-emerald-600", sub: "text-emerald-400", accent: "bg-emerald-500" },
+  amber:   { card: "bg-amber-50 border-amber-200",     text: "text-amber-600",   sub: "text-amber-400",   accent: "bg-amber-500" },
+  rose:    { card: "bg-rose-50 border-rose-200",       text: "text-rose-500",    sub: "text-rose-400",    accent: "bg-rose-500" },
+};
+// OEE colour helpers
+const oeeTextColor = (v) => (v >= 85 ? "text-emerald-600" : v >= 65 ? "text-amber-600" : "text-rose-500");
+const oeeBgColor   = (v) => (v >= 85 ? "bg-emerald-50 border-emerald-200" : v >= 65 ? "bg-amber-50 border-amber-200" : "bg-rose-50 border-rose-200");
+const oeeBarColor  = (v) => (v >= 85 ? "bg-emerald-500" : v >= 65 ? "bg-amber-500" : "bg-rose-500");
+
+/* ==================================================================
+ * 3. Component-quantity helper
+ * ------------------------------------------------------------------
+ * CHANGE: Component Qty is now the single source of truth for "how
+ * much did we make". This helper converts a raw record's sheet `qty`
+ * into component count using the master (sheets × components/sheet for
+ * punching parts, otherwise 1:1).
+ * ================================================================== */
+const componentsPerUnit = (materials, model) => {
+  const mat = getMaterialByModel(materials, model);
+  if (mat && isPunchingPart(mat)) {
+    const ns = Number(mat.noOfSheet) || 0;
+    const cps = Number(mat.actualComponentsPerSheet) || 0;
+    if (ns > 0 && cps > 0) return ns * cps;
+  }
+  return 1;
+};
+
+/* ==================================================================
+ * 4. Aggregation: raw records -> per-part summary rows
+ * ================================================================== */
+// Sum configured Plan target qty for a SAP code across the queried date span
+// (a multi-day query collapses into one row per SAP code, so plans for every
+// day in that span are summed). Inactive plans (status === false) are ignored.
+const sumPlannedQty = (plans, sapCode, dateFrom, dateTo) => {
+  if (!plans?.length || !sapCode) return 0;
+  return plans.reduce((sum, p) => {
+    if (p.sapCode !== sapCode) return sum;
+    if (p.status === false || p.status === 0) return sum;
+    if (dateFrom && p.planDate < dateFrom) return sum;
+    if (dateTo && p.planDate > dateTo) return sum;
+    return sum + (Number(p.targetQty) || 0);
+  }, 0);
+};
+
+const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []) => {
   if (!records.length) return [];
 
   // Enrich first — classifies Downtime >= 5 min as "Idle"
@@ -76,31 +126,34 @@ const aggregateRecords = (records, materials, queryDateStr) => {
 
   const map = {};
   enriched.forEach((r) => {
-    const sapCode = r.sapCode || (r.model ? getMaterialByModel(materials, r.model)?.sapCode : null) || "UNKNOWN";
+    const mat     = getMaterialByModel(materials, r.model);
+    const sapCode = mat?.sapCode || r.sapCode || "UNKNOWN";
     const key = sapCode;
 
     if (!map[key]) {
-      const mat = getMaterialByModel(materials, r.model);
       map[key] = {
         sapCode, model: r.model,
         itemDescription: mat?.partName || r.model || "-",
-        // NOTE: master no longer carries `cycleTime` (removed when the Material
-        // Config was trimmed). "Defined CT" now reads the per-component defined
-        // value. Confirm this is the target you want OEE/Performance measured
-        // against, or re-introduce a per-sheet defined cycle time on the master.
         definedCycleTime: mat?.definedComponentCycleTime || 0,
         stdChangeoverTime: STD_CHANGEOVER_MINS,
-        date: queryDateStr,
+        // CHANGE: track the actual production-day span instead of forcing
+        // every row to the query's start date (fixes multi-day collapse).
+        dateFrom: r._prodDay || null,
+        dateTo: r._prodDay || null,
         planQty: 0, actualQty: 0, goodQty: 0,
-        downtimeSecs: 0, downtimeCount: 0,  // brief downtime (<5m)
-        idleSecs: 0,    idleCount: 0,        // idle (>=5m)
+        downtimeSecs: 0, downtimeCount: 0, // brief downtime (<5m)
+        idleSecs: 0,    idleCount: 0,      // idle (>=5m)
         cycleSecs: [], productionEvents: 0,
-        rawRecords: [],  // keep for changeover detection
+        rawRecords: [],
       };
     }
 
     const g = map[key];
     g.rawRecords.push(r);
+    if (r._prodDay) {
+      if (!g.dateFrom || r._prodDay < g.dateFrom) g.dateFrom = r._prodDay;
+      if (!g.dateTo   || r._prodDay > g.dateTo)   g.dateTo   = r._prodDay;
+    }
 
     if (r.state === "Production") {
       g.actualQty += r.qty ?? 0;
@@ -118,139 +171,498 @@ const aggregateRecords = (records, materials, queryDateStr) => {
   });
 
   return Object.values(map)
-    .filter((row) => row.sapCode !== "UNKNOWN") // drop downtime/idle bucket with no associated part
+    .filter((row) => row.sapCode !== "UNKNOWN")
     .map((row, idx) => {
-    const avgCycleSecs = row.cycleSecs.length > 0
-      ? Math.round(row.cycleSecs.reduce((a, b) => a + b, 0) / row.cycleSecs.length)
-      : row.definedCycleTime;
+      const avgCycleSecs = row.cycleSecs.length > 0
+        ? Math.round(row.cycleSecs.reduce((a, b) => a + b, 0) / row.cycleSecs.length)
+        : row.definedCycleTime;
 
-    // Detect actual changeovers from production records in this group
-    const cos         = detectChangeovers(row.rawRecords);
-    const coSt        = changeoverStats(cos);
-    const downMins    = Math.round(row.downtimeSecs / 60);
-    const idleMins    = Math.round(row.idleSecs / 60);
-    const lossMins    = downMins + idleMins + coSt.overrunMins; // total loss
-    const prodTimeMins  = Math.round((row.actualQty * avgCycleSecs) / 60);
-    const actualTimeMins = prodTimeMins + downMins + idleMins;
+      const cos      = detectChangeovers(row.rawRecords);
+      const coSt     = changeoverStats(cos);
+      const downMins = Math.round(row.downtimeSecs / 60);
+      const idleMins = Math.round(row.idleSecs / 60);
+      const lossMins = downMins + idleMins + coSt.overrunMins;
 
-    // Plan qty defaults to actual + 5% padding if not configured
-    const planQty = row.planQty > 0 ? row.planQty : Math.ceil(row.actualQty * 1.05);
-    const reqTimeMins = Math.round((planQty * row.definedCycleTime) / 60);
+      // --- Punching component metrics ---
+      const matForRow  = getMaterialByModel(materials, row.model);
+      const punching   = isPunchingPart(matForRow);
+      const noOfSheet    = Number(matForRow?.noOfSheet) || 0;
+      const compPerSheet = Number(matForRow?.actualComponentsPerSheet) || 0;
+      const loadUnload   = Number(matForRow?.pncLoadingUnloading) || 0;
 
-    // OEE
-    const availSecs = actualTimeMins * 60;
-    const A = availSecs > 0
-      ? Math.max(0, (availSecs - row.downtimeSecs) / availSecs)
-      : 1;
-    const runSecs = availSecs - row.downtimeSecs;
-    const P = runSecs > 0 && row.definedCycleTime > 0
-      ? Math.min(1, (row.actualQty * row.definedCycleTime) / runSecs)
-      : 1;
-    const Q = row.actualQty > 0
-      ? Math.min(1, row.goodQty / row.actualQty)
-      : 1;
-    const oee = Math.round(A * P * Q * 1000) / 10;
-    const availability = Math.round(A * 1000) / 10;
-    const performance   = Math.round(P * 1000) / 10;
-    const quality       = Math.round(Q * 1000) / 10;
+      const sheetCT = punching && noOfSheet > 0
+        ? Math.round((avgCycleSecs / noOfSheet) * 100) / 100
+        : avgCycleSecs;
+      const compCT = punching && compPerSheet > 0
+        ? Math.round(((sheetCT + loadUnload) / compPerSheet) * 100) / 100
+        : null;
 
-    const rejects = row.actualQty - row.goodQty;
+      // Total Components Produced = (sheets × comps/sheet) × machine sheet count
+      const compQty = punching && noOfSheet > 0 && compPerSheet > 0
+        ? Math.round(noOfSheet * compPerSheet * row.actualQty)
+        : row.actualQty;
 
-    // Energy
-    const idealEnergyWh = Math.round((planQty * row.definedCycleTime * MACHINE_POWER_KW) / 3600);
-    const actualEnergyWh = Math.round((row.actualQty * avgCycleSecs * MACHINE_POWER_KW) / 3600);
+      // Plan Qty comes from the Planning Configuration upload when available
+      // (summed across the queried date span); otherwise falls back to a
+      // +5% estimate over components produced.
+      const plannedQty = sumPlannedQty(plans, row.sapCode, row.dateFrom, row.dateTo);
+      const planQty = plannedQty > 0 ? plannedQty : Math.ceil(compQty * 1.05);
+      const planQtyFromConfig = plannedQty > 0;
 
-    // --- Punching-process component metrics ---------------------------------
-    // Values pulled from the Material Config master:
-    //   noOfSheet                → No. of Sheets
-    //   actualComponentsPerSheet → No. of Components per Sheet
-    //   pncLoadingUnloading      → Loading/Unloading Time (s)
-    const matForRow    = getMaterialByModel(materials, row.model);
-    const punching     = isPunchingPart(matForRow);
-    const noOfSheet    = Number(matForRow?.noOfSheet) || 0;
-    const compPerSheet = Number(matForRow?.actualComponentsPerSheet) || 0;
-    const loadUnload   = Number(matForRow?.pncLoadingUnloading) || 0;
+      // ============================================================
+      // OEE  — all quantities in COMPONENT units (per spec)
+      // ------------------------------------------------------------
+      //   Actual Component CT  = per-component actual cycle time.
+      //     punching → compCT ; non-punching → machine CT (1 sheet = 1 comp)
+      //   Available Time = Plan Qty       × Defined CT
+      //   Actual Time    = Actual Prod    × Actual CT
+      //
+      //   A% = Actual Time   / Available Time
+      //   P% = Actual Prod   / Plan Qty
+      //   Q% = Accepted Qty  / Actual Qty
+      // ============================================================
+      const actualCompCT = compCT != null ? compCT : avgCycleSecs;
 
-    // Sheet CT = actual machine cycle time per punched sheet (from the machine)
-    const sheetCT = avgCycleSecs;
+      const availableTimeSecs = planQty * row.definedCycleTime; // Plan Qty × Defined CT
+      const actualTimeSecs    = compQty * actualCompCT;         // Actual Prod × Actual CT
+      const reqTimeMins    = Math.round(availableTimeSecs / 60); // "Required / Available Time"
+      const actualTimeMins = Math.round(actualTimeSecs / 60);    // "Actual Time"
 
-    // Component CT = (Sheet CT + Loading/Unloading Time) ÷ No. of Components per Sheet
-    const compCT = punching && compPerSheet > 0
-      ? Math.round(((sheetCT + loadUnload) / compPerSheet) * 100) / 100
-      : null;
+      // --- Rejected / Accepted (component units) ---
+      // Prefer the quality-log batch count; fall back to the GOOD flag ratio.
+      const compMultiplier = compQty > 0 && row.actualQty > 0 ? compQty / row.actualQty : 1;
+      const fallbackRejects = Math.round((row.actualQty - row.goodQty) * compMultiplier);
+      const logRejects = qualityByPartName[row.itemDescription ?? ""]?.rejected
+        ?? qualityByPartName[(getMaterialByModel(materials, row.model)?.partName) ?? ""]?.rejected;
+      const rejects  = logRejects != null ? logRejects : fallbackRejects;
+      const accepted = Math.max(0, compQty - rejects);
 
-    // Total Components Produced =
-    //   (No. of Sheets × No. of Components per Sheet) × Machine sheet count (actualQty)
-    const compQty = punching && noOfSheet > 0 && compPerSheet > 0
-      ? Math.round(noOfSheet * compPerSheet * row.actualQty)
-      : row.actualQty;
+      // A% = Actual Time / Available Time  (capped at 100% for the OEE product)
+      const A = availableTimeSecs > 0 ? Math.min(1, actualTimeSecs / availableTimeSecs) : 0;
+      // P% = Actual Prod / Plan Qty
+      const P = planQty > 0 ? Math.min(1, compQty / planQty) : 0;
+      // Q% = Accepted Qty / Actual Qty   (both in component units)
+      const Q = compQty > 0 ? Math.min(1, accepted / compQty) : 1;
 
-    return {
-      srNo: idx + 1,
-      date: row.date,
-      sapCode: row.sapCode,
-      itemDescription: row.itemDescription,
-      planQty,
-      actualQty: row.actualQty,        // Sheet Qty — machine sheet count
-      isPunching: punching,
-      componentQty: compQty,
-      componentCycleTime: compCT,
-      reqTimeMins,
-      actualTimeMins,
-      definedCycleTime: row.definedCycleTime,
-      sheetCycleTime: avgCycleSecs,    // Sheet CT — actual machine cycle time
-      stdChangeoverTime:    row.stdChangeoverTime,
-      actualChangeoverTime: Math.round(coSt.totalMins * 10) / 10,
-      plannedChangeovers:   coSt.count,           // each model change = 1 planned CO
-      actualChangeovers:    coSt.count,
-      coOverrunMins:        coSt.overrunMins,      // CO time beyond std
-      coOverrunCount:       coSt.overrunCount,
-      idleMins,
-      rejects,
-      lossMins,
-      oee: isNaN(oee) ? 0 : oee,
-      availability,
-      performance,
-      quality,
-      idealEnergyWh,
-      actualEnergyWh,
-      // for detail drill-down
-      rawRecords: null,
-    };
-  });
+      const oee = Math.round(A * P * Q * 1000) / 10;
+      const availability = Math.round(A * 1000) / 10;
+      const performance  = Math.round(P * 1000) / 10;
+      const quality      = Math.round(Q * 1000) / 10;
+
+      const goodComp = accepted;
+
+      // Energy
+      const idealEnergyWh  = Math.round((planQty * row.definedCycleTime * MACHINE_POWER_KW) / 3600);
+      const actualEnergyWh = Math.round((row.actualQty * avgCycleSecs * MACHINE_POWER_KW) / 3600);
+
+      return {
+        srNo: idx + 1,
+        dateFrom: row.dateFrom,
+        dateTo: row.dateTo,
+        date: row.dateFrom,                       // back-compat
+        sapCode: row.sapCode,
+        itemDescription: row.itemDescription,
+        model: row.model,
+        planQty,
+        planQtyFromConfig,
+        actualQty: row.actualQty,                 // Sheet Qty
+        isPunching: punching,
+        componentQty: compQty,                    // PRIMARY production count
+        goodComponentQty: goodComp,
+        componentCycleTime: compCT,
+        reqTimeMins,
+        actualTimeMins,
+        definedCycleTime: row.definedCycleTime,
+        sheetCycleTime: sheetCT,
+        machineCycleSecs: avgCycleSecs,
+        noOfSheet, compPerSheet, loadUnload,
+        stdChangeoverTime: row.stdChangeoverTime,
+        actualChangeoverTime: Math.round(coSt.totalMins * 10) / 10,
+        plannedChangeovers: coSt.count,
+        actualChangeovers: coSt.count,
+        coOverrunMins: coSt.overrunMins,
+        coOverrunCount: coSt.overrunCount,
+        idleMins, downMins, rejects, accepted, lossMins,
+        oee: isNaN(oee) ? 0 : oee,
+        availability, performance, quality,
+        idealEnergyWh, actualEnergyWh,
+        // OEE breakdown inputs (component units) — surfaced in the UI
+        actualCompCT, availableTimeSecs, actualTimeSecs,
+        downtimeSecs: row.downtimeSecs, idleSecs: row.idleSecs,
+        goodQty: row.goodQty,
+      };
+    });
 };
 
-// --- Export CSV -------------------------------------------------------------
-const exportCSV = (rows) => {
-  const H = ["Sr No","Date","SAP Code","Item Description",
-    "Plan Qty","Sheet Qty","Components Produced","Required Time (min)","Actual Time (min)",
-    "Defined Cycle Time (s)","Sheet Cycle Time (s)","Component Cycle Time (s)",
-    "Rejects","Loss (min)","Availability (%)","Performance (%)","Quality (%)","OEE (%)"];
-  const csv = [H.join(","), ...rows.map((r) =>
-    [r.srNo, r.date, r.sapCode, `"${r.itemDescription}"`,
-     r.planQty, r.actualQty, r.componentQty ?? "", r.reqTimeMins, r.actualTimeMins,
-     r.definedCycleTime, r.sheetCycleTime, r.componentCycleTime ?? "",
-     r.rejects, r.lossMins, r.availability, r.performance, r.quality, r.oee].join(",")
-  )].join("\n");
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  a.download = "production_report.csv"; a.click();
+/* ==================================================================
+ * 5. Reusable presentational pieces
+ * ================================================================== */
+const Spinner = ({ cls = "w-4 h-4" }) => <FiLoader className={`animate-spin ${cls}`} />;
+
+const StatCard = ({ icon: Icon, label, value, sub, tone = "slate", primary = false, delta }) => {
+  const t = TONE[tone] || TONE.slate;
+  return (
+    <div className={`relative flex flex-col rounded-xl border ${t.card} px-3.5 py-3 overflow-hidden
+      ${primary ? "sm:col-span-2 ring-1 ring-inset ring-blue-300/40" : ""}`}>
+      <span className={`absolute left-0 top-0 h-full w-1 ${t.accent}`} />
+      <div className="flex items-center justify-between">
+        <span className={`text-[10px] font-semibold uppercase tracking-wide ${t.sub}`}>{label}</span>
+        {Icon && <Icon className={`w-3.5 h-3.5 ${t.sub}`} />}
+      </div>
+      <div className="flex items-end gap-2 mt-1">
+        <span className={`font-mono font-bold ${primary ? "text-2xl" : "text-lg"} ${t.text}`}>{value}</span>
+        {delta != null && (
+          <span className={`text-[10px] font-bold mb-1 flex items-center gap-0.5 ${delta >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+            {delta >= 0 ? <FiArrowUp className="w-3 h-3" /> : <FiArrowDown className="w-3 h-3" />}
+            {Math.abs(delta).toLocaleString()}
+          </span>
+        )}
+      </div>
+      {sub && <span className={`text-[10px] mt-0.5 ${t.sub}`}>{sub}</span>}
+    </div>
+  );
 };
 
-// --- Summary Table Header Cell ----------------------------------------------
-const TH = ({ children, center, wide, sticky }) => (
-  <th className={`px-2.5 py-2 text-[10px] font-semibold text-slate-600 border-b border-r border-slate-200 whitespace-nowrap align-middle
-    ${center ? "text-center" : "text-left"}
-    ${wide ? "min-w-[120px]" : ""}
-    ${sticky ? "sticky left-0 z-20 bg-slate-100" : "bg-slate-100"}`}>
-    {children}
-  </th>
+const SectionCard = ({ children, className = "" }) => (
+  <div className={`bg-white rounded-xl border border-slate-200 shadow-sm ${className}`}>{children}</div>
 );
 
-// --- Main Component ---------------------------------------------------------
+const EmptyState = ({ icon: Icon = FiPackage, text }) => (
+  <div className="flex flex-col items-center gap-2 text-slate-300 py-14">
+    <Icon className="w-10 h-10 opacity-40" />
+    <p className="text-sm text-slate-400 font-medium">{text}</p>
+  </div>
+);
+
+// Delta badge (component-aware)
+const Delta = ({ actual, plan }) => {
+  if (!plan) return null;
+  const diff = actual - plan;
+  return (
+    <span className={`text-[9px] font-bold ${diff >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+      {diff >= 0 ? "▲" : "▼"}{Math.abs(diff).toLocaleString()}
+    </span>
+  );
+};
+
+/* ==================================================================
+ * 6. Summary table column config
+ * ------------------------------------------------------------------
+ * CHANGE: table is now driven by a column config array. This powers
+ * sorting, column-visibility toggles and CSV/Excel export from one
+ * source of truth (no more duplicated header/cell/CSV definitions).
+ * ================================================================== */
+const safePct = (num, den) => (den > 0 ? Math.min(100, (num / den) * 100) : 0);
+
+const buildColumns = (materials) => [
+  { key: "srNo", label: "Sr.", group: "info", sortable: true, always: true, align: "left",
+    cell: (r) => <span className="text-[11px] text-slate-400 font-mono">{r.srNo}</span>,
+    csv: (r) => r.srNo },
+  { key: "date", label: "Date", group: "info", sortable: true, align: "left",
+    sortVal: (r) => r.dateFrom || "",
+    cell: (r) => (
+      <span className="text-xs font-mono text-slate-600 whitespace-nowrap">
+        {r.dateFrom === r.dateTo ? toDisplayDate(r.dateFrom)
+          : `${toDisplayDate(r.dateFrom)} → ${toDisplayDate(r.dateTo)}`}
+      </span>
+    ),
+    csv: (r) => (r.dateFrom === r.dateTo ? r.dateFrom : `${r.dateFrom}..${r.dateTo}`) },
+  { key: "sapCode", label: "SAP Code", group: "info", sortable: true, align: "left",
+    cell: (r) => <span className="font-mono font-bold text-blue-600 text-xs">{r.sapCode}</span>,
+    csv: (r) => r.sapCode },
+  { key: "itemDescription", label: "Item Description", group: "info", sortable: true, always: true, align: "left", wide: true,
+    cell: (r) => (
+      materials.some((m) => m.partName === r.itemDescription)
+        ? <span className="font-semibold text-blue-700 text-xs leading-snug block max-w-[240px]">{r.itemDescription}</span>
+        : (
+          <div className="max-w-[240px]">
+            <span className="font-mono text-[11px] text-slate-600 block leading-snug">{r.itemDescription}</span>
+            <span className="text-[9px] font-bold text-rose-500 flex items-center gap-0.5"><FiAlertTriangle className="w-2.5 h-2.5" /> Master not found</span>
+          </div>
+        )
+    ),
+    csv: (r) => r.itemDescription },
+  { key: "planQty", label: "Plan Qty", group: "qty", sortable: true, align: "center",
+    cell: (r) => (
+      <div className="text-center">
+        <span className="font-mono font-semibold text-slate-700">{r.planQty.toLocaleString()}</span>
+        <div className="text-[9px] font-mono text-slate-400">
+          {r.planQtyFromConfig ? "from Planning Config" : `${r.componentQty}×1.05 (estimated)`}
+        </div>
+      </div>
+    ),
+    csv: (r) => r.planQty },
+  { key: "componentQty", label: "Components Produced", group: "qty", sortable: true, always: true, align: "center",
+    cell: (r) => (
+      <div className="flex flex-col items-center gap-0.5">
+        <span className={`font-bold font-mono text-sm ${r.componentQty >= r.planQty ? "text-emerald-600" : r.isPunching ? "text-violet-600" : "text-blue-500"}`}>
+          {r.componentQty.toLocaleString()}
+        </span>
+        <Delta actual={r.componentQty} plan={r.planQty} />
+        <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full ${r.componentQty >= r.planQty ? "bg-emerald-500" : "bg-blue-500"}`}
+            style={{ width: `${safePct(r.componentQty, r.planQty)}%` }} />
+        </div>
+        {r.isPunching && r.noOfSheet > 0 && r.compPerSheet > 0 && (
+          <div className="text-[9px] font-mono text-slate-400">{r.noOfSheet}×{r.compPerSheet}×{r.actualQty}</div>
+        )}
+      </div>
+    ),
+    csv: (r) => r.componentQty },
+  { key: "actualQty", label: "Sheet Qty", group: "qty", sortable: true, align: "center",
+    cell: (r) => <span className="font-bold font-mono text-sm text-slate-600">{r.actualQty.toLocaleString()}</span>,
+    csv: (r) => r.actualQty },
+  { key: "reqTimeMins", label: "Required Time", group: "time", sortable: true, align: "center",
+    cell: (r) => <span className="font-mono text-violet-600 font-semibold">{r.reqTimeMins}</span>,
+    csv: (r) => r.reqTimeMins },
+  { key: "actualTimeMins", label: "Actual Time", group: "time", sortable: true, align: "center",
+    cell: (r) => <span className={`font-mono font-semibold ${r.actualTimeMins > r.reqTimeMins ? "text-amber-600" : "text-violet-600"}`}>{r.actualTimeMins}</span>,
+    csv: (r) => r.actualTimeMins },
+  { key: "definedCycleTime", label: "Standard CT", group: "ct", sortable: true, align: "center",
+    cell: (r) => <span className="font-mono font-semibold text-cyan-600">{r.definedCycleTime > 0 ? r.definedCycleTime : "-"}</span>,
+    csv: (r) => r.definedCycleTime },
+  { key: "sheetCycleTime", label: "Sheet CT", group: "ct", sortable: true, align: "center",
+    cell: (r) => {
+      const good = r.sheetCycleTime <= r.definedCycleTime;
+      return (
+        <div className="text-center">
+          <span className={`font-mono font-bold ${good ? "text-emerald-600" : "text-amber-600"}`}>{r.sheetCycleTime > 0 ? r.sheetCycleTime : "-"}</span>
+          {r.isPunching && r.noOfSheet > 0 && <div className="text-[9px] font-mono text-slate-400">{r.machineCycleSecs} ÷ {r.noOfSheet}</div>}
+        </div>
+      );
+    },
+    csv: (r) => r.sheetCycleTime },
+  { key: "componentCycleTime", label: "Actual CT", group: "ct", sortable: true, align: "center",
+    sortVal: (r) => r.componentCycleTime ?? -1,
+    cell: (r) => (
+      r.componentCycleTime != null
+        ? (
+          <div className="text-center">
+            <span className="font-mono font-semibold text-indigo-600">{r.componentCycleTime}</span>
+            <div className="text-[9px] font-mono text-slate-400">({r.sheetCycleTime}+{r.loadUnload}) ÷ {r.compPerSheet}</div>
+          </div>
+        )
+        : <span className="text-slate-300 text-xs">—</span>
+    ),
+    csv: (r) => r.componentCycleTime ?? "" },
+  { key: "accepted", label: "Accepted", group: "quality", sortable: true, align: "center",
+    sortVal: (r) => r.accepted,
+    cell: (r) => <span className="font-bold font-mono text-emerald-600">{r.accepted.toLocaleString()}</span>,
+    csv: (r) => r.accepted },
+  { key: "rejected", label: "Rejected", group: "quality", sortable: true, align: "center",
+    sortVal: (r) => r.rejects,
+    cell: (r) => <span className="font-bold font-mono text-rose-500">{r.rejects.toLocaleString()}</span>,
+    csv: (r) => r.rejects },
+  { key: "availability", label: "A (%)", group: "oee", sortable: true, align: "center",
+    cell: (r) => (
+      <div className="text-center font-mono font-semibold text-slate-600">{r.availability}%
+        <div className="text-[9px] font-mono text-slate-400">{r.actualTimeMins} ÷ {r.reqTimeMins} m</div>
+      </div>
+    ),
+    csv: (r) => r.availability },
+  { key: "performance", label: "P (%)", group: "oee", sortable: true, align: "center",
+    cell: (r) => (
+      <div className="text-center font-mono font-semibold text-slate-600">{r.performance}%
+        <div className="text-[9px] font-mono text-slate-400">{r.componentQty} ÷ {r.planQty}</div>
+      </div>
+    ),
+    csv: (r) => r.performance },
+  { key: "quality", label: "Q (%)", group: "oee", sortable: true, align: "center",
+    cell: (r) => (
+      <div className="text-center font-mono font-semibold text-slate-600">{r.quality}%
+        <div className="text-[9px] font-mono text-slate-400">{r.accepted} ÷ {r.componentQty}</div>
+      </div>
+    ),
+    csv: (r) => r.quality },
+  { key: "oee", label: "OEE (%)", group: "oee", sortable: true, always: true, align: "center",
+    cell: (r) => (
+      <div className="text-center">
+        <div className={`inline-flex flex-col items-center px-2.5 py-1 rounded-lg border ${oeeBgColor(r.oee)}`}>
+          <span className={`text-sm font-bold font-mono ${oeeTextColor(r.oee)}`}>{r.oee}%</span>
+          <div className="w-10 h-1 bg-white/60 rounded-full overflow-hidden mt-0.5">
+            <div className={`h-full rounded-full ${oeeBarColor(r.oee)}`} style={{ width: `${r.oee}%` }} />
+          </div>
+        </div>
+        <div className="text-[9px] font-mono text-slate-400 mt-0.5">{r.availability}×{r.performance}×{r.quality}</div>
+      </div>
+    ),
+    csv: (r) => r.oee },
+];
+
+const GROUP_META = {
+  info:    { label: "Part Info",      tone: "text-slate-600  bg-slate-100" },
+  qty:     { label: "Production Qty",  tone: "text-blue-700   bg-blue-50" },
+  time:    { label: "Time (min)",      tone: "text-violet-700 bg-violet-50" },
+  ct:      { label: "Cycle Time (s)",  tone: "text-cyan-700   bg-cyan-50" },
+  quality: { label: "Quality Log",     tone: "text-emerald-700 bg-emerald-50" },
+  oee:     { label: "OEE (A × P × Q)", tone: "text-amber-700  bg-amber-50" },
+};
+
+// Collapse a column list into header-band segments [{group, count}].
+const groupSpans = (cols) => {
+  const segs = [];
+  cols.forEach((c) => {
+    const last = segs[segs.length - 1];
+    if (last && last.group === c.group) last.count += 1;
+    else segs.push({ group: c.group, count: 1 });
+  });
+  return segs;
+};
+
+/* ==================================================================
+ * 7. Export helpers
+ * ================================================================== */
+// Which summary columns are additive (SUM) vs averaged (AVG) for footer rows.
+const AGG_SUM = new Set(["planQty", "componentQty", "actualQty", "reqTimeMins", "actualTimeMins", "accepted", "rejected"]);
+const AGG_AVG = new Set(["availability", "performance", "quality", "oee"]);
+
+const computeTotals = (rows, columns) => {
+  const out = {};
+  columns.forEach((c) => {
+    if (AGG_SUM.has(c.key)) out[c.key] = rows.reduce((s, r) => s + (Number(c.csv(r)) || 0), 0);
+    else if (AGG_AVG.has(c.key)) out[c.key] = rows.length ? rows.reduce((s, r) => s + (Number(c.csv(r)) || 0), 0) / rows.length : 0;
+    else out[c.key] = null;
+  });
+  return out;
+};
+const fmtTotal = (c, totals, first) => {
+  if (first) return "TOTAL / AVG";
+  if (AGG_SUM.has(c.key)) return Math.round(totals[c.key]).toLocaleString();
+  if (AGG_AVG.has(c.key)) return `${totals[c.key].toFixed(1)}%`;
+  return "";
+};
+const reportMeta = (start, end) => ({ start, end, generated: new Date().toLocaleString() });
+
+const csvEscape = (v) => {
+  const s = String(v ?? "");
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+const downloadBlob = (content, mime, filename) => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([content], { type: mime }));
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+const exportCSV = (rows, columns) => {
+  const cols = columns.filter((c) => c.csv);
+  const header = cols.map((c) => csvEscape(c.label)).join(",");
+  const body = rows.map((r) => cols.map((c) => csvEscape(c.csv(r))).join(",")).join("\n");
+  downloadBlob(header + "\n" + body, "text/csv;charset=utf-8;", "production_report.csv");
+};
+// Formatted Excel without extra deps: an HTML table with the ms-excel mime
+// opens natively in Excel. Inline styles carry across as cell formatting:
+// title banner, bold dark header, zebra rows, right-aligned numbers, totals row.
+const exportExcel = async (rows, columns, meta) => {
+  const logo = await getWrlLogoBase64();
+  const cols = columns.filter((c) => c.csv);
+  const totals = computeTotals(rows, cols);
+  const span = cols.length;
+  const th = (c) => `<th style="background:#1e3a8a;color:#ffffff;font-weight:bold;border:1px solid #1e293b;padding:6px;text-align:${c.align === "center" ? "center" : "left"}">${c.label}</th>`;
+  const td = (c, v) => {
+    const num = v !== "" && v != null && !isNaN(parseFloat(v)) && isFinite(v);
+    return `<td style="border:1px solid #cbd5e1;padding:4px;text-align:${num ? "right" : "left"}">${v ?? ""}</td>`;
+  };
+  const head = `<tr>${cols.map(th).join("")}</tr>`;
+  const body = rows.map((r, i) =>
+    `<tr style="background:${i % 2 ? "#f1f5f9" : "#ffffff"}">${cols.map((c) => td(c, c.csv(r))).join("")}</tr>`).join("");
+  const foot = `<tr>${cols.map((c, i) =>
+    `<td style="background:#dbeafe;font-weight:bold;border:1px solid #1e293b;padding:5px;text-align:${c.align === "center" ? "center" : "left"}">${fmtTotal(c, totals, i === 0)}</td>`).join("")}</tr>`;
+  const logoCell = logo ? `<td style="width:90px;padding:6px"><img src="${logo}" width="80" height="40" /></td>` : "";
+  const html = `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">
+    <style>table{border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:11px}</style></head>
+    <body>
+      <table><tr>${logoCell}<td colspan="${span}" style="font-size:15px;font-weight:bold;padding:8px;text-align:center">Part Process — Production Report</td></tr>
+      <tr><td colspan="${span + (logo ? 1 : 0)}" style="font-size:10px;color:#475569;padding:0 8px 8px;text-align:center">${meta.start} → ${meta.end} · Generated ${meta.generated}</td></tr></table>
+      <table border="1">${head}${body}${foot}</table>
+    </body></html>`;
+  downloadBlob(html, "application/vnd.ms-excel", "production_report.xls");
+};
+
+// Print-only report block (hidden on screen, shown only when printing/PDF).
+// Direct PDF generation. Builds the document from data via jsPDF + autotable,
+// so the output contains ONLY the report — no app sidebar/header/username,
+// since we never capture the page DOM.
+const exportPDF = async (rows, columns, meta) => {
+  const logo = await getWrlLogoBase64();
+  const cols = columns.filter((c) => c.csv);
+  const segs = groupSpans(cols);
+  const totals = computeTotals(rows, cols);
+
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const marginX = 24;
+  const titleX = logo ? marginX + 56 : marginX;
+
+  if (logo) doc.addImage(logo, "PNG", marginX, 14, 44, 22);
+
+  // Title + meta (plain ASCII to stay safe across PDF fonts)
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.text("Part Process - Production Report", titleX, 28);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(110);
+  doc.text(`${meta.start} to ${meta.end}   |   Generated ${meta.generated}   |   ${rows.length} parts`, titleX, 42);
+  doc.setTextColor(0);
+
+  // Two header rows: coloured group band + column labels
+  const groupRow = segs.map((s) => ({
+    content: (GROUP_META[s.group] || GROUP_META.info).label,
+    colSpan: s.count,
+    styles: { halign: "center", fillColor: [226, 232, 240], textColor: [30, 41, 59], fontStyle: "bold" },
+  }));
+  const labelRow = cols.map((c) => ({
+    content: c.label,
+    styles: { halign: c.align === "center" ? "center" : "left" },
+  }));
+  const body = rows.map((r) => cols.map((c) => {
+    const v = c.csv(r);
+    return v == null ? "" : String(v);
+  }));
+  const footRow = cols.map((c, i) => ({
+    content: fmtTotal(c, totals, i === 0),
+    styles: { halign: c.align === "center" ? "center" : "left", fontStyle: "bold" },
+  }));
+  const columnStyles = {};
+  cols.forEach((c, i) => { columnStyles[i] = { halign: c.align === "center" ? "center" : "left" }; });
+
+  autoTable(doc, {
+    head: [groupRow, labelRow],
+    body,
+    foot: [footRow],
+    startY: 52,
+    margin: { left: marginX, right: marginX },
+    theme: "grid",
+    styles: { fontSize: 7, cellPadding: 2.5, overflow: "linebreak", lineColor: [203, 213, 225], lineWidth: 0.4 },
+    headStyles: { fillColor: [30, 58, 138], textColor: [255, 255, 255], fontStyle: "bold", lineColor: [30, 41, 59] },
+    footStyles: { fillColor: [219, 234, 254], textColor: [15, 23, 42], fontStyle: "bold", lineColor: [30, 41, 59] },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles,
+    didDrawPage: (data) => {
+      // page number footer
+      const str = `Page ${doc.internal.getNumberOfPages()}`;
+      doc.setFontSize(8); doc.setTextColor(120);
+      doc.text(str, doc.internal.pageSize.getWidth() - marginX, doc.internal.pageSize.getHeight() - 12, { align: "right" });
+      doc.setTextColor(0);
+    },
+  });
+
+  doc.save("production_report.pdf");
+};
+
+/* ==================================================================
+ * 8. Main component
+ * ================================================================== */
+const PAGE_SIZES = [10, 25, 50, 100];
+
 const PartProcessProductionReport = () => {
-  const materials    = useSelector(selectMaterials);
-  const configShifts = useSelector(selectShifts).filter(s => s.status);
+  const materials = useSelector(selectMaterials);
+  const plans = useSelector(selectPlans);
+  // CHANGE: memoise the filtered shift list. `.filter()` produced a NEW array
+  // every render, which re-created `fetchData` on every render and defeated
+  // useCallback/useMemo downstream.
+  const allShifts = useSelector(selectShifts);
+  const configShifts = useMemo(() => allShifts.filter((s) => s.status), [allShifts]);
 
   const [startTime, setStartTime] = useState(`${todayStr()} 08:00`);
   const [endTime, setEndTime]     = useState(`${todayStr()} 20:00`);
@@ -259,38 +671,50 @@ const PartProcessProductionReport = () => {
   const [todayLoading, setTodayLoading] = useState(false);
   const [records, setRecords]     = useState([]);
   const [rawRecords, setRawRecords] = useState([]);
+  const [dbQLogs, setDbQLogs]     = useState([]);
   const [showRaw, setShowRaw]     = useState(false);
-  const [viewMode, setViewMode]   = useState("summary"); // "summary" | "detail"
+  const [viewMode, setViewMode]   = useState("summary"); // summary | detail
 
-  // Extract query date from startTime
-  const queryDate = startTime.split(" ")[0]; // "YYYY-MM-DD"
+  // Table controls
+  const [search, setSearch]   = useState("");
+  const [sortKey, setSortKey] = useState("componentQty");
+  const [sortDir, setSortDir] = useState("desc");
+  const [page, setPage]       = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  // Sheet Qty + Sheet CT hidden by default; toggle on from the Columns menu.
+  const [hiddenCols, setHiddenCols] = useState({ actualQty: true, sheetCycleTime: true });
+  const [colMenuOpen, setColMenuOpen] = useState(false);
 
-  const DEMO_RECORDS = [
-    { srNo: 1,  shift: "Shift 2", state: "Production", model: "1127024-D-UNIT-FRAME-D150H", startTime: "08:00:41", endTime: "08:01:22", duration: "00:00:45", qty: 1, quality: "GOOD",  operator: null, downtimeReason: null },
-    { srNo: 2,  shift: "Shift 2", state: "Production", model: "1127024-D-UNIT-FRAME-D150H", startTime: "08:01:22", endTime: "08:02:10", duration: "00:00:48", qty: 1, quality: "GOOD",  operator: null, downtimeReason: null },
-    { srNo: 3,  shift: "Shift 2", state: "Downtime",   model: null,                         startTime: "08:02:10", endTime: "08:15:46", duration: "00:13:36", qty: 0, quality: null,    operator: null, downtimeReason: "Tool Change" },
+  // Advanced filters
+  const [modelFilter, setModelFilter]   = useState("ALL");
+  const [shiftFilter, setShiftFilter]   = useState("ALL");
+
+  const isAnyLoading = loading || ydayLoading || todayLoading;
+
+  /* ----- demo fallback (now includes downtime so OEE is realistic) ----- */
+  const DEMO_RECORDS = useMemo(() => ([
+    { srNo: 1, shift: "Shift 2", state: "Production", model: "1127024-D-UNIT-FRAME-D150H", startTime: "08:00:41", endTime: "08:01:22", duration: "00:00:45", qty: 1, quality: "GOOD", operator: "OP-12", downtimeReason: null },
+    { srNo: 2, shift: "Shift 2", state: "Production", model: "1127024-D-UNIT-FRAME-D150H", startTime: "08:01:22", endTime: "08:02:10", duration: "00:00:48", qty: 1, quality: "GOOD", operator: "OP-12", downtimeReason: null },
+    { srNo: 3, shift: "Shift 2", state: "Downtime", model: null, startTime: "08:02:10", endTime: "08:15:46", duration: "00:13:36", qty: 0, quality: null, operator: null, downtimeReason: "Tool Change" },
     ...Array.from({ length: 55 }, (_, i) => ({
       srNo: i + 4, shift: "Shift 2", state: "Production",
       model: i % 3 === 0 ? "0109855-C-INR-BTM-550G-RT-AS" : "1127024-D-UNIT-FRAME-D150H",
       startTime: `${pad(8 + Math.floor(i / 8))}:${pad((i * 7) % 60)}:00`,
-      endTime:   `${pad(8 + Math.floor(i / 8))}:${pad(((i * 7) + 43) % 60)}:00`,
+      endTime: `${pad(8 + Math.floor(i / 8))}:${pad(((i * 7) + 43) % 60)}:00`,
       duration: `00:00:${pad(41 + (i % 12))}`,
-      qty: 1, quality: i % 15 === 0 ? null : "GOOD", operator: null, downtimeReason: null,
+      qty: 1, quality: i % 15 === 0 ? null : "GOOD", operator: `OP-${10 + (i % 3)}`, downtimeReason: null,
     })),
     { srNo: 60, shift: "Shift 2", state: "Downtime", model: null, startTime: "12:10:00", endTime: "12:17:30", duration: "00:07:30", qty: 0, quality: null, operator: null, downtimeReason: "Assign" },
     ...Array.from({ length: 12 }, (_, i) => ({
-      srNo: i + 61, shift: "Shift 1", state: "Production",
-      model: "0109855-D-INR-BTM-550G-RT-AS",
+      srNo: i + 61, shift: "Shift 1", state: "Production", model: "0109855-D-INR-BTM-550G-RT-AS",
       startTime: `0${pad(6 + Math.floor(i / 4))}:${pad((i * 9) % 60)}:00`,
-      endTime:   `0${pad(6 + Math.floor(i / 4))}:${pad(((i * 9) + 38) % 60)}:00`,
+      endTime: `0${pad(6 + Math.floor(i / 4))}:${pad(((i * 9) + 38) % 60)}:00`,
       duration: `00:00:${pad(38 + (i % 8))}`,
-      qty: 1, quality: "GOOD", operator: null, downtimeReason: null,
+      qty: 1, quality: "GOOD", operator: `OP-${20 + (i % 2)}`, downtimeReason: null,
     })),
-  ];
+  ].map((r) => ({ ...r, _prodDay: todayStr(), _absMs: null, _absMsEnd: null }))), []);
 
-  // Fetch + filter. daily-summary groups by PRODUCTION DAY:
-  //   date=D  ->  [D dayStart, (D+1) dayStart)
-  // so post-midnight rows returned under date=D are really D+1 on the calendar.
+  /* ----- data fetch ----- */
   const fetchData = useCallback(async (start, end, setLoadFn) => {
     const startMs = new Date(start.replace(" ", "T") + ":00").getTime();
     const endMs   = new Date(end.replace(" ", "T") + ":00").getTime();
@@ -299,14 +723,12 @@ const PartProcessProductionReport = () => {
       return;
     }
 
-    setLoadFn(true); setRecords([]); setRawRecords([]);
+    setLoadFn(true); setRecords([]); setRawRecords([]); setPage(1);
     try {
-      // production-day start (seconds of day) = start of the earliest configured shift (08:00 here)
       const dayStartSec = configShifts.length
         ? Math.min(...configShifts.map((s) => toMins(s.startTime))) * 60
         : 0;
 
-      // which production day (Date @ local midnight of its start date) an instant belongs to
       const prodDayOf = (ms) => {
         const d = new Date(ms);
         const tod = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
@@ -315,27 +737,24 @@ const PartProcessProductionReport = () => {
         return base;
       };
 
-      // production-day summaries that overlap the window
       const dates = [];
       const cur  = prodDayOf(startMs);
-      const last = prodDayOf(endMs - 1000); // last instant actually inside the window
+      const last = prodDayOf(endMs - 1000);
       while (cur <= last) { dates.push(fmtYMD(cur)); cur.setDate(cur.getDate() + 1); }
 
+      const res = await axios.get(`${PART_PROCESS_API}/records-range`, {
+        params: { startDate: dates[0], endDate: dates[dates.length - 1] },
+        withCredentials: true,
+      });
+      const allRows = res.data?.data ?? [];
+
       const allMapped = [];
-      const allRaw    = [];
+      const allRaw = [];
 
       for (const date of dates) {
-        const raw = [];
-        let url = `${FACTORY_OS_BASE}/monitoring/daily-summary/${FACTORY_MACHINE_ID}/?date=${date}&page=1`;
-        while (url) {
-          const res = await fosClient.get(url);
-          raw.push(...(res.data?.results ?? [])); url = res.data?.next || null;
-          if (raw.length >= 5000) break;
-        }
-
-        // tag each raw row with its REAL calendar date (post-midnight rows roll to date+1)
+        const raw = allRows.filter((r) => String(r.EventDate).slice(0, 10) === date);
         raw.forEach((r) => {
-          const tod = todSecs(r.start_time);
+          const tod = todSecs(r.StartTime);
           let calDate = date;
           if (tod !== null && tod < dayStartSec) {
             const d = new Date(date + "T00:00:00"); d.setDate(d.getDate() + 1);
@@ -344,45 +763,45 @@ const PartProcessProductionReport = () => {
           allRaw.push({ _fetchDate: date, _calDate: calDate, ...r });
         });
 
-        // Include ALL event types (production + downtime) so aggregateRecords
-        // can compute Loss (downtime + idle + CO overrun) correctly.
         const midnight = new Date(date + "T00:00:00").getTime();
-        const mapped = enrichRecords(raw.map(mapFOsRecord)).map((r) => {
+        const mapped = raw.map((r, i) => ({ ...mapDbRecord(r, i), eventDate: date })).map((r) => {
           const tod    = todSecs(r.startTime);
           const todEnd = todSecs(r.endTime);
-          const absMs  = tod === null
-            ? null
-            : midnight + (tod < dayStartSec ? 86400000 : 0) + tod * 1000;
+          const absMs  = tod === null ? null : midnight + (tod < dayStartSec ? 86400000 : 0) + tod * 1000;
           let absMsEnd = null;
           if (absMs !== null && todEnd !== null) {
             const sm = new Date(absMs); sm.setHours(0, 0, 0, 0);
             absMsEnd = sm.getTime() + todEnd * 1000;
-            if (absMsEnd < absMs) absMsEnd += 86400000; // ran past midnight
+            if (absMsEnd < absMs) absMsEnd += 86400000;
           }
           return { ...r, _prodDay: date, _absMs: absMs, _absMsEnd: absMsEnd };
         });
         allMapped.push(...mapped);
       }
 
-      // exact-window filter on real timestamps, newest first
       const filtered = allMapped
-        .filter((r) =>
-          r._absMs !== null &&
-          r._absMs >= startMs &&
-          r._absMs < endMs &&
-          parseDurSecs(r.duration) <= 86400, // drop unclosed/open downtime
-        )
+        .filter((r) => r._absMs !== null && r._absMs >= startMs && r._absMs < endMs && parseDurSecs(r.duration) <= 86400)
         .sort((a, b) => b._absMs - a._absMs);
 
       setRecords(filtered);
       setRawRecords(allRaw);
-      const prodCount = filtered.filter(r => r.state === "Production").length;
+
+      try {
+        const qRes = await axios.get(`${PART_PROCESS_API}/quality-log`, {
+          params: { startDate: dates[0], endDate: dates[dates.length - 1] },
+          withCredentials: true,
+        });
+        setDbQLogs(qRes.data?.data ?? []);
+      } catch { setDbQLogs([]); }
+
+      const prodCount = filtered.filter((r) => r.state === "Production").length;
       toast.success(`${prodCount} production + ${filtered.length - prodCount} downtime records loaded`);
     } catch {
-      setRecords(DEMO_RECORDS.filter(r => r.state === "Production"));
-      toast("Demo data loaded - connect API for live data", { icon: "⚡" });
+      setRecords(DEMO_RECORDS);
+      setDbQLogs([]);
+      toast("Demo data loaded - connect to DB for live data", { icon: "⚡" });
     } finally { setLoadFn(false); }
-  }, [configShifts]);
+  }, [configShifts, DEMO_RECORDS]);
 
   const handleQuery = () => {
     if (!startTime || !endTime) { toast.error("Select a time range."); return; }
@@ -396,478 +815,337 @@ const PartProcessProductionReport = () => {
     const start = `${offsetDate(-1)} 08:00`; const end = `${todayStr()} 08:00`;
     setStartTime(start); setEndTime(end); fetchData(start, end, setYdayLoading);
   };
-  const isAnyLoading = loading || ydayLoading || todayLoading;
 
-  // --- Aggregated summary ---------------------------------------------------
+  /* ----- filtered records (model / shift advanced filters) ----- */
+  const filteredRecords = useMemo(() => records.filter((r) => {
+    if (modelFilter !== "ALL" && r.model !== modelFilter) return false;
+    if (shiftFilter !== "ALL" && r.shift !== shiftFilter) return false;
+    return true;
+  }), [records, modelFilter, shiftFilter]);
+
+  /* ----- quality log lookup (computed before summary so OEE Quality can use it) ----- */
+  const qualityByPartName = useMemo(() => {
+    const map = {};
+    dbQLogs.forEach((e) => {
+      const key = e.PartName || e.partName || e.Model || e.model || "";
+      if (!key) return;
+      if (!map[key]) map[key] = { inspected: 0, rejected: 0 };
+      const insp = parseInt(e.InspectedQty ?? e.inspectedQty ?? 0, 10);
+      const rej  = parseInt(e.RejectedQty ?? e.rejectedQty ?? 0, 10);
+      map[key].inspected = Math.max(map[key].inspected, insp);
+      map[key].rejected += rej;
+    });
+    return map;
+  }, [dbQLogs]);
+
+  /* ----- aggregated summary ----- */
   const summary = useMemo(
-    () => aggregateRecords(records, materials, queryDate),
-    [records, materials, queryDate]
-  );
+    () => aggregateRecords(filteredRecords, materials, qualityByPartName, plans),
+    [filteredRecords, materials, qualityByPartName, plans]);
 
-  // Totals footer
-  const totals = useMemo(() => ({
-    planQty:       summary.reduce((s, r) => s + r.planQty, 0),
-    actualQty:     summary.reduce((s, r) => s + r.actualQty, 0),
-    componentQty:  summary.reduce((s, r) => s + (r.componentQty ?? r.actualQty), 0),
-    rejects:       summary.reduce((s, r) => s + r.rejects, 0),
-    lossMins:  summary.reduce((s, r) => s + r.lossMins, 0),
-    availability: summary.length > 0 ? (summary.reduce((s, r) => s + r.availability, 0) / summary.length).toFixed(1) : 0,
-    performance:  summary.length > 0 ? (summary.reduce((s, r) => s + r.performance, 0) / summary.length).toFixed(1) : 0,
-    quality:      summary.length > 0 ? (summary.reduce((s, r) => s + r.quality, 0) / summary.length).toFixed(1) : 0,
-    oee:       summary.length > 0 ? (summary.reduce((s, r) => s + r.oee, 0) / summary.length).toFixed(1) : 0,
-    idealEnergyWh: summary.reduce((s, r) => s + r.idealEnergyWh, 0),
-    actualEnergyWh: summary.reduce((s, r) => s + r.actualEnergyWh, 0),
-  }), [summary]);
+  /* ----- columns ----- */
+  const columns = useMemo(() => buildColumns(materials), [materials]);
+  const visibleColumns = useMemo(() => columns.filter((c) => !hiddenCols[c.key]), [columns, hiddenCols]);
+  // Group-header spans — recomputed so colSpans track hidden columns.
+  const groupSegments = useMemo(() => groupSpans(visibleColumns), [visibleColumns]);
 
-  // --- Detail records (raw) -------------------------------------------------
-  const detailRecords = records;
+  /* ----- search + sort + paginate ----- */
+  const searchedRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return summary;
+    return summary.filter((r) =>
+      r.sapCode.toLowerCase().includes(q) || r.itemDescription.toLowerCase().includes(q));
+  }, [summary, search]);
 
+  const sortedRows = useMemo(() => {
+    const col = columns.find((c) => c.key === sortKey);
+    const getVal = col?.sortVal || ((r) => r[sortKey]);
+    const arr = [...searchedRows].sort((a, b) => {
+      const va = getVal(a), vb = getVal(b);
+      if (typeof va === "string" || typeof vb === "string") {
+        return String(va).localeCompare(String(vb));
+      }
+      return (va ?? 0) - (vb ?? 0);
+    });
+    if (sortDir === "desc") arr.reverse();
+    return arr.map((r, i) => ({ ...r, srNo: i + 1 }));
+  }, [searchedRows, sortKey, sortDir, columns]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pagedRows = useMemo(
+    () => sortedRows.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [sortedRows, safePage, pageSize]);
+
+  useEffect(() => { setPage(1); }, [search, modelFilter, shiftFilter, pageSize]);
+
+  const toggleSort = (key) => {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("desc"); }
+  };
+
+  /* ----- totals (over the searched set, component-first) ----- */
+  const totals = useMemo(() => {
+    const rows = searchedRows;
+    const n = rows.length || 1;
+    const sum = (f) => rows.reduce((s, r) => s + f(r), 0);
+    return {
+      planQty: sum((r) => r.planQty),
+      componentQty: sum((r) => r.componentQty),
+      actualQty: sum((r) => r.actualQty),
+      rejects: sum((r) => r.rejects),
+      accepted: sum((r) => r.accepted),
+      lossMins: sum((r) => r.lossMins),
+      idleMins: sum((r) => r.idleMins),
+      availability: (sum((r) => r.availability) / n).toFixed(1),
+      performance: (sum((r) => r.performance) / n).toFixed(1),
+      quality: (sum((r) => r.quality) / n).toFixed(1),
+      oee: (sum((r) => r.oee) / n).toFixed(1),
+      idealEnergyWh: sum((r) => r.idealEnergyWh),
+      actualEnergyWh: sum((r) => r.actualEnergyWh),
+    };
+  }, [searchedRows]);
+
+  // Sheet→component multiplier (cached); used by the Detail view's Components column.
+  const compMultiplierMap = useMemo(() => {
+    const m = new Map();
+    return (model) => {
+      if (!model) return 1;
+      if (m.has(model)) return m.get(model);
+      const v = componentsPerUnit(materials, model);
+      m.set(model, v);
+      return v;
+    };
+  }, [materials]);
+
+  const hasData = summary.length > 0;
+  const modelOptions = useMemo(() => {
+    const s = new Set();
+    records.forEach((r) => { if (r.model) s.add(r.model); });
+    return [...s].sort();
+  }, [records]);
+  const shiftOptions = useMemo(() => {
+    const s = new Set();
+    records.forEach((r) => { if (r.shift) s.add(r.shift); });
+    return [...s].sort();
+  }, [records]);
+
+  /* ================================================================
+   * 10. Render
+   * ================================================================ */
   return (
     <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
-      {/* -- HEADER -- */}
-      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0 flex-wrap gap-3">
+
+      {/* ---------- HEADER ---------- */}
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-4 sm:px-5 py-3 flex items-center justify-between shadow-sm shrink-0 flex-wrap gap-3">
         <div>
-          <h1 className="text-lg font-bold text-slate-800 leading-tight">
-            Part Process - Production Report
-          </h1>
-          <p className="text-[11px] text-slate-400">
-            Production events only · OEE · Cycle Time · Quality & Loss
-          </p>
+          <h1 className="text-base sm:text-lg font-bold text-slate-800 leading-tight">Part Process — Production Report</h1>
+          <p className="text-[11px] text-slate-400">Component Qty · OEE · Cycle Time</p>
         </div>
-        {summary.length > 0 && (
-          <div className="flex items-center gap-2">
-            {[
-              { label: "Plan Qty",   value: totals.planQty.toLocaleString(),   color: "slate"   },
-              { label: "Sheet Qty",  value: totals.actualQty.toLocaleString(), color: "blue"    },
-              { label: "Rejects",    value: totals.rejects.toLocaleString(),   color: "rose"    },
-              { label: "Avg OEE",    value: `${totals.oee}%`,                  color: "emerald" },
-            ].map(({ label, value, color }) => (
-              <div key={label} className={`flex flex-col items-center px-3 py-1.5 rounded-lg bg-${color}-50 border border-${color}-100 min-w-[68px]`}>
-                <span className={`text-base font-bold font-mono text-${color}-600`}>{value}</span>
-                <span className={`text-[9px] text-${color}-500 font-semibold uppercase tracking-wide`}>{label}</span>
-              </div>
-            ))}
+        {hasData && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <StatCard icon={FiGrid} label="Components" value={totals.componentQty.toLocaleString()} tone="violet" />
+            <StatCard icon={FiPackage} label="Sheets" value={totals.actualQty.toLocaleString()} tone="blue" />
+            <StatCard icon={FiAlertTriangle} label="Rejects" value={totals.rejects.toLocaleString()} tone="rose" />
+            <StatCard icon={FiActivity} label="Avg OEE" value={`${totals.oee}%`} tone="emerald" />
           </div>
         )}
       </div>
 
-      {/* -- BODY -- */}
-      <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
-        {/* Filters */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
+      {/* ---------- BODY (screen only) ---------- */}
+      <div className="flex-1 overflow-auto p-3 sm:p-4 flex flex-col gap-3">
+
+        {/* ----- FILTERS ----- */}
+        <SectionCard className="p-4 shrink-0">
           <div className="flex items-center gap-1.5 mb-3">
-            <Filter className="w-3 h-3 text-slate-400" />
+            <FiFilter className="w-3 h-3 text-slate-400" />
             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Filters</span>
           </div>
           <div className="flex flex-wrap gap-3 items-end">
-            <div className="min-w-[165px] flex-1">
+            <div className="min-w-[160px] flex-1">
               <DateTimePicker label="Start Time" name="start" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
             </div>
-            <div className="min-w-[165px] flex-1">
+            <div className="min-w-[160px] flex-1">
               <DateTimePicker label="End Time" name="end" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+            </div>
+            {/* advanced: model / shift */}
+            <div className="min-w-[150px]">
+              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Model</label>
+              <select value={modelFilter} onChange={(e) => setModelFilter(e.target.value)}
+                className="w-full text-xs border border-slate-200 rounded-lg px-2 py-2 bg-white text-slate-600 focus:ring-2 focus:ring-blue-200 outline-none">
+                <option value="ALL">All models</option>
+                {modelOptions.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div className="min-w-[120px]">
+              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Shift</label>
+              <select value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)}
+                className="w-full text-xs border border-slate-200 rounded-lg px-2 py-2 bg-white text-slate-600 focus:ring-2 focus:ring-blue-200 outline-none">
+                <option value="ALL">All shifts</option>
+                {shiftOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
             </div>
             <div className="flex gap-2 pb-0.5 shrink-0 flex-wrap">
               <button onClick={handleYesterday} disabled={isAnyLoading}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${isAnyLoading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-amber-500 hover:bg-amber-600 text-white"}`}>
-                {ydayLoading ? <Spinner /> : <Calendar className="w-3.5 h-3.5" />} Yesterday
+                {ydayLoading ? <Spinner /> : <FiCalendar className="w-3.5 h-3.5" />} Yesterday
               </button>
               <button onClick={handleToday} disabled={isAnyLoading}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${isAnyLoading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700 text-white"}`}>
-                {todayLoading ? <Spinner /> : <Clock className="w-3.5 h-3.5" />} Today
+                {todayLoading ? <Spinner /> : <FiClock className="w-3.5 h-3.5" />} Today
               </button>
               <button onClick={handleQuery} disabled={isAnyLoading}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${isAnyLoading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"}`}>
-                {loading ? <Spinner /> : <Search className="w-3.5 h-3.5" />} {loading ? "Loading…" : "Query"}
+                {loading ? <Spinner /> : <FiSearch className="w-3.5 h-3.5" />} {loading ? "Loading…" : "Query"}
               </button>
             </div>
           </div>
-        </div>
+        </SectionCard>
 
-        {/* View mode tabs + export */}
-        <div className="flex items-center justify-between gap-3 shrink-0">
-          <div className="flex gap-1 bg-white rounded-xl border border-slate-200 shadow-sm p-1">
-            {[["summary", BarChart2, "Summary Report"], ["detail", List, "Detail Records"]].map(([mode, Icon, label]) => (
+        {/* ----- VIEW TABS + EXPORT ----- */}
+        <div className="flex items-center justify-between gap-3 shrink-0 flex-wrap">
+          <div className="flex gap-1 bg-white rounded-xl border border-slate-200 shadow-sm p-1 flex-wrap">
+            {[
+              ["summary", FiBarChart2, "Summary"],
+
+            ].map(([mode, Icon, label]) => (
               <button key={mode} onClick={() => setViewMode(mode)}
-                className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${viewMode === mode ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
-                <Icon className="w-3.5 h-3.5" /> {label}
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${viewMode === mode ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                <Icon className="w-3.5 h-3.5" /> <span className="hidden sm:inline">{label}</span>
               </button>
             ))}
           </div>
-          {summary.length > 0 && viewMode === "summary" && (
-            <button onClick={() => exportCSV(summary)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors">
-              <Download className="w-3.5 h-3.5" /> Export CSV
-            </button>
+          {hasData && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={() => exportCSV(sortedRows, visibleColumns)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600">
+                <FiDownload className="w-3.5 h-3.5" /> CSV
+              </button>
+              <button onClick={() => exportExcel(sortedRows, visibleColumns, reportMeta(startTime, endTime))} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-emerald-600">
+                <FiFileText className="w-3.5 h-3.5" /> Excel
+              </button>
+              <button onClick={() => exportPDF(sortedRows, visibleColumns, reportMeta(startTime, endTime))} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-rose-600">
+                <FiFile className="w-3.5 h-3.5" /> PDF
+              </button>
+            </div>
           )}
         </div>
 
-        {/* -- SUMMARY TABLE -- */}
+        {/* ================= SUMMARY TABLE ================= */}
         {viewMode === "summary" && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1">
+          <SectionCard className="overflow-hidden flex flex-col flex-1">
+            {/* table toolbar */}
+            <div className="flex items-center justify-between gap-3 px-3 py-2.5 border-b border-slate-100 flex-wrap">
+              <div className="relative">
+                <FiSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search SAP code / description…"
+                  className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg w-56 focus:ring-2 focus:ring-blue-200 outline-none" />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-400">{sortedRows.length} rows</span>
+                <div className="relative">
+                  <button onClick={() => setColMenuOpen((v) => !v)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600">
+                    <FiColumns className="w-3.5 h-3.5" /> Columns <FiChevronDown className="w-3 h-3" />
+                  </button>
+                  {colMenuOpen && (
+                    <div className="absolute right-0 mt-1 z-30 bg-white border border-slate-200 rounded-lg shadow-lg p-2 w-56 max-h-72 overflow-auto">
+                      {columns.map((c) => (
+                        <label key={c.key} className={`flex items-center gap-2 px-2 py-1 text-xs rounded hover:bg-slate-50 ${c.always ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+                          <input type="checkbox" disabled={c.always} checked={!hiddenCols[c.key]}
+                            onChange={() => setHiddenCols((h) => ({ ...h, [c.key]: !h[c.key] }))} />
+                          {c.label}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div className="overflow-auto">
-              <table className="border-separate border-spacing-0" style={{ minWidth: "2240px" }}>
+              <table className="border-separate border-spacing-0 w-full">
                 <thead className="sticky top-0 z-10">
-                  {/* Group headers */}
-                  <tr className="bg-slate-200">
-                    <th colSpan={4} className="px-2 py-1.5 text-[10px] font-bold text-slate-600 border-b border-r border-slate-300 text-center sticky left-0 bg-slate-200 z-20">
-                      Part Info
-                    </th>
-                    <th colSpan={3} className="px-2 py-1.5 text-[10px] font-bold text-blue-700 border-b border-r border-blue-200 text-center bg-blue-50">
-                      Production Qty
-                    </th>
-                    <th colSpan={2} className="px-2 py-1.5 text-[10px] font-bold text-violet-700 border-b border-r border-violet-200 text-center bg-violet-50">
-                      Time (min)
-                    </th>
-                    <th colSpan={3} className="px-2 py-1.5 text-[10px] font-bold text-cyan-700 border-b border-r border-cyan-200 text-center bg-cyan-50">
-                      Cycle Time (s)
-                    </th>
-                    <th colSpan={2} className="px-2 py-1.5 text-[10px] font-bold text-rose-700 border-b border-r border-rose-200 text-center bg-rose-50">
-                      Quality & Loss
-                    </th>
-                    <th colSpan={4} className="px-2 py-1.5 text-[10px] font-bold text-amber-700 border-b border-r border-amber-200 text-center bg-amber-50">
-                      OEE (A × P × Q)
-                    </th>
-                  </tr>
-                  {/* Column headers */}
+                  {/* grouped header band */}
                   <tr>
-                    <TH sticky>Sr. No.</TH>
-                    <TH>Date</TH>
-                    <TH wide>SAP Code</TH>
-                    <TH wide>Item Description</TH>
-                    {/* Production Qty */}
-                    <TH center>Plan Qty</TH>
-                    <TH center>Sheet Qty</TH>
-                    <TH center>Components Produced</TH>
-                    {/* Time */}
-                    <TH center>Required Time</TH>
-                    <TH center>Actual Time</TH>
-                    {/* Cycle Time */}
-                    <TH center>Defined CT</TH>
-                    <TH center>Sheet CT</TH>
-                    <TH center>Component CT</TH>
-                    {/* Quality & Loss */}
-                    <TH center>Rejects</TH>
-                    <TH center>Loss (min)</TH>
-                    {/* OEE breakdown */}
-                    <TH center>A (%)</TH>
-                    <TH center>P (%)</TH>
-                    <TH center>Q (%)</TH>
-                    <TH center>OEE (%)</TH>
+                    {groupSegments.map((s, i) => {
+                      const g = GROUP_META[s.group] || GROUP_META.info;
+                      return (
+                        <th key={`${s.group}-${i}`} colSpan={s.count}
+                          className={`px-2 py-1.5 text-[10px] font-bold border-b border-r border-slate-300 text-center ${g.tone}`}>
+                          {g.label}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                  {/* sortable single-row header with group colour accents */}
+                  <tr>
+                    {visibleColumns.map((c) => {
+                      const g = GROUP_META[c.group] || GROUP_META.info;
+                      const active = sortKey === c.key;
+                      return (
+                        <th key={c.key}
+                          onClick={() => c.sortable && toggleSort(c.key)}
+                          className={`px-2.5 py-2 text-[10px] font-semibold border-b border-r border-slate-200 whitespace-nowrap align-middle ${g.tone} ${c.align === "center" ? "text-center" : "text-left"} ${c.sortable ? "cursor-pointer select-none hover:brightness-95" : ""} ${c.wide ? "min-w-[150px]" : ""}`}>
+                          <span className="inline-flex items-center gap-1">
+                            {c.label}
+                            {c.sortable && (active
+                              ? (sortDir === "asc" ? <FiArrowUp className="w-3 h-3" /> : <FiArrowDown className="w-3 h-3" />)
+                              : <FiChevronDown className="w-2.5 h-2.5 opacity-30" />)}
+                          </span>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
                   {isAnyLoading ? (
-                    <tr><td colSpan={18} className="py-14 text-center">
+                    <tr><td colSpan={visibleColumns.length} className="py-14 text-center">
                       <div className="flex justify-center items-center gap-2 text-slate-400">
-                        <Spinner cls="w-5 h-5 text-blue-500" />
-                        <span className="text-sm">Computing production summary…</span>
+                        <Spinner cls="w-5 h-5 text-blue-500" /><span className="text-sm">Computing production summary…</span>
                       </div>
                     </td></tr>
-                  ) : summary.length > 0 ? (
-                    summary.map((r) => {
-                      const cycleStatus = r.sheetCycleTime <= r.definedCycleTime ? "good" : "over";
-                      return (
-                        <tr key={r.srNo} className="hover:bg-blue-50/30 transition-colors even:bg-slate-50/30">
-                          {/* Sr No */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-[11px] text-slate-400 font-mono sticky left-0 bg-white">
-                            {r.srNo}
+                  ) : pagedRows.length > 0 ? (
+                    pagedRows.map((r) => (
+                      <tr key={r.sapCode} className="hover:bg-blue-50/30 transition-colors even:bg-slate-50/30">
+                        {visibleColumns.map((c) => (
+                          <td key={c.key} className={`px-2.5 py-2.5 border-b border-r border-slate-100 ${c.align === "center" ? "text-center" : ""}`}>
+                            {c.cell(r)}
                           </td>
-                          {/* Date */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-xs font-mono text-slate-600 whitespace-nowrap">
-                            {toDisplayDate(r.date)}
-                          </td>
-                          {/* SAP Code */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100">
-                            <span className="font-mono font-bold text-blue-600 text-xs">{r.sapCode}</span>
-                          </td>
-                          {/* Item Description — partName from master, or program name + warning */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 max-w-[240px]">
-                            {materials.some(m => m.partName === r.itemDescription) ? (
-                              <span className="font-semibold text-blue-700 text-xs leading-snug block">{r.itemDescription}</span>
-                            ) : (
-                              <div>
-                                <span className="font-mono text-[11px] text-slate-600 block leading-snug">{r.itemDescription}</span>
-                                <span className="text-[9px] font-bold text-rose-500">⚠ Master not exist</span>
-                              </div>
-                            )}
-                          </td>
-                          {/* Plan Qty */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-center font-mono font-semibold text-slate-700">
-                            {r.planQty}
-                          </td>
-                          {/* Sheet Qty — machine sheet count */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-center">
-                            <div className="flex flex-col items-center gap-0.5">
-                              <span className={`font-bold font-mono text-sm ${r.actualQty >= r.planQty ? "text-emerald-600" : "text-blue-600"}`}>
-                                {r.actualQty}
-                              </span>
-                              <Delta actual={r.actualQty} plan={r.planQty} />
-                              <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full ${r.actualQty >= r.planQty ? "bg-emerald-500" : "bg-blue-500"}`}
-                                  style={{ width: `${Math.min(100, (r.actualQty / r.planQty) * 100)}%` }}
-                                />
-                              </div>
-                            </div>
-                          </td>
-                          {/* Components Produced */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-center">
-                            <span className={`font-bold font-mono text-sm ${r.isPunching ? "text-violet-600" : "text-blue-500"}`}>
-                              {r.componentQty}
-                            </span>
-                          </td>
-                          {/* Required Time */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-center font-mono text-violet-600 font-semibold">
-                            {r.reqTimeMins}
-                          </td>
-                          {/* Actual Time */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-center">
-                            <span className={`font-mono font-semibold ${r.actualTimeMins > r.reqTimeMins ? "text-amber-600" : "text-violet-600"}`}>
-                              {r.actualTimeMins}
-                            </span>
-                          </td>
-                          {/* Defined Cycle Time */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-center font-mono font-semibold text-cyan-600">
-                            {r.definedCycleTime > 0 ? `${r.definedCycleTime}` : "-"}
-                          </td>
-                          {/* Sheet CT — actual machine cycle time */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-center">
-                            <span className={`font-mono font-bold ${cycleStatus === "good" ? "text-emerald-600" : "text-amber-600"}`}>
-                              {r.sheetCycleTime > 0 ? r.sheetCycleTime : "-"}
-                            </span>
-                          </td>
-                          {/* Component CT */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-center">
-                            {r.componentCycleTime != null ? (
-                              <span className="font-mono font-semibold text-indigo-600">{r.componentCycleTime}</span>
-                            ) : (
-                              <span className="text-slate-300 text-xs">—</span>
-                            )}
-                          </td>
-                          {/* Rejects */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-center">
-                            <span className={`font-bold font-mono ${r.rejects > 0 ? "text-rose-500" : "text-emerald-600"}`}>
-                              {r.rejects}
-                            </span>
-                          </td>
-                          {/* Loss (min) */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-center">
-                            <span className={`font-bold font-mono ${r.lossMins > 30 ? "text-rose-500" : r.lossMins > 0 ? "text-amber-600" : "text-emerald-600"}`}>
-                              {r.lossMins}
-                            </span>
-                          </td>
-                          {/* Availability */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-center font-mono font-semibold text-slate-600">
-                            {r.availability}%
-                          </td>
-                          {/* Performance */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-center font-mono font-semibold text-slate-600">
-                            {r.performance}%
-                          </td>
-                          {/* Quality */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-center font-mono font-semibold text-slate-600">
-                            {r.quality}%
-                          </td>
-                          {/* OEE */}
-                          <td className="px-2.5 py-2.5 border-b border-r border-slate-100 text-center">
-                            <div className={`inline-flex flex-col items-center px-2.5 py-1 rounded-lg border ${oeeBgColor(r.oee)}`}>
-                              <span className={`text-sm font-bold font-mono ${oeeTextColor(r.oee)}`}>
-                                {r.oee}%
-                              </span>
-                              <div className="w-10 h-1 bg-white/60 rounded-full overflow-hidden mt-0.5">
-                                <div
-                                  className={`h-full rounded-full ${r.oee >= 85 ? "bg-emerald-500" : r.oee >= 65 ? "bg-amber-500" : "bg-rose-500"}`}
-                                  style={{ width: `${r.oee}%` }}
-                                />
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
+                        ))}
+                      </tr>
+                    ))
                   ) : (
-                    <tr><td colSpan={18} className="py-14 text-center">
-                      <div className="flex flex-col items-center gap-2 text-slate-300">
-                        <PackageOpen className="w-10 h-10 opacity-40" strokeWidth={1.2} />
-                        <p className="text-sm text-slate-400 font-medium">No data - select filters and click Query</p>
-                      </div>
-                    </td></tr>
-                  )}
-                </tbody>
-
-                {/* Totals footer */}
-                {summary.length > 0 && (
-                  <tfoot>
-                    <tr className="bg-slate-100">
-                      <td colSpan={4} className="px-2.5 py-2.5 border-t border-r-2 border-r-slate-300 border-slate-200 font-bold text-xs text-slate-700 sticky left-0 bg-slate-100">
-                        TOTAL / AVG
-                      </td>
-                      <td className="px-2.5 py-2.5 border-t border-r border-slate-200 text-center font-bold font-mono text-slate-700">
-                        {totals.planQty.toLocaleString()}
-                      </td>
-                      <td className="px-2.5 py-2.5 border-t border-r border-slate-200 text-center font-bold font-mono text-blue-600">
-                        {totals.actualQty.toLocaleString()}
-                      </td>
-                      <td className="px-2.5 py-2.5 border-t border-r border-slate-200 text-center font-bold font-mono text-violet-600">
-                        {totals.componentQty.toLocaleString()}
-                      </td>
-                      <td colSpan={5} className="border-t border-r border-slate-200" />
-                      <td className="px-2.5 py-2.5 border-t border-r border-slate-200 text-center font-bold font-mono text-rose-500">
-                        {totals.rejects.toLocaleString()}
-                      </td>
-                      <td className="px-2.5 py-2.5 border-t border-r border-slate-200 text-center font-bold font-mono text-amber-600">
-                        {totals.lossMins}
-                      </td>
-                      <td className="px-2.5 py-2.5 border-t border-r border-slate-200 text-center font-bold font-mono text-slate-600">
-                        {totals.availability}%
-                      </td>
-                      <td className="px-2.5 py-2.5 border-t border-r border-slate-200 text-center font-bold font-mono text-slate-600">
-                        {totals.performance}%
-                      </td>
-                      <td className="px-2.5 py-2.5 border-t border-r border-slate-200 text-center font-bold font-mono text-slate-600">
-                        {totals.quality}%
-                      </td>
-                      <td className="px-2.5 py-2.5 border-t border-r border-slate-200 text-center">
-                        <span className={`font-bold font-mono ${oeeTextColor(parseFloat(totals.oee))}`}>
-                          {totals.oee}%
-                        </span>
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* -- DETAIL RECORDS TABLE -- */}
-        {viewMode === "detail" && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 shrink-0">
-              <div className="flex items-center gap-2">
-                <List className="w-3.5 h-3.5 text-blue-500" />
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
-                  Raw Production Records
-                </span>
-                {detailRecords.length > 0 && (
-                  <span className="text-[10px] text-slate-400">· {detailRecords.length} rows</span>
-                )}
-              </div>
-            </div>
-            <div className="overflow-auto">
-              <table className="min-w-full text-xs border-separate border-spacing-0">
-                <thead className="sticky top-0 z-10">
-                  <tr className="bg-slate-50">
-                    {["Sr No","Shift","State","Model","Part Name","Start Time","End Time","Duration","Qty","Quality","Downtime Reason"].map((h) => (
-                      <th key={h} className="px-3 py-2.5 text-left text-[10px] font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {detailRecords.length > 0 ? detailRecords.map((r, idx) => {
-                    const mat = r.model ? getMaterialByModel(materials, r.model) : null;
-                    return (
-                      <tr key={idx} className={`transition-colors hover:bg-blue-50/30 ${r.state === "Downtime" ? "bg-amber-50/40" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`}>
-                        <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-400">{r.srNo}</td>
-                        <td className="px-3 py-2 border-b border-slate-100">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">{r.shift}</span>
-                        </td>
-                        <td className="px-3 py-2 border-b border-slate-100">
-                          {r.state === "Production"
-                            ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Production</span>
-                            : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Downtime</span>}
-                        </td>
-                        <td className="px-3 py-2 border-b border-slate-100 font-mono text-[11px] text-slate-600 whitespace-nowrap">
-                          {r.model ?? <span className="text-slate-300">-</span>}
-                        </td>
-                        <td className="px-3 py-2 border-b border-slate-100">
-                          {mat ? (
-                            <span className="font-semibold text-blue-700 text-xs">{mat.partName}</span>
-                          ) : r.model ? (
-                            <div>
-                              <span className="font-mono text-[11px] text-slate-600">{r.model}</span>
-                              <span className="block text-[9px] font-bold text-rose-500 mt-0.5">⚠ Master not exist</span>
-                            </div>
-                          ) : <span className="text-slate-300">—</span>}
-                        </td>
-                        <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">{fmtAbs(r._absMs, r.startTime)}</td>
-                        <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">{fmtAbs(r._absMsEnd, r.endTime)}</td>
-                        <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap">{r.duration}</td>
-                        <td className="px-3 py-2 border-b border-slate-100 text-center font-bold text-blue-600 font-mono">{r.qty ?? 0}</td>
-                        <td className="px-3 py-2 border-b border-slate-100">
-                          {r.quality === "GOOD"
-                            ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">GOOD</span>
-                            : <span className="text-slate-300">-</span>}
-                        </td>
-                        <td className="px-3 py-2 border-b border-slate-100 text-amber-600 font-medium">
-                          {r.downtimeReason ?? <span className="text-slate-300">-</span>}
-                        </td>
-                      </tr>
-                    );
-                  }) : (
-                    <tr><td colSpan={11} className="py-12 text-center">
-                      <div className="flex flex-col items-center gap-2 text-slate-300">
-                        <PackageOpen className="w-8 h-8 opacity-50" strokeWidth={1.2} />
-                        <p className="text-xs text-slate-400">No records - click Query to load data</p>
-                      </div>
+                    <tr><td colSpan={visibleColumns.length} className="py-14 text-center">
+                      <EmptyState text="No matching rows" />
                     </td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
 
-        {/* -- RAW DATA VERIFICATION -- */}
-        {rawRecords.length > 0 && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden shrink-0">
-            <button onClick={() => setShowRaw(v => !v)}
-              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition-colors">
-              <div className="flex items-center gap-2">
-                <Search className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Raw API Data — {rawRecords.length} records</span>
-                <span className="text-[9px] text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded font-bold">Unprocessed</span>
-              </div>
-              <span className="text-[10px] text-slate-400">{showRaw ? "Hide ▲" : "Show ▼"}</span>
-            </button>
-            {showRaw && (
-              <div className="overflow-auto max-h-96 border-t border-slate-100">
-                <table className="min-w-full text-[10px] border-separate border-spacing-0">
-                  <thead className="sticky top-0 z-10">
-                    <tr className="bg-amber-50">
-                      {["#","Date","Shift","Type","Program / Barcode","Start","End","Duration","Qty","Quality","DT Reason","Asset","Line"].map(h => (
-                        <th key={h} className="px-2 py-2 text-left text-[9px] font-bold text-amber-700 border-b border-amber-200 whitespace-nowrap">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rawRecords.map((r, i) => (
-                      <tr key={i} className={`hover:bg-amber-50/30 ${i%2===0?"bg-white":"bg-slate-50/50"}`}>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-400 font-mono">{i+1}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">{r._calDate || r._fetchDate}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 whitespace-nowrap text-slate-600">{r.shift?.shift_name||"—"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 whitespace-nowrap">
-                          <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] ${r.event_type==="Production"?"bg-emerald-50 text-emerald-700":"bg-rose-50 text-rose-600"}`}>{r.event_type}</span>
-                        </td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-700 max-w-[200px] truncate" title={r.barcode||""}>{r.barcode||"—"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap">{r.start_time}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap">{r.end_time}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">{r.duration}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono font-bold text-slate-700">{r.parts_quantity??"-"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 whitespace-nowrap">
-                          {r.parts_quality?<span className={`text-[9px] font-bold px-1 rounded ${r.parts_quality==="GOOD"?"text-emerald-700 bg-emerald-50":"text-rose-600 bg-rose-50"}`}>{r.parts_quality}</span>:<span className="text-slate-300">—</span>}
-                        </td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-rose-600 whitespace-nowrap">{r.downtime_reason||"—"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-500 whitespace-nowrap">{r.asset_name||"—"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-500 whitespace-nowrap">{r.line_name||"—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {/* pagination */}
+            {sortedRows.length > 0 && (
+              <div className="flex items-center justify-between gap-3 px-3 py-2.5 border-t border-slate-100 flex-wrap">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  Rows per page
+                  <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="border border-slate-200 rounded px-1.5 py-1 text-xs outline-none">
+                    {PAGE_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <span>· {(safePage - 1) * pageSize + 1}-{Math.min(safePage * pageSize, sortedRows.length)} of {sortedRows.length}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setPage(1)} disabled={safePage === 1} className="p-1.5 rounded border border-slate-200 disabled:opacity-30 hover:bg-slate-50"><FiChevronsLeft className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1} className="p-1.5 rounded border border-slate-200 disabled:opacity-30 hover:bg-slate-50"><FiChevronLeft className="w-3.5 h-3.5" /></button>
+                  <span className="px-2 text-xs text-slate-600">{safePage} / {totalPages}</span>
+                  <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="p-1.5 rounded border border-slate-200 disabled:opacity-30 hover:bg-slate-50"><FiChevronRight className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setPage(totalPages)} disabled={safePage === totalPages} className="p-1.5 rounded border border-slate-200 disabled:opacity-30 hover:bg-slate-50"><FiChevronsRight className="w-3.5 h-3.5" /></button>
+                </div>
               </div>
             )}
-          </div>
+          </SectionCard>
         )}
+
 
       </div>
     </div>

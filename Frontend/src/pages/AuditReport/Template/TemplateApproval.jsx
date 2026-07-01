@@ -29,6 +29,9 @@ import useAuditData from "../../../hooks/useAuditData";
 import toast from "react-hot-toast";
 import { useSelector } from "react-redux";
 import { ROLES } from "../../../config/routes.config";
+import TemplateHistoryPanel from "./components/TemplateHistoryPanel";
+import { useTemplateSearch } from "../../../hooks/useTemplateSearch";
+import { ConfirmModal, StatusBadge as SharedStatusBadge, TD } from "../_shared.jsx";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -38,27 +41,6 @@ const STATUS_LABELS = {
   approved:         { label: "Approved",         cls: "bg-green-100 text-green-700 border-green-300" },
   rejected:         { label: "Rejected",         cls: "bg-red-100 text-red-700 border-red-300" },
 };
-
-const ACTION_CFG = {
-  created:               { label: "Created",               color: "text-indigo-600", dot: "bg-indigo-400", type: "new"  },
-  updated:               { label: "Updated",               color: "text-blue-600",   dot: "bg-blue-400",   type: "edit" },
-  submitted_for_approval:{ label: "Submitted for Approval",color: "text-amber-600",  dot: "bg-amber-400",  type: "edit" },
-  status_changed:        { label: "Status Changed",        color: "text-violet-600", dot: "bg-violet-400", type: "edit" },
-  approved:              { label: "Approved",              color: "text-green-600",  dot: "bg-green-500",  type: "edit" },
-  rejected:              { label: "Rejected",              color: "text-red-600",    dot: "bg-red-500",    type: "edit" },
-  deleted:               { label: "Deleted",               color: "text-gray-500",   dot: "bg-gray-400",   type: "edit" },
-};
-
-const TypeBadge = ({ type }) =>
-  type === "new" ? (
-    <span className="inline-flex items-center text-[9px] font-black px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 uppercase tracking-wide">
-      New Template
-    </span>
-  ) : (
-    <span className="inline-flex items-center text-[9px] font-black px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-wide">
-      Template Edit
-    </span>
-  );
 
 const relativeTime = (d) => {
   if (!d) return "—";
@@ -73,12 +55,8 @@ const relativeTime = (d) => {
   return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
 
-const fmtDate = (d) => {
-  if (!d) return "—";
-  return new Date(d).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true });
-};
-
 const getTotalCheckpoints = (template) => {
+  if (template?.checkpointCount != null) return template.checkpointCount;
   if (!template?.defaultSections) return 0;
   let n = 0;
   template.defaultSections.forEach((s) => {
@@ -88,12 +66,17 @@ const getTotalCheckpoints = (template) => {
   return n;
 };
 
+const getTotalSections = (template) => {
+  if (template?.sectionCount != null) return template.sectionCount;
+  return template?.defaultSections?.length || 0;
+};
+
 const StatusBadge = ({ status }) => {
   const cfg = STATUS_LABELS[status] || { label: "Not Set", cls: "bg-slate-100 text-slate-600 border-slate-200" };
   return (
-    <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${cfg.cls}`}>
-      {cfg.label}
-    </span>
+    <SharedStatusBadge
+      config={{ ...cfg, cls: `inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${cfg.cls}` }}
+    />
   );
 };
 
@@ -102,7 +85,7 @@ const StatusBadge = ({ status }) => {
 const TemplateApproval = () => {
   const navigate = useNavigate();
   const { user } = useSelector((store) => store.auth);
-  const { templates, loadTemplates, updateTemplate, getTemplateHistory } = useAuditData();
+  const { templates, loadTemplates, updateTemplate } = useAuditData();
 
   const canApprove = [ROLES.SUPER_ADMIN, ROLES.QUALITY_MANAGER].includes(user?.roleName);
   const isAdmin    = user?.roleName === ROLES.SUPER_ADMIN;
@@ -119,18 +102,11 @@ const TemplateApproval = () => {
   const [rejectReason, setRejectReason]         = useState("");
   const [rejecting, setRejecting]               = useState(false);
 
-  // History — inline row expansion
-  const [expandedHistoryId, setExpandedHistoryId]   = useState(null);     // which template row is open
-  const [historyCache, setHistoryCache]             = useState({});        // id → history[]
-  const [historyLoadingId, setHistoryLoadingId]     = useState(null);
-  const [expandedChanges, setExpandedChanges]       = useState(new Set()); // "entryId_fi" keys
-
-  const toggleChange = (key) =>
-    setExpandedChanges((prev) => {
-      const s = new Set(prev);
-      s.has(key) ? s.delete(key) : s.add(key);
-      return s;
-    });
+  // History — inline row expansion. Fetching/caching now lives in
+  // TemplateHistoryPanel; historyRefreshKey forces a refetch for a specific
+  // template after an approve/reject action changes its history server-side.
+  const [expandedHistoryId, setExpandedHistoryId] = useState(null); // which template row is open
+  const [historyRefreshKey, setHistoryRefreshKey] = useState({}); // id -> counter
 
   // ── Visibility ───────────────────────────────────────────────────────────
 
@@ -162,25 +138,11 @@ const TemplateApproval = () => {
 
   // ── History panel ────────────────────────────────────────────────────────
 
-  const openHistory = async (template) => {
-    // Toggle off if already open
-    if (expandedHistoryId === template.id) { setExpandedHistoryId(null); return; }
+  const openHistory = (template) =>
+    setExpandedHistoryId((prev) => (prev === template.id ? null : template.id));
 
-    setExpandedHistoryId(template.id);
-
-    // Use cache if available
-    if (historyCache[template.id]) return;
-
-    setHistoryLoadingId(template.id);
-    try {
-      const data = await getTemplateHistory(template.id);
-      setHistoryCache((prev) => ({ ...prev, [template.id]: data }));
-    } catch (err) {
-      toast.error("Failed to load history: " + err.message);
-    } finally {
-      setHistoryLoadingId(null);
-    }
-  };
+  const bumpHistoryRefresh = (templateId) =>
+    setHistoryRefreshKey((prev) => ({ ...prev, [templateId]: (prev[templateId] || 0) + 1 }));
 
   // ── Approve / Reject ─────────────────────────────────────────────────────
 
@@ -193,7 +155,7 @@ const TemplateApproval = () => {
       });
       toast.success(`"${template.name}" approved`);
       await loadTemplates();
-      if (expandedHistoryId === template.id) { setHistoryCache((p) => { const n={...p}; delete n[template.id]; return n; }); openHistory(template); }
+      bumpHistoryRefresh(template.id);
     } catch (err) { toast.error("Approval failed: " + err.message); }
   };
 
@@ -215,23 +177,21 @@ const TemplateApproval = () => {
       setShowRejectModal(false);
       setSelectedTemplate(null);
       await loadTemplates();
-      if (expandedHistoryId === selectedTemplate.id) { setHistoryCache((p) => { const n={...p}; delete n[selectedTemplate.id]; return n; }); openHistory(selectedTemplate); }
+      bumpHistoryRefresh(selectedTemplate.id);
     } catch (err) { toast.error("Rejection failed: " + err.message); }
     finally { setRejecting(false); }
   };
 
   // ── Filter ───────────────────────────────────────────────────────────────
 
-  const filtered = useMemo(() => {
+  const statusFiltered = useMemo(() => {
     let list = visibleTemplates;
     if (filterStatus === "pending") list = list.filter((t) => t.approvalStatus === "pending_approval" || !t.approvalStatus);
     else if (filterStatus !== "all") list = list.filter((t) => t.approvalStatus === filterStatus);
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      list = list.filter((t) => t.name?.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q) || t.category?.toLowerCase().includes(q));
-    }
     return list;
-  }, [visibleTemplates, filterStatus, searchTerm]);
+  }, [visibleTemplates, filterStatus]);
+
+  const filtered = useTemplateSearch(statusFiltered, searchTerm);
 
   // ── Stats ─────────────────────────────────────────────────────────────────
 
@@ -342,14 +302,12 @@ const TemplateApproval = () => {
                   {filtered.map((t, idx) => {
                     const cps      = getTotalCheckpoints(t);
                     const isOpen   = expandedHistoryId === t.id;
-                    const tHistory = historyCache[t.id] || [];
-                    const isLoading = historyLoadingId === t.id;
 
                     return (
                       <React.Fragment key={t.id}>
                         {/* ── Main row ── */}
                         <tr className={`hover:bg-indigo-50/20 transition-colors ${idx % 2 === 1 ? "bg-gray-50/30" : ""} ${isOpen ? "bg-indigo-50/30" : ""}`}>
-                          <td className="px-4 py-3 max-w-[200px]">
+                          <TD cls="max-w-[200px]">
                             <p className="font-black text-gray-800 text-xs truncate" title={t.name}>{t.name}</p>
                             {t.description && <p className="text-[10px] text-gray-400 truncate mt-0.5">{t.description}</p>}
                             <p className="text-[10px] text-indigo-500 font-mono mt-0.5">{t.templateCode}</p>
@@ -359,23 +317,23 @@ const TemplateApproval = () => {
                                 <p className="text-[10px] text-red-600 leading-tight">{t.rejectionReason}</p>
                               </div>
                             )}
-                          </td>
-                          <td className="px-4 py-3 text-center">
+                          </TD>
+                          <TD center>
                             <span className="text-xs text-gray-600 capitalize">{t.category || "—"}</span>
                             <p className="text-[10px] text-gray-400 mt-0.5">v{t.version || "01"}</p>
-                          </td>
-                          <td className="px-4 py-3 text-center">
+                          </TD>
+                          <TD center>
                             <span className="text-sm font-black text-indigo-600">{cps}</span>
-                            <p className="text-[10px] text-gray-400">{t.defaultSections?.length || 0} sections</p>
-                          </td>
-                          <td className="px-4 py-3 text-center"><StatusBadge status={t.approvalStatus} /></td>
-                          <td className="px-4 py-3 text-center text-xs text-gray-600">{t.createdBy || "—"}</td>
-                          <td className="px-4 py-3 text-center text-xs text-gray-600">{t.approvedBy || "—"}</td>
-                          <td className="px-4 py-3 text-center">
+                            <p className="text-[10px] text-gray-400">{getTotalSections(t)} sections</p>
+                          </TD>
+                          <TD center><StatusBadge status={t.approvalStatus} /></TD>
+                          <TD center cls="text-xs text-gray-600">{t.createdBy || "—"}</TD>
+                          <TD center cls="text-xs text-gray-600">{t.approvedBy || "—"}</TD>
+                          <TD center>
                             <p className="text-xs text-gray-600">{relativeTime(t.updatedAt)}</p>
                             <p className="text-[10px] text-gray-400">{new Date(t.updatedAt).toLocaleDateString("en-IN")}</p>
-                          </td>
-                          <td className="px-4 py-3">
+                          </TD>
+                          <TD>
                             <div className="flex items-center justify-center gap-1.5">
                               <button onClick={() => navigate(`/auditreport/templates/${t.id}`)} className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition" title="View/Edit"><FaEye size={11} /></button>
                               <button onClick={() => openHistory(t)} className={`p-1.5 rounded-lg transition flex items-center gap-1 ${isOpen ? "bg-indigo-200 text-indigo-700" : "bg-indigo-50 hover:bg-indigo-100 text-indigo-600"}`} title="Toggle Change Log">
@@ -389,102 +347,20 @@ const TemplateApproval = () => {
                                 </>
                               )}
                             </div>
-                          </td>
+                          </TD>
                         </tr>
 
                         {/* ── Inline history row ── */}
                         {isOpen && (
                           <tr>
                             <td colSpan={8} className="px-6 py-4 bg-indigo-50/20 border-t border-indigo-100">
-                              <div className="flex items-center gap-2 mb-3">
-                                <FaHistory className="text-indigo-400" size={12} />
-                                <span className="text-xs font-black text-indigo-700 uppercase tracking-wider">Change Log — {t.name}</span>
-                              </div>
-
-                              {isLoading ? (
-                                <div className="flex items-center justify-center py-8">
-                                  <div className="w-6 h-6 border-4 border-indigo-100 border-t-indigo-400 rounded-full animate-spin" />
-                                </div>
-                              ) : tHistory.length === 0 ? (
-                                <div className="text-center py-6 text-gray-400 text-xs">No history recorded yet.</div>
-                              ) : (
-                                <div className="relative border-l-2 border-indigo-100 ml-3 space-y-2">
-                                  {tHistory.map((entry, ei) => {
-                                    const cfg = ACTION_CFG[entry.Action?.toLowerCase()] || ACTION_CFG.updated;
-                                    return (
-                                      <div key={entry.Id} className="relative pl-5">
-                                        <div className={`absolute -left-[5px] top-2.5 w-2.5 h-2.5 rounded-full ring-2 ring-white ${cfg.dot}`} />
-                                        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-                                          {/* Entry header */}
-                                          <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-100">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                              <TypeBadge type={cfg.type} />
-                                              <span className={`text-[10px] font-black ${cfg.color}`}>{cfg.label}</span>
-                                              {(entry.PreviousStatus || entry.NewStatus) && (
-                                                <div className="flex items-center gap-1">
-                                                  {entry.PreviousStatus && <StatusBadge status={entry.PreviousStatus} />}
-                                                  {entry.PreviousStatus && entry.NewStatus && <FaChevronRight size={7} className="text-gray-400" />}
-                                                  {entry.NewStatus && <StatusBadge status={entry.NewStatus} />}
-                                                </div>
-                                              )}
-                                            </div>
-                                            <div className="flex items-center gap-3 text-[10px] text-gray-400">
-                                              <span>{entry.ActionBy || "System"}</span>
-                                              <span>{fmtDate(entry.ActionAt)}</span>
-                                            </div>
-                                          </div>
-
-                                          {/* Rejection comment */}
-                                          {entry.Comments && (
-                                            <div className="px-4 py-2 bg-red-50 border-b border-red-100">
-                                              <span className="text-[9px] font-bold text-red-500 uppercase tracking-wider mr-2">Remarks:</span>
-                                              <span className="text-[10px] text-red-600">{entry.Comments}</span>
-                                            </div>
-                                          )}
-
-                                          {/* Field changes — collapsible */}
-                                          {entry.FieldChanges?.length > 0 && (
-                                            <div className="px-4 py-2.5 flex flex-wrap gap-2">
-                                              {entry.FieldChanges.map((fc, fi) => {
-                                                const key    = `${entry.Id}_${fi}`;
-                                                const isOpen = expandedChanges.has(key);
-                                                const isRm   = !fc.to || fc.to === "";
-                                                const isAdd  = !fc.from || fc.from === "";
-                                                const dotClr = isRm ? "bg-red-400" : isAdd ? "bg-green-400" : "bg-amber-400";
-                                                return (
-                                                  <div key={fi} className="border border-gray-100 rounded-lg overflow-hidden text-[9px] min-w-[120px]">
-                                                    <button type="button" onClick={() => toggleChange(key)}
-                                                      className="w-full flex items-center justify-between px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 transition-colors">
-                                                      <div className="flex items-center gap-1.5">
-                                                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotClr}`} />
-                                                        <span className="font-bold text-gray-600 uppercase tracking-wide">{fc.field}</span>
-                                                        {fc.note && <span className={`px-1.5 py-0.5 rounded-full font-bold ${isRm ? "bg-red-100 text-red-600" : isAdd ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>{fc.note}</span>}
-                                                      </div>
-                                                      <FaChevronRight size={7} className={`text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
-                                                    </button>
-                                                    {isOpen && (
-                                                      <div className="grid grid-cols-2 gap-1 p-1.5 bg-white">
-                                                        <div className="bg-red-50 rounded px-1.5 py-1 border border-red-100">
-                                                          <p className="text-red-400 font-bold uppercase mb-0.5">Before</p>
-                                                          <p className="text-red-700 font-semibold break-all">{fc.from ?? "—"}</p>
-                                                        </div>
-                                                        <div className="bg-green-50 rounded px-1.5 py-1 border border-green-100">
-                                                          <p className="text-green-400 font-bold uppercase mb-0.5">After</p>
-                                                          <p className="text-green-700 font-semibold break-all">{fc.to ?? "—"}</p>
-                                                        </div>
-                                                      </div>
-                                                    )}
-                                                  </div>
-                                                );
-                                              })}
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
+                              <TemplateHistoryPanel
+                                templateId={t.id}
+                                isOpen={isOpen}
+                                variant="inline-list"
+                                title={`Change Log — ${t.name}`}
+                                refreshKey={historyRefreshKey[t.id] || 0}
+                              />
                             </td>
                           </tr>
                         )}
@@ -515,7 +391,7 @@ const TemplateApproval = () => {
                     <div className="p-4 space-y-2 text-xs">
                       <div className="grid grid-cols-2 gap-2">
                         <div className="bg-indigo-50 rounded-lg px-2 py-1.5 text-center"><p className="text-[9px] text-indigo-400 font-bold uppercase">Checkpoints</p><p className="text-base font-black text-indigo-700">{cps}</p></div>
-                        <div className="bg-gray-50 rounded-lg px-2 py-1.5 text-center"><p className="text-[9px] text-gray-400 font-bold uppercase">Sections</p><p className="text-base font-black text-gray-700">{t.defaultSections?.length || 0}</p></div>
+                        <div className="bg-gray-50 rounded-lg px-2 py-1.5 text-center"><p className="text-[9px] text-gray-400 font-bold uppercase">Sections</p><p className="text-base font-black text-gray-700">{getTotalSections(t)}</p></div>
                       </div>
                       {[["Category",   t.category  || "—"],["Version",  `v${t.version || "01"}`],
                         ["Created By", t.createdBy || "—"],["Approved By", t.approvedBy || "—"],
@@ -544,6 +420,16 @@ const TemplateApproval = () => {
                         )}
                       </div>
                     </div>
+                    {isActive && (
+                      <div className="border-t border-indigo-100 px-4 py-3">
+                        <TemplateHistoryPanel
+                          templateId={t.id}
+                          isOpen={isActive}
+                          variant="inline-grid"
+                          refreshKey={historyRefreshKey[t.id] || 0}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -554,28 +440,22 @@ const TemplateApproval = () => {
 
       {/* ── Reject Modal ───────────────────────────────────────────────── */}
       {showRejectModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={() => setShowRejectModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 bg-gradient-to-r from-red-600 to-red-700 text-white">
-              <h3 className="text-base font-black flex items-center gap-2"><FaTimesCircle /> Reject Template</h3>
-              <p className="text-red-200 text-xs mt-1">Template: <strong>{selectedTemplate?.name}</strong></p>
-            </div>
-            <div className="p-6">
-              <label className="block text-xs font-bold text-gray-700 mb-2">Rejection Reason <span className="text-red-500">*</span></label>
-              <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Describe what needs to be corrected…" rows={4}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none" />
-              <div className="flex items-center justify-end gap-3 mt-4">
-                <button onClick={() => setShowRejectModal(false)} disabled={rejecting}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium text-sm disabled:opacity-50 transition">Cancel</button>
-                <button onClick={handleReject} disabled={rejecting || !rejectReason.trim()}
-                  className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed transition">
-                  {rejecting ? "Rejecting…" : "Confirm Reject"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ConfirmModal
+          onClose={() => setShowRejectModal(false)}
+          onConfirm={handleReject}
+          confirming={rejecting}
+          confirmDisabled={!rejectReason.trim()}
+          icon={FaTimesCircle}
+          title="Reject Template"
+          subtitle={<>Template: <strong>{selectedTemplate?.name}</strong></>}
+          confirmLabel="Confirm Reject"
+          confirmingLabel="Rejecting…"
+        >
+          <label className="block text-xs font-bold text-gray-700 mb-2">Rejection Reason <span className="text-red-500">*</span></label>
+          <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Describe what needs to be corrected…" rows={4}
+            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none" />
+        </ConfirmModal>
       )}
     </div>
   );

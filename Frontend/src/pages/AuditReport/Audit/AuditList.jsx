@@ -272,7 +272,6 @@ const AuditList = () => {
     loadAudits,
     loadTemplates,
     getAuditById,
-    loading,
   } = useAuditData();
 
   const { user } = useSelector((store) => store.auth);
@@ -280,7 +279,6 @@ const AuditList = () => {
   const isViewOnly = [user?.role, user?.roleName].includes(
     ROLES.QUALITY_AUDITOR,
   );
-  const isQualityAuditor = isViewOnly;
   // My Drafts tab — available to all users
   const [showMyDrafts, setShowMyDrafts] = useState(false);
   
@@ -485,9 +483,6 @@ const AuditList = () => {
   const passRateColor = (r) =>
     r >= 90 ? "text-green-600" : r >= 70 ? "text-amber-600" : "text-red-600";
 
-  const passRateBg = (r) =>
-    r >= 90 ? "bg-green-500" : r >= 70 ? "bg-amber-500" : "bg-red-500";
-
   // ==================== ENRICHED ROWS ====================
   const enrichedAudits = useMemo(
     () =>
@@ -541,7 +536,6 @@ const AuditList = () => {
     });
   }, [
     showMyDrafts,
-    user,
     enrichedAudits,
     searchTerm,
     filterStatus,
@@ -1316,6 +1310,11 @@ const AuditList = () => {
                             <span className="text-xs text-gray-400 truncate max-w-[130px]">
                               {audit.templateName}
                             </span>
+                            {audit.templateVersion && (
+                              <span className="bg-gray-100 text-gray-500 text-[9px] px-1.5 py-0.5 rounded-md font-bold border border-gray-200">
+                                v{audit.templateVersion}
+                              </span>
+                            )}
                           </div>
                           {(audit.formatNo || audit.revNo) && (
                             <div className="text-[10px] text-gray-400 mt-1">
@@ -1542,7 +1541,6 @@ const AuditList = () => {
                   audit;
                 const passRate = getPassRate(summary);
                 const isSelected = selectedIds.has(audit.id);
-                const statusCfg = STATUS_CONFIG[audit.status] || {};
 
                 return (
                   <div
@@ -1586,6 +1584,11 @@ const AuditList = () => {
                           <span className="text-[10px] text-gray-400 truncate">
                             {audit.templateName}
                           </span>
+                          {audit.templateVersion && (
+                            <span className="text-[9px] bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 rounded-md font-bold">
+                              v{audit.templateVersion}
+                            </span>
+                          )}
                         </div>
                       </div>
 

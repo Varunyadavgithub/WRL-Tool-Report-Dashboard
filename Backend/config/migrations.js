@@ -439,5 +439,251 @@ export const runMigrations = async (pool3) => {
     END
   `);
 
+  // ── MailSubscribers: Master Config > Mail Config ─────────────────────────
+  await pool3.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='MailSubscribers')
+    BEGIN
+      CREATE TABLE MailSubscribers (
+        Id            INT IDENTITY(1,1) PRIMARY KEY,
+        EmpName       NVARCHAR(200)  NOT NULL,
+        EmpId         NVARCHAR(50)   NULL,
+        Department    NVARCHAR(200)  NULL,
+        Designation   NVARCHAR(200)  NULL,
+        Email         NVARCHAR(200)  NOT NULL,
+        Mobile        NVARCHAR(20)   NULL,
+        Subscriptions NVARCHAR(MAX)  NULL,
+        Frequency     NVARCHAR(50)   NOT NULL DEFAULT 'Shift-wise',
+        Whatsapp      BIT            NOT NULL DEFAULT 0,
+        Sms           BIT            NOT NULL DEFAULT 0,
+        Status        BIT            NOT NULL DEFAULT 1,
+        CreatedAt     DATETIME       NOT NULL DEFAULT GETDATE(),
+        UpdatedAt     DATETIME       NOT NULL DEFAULT GETDATE()
+      );
+      PRINT 'Migration: Created MailSubscribers table';
+    END
+  `);
+
+  // ── Machines: Master Config > Machine Config ─────────────────────────────
+  await pool3.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='Machines')
+    BEGIN
+      CREATE TABLE Machines (
+        Id             INT IDENTITY(1,1) PRIMARY KEY,
+        MachineName    NVARCHAR(200)  NOT NULL,
+        MachineCode    NVARCHAR(50)   NOT NULL,
+        IpAddress      NVARCHAR(50)   NULL,
+        ControllerType NVARCHAR(50)   NULL,
+        ApiEndpoint    NVARCHAR(300)  NULL,
+        Department     NVARCHAR(200)  NULL,
+        LineName       NVARCHAR(100)  NULL,
+        PlantLocation  NVARCHAR(100)  NULL,
+        ImagePath      NVARCHAR(300)  NULL,
+        Connected      BIT            NOT NULL DEFAULT 0,
+        Status         BIT            NOT NULL DEFAULT 1,
+        CreatedAt      DATETIME       NOT NULL DEFAULT GETDATE(),
+        UpdatedAt      DATETIME       NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT UQ_Machine_Code UNIQUE (MachineCode)
+      );
+      PRINT 'Migration: Created Machines table';
+    END
+  `);
+
+  // ── ProductionPlans: Master Config > Planning Configuration ──────────────
+  await pool3.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ProductionPlans')
+    BEGIN
+      CREATE TABLE ProductionPlans (
+        Id                 INT IDENTITY(1,1) PRIMARY KEY,
+        MachineName        NVARCHAR(200)  NOT NULL,
+        SapCode            NVARCHAR(50)   NOT NULL,
+        PartName           NVARCHAR(300)  NULL,
+        ModelCode          NVARCHAR(100)  NULL,
+        TargetQty          DECIMAL(14,2)  NOT NULL DEFAULT 0,
+        Shift              NVARCHAR(50)   NOT NULL DEFAULT 'All Shifts',
+        PlanDate           DATE           NOT NULL,
+        Priority           NVARCHAR(20)   NOT NULL DEFAULT 'Medium',
+        Customer           NVARCHAR(200)  NULL,
+        PlannedCycleTime   DECIMAL(12,3)  NULL,
+        Status             BIT            NOT NULL DEFAULT 1,
+        CreatedAt          DATETIME       NOT NULL DEFAULT GETDATE(),
+        UpdatedAt          DATETIME       NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT UQ_ProductionPlan_Key UNIQUE (SapCode, MachineName, PlanDate, Shift)
+      );
+      CREATE INDEX IX_ProductionPlan_SapDate ON ProductionPlans (SapCode, PlanDate);
+      PRINT 'Migration: Created ProductionPlans table';
+    END
+  `);
+
+  // ── AuditTemplates: add version-integrity snapshot columns ───────────────
+  for (const col of [
+    { name: "TemplateHash",            def: "NVARCHAR(64)  NULL" },
+    { name: "TemplateSize",            def: "INT           NULL" },
+    { name: "SectionCount",            def: "INT           NULL" },
+    { name: "StageCount",              def: "INT           NULL" },
+    { name: "CheckpointCount",         def: "INT           NULL" },
+    { name: "RequiredCheckpointCount", def: "INT           NULL" },
+    { name: "JsonSchemaVersion",       def: "NVARCHAR(10)  NULL DEFAULT '1'" },
+  ]) {
+    await pool3.request().query(`
+      IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'AuditTemplates')
+      AND NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = 'AuditTemplates' AND COLUMN_NAME = '${col.name}'
+      )
+      BEGIN
+        ALTER TABLE AuditTemplates ADD ${col.name} ${col.def};
+        PRINT 'Migration: Added ${col.name} column to AuditTemplates';
+      END
+    `);
+  }
+
+  // ── AuditTemplateVersions: immutable per-version file+hash ledger ────────
+  await pool3.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='AuditTemplateVersions')
+    BEGIN
+      CREATE TABLE AuditTemplateVersions (
+        Id                      INT IDENTITY(1,1) PRIMARY KEY,
+        TemplateId              INT           NOT NULL,
+        Version                 NVARCHAR(20)  NOT NULL,
+        TemplateFileName        NVARCHAR(500) NOT NULL,
+        TemplateHash            NVARCHAR(64)  NOT NULL,
+        TemplateSize            INT           NOT NULL DEFAULT 0,
+        SectionCount            INT           NOT NULL DEFAULT 0,
+        StageCount              INT           NOT NULL DEFAULT 0,
+        CheckpointCount         INT           NOT NULL DEFAULT 0,
+        RequiredCheckpointCount INT           NOT NULL DEFAULT 0,
+        JsonSchemaVersion       NVARCHAR(10)  NULL DEFAULT '1',
+        IsLatest                BIT           NOT NULL DEFAULT 0,
+        CreatedBy               NVARCHAR(200) NULL,
+        CreatedAt               DATETIME      NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT UQ_TemplateVersion UNIQUE (TemplateId, Version)
+      );
+      CREATE INDEX IX_TemplateVersions_TemplateId ON AuditTemplateVersions (TemplateId);
+      PRINT 'Migration: Created AuditTemplateVersions table';
+    END
+  `);
+
+  // ── Audits: hardened template linkage (Phase 2) ──────────────────────────
+  // Permanent snapshot of which template VERSION/FILE/HASH an audit was
+  // created against, stamped server-side at creation time. Existing rows
+  // have no source of truth to backfill from, so they stay NULL forever —
+  // an accepted, documented gap (unlike Phase 1's hash backfill).
+  for (const col of [
+    { name: "TemplateVersion",  def: "NVARCHAR(20)  NULL" },
+    { name: "TemplateFileName", def: "NVARCHAR(500) NULL" },
+    { name: "TemplateHash",     def: "NVARCHAR(64)  NULL" },
+    { name: "TemplateSize",     def: "INT           NULL" },
+  ]) {
+    await pool3.request().query(`
+      IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Audits')
+      AND NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = 'Audits' AND COLUMN_NAME = '${col.name}'
+      )
+      BEGIN
+        ALTER TABLE Audits ADD ${col.name} ${col.def};
+        PRINT 'Migration: Added ${col.name} column to Audits';
+      END
+    `);
+  }
+
+  // ── CheckpointLibrary: Master Config > Checkpoint Library (Phase 3) ──────
+  // Global, admin-curated reusable checkpoints. No FK to AuditTemplates —
+  // inserting a library checkpoint into a template makes a fully
+  // independent local copy (fresh permanent UUID), same spirit as
+  // duplicateTemplate.
+  await pool3.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='CheckpointLibrary')
+    BEGIN
+      CREATE TABLE CheckpointLibrary (
+        Id            INT IDENTITY(1,1) PRIMARY KEY,
+        CheckPointText NVARCHAR(500) NOT NULL,
+        Method        NVARCHAR(300) NULL,
+        Specification NVARCHAR(500) NULL,
+        Category      NVARCHAR(100) NULL,
+        Required      BIT           NOT NULL DEFAULT 0,
+        UsageCount    INT           NOT NULL DEFAULT 0,
+        Status        BIT           NOT NULL DEFAULT 1,
+        CreatedBy     NVARCHAR(200) NULL,
+        CreatedAt     DATETIME      NOT NULL DEFAULT GETDATE(),
+        UpdatedBy     NVARCHAR(200) NULL,
+        UpdatedAt     DATETIME      NOT NULL DEFAULT GETDATE()
+      );
+      PRINT 'Migration: Created CheckpointLibrary table';
+    END
+  `);
+
+  // ── AuditTemplates: pointer to the current active version's content (Phase 5) ─
+  await pool3.request().query(`
+    IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'AuditTemplates')
+    AND NOT EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'AuditTemplates' AND COLUMN_NAME = 'CurrentVersionContentId'
+    )
+    BEGIN
+      ALTER TABLE AuditTemplates ADD CurrentVersionContentId INT NULL;
+      PRINT 'Migration: Added CurrentVersionContentId column to AuditTemplates';
+    END
+  `);
+
+  // ── AuditTemplateContent: SQL-backed, immutable per-version content (Phase 5) ─
+  // Replaces JSON-file storage as the source of truth. TemplateId stays stable
+  // across versions (AuditTemplates.Id never changes); each row here is one
+  // immutable version's content. Only IsActiveVersion and the approval-status
+  // fields on the currently-active row are ever updated after insert.
+  await pool3.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='AuditTemplateContent')
+    BEGIN
+      CREATE TABLE AuditTemplateContent (
+        Id                      INT IDENTITY(1,1) PRIMARY KEY,
+        TemplateId              INT            NOT NULL,
+        Version                 NVARCHAR(20)   NOT NULL,
+        HeaderConfig            NVARCHAR(MAX)  NOT NULL DEFAULT '{}',
+        InfoFields              NVARCHAR(MAX)  NOT NULL DEFAULT '[]',
+        Columns                 NVARCHAR(MAX)  NOT NULL DEFAULT '[]',
+        DefaultSections         NVARCHAR(MAX)  NOT NULL DEFAULT '[]',
+        ContentHash             NVARCHAR(64)   NOT NULL,
+        ContentSize             INT            NOT NULL DEFAULT 0,
+        SectionCount            INT            NOT NULL DEFAULT 0,
+        StageCount              INT            NOT NULL DEFAULT 0,
+        CheckpointCount         INT            NOT NULL DEFAULT 0,
+        RequiredCheckpointCount INT            NOT NULL DEFAULT 0,
+        JsonSchemaVersion       NVARCHAR(10)   NULL DEFAULT '1',
+        ApprovalStatus          NVARCHAR(50)   NOT NULL DEFAULT 'draft',
+        ApprovedBy              NVARCHAR(200)  NULL,
+        ApprovedAt              DATETIME       NULL,
+        RejectionReason         NVARCHAR(MAX)  NULL,
+        IsActiveVersion         BIT            NOT NULL DEFAULT 0,
+        ChangeType              NVARCHAR(20)   NOT NULL DEFAULT 'create',
+        CreatedFromVersionId    INT            NULL,
+        CreatedBy               NVARCHAR(200)  NULL,
+        CreatedAt               DATETIME       NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT UQ_TemplateContent_Version UNIQUE (TemplateId, Version)
+      );
+      CREATE INDEX IX_TemplateContent_TemplateId ON AuditTemplateContent (TemplateId);
+      CREATE INDEX IX_TemplateContent_ActiveLookup ON AuditTemplateContent (TemplateId, IsActiveVersion) WHERE IsActiveVersion = 1;
+      PRINT 'Migration: Created AuditTemplateContent table';
+    END
+  `);
+
+  // ── AuditTemplateHistory: per-version audit-trail columns (Phase 5) ──────
+  for (const col of [
+    { name: "VersionNumber",     def: "NVARCHAR(20) NULL" },
+    { name: "PreviousVersion",   def: "NVARCHAR(20) NULL" },
+    { name: "CreatedFromVersion", def: "NVARCHAR(20) NULL" },
+  ]) {
+    await pool3.request().query(`
+      IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'AuditTemplateHistory')
+      AND NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = 'AuditTemplateHistory' AND COLUMN_NAME = '${col.name}'
+      )
+      BEGIN
+        ALTER TABLE AuditTemplateHistory ADD ${col.name} ${col.def};
+        PRINT 'Migration: Added ${col.name} column to AuditTemplateHistory';
+      END
+    `);
+  }
+
   console.log("Migrations completed.");
 };
