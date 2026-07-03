@@ -82,6 +82,13 @@ const INITIAL_FORM = {
   maxCurr: "",
   minPow: "",
   maxPow: "",
+  bis: "Non BIS",
+};
+
+const deriveBIS = (modelName) => {
+  if (!modelName) return "Non BIS";
+  const first = modelName.trim().charAt(0).toUpperCase();
+  return first === "F" || first === "D" ? "BIS" : "Non BIS";
 };
 
 // ─── Spinner ───────────────────────────────────────────────────────────────────
@@ -264,6 +271,21 @@ const RecipeTable = ({ data, onUpdate, onDelete }) => {
                     ))}
                 </span>
               </th>
+              <th
+                onClick={() => toggleSort("BIS")}
+                className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-center whitespace-nowrap cursor-pointer hover:text-blue-600"
+                rowSpan={2}
+              >
+                <span className="inline-flex items-center gap-1">
+                  BIS Type
+                  {sort.key === "BIS" &&
+                    (sort.dir === "asc" ? (
+                      <ArrowUp className="w-2.5 h-2.5" />
+                    ) : (
+                      <ArrowDown className="w-2.5 h-2.5" />
+                    ))}
+                </span>
+              </th>
               {PARAM_CONFIG.map((p) => (
                 <th
                   key={p.key}
@@ -308,6 +330,17 @@ const RecipeTable = ({ data, onUpdate, onDelete }) => {
                 </td>
                 <td className="px-3 py-2.5 border-b border-slate-100 font-bold text-slate-800">
                   {item.ModelName}
+                </td>
+                <td className="px-3 py-2.5 border-b border-slate-100 text-center">
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                      (item.BIS || deriveBIS(item.ModelName)) === "BIS"
+                        ? "bg-blue-50 text-blue-800 border-blue-200"
+                        : "bg-slate-50 text-slate-600 border-slate-200"
+                    }`}
+                  >
+                    {item.BIS || deriveBIS(item.ModelName)}
+                  </span>
                 </td>
                 {PARAM_CONFIG.map((p) => (
                   <>
@@ -371,6 +404,20 @@ const UpdateModalContent = ({ fields, setFields }) => (
           Read Only
         </span>
       </div>
+    </div>
+
+    {/* BIS Type */}
+    <div className="max-w-xs">
+      <SelectField
+        label="BIS Type"
+        name="bis"
+        value={fields.bis || "Non BIS"}
+        onChange={(e) => setFields({ ...fields, bis: e.target.value })}
+        options={[
+          { label: "BIS", value: "BIS" },
+          { label: "Non BIS", value: "Non BIS" },
+        ]}
+      />
     </div>
 
     {/* Parameter Rows */}
@@ -441,6 +488,7 @@ const LPTRecipe = () => {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [updateFields, setUpdateFields] = useState({
     modelName: "",
+    bis: "Non BIS",
     ...INITIAL_FORM,
   });
   const [recipes, setRecipes] = useState([]);
@@ -487,7 +535,13 @@ const LPTRecipe = () => {
       await axios.post(`${baseURL}quality/lpt-recipe`, {
         matCode: selectedModelVariant.value,
         modelName: selectedModelVariant.label,
-        ...formFields,
+        bis: formFields.bis,
+        minTemp: formFields.minTemp,
+        maxTemp: formFields.maxTemp,
+        minCurr: formFields.minCurr,
+        maxCurr: formFields.maxCurr,
+        minPow: formFields.minPow,
+        maxPow: formFields.maxPow,
       });
       toast.success("Recipe added successfully.");
       fetchRecipes();
@@ -504,6 +558,7 @@ const LPTRecipe = () => {
   const handleUpdate = (item) => {
     setUpdateFields({
       modelName: item.ModelName || "",
+      bis: item.BIS || deriveBIS(item.ModelName),
       minTemp: item.MinTemp || "",
       maxTemp: item.MaxTemp || "",
       minCurr: item.MinCurrent || "",
@@ -539,6 +594,7 @@ const LPTRecipe = () => {
           maxCurr: updateFields.maxCurr,
           minPow: updateFields.minPow,
           maxPow: updateFields.maxPow,
+          bis: updateFields.bis,
         },
       );
       if (res?.data?.success) {
@@ -635,11 +691,11 @@ const LPTRecipe = () => {
                 label="Model Variant"
                 options={[{ value: "", label: "Select Model" }, ...variants]}
                 value={selectedModelVariant?.value || ""}
-                onChange={(e) =>
-                  setSelectedModelVariant(
-                    variants.find((o) => o.value === e.target.value) || null,
-                  )
-                }
+                onChange={(e) => {
+                  const v = variants.find((o) => o.value === e.target.value) || null;
+                  setSelectedModelVariant(v);
+                  if (v) setFormFields((f) => ({ ...f, bis: deriveBIS(v.label) }));
+                }}
               />
             </div>
 
@@ -659,6 +715,20 @@ const LPTRecipe = () => {
                   }
                 />
               ))}
+            </div>
+
+            {/* BIS Select */}
+            <div className="max-w-xs">
+              <SelectField
+                label="BIS Type"
+                name="bis"
+                value={formFields.bis}
+                onChange={(e) => setFormFields((f) => ({ ...f, bis: e.target.value }))}
+                options={[
+                  { label: "BIS", value: "BIS" },
+                  { label: "Non BIS", value: "Non BIS" },
+                ]}
+              />
             </div>
 
             {/* Add Button */}
@@ -724,6 +794,18 @@ const LPTRecipe = () => {
                 label="Power Configs"
                 value={recipes.filter((r) => r.MinPower && r.MaxPower).length}
                 borderColor="#6366f1"
+              />
+              <KpiCard
+                icon={Shield}
+                label="BIS"
+                value={recipes.filter((r) => (r.BIS || deriveBIS(r.ModelName)) === "BIS").length}
+                borderColor="#3b82f6"
+              />
+              <KpiCard
+                icon={Shield}
+                label="Non BIS"
+                value={recipes.filter((r) => (r.BIS || deriveBIS(r.ModelName)) === "Non BIS").length}
+                borderColor="#94a3b8"
               />
             </div>
           </div>

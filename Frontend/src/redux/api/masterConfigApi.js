@@ -154,6 +154,20 @@ export const masterConfigApi = createApi({
       invalidatesTags: ["Machine"],
     }),
 
+    // ── Material Drawings ────────────────────────────────────────────────────
+    uploadMaterialDrawing: builder.mutation({
+      query: ({ id, file }) => {
+        const formData = new FormData();
+        formData.append("drawing", file);
+        return { url: `master-config/materials/${id}/drawing`, method: "POST", body: formData };
+      },
+      invalidatesTags: ["Material"],
+    }),
+    deleteMaterialDrawing: builder.mutation({
+      query: (id) => ({ url: `master-config/materials/${id}/drawing`, method: "DELETE" }),
+      invalidatesTags: ["Material"],
+    }),
+
     // ── Production Plans ─────────────────────────────────────────────────────
     getPlans: builder.query({
       query: () => "master-config/plans",
@@ -206,6 +220,7 @@ export const masterConfigApi = createApi({
 
 export const {
   useGetMaterialsQuery, useAddMaterialMutation, useUpdateMaterialMutation, useDeleteMaterialMutation, useBulkAddMaterialsMutation,
+  useUploadMaterialDrawingMutation, useDeleteMaterialDrawingMutation,
   useGetShiftsQuery, useAddShiftMutation, useUpdateShiftMutation, useDeleteShiftMutation,
   useGetDowntimeReasonsQuery, useAddDowntimeReasonMutation, useUpdateDowntimeReasonMutation, useDeleteDowntimeReasonMutation,
   useGetDepartmentsQuery, useAddDepartmentMutation, useUpdateDepartmentMutation, useDeleteDepartmentMutation,

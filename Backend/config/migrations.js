@@ -685,5 +685,60 @@ export const runMigrations = async (pool3) => {
     `);
   }
 
+  // ── DrawingPath column on MaterialConfigs ────────────────────────────────
+  await pool3.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'MaterialConfigs' AND COLUMN_NAME = 'DrawingPath'
+    )
+    BEGIN
+      ALTER TABLE MaterialConfigs ADD DrawingPath NVARCHAR(500) NULL;
+      PRINT 'Migration: Added DrawingPath column to MaterialConfigs';
+    END
+  `);
+
+  // ── LPTReport: add LPTType column ────────────────────────────────────────
+  await pool3.request().query(`
+    IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'LPTReport')
+    AND NOT EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'LPTReport' AND COLUMN_NAME = 'LPTType'
+    )
+    BEGIN
+      ALTER TABLE LPTReport ADD LPTType NVARCHAR(50) NULL DEFAULT 'LPT';
+      UPDATE LPTReport SET LPTType = 'LPT' WHERE LPTType IS NULL;
+      PRINT 'Migration: Added LPTType column to LPTReport';
+    END
+  `);
+
+  // ── LPTRecipe: add BIS column and auto-classify existing records ─────────
+  await pool3.request().query(`
+    IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'LPTRecipe')
+    AND NOT EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'LPTRecipe' AND COLUMN_NAME = 'BIS'
+    )
+    BEGIN
+      ALTER TABLE LPTRecipe ADD BIS NVARCHAR(50) NULL DEFAULT 'Non BIS';
+      UPDATE LPTRecipe
+        SET BIS = CASE WHEN LEFT(ModelName, 1) IN ('F', 'D') THEN 'BIS' ELSE 'Non BIS' END;
+      PRINT 'Migration: Added BIS column to LPTRecipe and classified existing records';
+    END
+  `);
+
+  // ── AppSettings: global key-value store (e.g. menu layout) ─────────────────
+  await pool3.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='AppSettings')
+    BEGIN
+      CREATE TABLE AppSettings (
+        SettingKey  NVARCHAR(100)  NOT NULL PRIMARY KEY,
+        Value       NVARCHAR(MAX)  NULL,
+        UpdatedBy   NVARCHAR(100)  NULL,
+        UpdatedAt   DATETIME       NOT NULL DEFAULT GETDATE()
+      );
+      PRINT 'Migration: Created AppSettings table';
+    END
+  `);
+
   console.log("Migrations completed.");
 };

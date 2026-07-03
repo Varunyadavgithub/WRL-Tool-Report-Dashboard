@@ -56,8 +56,10 @@ const PartProcessOverview = () => {
     records,
   } = usePartProcessOEE();
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all"); // all | online | offline
+  const [search, setSearch]               = useState("");
+  const [statusFilter, setStatusFilter]   = useState("all"); // all | online | offline
+  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [lineFilter, setLineFilter]       = useState("");
 
   // Match the configured Machine for this card's header, same approach as
   // the full Dashboard: use the most recent record's assetName/lineName.
@@ -76,6 +78,22 @@ const PartProcessOverview = () => {
     );
   }, [configuredMachines, records]);
 
+  const departments = useMemo(() =>
+    [...new Set(configuredMachines.map(m => m.department).filter(Boolean))].sort(),
+    [configuredMachines],
+  );
+  const lines = useMemo(() => {
+    const src = departmentFilter
+      ? configuredMachines.filter(m => m.department === departmentFilter)
+      : configuredMachines;
+    return [...new Set(src.map(m => m.lineName).filter(Boolean))].sort();
+  }, [configuredMachines, departmentFilter]);
+
+  const handleDepartmentChange = (e) => {
+    setDepartmentFilter(e.target.value);
+    setLineFilter(""); // reset line when department changes
+  };
+
   const statTiles = [
     { label: "Good Parts", value: displayGood,     color: "#0069b4" },
     { label: "NG Parts",   value: displayBad,       color: "#111827" },
@@ -87,14 +105,20 @@ const PartProcessOverview = () => {
   // entry here and gets its own card below, filtered by search/status.
   const machineName = currentMachine?.machineName || curMat?.partName || curModel || "Part Process Machine";
   const machines = [
-    { id: "part-process", name: machineName, model: curModel, isRunning, oee: activeOEE },
+    {
+      id: "part-process", name: machineName, model: curModel, isRunning, oee: activeOEE,
+      department: currentMachine?.department || "",
+      lineName:   currentMachine?.lineName   || "",
+    },
   ];
 
   const q = search.trim().toLowerCase();
   const filteredMachines = machines.filter((m) => {
     const matchesSearch = !q || m.name.toLowerCase().includes(q) || (m.model || "").toLowerCase().includes(q);
     const matchesStatus = statusFilter === "all" || (statusFilter === "online" ? m.isRunning : !m.isRunning);
-    return matchesSearch && matchesStatus;
+    const matchesDept   = !departmentFilter || m.department === departmentFilter;
+    const matchesLine   = !lineFilter       || m.lineName   === lineFilter;
+    return matchesSearch && matchesStatus && matchesDept && matchesLine;
   });
   const showCard = filteredMachines.some((m) => m.id === "part-process");
 
@@ -111,7 +135,7 @@ const PartProcessOverview = () => {
     { key: "offline", label: "Offline" },
   ];
 
-  const hasFilters = q || statusFilter !== "all";
+  const hasFilters = q || statusFilter !== "all" || departmentFilter || lineFilter;
 
   return (
     <div className="h-full bg-slate-100 overflow-auto  ">
@@ -139,6 +163,26 @@ const PartProcessOverview = () => {
               </button>
             )}
           </div>
+          {/* Department filter */}
+          <select
+            value={departmentFilter}
+            onChange={handleDepartmentChange}
+            className="text-xs rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200 text-slate-600"
+          >
+            <option value="">All Departments</option>
+            {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
+
+          {/* Line filter */}
+          <select
+            value={lineFilter}
+            onChange={(e) => setLineFilter(e.target.value)}
+            className="text-xs rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200 text-slate-600"
+          >
+            <option value="">All Lines</option>
+            {lines.map((l) => <option key={l} value={l}>{l}</option>)}
+          </select>
+
           <div className="flex items-center gap-1 shrink-0">
             {statusFilters.map((f) => (
               <button key={f.key} onClick={() => setStatusFilter(f.key)}
@@ -164,7 +208,7 @@ const PartProcessOverview = () => {
               <Search className="w-6 h-6 text-slate-300" />
               <p className="text-sm font-semibold text-slate-500">No machines match your search</p>
               {hasFilters && (
-                <button onClick={() => { setSearch(""); setStatusFilter("all"); }}
+                <button onClick={() => { setSearch(""); setStatusFilter("all"); setDepartmentFilter(""); setLineFilter(""); }}
                   className="text-xs font-bold text-blue-600 hover:underline">
                   Clear filters
                 </button>

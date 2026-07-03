@@ -2705,8 +2705,8 @@ const PartProcessDashboard = () => {
           </div>
         </div>
 
-        {/* ── SCROLLABLE CONTENT ── */}
-        <div className="flex-1 overflow-auto p-4 flex flex-col gap-4 relative">
+        {/* ── SINGLE-SCREEN CONTENT ── */}
+        <div className="flex-1 overflow-hidden p-2 flex flex-col gap-2 relative">
           {loading && (
             <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-slate-100/80 backdrop-blur-sm">
               <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -2722,1178 +2722,473 @@ const PartProcessDashboard = () => {
             </div>
           )}
 
-          {/* ── SHIFT SELECTOR ── */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 shrink-0">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
-                  Shift
-                </span>
+          {/* ── SHIFT SELECTOR (compact) ── */}
+          <div className="bg-white rounded-lg border border-slate-200 shadow-sm px-3 py-1.5 shrink-0 flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3 text-slate-400" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Shift</span>
+            </div>
+            <button onClick={() => setSelectedShift(null)} className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all ${!selectedShift ? "bg-slate-800 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>All</button>
+            {shifts.map((s) => {
+              const active = isActiveShift(s) && isToday;
+              const sel = selectedShift?.id === s.id;
+              return (
+                <button key={s.id} onClick={() => setSelectedShift(s)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-md border transition-all ${sel ? "text-white shadow-sm" : active ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-600"}`}
+                  style={sel ? { backgroundColor: s.color || "#3b82f6", borderColor: s.color || "#3b82f6" } : {}}
+                >
+                  {active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />}
+                  <span>{s.shiftName}</span>
+                  <span className="font-normal opacity-70">{s.startTime}–{s.endTime}</span>
+                  {active && <span className={`text-[9px] font-bold px-1 py-0.5 rounded-full ${sel ? "bg-white/20" : "bg-emerald-100 text-emerald-700"}`}>NOW</span>}
+                </button>
+              );
+            })}
+            {selectedShift && shiftProgress && (
+              <div className="ml-auto flex items-center gap-2">
+                <span className="text-[10px] font-bold text-slate-500">{shiftProgress.remaining} left</span>
+                <div className="w-28 h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${shiftProgress.pct}%`, backgroundColor: selectedShift.color || "#3b82f6" }} />
+                </div>
+                <span className="text-xs font-bold" style={{ color: selectedShift.color || "#3b82f6" }}>{shiftProgress.pct}%</span>
               </div>
-              <button
-                onClick={() => setSelectedShift(null)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${!selectedShift ? "bg-slate-800 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
-              >
-                All Shifts
-              </button>
-              {shifts.map((s) => {
-                const active = isActiveShift(s) && isToday;
-                const selected = selectedShift?.id === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => setSelectedShift(s)}
-                    className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${selected ? "text-white shadow-sm" : active ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
-                    style={
-                      selected
-                        ? {
-                            backgroundColor: s.color || "#3b82f6",
-                            borderColor: s.color || "#3b82f6",
-                          }
-                        : {}
-                    }
-                  >
-                    {active && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                    )}
-                    <span>{s.shiftName}</span>
-                    <span className="font-normal opacity-70 text-[10px]">
-                      {s.startTime}–{s.endTime}
-                    </span>
-                    {active && (
-                      <span
-                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${selected ? "bg-white/20" : "bg-emerald-100 text-emerald-700"}`}
-                      >
-                        NOW
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+            )}
+          </div>
+
+          {/* ── ROW 1: KPI Cards (compact, bold, no ring) ── */}
+          <div className="grid grid-cols-4 gap-2 shrink-0">
+            {/* Components */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 flex flex-col justify-between">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                {selectedShift ? `${selectedShift.shiftName} Components` : "Components Produced"}
+              </p>
+              <p className="text-5xl font-black font-mono text-slate-800 leading-none my-1">
+                {displayComponentQty.toLocaleString()}
+              </p>
+              <div className="flex items-center gap-3">
+                {displayComponentQty !== displayQty && (
+                  <span className="text-sm font-bold text-violet-600">{displayQty.toLocaleString()} sheets</span>
+                )}
+                <span className="text-xs font-semibold text-slate-400">{totalProdRecords} events</span>
+              </div>
+            </div>
+
+            {/* OEE */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 flex flex-col justify-between">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                {selectedShift ? `${selectedShift.shiftName} OEE` : "OEE"}
+              </p>
+              <p className="text-5xl font-black font-mono leading-none my-1" style={{ color: oeeColor(activeOEE) }}>
+                {activeOEE}%
+              </p>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${activeOEE >= 85 ? "bg-emerald-50 text-emerald-700" : activeOEE >= 65 ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-600"}`}>
+                  {activeOEE >= 85 ? "World Class" : activeOEE >= 65 ? "Acceptable" : "Needs Attention"}
+                </span>
+                <span className="text-xs font-semibold text-slate-400">A:{activeA}% P:{activeP}% Q:{activeQ}%</span>
+              </div>
+            </div>
+
+            {/* Quality */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                  {selectedShift ? `${selectedShift.shiftName} Quality` : "Quality"}
+                </p>
+                {qualityTotals.hasData && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-200">From Log</span>
+                )}
+              </div>
+              <div className="flex items-end gap-4 my-1">
+                <div>
+                  <p className="text-4xl font-black font-mono text-emerald-600 leading-none">
+                    {qualityTotals.hasData ? qualityTotals.accepted : displayGood}
+                  </p>
+                  <p className="text-xs font-bold text-emerald-500">Accepted</p>
+                </div>
+                <div className="w-px h-10 bg-slate-200" />
+                <div>
+                  <p className="text-4xl font-black font-mono text-rose-500 leading-none">
+                    {qualityTotals.hasData ? qualityTotals.rejected : displayBad}
+                  </p>
+                  <p className="text-xs font-bold text-rose-400">Rejected</p>
+                </div>
+              </div>
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden flex">
+                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${qualityTotals.hasData ? qualityTotals.passRate : passR}%` }} />
+                <div className="h-full bg-rose-400" style={{ width: `${100 - (qualityTotals.hasData ? qualityTotals.passRate : passR)}%` }} />
+              </div>
+              <p className="text-xs font-bold text-slate-500 mt-0.5">{qualityTotals.hasData ? qualityTotals.passRate : passR}% pass rate</p>
+            </div>
+
+            {/* Downtime */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 flex flex-col justify-between">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                {selectedShift ? `${selectedShift.shiftName} Downtime` : "Downtime"}
+              </p>
+              <div className="flex items-end gap-4 my-1">
+                <div>
+                  <p className={`text-5xl font-black font-mono leading-none ${dMins > 30 ? "text-rose-500" : "text-amber-600"}`}>{dMins}</p>
+                  <p className="text-xs font-bold text-slate-400">min total</p>
+                </div>
+                <div className="w-px h-10 bg-slate-200" />
+                <div>
+                  <p className="text-4xl font-black font-mono text-amber-600 leading-none">{coStats.count}</p>
+                  <p className="text-xs font-bold text-amber-500">Changeovers</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-semibold text-rose-500">
+                  {shiftRecords.filter((r) => (r.effectiveState || r.state) === "Downtime").length}× brief
+                </span>
+                <span className="text-xs font-semibold text-amber-600">
+                  {shiftRecords.filter((r) => (r.effectiveState || r.state) === "Idle").length}× idle
+                </span>
+                <span className="text-xs font-semibold text-slate-400">CT:{activeAvgCycleSecs}s</span>
+              </div>
             </div>
           </div>
 
-          {/* ── SHIFT INFO CARD ── */}
-          {selectedShift && (
-            <div
-              className="bg-white rounded-xl border shadow-sm shrink-0 overflow-hidden"
-              style={{ borderColor: selectedShift.color || "#e2e8f0" }}
-            >
-              <div className="flex items-start gap-4 p-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{
-                        backgroundColor: selectedShift.color || "#3b82f6",
-                      }}
-                    />
-                    <p className="text-sm font-bold text-slate-800">
-                      {selectedShift.shiftName}
-                    </p>
-                    <span className="text-[10px] font-semibold text-slate-400 font-mono">
-                      [{selectedShift.shiftCode}]
-                    </span>
-                    {isActiveShift(selectedShift) && isToday && (
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />{" "}
-                        Active Now
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-slate-500 mb-3">
-                    <span className="font-mono font-semibold text-slate-700">
-                      {selectedShift.startTime} → {selectedShift.endTime}
-                    </span>
-                    {selectedShift.breakStart && (
-                      <span>
-                        Break:{" "}
-                        <strong className="text-slate-600">
-                          {selectedShift.breakStart}–{selectedShift.breakEnd}
-                        </strong>
-                      </span>
-                    )}
-                    <span>
-                      Tea breaks:{" "}
-                      <strong className="text-slate-600">
-                        {selectedShift.teaBreaks}
-                      </strong>
+          {/* ── MAIN GRID: Model Breakdown | OEE Chart + Timeline | Stats ── */}
+          <div className="flex-1 min-h-0 grid gap-2" style={{ gridTemplateColumns: "1fr 2fr 1fr" }}>
+            {/* ── COL 1: Current Part Info + Model Breakdown + Downtime Log ── */}
+            <div className="flex flex-col gap-2 min-h-0">
+              {/* Model Parameters */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 shrink-0">
+                <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-2">Model Parameters</p>
+                <div className="flex flex-col divide-y divide-slate-100">
+                  <div className="flex items-start justify-between py-1.5 gap-2">
+                    <span className="text-xs font-semibold text-slate-500 shrink-0">Part Name</span>
+                    <span className="text-xs font-black text-blue-700 text-right leading-snug">
+                      {curMat?.partName || (curModel ? (
+                        <span className="text-slate-600 font-normal">
+                          {extractProgramName(curModel) || curModel}
+                          <span className="block text-[9px] font-bold text-rose-500">⚠ No master</span>
+                        </span>
+                      ) : <span className="text-amber-600 font-bold">N/A</span>)}
                     </span>
                   </div>
-                  {shiftProgress && (
-                    <div>
-                      <div className="flex items-center justify-between text-[10px] mb-1">
-                        <span className="text-slate-400">Shift Progress</span>
-                        <span
-                          className="font-bold font-mono"
-                          style={{ color: selectedShift.color || "#3b82f6" }}
+                  {[
+                    { label: "Defined Comp CT", value: curMat ? `${curMat.definedComponentCycleTime} s` : "N/A", color: "text-violet-600" },
+                    { label: "Sheet CT (Machine)", value: activeAvgCycleSecs > 0 ? `${activeAvgCycleSecs} s` : "N/A", color: "text-amber-600" },
+                    { label: "Component CT", value: curComponentCT != null ? `${curComponentCT} s` : "N/A", color: "text-emerald-600" },
+                    { label: "SAP Code", value: curMat?.sapCode || extractSapCode(curModel) || "N/A", color: "text-blue-600" },
+                    { label: "Sheets × Comp/Sheet", value: curMat ? `${curMat.noOfSheet} × ${curMat.actualComponentsPerSheet}` : "N/A", color: "text-slate-700" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="flex items-center justify-between py-1.5">
+                      <span className="text-xs font-semibold text-slate-500">{label}</span>
+                      <span className={`text-sm font-black font-mono ${color}`}>{value}</span>
+                    </div>
+                  ))}
+                  {curMat && (
+                    <div className="pt-2">
+                      {curMat.drawingPath ? (
+                        <a
+                          href={`${fileBaseURL}${curMat.drawingPath}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors"
                         >
-                          {shiftProgress.pct}% · {shiftProgress.remaining}{" "}
-                          remaining
-                        </span>
-                      </div>
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-1000"
-                          style={{
-                            width: `${shiftProgress.pct}%`,
-                            backgroundColor: selectedShift.color || "#3b82f6",
-                          }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-[9px] text-slate-400 mt-0.5 font-mono">
-                        <span>{selectedShift.startTime}</span>
-                        <span>
-                          {shiftProgress.elapsed}m elapsed of{" "}
-                          {shiftProgress.total}m
-                        </span>
-                        <span>{selectedShift.endTime}</span>
-                      </div>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+                          </svg>
+                          View Drawing
+                        </a>
+                      ) : (
+                        <div className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-400 cursor-default">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                          </svg>
+                          No Drawing
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  {[
-                    {
-                      label: "Qty",
-                      value: shiftOEE.qty,
-                      color: "text-blue-600",
-                    },
-                    {
-                      label: "Good",
-                      value: shiftOEE.good,
-                      color: "text-emerald-600",
-                    },
-                    {
-                      label: "Downtime",
-                      value: `${shiftOEE.downMins}m`,
-                      color: "text-rose-500",
-                    },
-                  ].map(({ label, value, color }) => (
-                    <div
-                      key={label}
-                      className="flex flex-col items-center px-3 py-2 rounded-lg bg-slate-50 border border-slate-100 min-w-[60px]"
-                    >
-                      <span className={`text-lg font-bold font-mono ${color}`}>
-                        {value}
-                      </span>
-                      <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide">
-                        {label}
-                      </span>
-                    </div>
-                  ))}
+              </div>
+              {/* Model Breakdown */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 shrink-0">
+                  <PackageOpen className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Model Breakdown</span>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── ROW 1: KPI Cards ── */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-4">
-              <div className="relative shrink-0">
-                <RingProgress
-                  value={displayComponentQty}
-                  max={Math.max(displayComponentQty, 500)}
-                  color={selectedShift?.color || "#3b82f6"}
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xs font-bold font-mono text-slate-700">
-                    {displayComponentQty > 0
-                      ? Math.min(
-                          100,
-                          Math.round((displayComponentQty / 500) * 100),
-                        )
-                      : 0}
-                    %
-                  </span>
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
-                  {selectedShift
-                    ? `${selectedShift.shiftName} Components`
-                    : "Components Produced"}
-                </p>
-                <p className="text-2xl font-bold font-mono text-slate-800">
-                  {displayComponentQty.toLocaleString()}
-                </p>
-                {displayComponentQty !== displayQty && (
-                  <p className="text-[11px] font-semibold text-violet-600">
-                    {displayQty.toLocaleString()} sheets
-                  </p>
-                )}
-                <p className="text-[11px] text-slate-400">
-                  {totalProdRecords} production events
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-4">
-              <div className="relative shrink-0">
-                <RingProgress
-                  value={activeOEE}
-                  max={100}
-                  color={oeeColor(activeOEE)}
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span
-                    className="text-xs font-bold font-mono"
-                    style={{ color: oeeColor(activeOEE) }}
-                  >
-                    {activeOEE}%
-                  </span>
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
-                  {selectedShift ? `${selectedShift.shiftName} OEE` : "OEE"}
-                </p>
-                <p
-                  className="text-2xl font-bold font-mono"
-                  style={{ color: oeeColor(activeOEE) }}
-                >
-                  {activeOEE}%
-                </p>
-                <span
-                  className={`text-[10px] font-semibold block mt-0.5 ${activeOEE >= 85 ? "text-emerald-600" : activeOEE >= 65 ? "text-amber-600" : "text-rose-500"}`}
-                >
-                  {activeOEE >= 85
-                    ? "World Class"
-                    : activeOEE >= 65
-                      ? "Acceptable"
-                      : "Needs Attention"}
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
-                  {selectedShift
-                    ? `${selectedShift.shiftName} Quality`
-                    : "Quality Split"}
-                </p>
-                {qualityTotals.hasData && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-500 border border-violet-200">
-                    From Log
-                  </span>
-                )}
-              </div>
-              <div className="flex items-end gap-3 mb-2">
-                <div>
-                  <p className="text-xl font-bold font-mono text-emerald-600">
-                    {qualityTotals.hasData
-                      ? qualityTotals.accepted
-                      : displayGood}
-                  </p>
-                  <p className="text-[10px] text-emerald-500 font-medium">
-                    Accepted
-                  </p>
-                </div>
-                <div className="w-px h-8 bg-slate-200" />
-                <div>
-                  <p className="text-xl font-bold font-mono text-rose-500">
-                    {qualityTotals.hasData
-                      ? qualityTotals.rejected
-                      : displayBad}
-                  </p>
-                  <p className="text-[10px] text-rose-400 font-medium">
-                    Rejected
-                  </p>
-                </div>
-                {qualityTotals.hasData && (
-                  <>
-                    <div className="w-px h-8 bg-slate-200" />
-
-                  </>
-                )}
-              </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden flex">
-                {qualityTotals.hasData ? (
-                  <>
-                    <div
-                      className="h-full bg-emerald-500 rounded-full"
-                      style={{ width: `${qualityTotals.passRate}%` }}
-                    />
-                    {qualityTotals.rejected > 0 && (
-                      <div
-                        className="h-full bg-rose-400"
-                        style={{ width: `${100 - qualityTotals.passRate}%` }}
-                      />
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div
-                      className="h-full bg-emerald-500 rounded-full"
-                      style={{ width: `${passR}%` }}
-                    />
-                    {displayBad > 0 && (
-                      <div
-                        className="h-full bg-rose-400"
-                        style={{ width: `${100 - passR}%` }}
-                      />
-                    )}
-                  </>
-                )}
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1">
-                {qualityTotals.hasData ? qualityTotals.passRate : passR}% pass
-                rate
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">
-                {selectedShift
-                  ? `${selectedShift.shiftName} Downtime`
-                  : "Downtime"}
-              </p>
-              <div className="flex items-end gap-2 mb-2 flex-wrap">
-                <div>
-                  <p
-                    className={`text-xl font-bold font-mono ${dMins > 30 ? "text-rose-500" : "text-amber-600"}`}
-                  >
-                    {dMins}
-                  </p>
-                  <p className="text-[9px] text-slate-400 font-medium">
-                    min total
-                  </p>
-                </div>
-                <div className="flex flex-col gap-0.5 text-[9px] font-semibold pb-0.5">
-                  <span className="text-rose-500">
-                    {
-                      shiftRecords.filter(
-                        (r) => (r.effectiveState || r.state) === "Downtime",
-                      ).length
-                    }
-                    × brief (&lt;{IDLE_THRESHOLD_MINS}m)
-                  </span>
-                  <span className="text-amber-600">
-                    {
-                      shiftRecords.filter(
-                        (r) => (r.effectiveState || r.state) === "Idle",
-                      ).length
-                    }
-                    × idle (≥{IDLE_THRESHOLD_MINS}m)
-                  </span>
-                </div>
-                <div className="w-px h-8 bg-slate-200" />
-                <div className="text-center">
-                  <p className="text-xl font-bold font-mono text-amber-600">
-                    {coStats.count}
-                  </p>
-                  <p className="text-[9px] text-amber-500 font-medium">
-                    Changeovers
-                  </p>
-                </div>
-              </div>
-              {coStats.overrunMins > 0 && (
-                <div className="flex items-center gap-1 px-2 py-1 rounded bg-rose-50 border border-rose-100">
-                  <AlertTriangle className="w-3 h-3 text-rose-500 shrink-0" />
-                  <span className="text-[10px] text-rose-600 font-semibold">
-                    {coStats.overrunCount} CO &gt;{STD_CHANGEOVER_MINS}m ·{" "}
-                    {coStats.overrunMins}m loss
-                  </span>
-                </div>
-              )}
-              <div className="flex items-center gap-1.5 mt-1">
-                <Timer className="w-3 h-3 text-slate-400" />
-                <span className="text-[10px] text-slate-500">
-                  Avg sheet CT: <strong>{activeAvgCycleSecs}s</strong>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* ── ROW 2: OEE Chart + Production Summary + Setting Parameters ── */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
-            <div className="xl:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 shrink-0">
-                <span className="text-xs font-bold text-blue-600 uppercase tracking-widest">
-                  OEE
-                </span>
-                {records.length > 0 && (
-                  <div className="flex items-center gap-2 text-[10px]">
-                    <span
-                      className={`font-bold ${activeOEE >= 85 ? "text-emerald-600" : activeOEE >= 65 ? "text-amber-600" : "text-rose-500"}`}
-                    >
-                      {selectedShift ? selectedShift.shiftName : "All Shifts"}{" "}
-                      OEE: {activeOEE}%
-                    </span>
-                    <span className="text-slate-300">|</span>
-                    <span className="text-slate-400">
-                      A:{activeA}% · P:{activeP}% · Q:{activeQ}%
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="p-4 flex-1 min-h-80">
-                {oeeTimeSeries.labels.length > 1 ? (
-                  <Line data={oeeLineData} options={oeeLineOptions} />
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-300">
-                    <Gauge className="w-8 h-8 opacity-40" strokeWidth={1.2} />
-                    <p className="text-xs text-slate-400">
-                      Load data to see OEE trend
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex-1">
-                <p className="text-[11px] font-bold text-blue-600 uppercase tracking-widest mb-3">
-                  Production Summary
-                </p>
-                <div className="flex flex-col divide-y divide-slate-100">
-                  {[
-                    {
-                      label: "Model Target",
-                      value:
-                        modelLabels.length ||
-                        (shiftRecords.length > 0 ? 1 : "-"),
-                      color: "text-slate-600",
-                    },
-                    {
-                      label: "Produced Part Count",
-                      value: displayComponentQty.toLocaleString(),
-                      color: "text-blue-600",
-                    },
-                    {
-                      label: "Inspected Count",
-                      value: qualityTotals.hasData
-                        ? qualityTotals.inspected
-                        : "—",
-                      color: "text-violet-600",
-                    },
-                    {
-                      label: "Accepted Count",
-                      value: qualityTotals.hasData
-                        ? qualityTotals.accepted
-                        : displayGood,
-                      color: "text-emerald-600",
-                    },
-                    {
-                      label: "Rejected Count",
-                      value: qualityTotals.hasData
-                        ? qualityTotals.rejected
-                        : displayBad,
-                      color: "text-rose-500",
-                    },
-                  ].map(({ label, value, color }) => (
-                    <div
-                      key={label}
-                      className="flex items-center justify-between py-2.5"
-                    >
-                      <span className="text-[12px] text-slate-500">
-                        {label}
-                      </span>
-                      <span className={`text-sm font-bold font-mono ${color}`}>
-                        {value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex-1">
-                <p className="text-[11px] font-bold text-blue-600 uppercase tracking-widest mb-3">
-                  Setting Parameters
-                </p>
-                <div className="flex flex-col divide-y divide-slate-100">
-                  <div className="py-2.5">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
-                      Part Name
-                    </span>
-                    <p className="text-sm font-bold text-blue-700 mt-0.5 leading-snug">
-                      {curMat?.partName ||
-                        (curModel ? (
-                          <span className="text-slate-600 text-xs font-normal block">
-                            {extractProgramName(curModel) || curModel}
-                            <span className="block text-[9px] font-bold text-rose-500 mt-0.5">
-                              ⚠ Master not exist
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="text-amber-600">N/A</span>
-                        ))}
-                    </p>
-                  </div>
-                  {[
-                    {
-                      label: "Defined Component CT",
-                      value: curMat
-                        ? `${curMat.definedComponentCycleTime} s`
-                        : "N/A",
-                    },
-                    {
-                      label: "Sheet CT (Machine)",
-                      value:
-                        activeAvgCycleSecs > 0
-                          ? `${activeAvgCycleSecs} s`
-                          : "N/A",
-                    },
-                    {
-                      label: "Component CT",
-                      value:
-                        curComponentCT != null ? `${curComponentCT} s` : "N/A",
-                    },
-                    {
-                      label: "SAP Code",
-                      value:
-                        curMat?.sapCode || extractSapCode(curModel) || "N/A",
-                    },
-                    // FIX #3 — runTimeMins & downTimeMins now always returned from computeOEE
-                    {
-                      label: "RunTime/DownTime",
-                      value:
-                        activeOEEData.runTimeMins > 0 ||
-                        activeOEEData.downMins > 0
-                          ? `${activeOEEData.runTimeMins}/${activeOEEData.downMins}`
-                          : "N/A",
-                    },
-                  ].map(({ label, value }) => (
-                    <div
-                      key={label}
-                      className="flex items-center justify-between py-2.5"
-                    >
-                      <span className="text-[12px] text-slate-500">
-                        {label}
-                      </span>
-                      <span className="text-sm font-bold font-mono text-amber-600">
-                        {value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ── ROW 3: Model breakdown + Running Summary + OEE A·P·Q ── */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100">
-                <PackageOpen className="w-3.5 h-3.5 text-blue-500" />
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                  Model Breakdown
-                </span>
-              </div>
-              {modelBreakdownLabels.length > 0 ? (
-                <div className="overflow-auto">
-                  <table className="min-w-full text-[11px] border-separate border-spacing-0">
-                    <thead className="sticky top-0 bg-slate-50">
-                      <tr>
-                        {["Model", "Target", "Produced", "Accepted", "Rejected"].map(
-                          (h) => (
-                            <th
-                              key={h}
-                              className="px-3 py-2 text-[10px] font-semibold text-slate-400 border-b border-slate-200 text-left whitespace-nowrap"
-                            >
-                              {h}
-                            </th>
-                          ),
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {modelBreakdownLabels.map((m, i) => {
-                        const produced = activeModelMap[m] || 0;
-                        const target = plannedModelMap[m] || 0;
-                        const masterMatch = materials.some(
-                          (mat) => mat.partName === m,
-                        );
-                        const qLog = qualityByModel[m] || {
-                          inspected: 0,
-                          rejected: 0,
-                        };
-                        const accepted = Math.max(0, produced - qLog.rejected);
-                        return (
-                          <tr
-                            key={m}
-                            className="hover:bg-blue-50/30 transition-colors"
-                          >
-                            <td className="px-3 py-2.5 border-b border-slate-100">
-                              <div className="flex items-center gap-1.5">
-                                <span
-                                  className="w-2 h-2 rounded-full shrink-0"
-                                  style={{
-                                    backgroundColor:
-                                      CHART_COLORS[i % CHART_COLORS.length],
-                                  }}
-                                />
-                                <div className="min-w-0">
-                                  <p
-                                    className={`font-semibold leading-snug truncate max-w-[160px] ${masterMatch ? "text-slate-700" : "text-slate-500"}`}
-                                  >
-                                    {m}
-                                  </p>
-                                  {!masterMatch && (
-                                    <p className="text-[9px] font-bold text-rose-500">
-                                      ⚠ no master
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-3 py-2.5 border-b border-slate-100 font-bold font-mono text-slate-500">
-                              {target > 0 ? target : <span className="text-slate-300">—</span>}
-                            </td>
-                            <td className="px-3 py-2.5 border-b border-slate-100 font-bold font-mono text-blue-600">
-                              {produced}
-                            </td>
-                            <td
-                              className="px-3 py-2.5 border-b border-slate-100 font-bold font-mono"
-                              style={{
-                                color: qLog.rejected > 0 ? "#ef4444" : "#22c55e",
-                              }}
-                            >
-                              {qLog.rejected}
-                            </td>
-                            <td className="px-3 py-2.5 border-b border-slate-100 font-bold font-mono text-emerald-600">
-                              {accepted}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-2 text-slate-300 py-6 px-3">
-                  <PackageOpen
-                    className="w-8 h-8 opacity-40"
-                    strokeWidth={1.2}
-                  />
-                  <p className="text-xs text-slate-400">No data yet</p>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100">
-                <Activity className="w-3.5 h-3.5 text-violet-500" />
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                  Department Loss
-                </span>
-                {loading && (
-                  <Loader2 className="w-3 h-3 animate-spin text-blue-400 ml-auto" />
-                )}
-              </div>
-              {deptLoss.length === 0 ? (
-                <div className="p-4 flex flex-col items-center justify-center gap-2 text-center min-h-[120px]">
-                  <span className="text-2xl">🏭</span>
-                  <p className="text-[11px] text-slate-400 font-medium">
-                    No department data yet
-                  </p>
-                  <p className="text-[10px] text-slate-300">
-                    Log downtime reasons with departments to see breakdown
-                  </p>
-                </div>
-              ) : (
-                <div className="p-3 flex flex-col gap-2.5">
-                  {deptLoss.map(([dept, secs], i) => {
-                    const mins = Math.round((secs / 60) * 10) / 10;
-                    const pct =
-                      deptTotalSecs > 0
-                        ? Math.round((secs / deptTotalSecs) * 100)
-                        : 0;
-                    const col = DEPT_COLORS[i % DEPT_COLORS.length];
-                    return (
-                      <div key={dept}>
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className="w-2 h-2 rounded-full shrink-0"
-                              style={{ backgroundColor: col }}
-                            />
-                            <span className="text-[11px] font-semibold text-slate-700 truncate max-w-[130px]">
-                              {dept}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-slate-400">
-                              {pct}%
-                            </span>
-                            <span
-                              className="text-[11px] font-bold font-mono"
-                              style={{ color: col }}
-                            >
-                              {mins}m
-                            </span>
-                          </div>
-                        </div>
-                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{ width: `${pct}%`, backgroundColor: col }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div className="flex justify-between items-center pt-1 mt-0.5 border-t border-slate-100">
-                    <span className="text-[10px] text-slate-400">
-                      Total attributed loss
-                    </span>
-                    <span className="text-[11px] font-bold font-mono text-slate-600">
-                      {Math.round((deptTotalSecs / 60) * 10) / 10}m
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100">
-                <Gauge className="w-3.5 h-3.5 text-blue-500" />
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                  OEE Breakdown (A · P · Q)
-                </span>
-                <span
-                  className="ml-auto text-sm font-bold font-mono"
-                  style={{
-                    color: activeOEE > 0 ? oeeColor(activeOEE) : "#94a3b8",
-                  }}
-                >
-                  {activeOEE > 0 ? `${activeOEE}%` : "N/A"}
-                </span>
-              </div>
-              <div className="p-3 grid grid-cols-3 gap-2">
-                {(() => {
-                  const qVal = qualityTotals.hasData
-                    ? qualityTotals.passRate
-                    : activeQ;
-                  const qWarn = qualityTotals.hasData
-                    ? false
-                    : activeQUnverified;
-                  return [
-                    {
-                      label: "Availability",
-                      key: "A",
-                      value: activeA,
-                      color: "#22c55e",
-                      warn: false,
-                    },
-                    {
-                      label: "Performance",
-                      key: "P",
-                      value: activeP,
-                      color: "#f59e0b",
-                      warn: activePUnverified,
-                    },
-                    {
-                      label: "Quality",
-                      key: "Q",
-                      value: qVal,
-                      color: "#a78bfa",
-                      warn: qWarn,
-                      fromLog: qualityTotals.hasData,
-                    },
-                  ].map(({ label, key, value, color, warn, fromLog }) => (
-                    <div
-                      key={key}
-                      className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex flex-col gap-1.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
-                          {key}
-                        </span>
-                        <span
-                          className="text-base font-bold font-mono"
-                          style={{ color: value > 0 ? color : "#94a3b8" }}
-                        >
-                          {value > 0 ? `${value}%` : "—"}
-                        </span>
-                      </div>
-                      <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${value}%`,
-                            backgroundColor: value > 0 ? color : "#e2e8f0",
-                          }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-[9px] text-slate-400">{label}</p>
-                        {fromLog && (
-                          <span className="text-[8px] font-bold text-violet-500 bg-violet-50 border border-violet-200 px-1 rounded">
-                            log
-                          </span>
-                        )}
-                        {warn && (
-                          <span className="text-[8px] font-bold text-amber-500 bg-amber-50 border border-amber-200 px-1 rounded">
-                            no data
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ));
-                })()}
-              </div>
-              <div className="px-3 pb-3 flex flex-col gap-1.5">
-                {[
-                  {
-                    label: "Runtime",
-                    value: `${activeOEEData.runTimeMins || 0} min`,
-                    color: "text-emerald-600",
-                  },
-                  {
-                    label: "Downtime",
-                    value: `${activeOEEData.downMins || 0} min`,
-                    color: "text-rose-500",
-                  },
-                  {
-                    label: "Avg Sheet CT",
-                    value:
-                      activeAvgCycleSecs > 0 ? `${activeAvgCycleSecs}s` : "—",
-                    color: "text-violet-600",
-                  },
-                ].map(({ label, value, color }) => (
-                  <div
-                    key={label}
-                    className="flex justify-between items-center text-[11px] py-1 border-t border-slate-100"
-                  >
-                    <span className="text-slate-500">{label}</span>
-                    <span className={`font-bold font-mono ${color}`}>
-                      {value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* ── TIMELINE ── */}
-          {/* FIX #7 — pass `changeovers` prop so markers match KPI card count */}
-          {/* FIX #8 — shift start/end passed for correct axis boundaries */}
-          {timelineRecords.length > 0 &&
-            (() => {
-              // Compute absolute datetime window for the timeline axis:
-              //   All Shifts:  rangeStart → rangeEnd  (from date-range picker)
-              //   Shift 1:     selectedDate 08:00 IST → selectedDate 20:00 IST
-              //   Shift 2:     selectedDate 20:00 IST → (selectedDate+1) 08:00 IST
-              // IST = UTC+5:30 → subtract 5h30m to get UTC, then Date.UTC
-              const istOffsetMs = 5.5 * 3600_000;
-              let tlWindowStart, tlWindowEnd;
-              if (!selectedShift) {
-                // All Shifts: use the loaded range directly
-                tlWindowStart = new Date(rangeStart).getTime();
-                tlWindowEnd = new Date(rangeEnd).getTime();
-              } else {
-                // Parse "HH:MM" shift times against selectedDate in IST
-                const [sH, sM] = selectedShift.startTime.split(":").map(Number);
-                const [eH, eM] = selectedShift.endTime.split(":").map(Number);
-                const [yr, mo, dy] = selectedDate.split("-").map(Number);
-                // Start: selectedDate HH:MM IST → UTC ms
-                tlWindowStart = Date.UTC(yr, mo - 1, dy, sH, sM) - istOffsetMs;
-                // End: same date if day shift, next date if overnight
-                const isON = eH * 60 + eM <= sH * 60 + sM;
-                const endDy = isON ? dy + 1 : dy;
-                tlWindowEnd = Date.UTC(yr, mo - 1, endDy, eH, eM) - istOffsetMs;
-              }
-              // Earliest configured shift start = the production-day boundary.
-              // Any record time-of-day before this belongs to the next
-              // calendar date relative to its (production-day) eventDate.
-              const dayStartMins = shifts.length > 0
-                ? Math.min(...shifts.map((s) => {
-                    const [h, m] = s.startTime.split(":").map(Number);
-                    return h * 60 + m;
-                  }))
-                : 480;
-              return (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-                  <TimeMap
-                    records={timelineRecords}
-                    changeovers={changeovers}
-                    isToday={isToday}
-                    shiftName={selectedShift?.shiftName}
-                    shiftColor={selectedShift?.color}
-                    dayStartMins={dayStartMins}
-                    windowStartMs={tlWindowStart}
-                    windowEndMs={tlWindowEnd}
-                  />
-                </div>
-              );
-            })()}
-
-          {/* ── Model-wise Production Chart ── */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <BarChart2 className="w-4 h-4 text-blue-500" />
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                Model-wise Production (Components)
-              </span>
-            </div>
-            <div className="h-56">
-              {modelLabels.length > 0 ? (
-                <Bar data={modelChartData} options={modelChartOptions} />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-300">
-                  <BarChart2 className="w-8 h-8 opacity-40" strokeWidth={1.2} />
-                  <p className="text-xs text-slate-400">
-                    No production data yet
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ── Logged Entries ── */}
-          {(mergedDTEntries.length > 0 || mergedQEntries.length > 0) && (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-              {/* Downtime / Changeover Logs */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100">
-                  <TimerOff className="w-3.5 h-3.5 text-rose-500" />
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                    Downtime Log
-                  </span>
-                  <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
-                    {mergedDTEntries.length}
-                  </span>
-                </div>
-                {mergedDTEntries.length === 0 ? (
-                  <p className="px-4 py-6 text-xs text-slate-300 text-center">
-                    No downtime entries logged yet.
-                  </p>
-                ) : (
-                  <div className="overflow-auto max-h-52">
-                    <table className="min-w-full text-[11px] border-separate border-spacing-0">
+                {modelBreakdownLabels.length > 0 ? (
+                  <div className="overflow-auto flex-1">
+                    <table className="min-w-full text-sm border-separate border-spacing-0">
                       <thead className="sticky top-0 bg-slate-50">
                         <tr>
-                          {[
-                            "Shift",
-                            "Start",
-                            "Duration",
-                            "Reason",
-                            "Remarks",
-                          ].map((h) => (
-                            <th
-                              key={h}
-                              className="px-3 py-2 text-left text-[10px] font-semibold text-slate-400 border-b border-slate-200 whitespace-nowrap"
-                            >
-                              {h}
-                            </th>
+                          {["Model", "Target", "Produced", "Rej", "Acc"].map((h) => (
+                            <th key={h} className="px-2 py-2 text-xs font-bold text-slate-500 border-b border-slate-200 text-left whitespace-nowrap">{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {mergedDTEntries.map((e, i) => {
+                        {modelBreakdownLabels.map((m, i) => {
+                          const produced = activeModelMap[m] || 0;
+                          const target = plannedModelMap[m] || 0;
+                          const masterMatch = materials.some((mat) => mat.partName === m);
+                          const qLog = qualityByModel[m] || { inspected: 0, rejected: 0 };
+                          const accepted = Math.max(0, produced - qLog.rejected);
+                          return (
+                            <tr key={m} className="hover:bg-blue-50/30 transition-colors">
+                              <td className="px-2 py-2 border-b border-slate-100">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                                  <div className="min-w-0">
+                                    <p className={`text-sm font-bold leading-snug truncate max-w-[130px] ${masterMatch ? "text-slate-700" : "text-slate-500"}`}>{m}</p>
+                                    {!masterMatch && <p className="text-[9px] font-bold text-rose-500">⚠ no master</p>}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-2 py-2 border-b border-slate-100 font-bold font-mono text-slate-500 text-sm">{target > 0 ? target : <span className="text-slate-300">—</span>}</td>
+                              <td className="px-2 py-2 border-b border-slate-100 font-black font-mono text-blue-600 text-sm">{produced}</td>
+                              <td className="px-2 py-2 border-b border-slate-100 font-black font-mono text-sm" style={{ color: qLog.rejected > 0 ? "#ef4444" : "#22c55e" }}>{qLog.rejected}</td>
+                              <td className="px-2 py-2 border-b border-slate-100 font-black font-mono text-emerald-600 text-sm">{accepted}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-slate-300 py-8 flex-1 justify-center">
+                    <PackageOpen className="w-8 h-8 opacity-40" strokeWidth={1.2} />
+                    <p className="text-xs text-slate-400">No data yet</p>
+                  </div>
+                )}
+              </div>
+              {/* Downtime Log */}
+              {mergedDTEntries.length > 0 && (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden shrink-0 flex flex-col" style={{ maxHeight: "28%" }}>
+                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 shrink-0">
+                    <TimerOff className="w-3 h-3 text-rose-500" />
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Downtime Log</span>
+                    <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">{mergedDTEntries.length}</span>
+                  </div>
+                  <div className="overflow-auto flex-1">
+                    <table className="min-w-full text-xs border-separate border-spacing-0">
+                      <thead className="sticky top-0 bg-slate-50">
+                        <tr>
+                          {["Start", "Dur", "Reason", "Remarks"].map((h) => (
+                            <th key={h} className="px-2 py-1 text-[10px] font-bold text-slate-400 border-b border-slate-200 text-left whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mergedDTEntries.slice(0, 5).map((e, i) => {
                           const reason = e.reasonName || e.ReasonName;
                           const isCO = e.isChangeover || e.IsChangeover;
                           return (
                             <tr key={i} className="hover:bg-slate-50">
-                              <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
-                                {e.shift || e.ShiftName || "—"}
+                              <td className="px-2 py-1 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">{String(e.startTime || e.StartTime || "").substring(0, 8) || "—"}</td>
+                              <td className="px-2 py-1 border-b border-slate-100 font-mono font-bold text-rose-500 whitespace-nowrap">{e.duration || e.Duration || "—"}</td>
+                              <td className="px-2 py-1 border-b border-slate-100">
+                                {isCO ? <span className="text-[10px] font-bold px-1 py-0.5 rounded bg-purple-50 text-purple-600">CO</span>
+                                  : reason ? <span className="text-emerald-700 font-semibold">{reason}</span>
+                                  : <span className="text-amber-500 text-[10px] font-bold">Unassigned</span>}
                               </td>
-                              <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">
-                                {String(
-                                  e.startTime || e.StartTime || "",
-                                ).substring(0, 8) || "—"}
-                              </td>
-                              <td className="px-3 py-2 border-b border-slate-100 font-mono font-bold text-rose-500 whitespace-nowrap">
-                                {e.duration || e.Duration || "—"}
-                              </td>
-                              <td className="px-3 py-2 border-b border-slate-100">
-                                {isCO ? (
-                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600 border border-purple-200">
-                                    Changeover
-                                  </span>
-                                ) : reason ? (
-                                  <span className="text-emerald-700 font-semibold">
-                                    {reason}
-                                  </span>
-                                ) : (
-                                  <span className="text-amber-500 text-[10px] font-bold">
-                                    Unassigned
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 border-b border-slate-100 text-slate-400 max-w-[120px] truncate">
-                                {e.remarks || e.Remarks || "—"}
-                              </td>
+                              <td className="px-2 py-1 border-b border-slate-100 text-slate-400 max-w-[80px] truncate">{e.remarks || e.Remarks || "—"}</td>
                             </tr>
                           );
                         })}
                       </tbody>
                     </table>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+            </div>
 
-              {/* Quality Logs */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100">
-                  <ShieldCheck className="w-3.5 h-3.5 text-violet-500" />
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                    Quality Log
-                  </span>
-                  <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-200">
-                    {mergedQEntries.length}
+            {/* ── COL 2: OEE Chart + Timeline ── */}
+            <div className="flex flex-col gap-2 min-h-0">
+              {/* OEE Trend */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 shrink-0">
+                  <span className="text-xs font-bold text-blue-600 uppercase tracking-widest">OEE Trend</span>
+                  {records.length > 0 && (
+                    <span className={`text-xs font-bold ${activeOEE >= 85 ? "text-emerald-600" : activeOEE >= 65 ? "text-amber-600" : "text-rose-500"}`}>
+                      {selectedShift ? selectedShift.shiftName : "All Shifts"} · {activeOEE}% · A:{activeA}% P:{activeP}% Q:{activeQ}%
+                    </span>
+                  )}
+                </div>
+                <div className="p-3 flex-1 min-h-0">
+                  {oeeTimeSeries.labels.length > 1 ? (
+                    <Line data={oeeLineData} options={oeeLineOptions} />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-300">
+                      <Gauge className="w-8 h-8 opacity-40" strokeWidth={1.2} />
+                      <p className="text-xs text-slate-400">Load data to see OEE trend</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* Timeline */}
+              {timelineRecords.length > 0 && (() => {
+                const istOffsetMs = 5.5 * 3600_000;
+                let tlWindowStart, tlWindowEnd;
+                if (!selectedShift) {
+                  tlWindowStart = new Date(rangeStart).getTime();
+                  tlWindowEnd = new Date(rangeEnd).getTime();
+                } else {
+                  const [sH, sM] = selectedShift.startTime.split(":").map(Number);
+                  const [eH, eM] = selectedShift.endTime.split(":").map(Number);
+                  const [yr, mo, dy] = selectedDate.split("-").map(Number);
+                  tlWindowStart = Date.UTC(yr, mo - 1, dy, sH, sM) - istOffsetMs;
+                  const isON = eH * 60 + eM <= sH * 60 + sM;
+                  const endDy = isON ? dy + 1 : dy;
+                  tlWindowEnd = Date.UTC(yr, mo - 1, endDy, eH, eM) - istOffsetMs;
+                }
+                const dayStartMins = shifts.length > 0
+                  ? Math.min(...shifts.map((s) => { const [h, m] = s.startTime.split(":").map(Number); return h * 60 + m; }))
+                  : 480;
+                return (
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 shrink-0">
+                    <TimeMap records={timelineRecords} changeovers={changeovers} isToday={isToday} shiftName={selectedShift?.shiftName} shiftColor={selectedShift?.color} dayStartMins={dayStartMins} windowStartMs={tlWindowStart} windowEndMs={tlWindowEnd} />
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* ── COL 3: OEE A·P·Q + Production Summary + Dept Loss ── */}
+            <div className="flex flex-col gap-2 min-h-0">
+              {/* OEE A·P·Q */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden shrink-0">
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100">
+                  <Gauge className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">OEE Breakdown</span>
+                  <span className="ml-auto text-sm font-black font-mono" style={{ color: activeOEE > 0 ? oeeColor(activeOEE) : "#94a3b8" }}>
+                    {activeOEE > 0 ? `${activeOEE}%` : "N/A"}
                   </span>
                 </div>
-                {mergedQEntries.length === 0 ? (
-                  <p className="px-4 py-6 text-xs text-slate-300 text-center">
-                    No quality entries logged yet.
-                  </p>
-                ) : (
-                  <div className="overflow-auto max-h-52">
-                    <table className="min-w-full text-[11px] border-separate border-spacing-0">
-                      <thead className="sticky top-0 bg-slate-50">
-                        <tr>
-                          {[
-                            "Shift",
-                            "Model",
-                            "Inspected",
-                            "Rejected",
-                            "Defect",
-                            "Disposition",
-                          ].map((h) => (
-                            <th
-                              key={h}
-                              className="px-3 py-2 text-left text-[10px] font-semibold text-slate-400 border-b border-slate-200 whitespace-nowrap"
-                            >
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {mergedQEntries.map((e, i) => {
-                          const rej = parseInt(
-                            e.rejectedQty ?? e.RejectedQty ?? 0,
-                            10,
-                          );
-                          return (
-                            <tr key={i} className="hover:bg-slate-50">
-                              <td className="px-3 py-2 border-b border-slate-100 whitespace-nowrap">
-                                {e.shift || e.ShiftName || "—"}
-                              </td>
-                              <td className="px-3 py-2 border-b border-slate-100 max-w-[140px] truncate font-medium text-slate-700">
-                                {e.partName ||
-                                  e.PartName ||
-                                  e.model ||
-                                  e.Model ||
-                                  "—"}
-                              </td>
-                              <td className="px-3 py-2 border-b border-slate-100 font-mono font-bold text-blue-600 text-center">
-                                {e.inspectedQty ?? e.InspectedQty ?? "—"}
-                              </td>
-                              <td
-                                className="px-3 py-2 border-b border-slate-100 font-mono font-bold text-center"
-                                style={{
-                                  color: rej > 0 ? "#ef4444" : "#22c55e",
-                                }}
-                              >
-                                {rej}
-                              </td>
-                              <td className="px-3 py-2 border-b border-slate-100">
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                                  {e.defectCode || e.DefectCode || "—"}
-                                </span>
-                                <span className="ml-1 text-slate-500">
-                                  {e.defectName || e.DefectName || ""}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 border-b border-slate-100 text-slate-500">
-                                {e.disposition || e.Disposition || "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                <div className="p-2 grid grid-cols-3 gap-2">
+                  {(() => {
+                    const qVal = qualityTotals.hasData ? qualityTotals.passRate : activeQ;
+                    const qWarn = qualityTotals.hasData ? false : activeQUnverified;
+                    return [
+                      { label: "Availability", key: "A", value: activeA, color: "#22c55e", warn: false },
+                      { label: "Performance", key: "P", value: activeP, color: "#f59e0b", warn: activePUnverified },
+                      { label: "Quality", key: "Q", value: qVal, color: "#a78bfa", warn: qWarn, fromLog: qualityTotals.hasData },
+                    ].map(({ label, key, value, color, warn, fromLog }) => (
+                      <div key={key} className="bg-slate-50 rounded-lg p-2 border border-slate-100 flex flex-col gap-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">{key}</span>
+                          <span className="text-lg font-black font-mono" style={{ color: value > 0 ? color : "#94a3b8" }}>{value > 0 ? `${value}%` : "—"}</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${value}%`, backgroundColor: value > 0 ? color : "#e2e8f0" }} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[9px] text-slate-400">{label}</p>
+                          {fromLog && <span className="text-[8px] font-bold text-violet-500 bg-violet-50 border border-violet-200 px-1 rounded">log</span>}
+                          {warn && <span className="text-[8px] font-bold text-amber-500 bg-amber-50 border border-amber-200 px-1 rounded">?</span>}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+
+              {/* Production Summary + Setting Parameters */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 shrink-0">
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">Production Summary</p>
+                <div className="flex flex-col divide-y divide-slate-100">
+                  {[
+                    { label: "Models", value: modelLabels.length || (shiftRecords.length > 0 ? 1 : "—"), color: "text-slate-700" },
+                    { label: "Components", value: displayComponentQty.toLocaleString(), color: "text-blue-600" },
+                    { label: "Inspected", value: qualityTotals.hasData ? qualityTotals.inspected : "—", color: "text-violet-600" },
+                    { label: "Accepted", value: qualityTotals.hasData ? qualityTotals.accepted : displayGood, color: "text-emerald-600" },
+                    { label: "Rejected", value: qualityTotals.hasData ? qualityTotals.rejected : displayBad, color: "text-rose-500" },
+                    { label: "Runtime / Downtime", value: (activeOEEData.runTimeMins > 0 || activeOEEData.downMins > 0) ? `${activeOEEData.runTimeMins}/${activeOEEData.downMins}m` : "—", color: "text-amber-600" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="flex items-center justify-between py-1.5">
+                      <span className="text-xs font-semibold text-slate-500">{label}</span>
+                      <span className={`text-sm font-black font-mono ${color}`}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Department Loss + Quality Log – share remaining space */}
+              <div className="flex flex-col gap-2 flex-1 min-h-0">
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+                  <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 shrink-0">
+                    <Activity className="w-3.5 h-3.5 text-violet-500" />
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Dept Loss</span>
+                    {loading && <Loader2 className="w-3 h-3 animate-spin text-blue-400 ml-auto" />}
+                  </div>
+                  {deptLoss.length === 0 ? (
+                    <div className="p-3 flex flex-col items-center justify-center gap-1 text-center flex-1">
+                      <span className="text-xl">🏭</span>
+                      <p className="text-xs text-slate-400 font-medium">No department data</p>
+                    </div>
+                  ) : (
+                    <div className="p-3 flex flex-col gap-2 overflow-auto flex-1">
+                      {deptLoss.map(([dept, secs], i) => {
+                        const mins = Math.round((secs / 60) * 10) / 10;
+                        const pct = deptTotalSecs > 0 ? Math.round((secs / deptTotalSecs) * 100) : 0;
+                        const col = DEPT_COLORS[i % DEPT_COLORS.length];
+                        return (
+                          <div key={dept}>
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: col }} />
+                                <span className="text-sm font-bold text-slate-700 truncate max-w-[110px]">{dept}</span>
+                              </div>
+                              <span className="text-sm font-black font-mono" style={{ color: col }}>{mins}m <span className="text-xs font-semibold text-slate-400">({pct}%)</span></span>
+                            </div>
+                            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: col }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div className="flex justify-between items-center pt-1 mt-1 border-t border-slate-100">
+                        <span className="text-xs font-bold text-slate-500">Total</span>
+                        <span className="text-sm font-black font-mono text-slate-700">{Math.round((deptTotalSecs / 60) * 10) / 10}m</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {/* Quality Log */}
+                {mergedQEntries.length > 0 && (
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden shrink-0 flex flex-col" style={{ maxHeight: "28%" }}>
+                    <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 shrink-0">
+                      <ShieldCheck className="w-3 h-3 text-violet-500" />
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Quality Log</span>
+                      <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-200">{mergedQEntries.length}</span>
+                    </div>
+                    <div className="overflow-auto flex-1">
+                      <table className="min-w-full text-xs border-separate border-spacing-0">
+                        <thead className="sticky top-0 bg-slate-50">
+                          <tr>
+                            {["Model", "Insp", "Rej", "Defect", "Disp"].map((h) => (
+                              <th key={h} className="px-2 py-1 text-[10px] font-bold text-slate-400 border-b border-slate-200 text-left whitespace-nowrap">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {mergedQEntries.map((e, i) => {
+                            const rej = parseInt(e.rejectedQty ?? e.RejectedQty ?? 0, 10);
+                            return (
+                              <tr key={i} className="hover:bg-slate-50">
+                                <td className="px-2 py-1 border-b border-slate-100 max-w-[100px] truncate font-semibold text-slate-700">{e.partName || e.PartName || e.model || e.Model || "—"}</td>
+                                <td className="px-2 py-1 border-b border-slate-100 font-mono font-bold text-blue-600 text-center">{e.inspectedQty ?? e.InspectedQty ?? "—"}</td>
+                                <td className="px-2 py-1 border-b border-slate-100 font-mono font-bold text-center" style={{ color: rej > 0 ? "#ef4444" : "#22c55e" }}>{rej}</td>
+                                <td className="px-2 py-1 border-b border-slate-100">
+                                  <span className="text-[10px] font-bold px-1 py-0.5 rounded bg-slate-100 text-slate-600">{e.defectCode || e.DefectCode || "—"}</span>
+                                </td>
+                                <td className="px-2 py-1 border-b border-slate-100 text-slate-500">{e.disposition || e.Disposition || "—"}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
-          )}
-
-          {/* ── Current Part Info ── */}
-          {curMat && (
-            <div className="bg-white rounded-xl border border-blue-200 shadow-sm p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <FileImage className="w-4 h-4 text-blue-500" />
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                  Current Part Details — from Material Config
-                </span>
-                <span className="ml-auto text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                  SAP: {curMat.sapCode}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
-                {[
-                  {
-                    label: "Part Name",
-                    value: curMat.partName,
-                    bold: true,
-                    color: "text-blue-700",
-                  },
-                  {
-                    label: "Category",
-                    value: curMat.category,
-                    bold: false,
-                    color: "text-slate-600",
-                  },
-                  {
-                    label: "Defined Comp CT",
-                    value: `${curMat.definedComponentCycleTime} s`,
-                    bold: true,
-                    color: "text-violet-600",
-                  },
-                  {
-                    label: "No of Sheet",
-                    value: curMat.noOfSheet,
-                    bold: true,
-                    color: "text-emerald-600",
-                  },
-                  {
-                    label: "Comp / Sheet",
-                    value: curMat.actualComponentsPerSheet,
-                    bold: true,
-                    color: "text-emerald-600",
-                  },
-                  {
-                    label: "Load/Unload",
-                    value: `${curMat.pncLoadingUnloading} s`,
-                    bold: false,
-                    color: "text-amber-700",
-                  },
-                  {
-                    label: "Drawing No.",
-                    value: curMat.drawingNumber,
-                    bold: false,
-                    color: "text-amber-700",
-                  },
-                  {
-                    label: "Rev.",
-                    value: curMat.drawingRevision,
-                    bold: false,
-                    color: "text-amber-600",
-                  },
-                ].map(({ label, value, bold, color }) => (
-                  <div
-                    key={label}
-                    className="bg-slate-50 rounded-lg p-2.5 border border-slate-100"
-                  >
-                    <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5">
-                      {label}
-                    </p>
-                    <p
-                      className={`text-xs ${bold ? "font-bold" : "font-medium"} ${color}`}
-                    >
-                      {value || "—"}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -3934,9 +3229,10 @@ const PartProcessDashboard = () => {
               downtimeEntries={mergedDTEntries}
               changeovers={changeovers}
               onSave={async (entry) => {
-                dispatch(logDowntimeEntry(entry));
+                const fullEntry = { ...entry, eventDate: selectedDate };
+                dispatch(logDowntimeEntry(fullEntry));
                 try {
-                  await axios.post(`${PART_PROCESS_API}/downtime-log`, entry, {
+                  await axios.post(`${PART_PROCESS_API}/downtime-log`, fullEntry, {
                     withCredentials: true,
                   });
                   toast.success("Downtime logged.");
@@ -4096,6 +3392,7 @@ const PartProcessDashboard = () => {
           </div>
         </div>
       )}
+
     </>
   );
 };

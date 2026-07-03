@@ -87,7 +87,7 @@ const FieldLabel = ({ children }) => (
 
 // ── Input styles ───────────────────────────────────────────────────────────────
 const inputCls =
-  "w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300";
+  "w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all";
 
 // ── File Card ──────────────────────────────────────────────────────────────────
 const FileCard = ({ file, onEdit, onDownload, onDelete }) => (
@@ -707,7 +707,7 @@ const UploadBISReport = () => {
                     onChange={(e) =>
                       setSearchParams((p) => ({ ...p, term: e.target.value }))
                     }
-                    className="w-full h-9 pl-8 pr-3 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="w-full h-9 pl-8 pr-3 text-xs text-slate-700 border border-slate-200 rounded-lg outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
                   />
                 </div>
                 <select
@@ -715,7 +715,7 @@ const UploadBISReport = () => {
                   onChange={(e) =>
                     setSearchParams((p) => ({ ...p, field: e.target.value }))
                   }
-                  className="h-9 px-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                  className="h-9 px-2 text-xs text-slate-700 border border-slate-200 rounded-lg outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white transition-all"
                 >
                   <option value="all">All Fields</option>
                   <option value="modelName">Model Name</option>

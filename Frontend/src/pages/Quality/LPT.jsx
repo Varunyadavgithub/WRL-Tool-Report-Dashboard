@@ -28,7 +28,15 @@ import {
   FileText,
   AlertTriangle,
   MessageSquare,
+  Shield,
 } from "lucide-react";
+
+// ─── BIS Classifier ────────────────────────────────────────────────────────────
+const deriveBIS = (modelName) => {
+  if (!modelName) return "Non BIS";
+  const first = modelName.trim().charAt(0).toUpperCase();
+  return first === "F" || first === "D" ? "BIS" : "Non BIS";
+};
 
 // ─── Spinner ───────────────────────────────────────────────────────────────────
 const Spinner = ({ cls = "w-4 h-4" }) => (
@@ -742,8 +750,8 @@ const LPT = () => {
               </div>
             </div>
 
-            {/* ── Right: Model Count Table ── */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-w-[380px]">
+            {/* ── Right: Model Summary (grouped by BIS) ── */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-w-[420px]">
               <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 shrink-0">
                 <BarChart3 className="w-3.5 h-3.5 text-blue-500" />
                 <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
@@ -754,64 +762,141 @@ const LPT = () => {
                 </span>
               </div>
               <div className="overflow-auto max-h-[50vh]">
-                <table className="min-w-full text-xs text-left border-separate border-spacing-0">
-                  <thead className="sticky top-0 z-10">
-                    <tr className="bg-slate-100">
-                      {[
-                        "Model Name",
-                        "Production",
-                        "LPT",
-                        "Tested",
-                        "Pending",
-                        "LPT %",
-                      ].map((h) => (
-                        <th
-                          key={h}
-                          className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-center whitespace-nowrap"
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lptDefectCount.length > 0 ? (
-                      lptDefectCount.map((item, index) => (
-                        <tr
-                          key={index}
-                          className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40 text-center"
-                        >
-                          <td className="px-3 py-2 border-b border-slate-100 font-semibold text-slate-800 text-left">
-                            {item.ModelName}
-                          </td>
-                          <td className="px-3 py-2 border-b border-slate-100 font-bold text-blue-600">
-                            {item.ModelCount}
-                          </td>
-                          <td className="px-3 py-2 border-b border-slate-100 text-slate-600">
-                            {item.LPT}
-                          </td>
-                          <td className="px-3 py-2 border-b border-slate-100 font-bold text-emerald-600">
-                            {item.SampleInspected}
-                          </td>
-                          <td className="px-3 py-2 border-b border-slate-100">
-                            <span
-                              className={`font-bold ${item.PendingSample < 0 ? "text-emerald-600" : item.PendingSample > 0 ? "text-rose-600" : "text-slate-400"}`}
-                            >
-                              {item.PendingSample < 0
-                                ? `(${Math.abs(item.PendingSample)})`
-                                : item.PendingSample}
+                {lptDefectCount.length === 0 ? (
+                  <table className="min-w-full"><tbody><EmptyRow colSpan={6} /></tbody></table>
+                ) : (() => {
+                  const bisRows = lptDefectCount.filter((r) => deriveBIS(r.ModelName) === "BIS");
+                  const nonBisRows = lptDefectCount.filter((r) => deriveBIS(r.ModelName) === "Non BIS");
+
+                  const subTotal = (rows) => ({
+                    prod: rows.reduce((s, r) => s + (r.ModelCount || 0), 0),
+                    lpt: rows.reduce((s, r) => s + (r.LPT || 0), 0),
+                    tested: rows.reduce((s, r) => s + (r.SampleInspected || 0), 0),
+                  });
+
+                  const renderDataRows = (rows) =>
+                    rows.map((item, i) => (
+                      <tr key={i} className="hover:bg-blue-50/60 transition-colors text-center">
+                        <td className="px-3 py-2 border-b border-slate-100 font-semibold text-slate-800 text-left pl-6 whitespace-nowrap">
+                          {item.ModelName}
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100 font-bold text-blue-600">
+                          {item.ModelCount}
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100 text-indigo-600 font-semibold">
+                          {item.LPT}
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100 font-bold text-emerald-600">
+                          {item.SampleInspected}
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100 font-bold">
+                          <span className={item.PendingSample < 0 ? "text-emerald-600" : item.PendingSample > 0 ? "text-rose-600" : "text-slate-400"}>
+                            {item.PendingSample < 0 ? `(${Math.abs(item.PendingSample)})` : item.PendingSample}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                            item.PendingSample <= 0
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : item.LPT_Percentage >= 50
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : "bg-rose-50 text-rose-800 border-rose-200"
+                          }`}>
+                            {item.LPT_Percentage}%
+                          </span>
+                        </td>
+                      </tr>
+                    ));
+
+                  const renderSubTotal = (label, rows, isBisGroup) => {
+                    const { prod, lpt, tested } = subTotal(rows);
+                    const pending = lpt - tested;
+                    return (
+                      <tr className={isBisGroup ? "bg-slate-50 font-bold text-center" : "bg-slate-100 font-bold text-center"}>
+                        <td className="px-3 py-2 text-left text-[11px] uppercase tracking-wide text-slate-500 border-t border-slate-200">{label}</td>
+                        <td className="px-3 py-2 text-slate-600 border-t border-slate-200">{prod}</td>
+                        <td className="px-3 py-2 text-indigo-600 border-t border-slate-200">{lpt}</td>
+                        <td className="px-3 py-2 text-emerald-600 border-t border-slate-200">{tested}</td>
+                        <td className="px-3 py-2 border-t border-slate-200">
+                          <span className={pending < 0 ? "text-emerald-600" : "text-rose-600"}>
+                            {pending < 0 ? `(${Math.abs(pending)})` : pending}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-slate-600 border-t border-slate-200">
+                          {lpt > 0 ? `${((tested / lpt) * 100).toFixed(2)}%` : "—"}
+                        </td>
+                      </tr>
+                    );
+                  };
+
+                  const grand = subTotal(lptDefectCount);
+                  const grandPending = grand.lpt - grand.tested;
+
+                  return (
+                    <table className="min-w-full text-xs text-left border-separate border-spacing-0">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="bg-slate-100">
+                          {["Model Name", "Production", "LPT", "Tested", "Pending", "LPT %"].map((h) => (
+                            <th key={h} className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 text-center whitespace-nowrap first:text-left">
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bisRows.length > 0 && (
+                          <>
+                            <tr className="bg-blue-600">
+                              <td colSpan={6} className="px-4 py-2.5">
+                                <span className="inline-flex items-center gap-2 text-xs font-bold text-white uppercase tracking-widest">
+                                  <Shield className="w-3.5 h-3.5" /> BIS
+                                  <span className="ml-1 font-normal text-blue-200">({bisRows.length} models)</span>
+                                </span>
+                              </td>
+                            </tr>
+                            {renderDataRows(bisRows)}
+                            {renderSubTotal("BIS Sub-total", bisRows, true)}
+                          </>
+                        )}
+                        {bisRows.length > 0 && nonBisRows.length > 0 && (
+                          <tr>
+                            <td colSpan={6} className="py-2 bg-slate-100 border-y border-slate-200" />
+                          </tr>
+                        )}
+                        {nonBisRows.length > 0 && (
+                          <>
+                            <tr className="bg-slate-500">
+                              <td colSpan={6} className="px-4 py-2.5">
+                                <span className="inline-flex items-center gap-2 text-xs font-bold text-white uppercase tracking-widest">
+                                  <Shield className="w-3.5 h-3.5" /> Non BIS
+                                  <span className="ml-1 font-normal text-slate-300">({nonBisRows.length} models)</span>
+                                </span>
+                              </td>
+                            </tr>
+                            {renderDataRows(nonBisRows)}
+                            {renderSubTotal("Non BIS Sub-total", nonBisRows, false)}
+                          </>
+                        )}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-slate-200 font-bold text-center">
+                          <td className="px-3 py-2 text-left text-[11px] uppercase tracking-wide text-slate-700 border-t-2 border-slate-300">Grand Total</td>
+                          <td className="px-3 py-2 text-slate-700 border-t-2 border-slate-300">{grand.prod}</td>
+                          <td className="px-3 py-2 text-indigo-700 border-t-2 border-slate-300">{grand.lpt}</td>
+                          <td className="px-3 py-2 text-emerald-700 border-t-2 border-slate-300">{grand.tested}</td>
+                          <td className="px-3 py-2 border-t-2 border-slate-300">
+                            <span className={grandPending < 0 ? "text-emerald-600" : "text-rose-600"}>
+                              {grandPending < 0 ? `(${Math.abs(grandPending)})` : grandPending}
                             </span>
                           </td>
-                          <td className="px-3 py-2 border-b border-slate-100 font-bold text-violet-600">
-                            {item.LPT_Percentage}%
+                          <td className="px-3 py-2 text-slate-700 border-t-2 border-slate-300">
+                            {grand.lpt > 0 ? `${((grand.tested / grand.lpt) * 100).toFixed(2)}%` : "—"}
                           </td>
                         </tr>
-                      ))
-                    ) : (
-                      <EmptyRow colSpan={6} />
-                    )}
-                  </tbody>
-                </table>
+                      </tfoot>
+                    </table>
+                  );
+                })()}
               </div>
             </div>
           </div>

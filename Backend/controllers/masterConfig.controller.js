@@ -3,7 +3,10 @@
  * CRUD for Material Config, Shift Config, Downtime Reasons, Departments
  * and Quality Defects (pool3 / DB3).
  */
+import fs from "fs";
+import path from "path";
 import sql from "mssql";
+import { UPLOADS_DIR } from "../utils/storage/config.js";
 import { sendTestMail } from "../emailTemplates/PartProcess_System/testMail.template.js";
 import { sendShiftEndReportMail } from "../emailTemplates/PartProcess_System/shiftEndReport.template.js";
 import { buildShiftReport } from "../services/shiftReport.service.js";
@@ -20,7 +23,8 @@ const MATERIAL_SELECT = `
     ComponentWeight AS componentWeight, ScrapWeight AS scrapWeight,
     NoOfSheet AS noOfSheet, ActualComponentsPerSheet AS actualComponentsPerSheet,
     PncLoadingUnloading AS pncLoadingUnloading, DefinedComponentCycleTime AS definedComponentCycleTime,
-    DrawingNumber AS drawingNumber, DrawingRevision AS drawingRevision, Status AS status
+    DrawingNumber AS drawingNumber, DrawingRevision AS drawingRevision,
+    DrawingPath AS drawingPath, Status AS status
   FROM MaterialConfigs`;
 
 // ── Materials ────────────────────────────────────────────────────────────────
@@ -140,6 +144,67 @@ export const deleteMaterial = async (req, res) => {
   try {
     const { id } = req.params;
     await global.pool3.request().input("id", sql.Int, id).query(`DELETE FROM MaterialConfigs WHERE Id = @id`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const uploadMaterialDrawing = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.file) return res.status(400).json({ success: false, message: "PDF file is required" });
+
+    // Delete the old file if one exists
+    const existing = await global.pool3.request()
+      .input("id", sql.Int, id)
+      .query(`SELECT DrawingPath FROM MaterialConfigs WHERE Id = @id`);
+    if (existing.recordset.length) {
+      const oldPath = existing.recordset[0].DrawingPath;
+      if (oldPath) {
+        const fullOld = path.join(UPLOADS_DIR, oldPath.replace(/^\/uploads\//, ""));
+        if (fs.existsSync(fullOld)) fs.unlinkSync(fullOld);
+      }
+    }
+
+    const drawingPath = `/uploads/MaterialDrawings/${req.file.filename}`;
+    const result = await global.pool3.request()
+      .input("id", sql.Int, id)
+      .input("drawingPath", sql.NVarChar(500), drawingPath)
+      .query(`
+        UPDATE MaterialConfigs SET DrawingPath = @drawingPath, UpdatedAt = GETDATE()
+        OUTPUT INSERTED.Id AS id, INSERTED.SapCode AS sapCode, INSERTED.PartName AS partName,
+          INSERTED.DrawingNumber AS drawingNumber, INSERTED.DrawingRevision AS drawingRevision,
+          INSERTED.DrawingPath AS drawingPath
+        WHERE Id = @id
+      `);
+
+    if (!result.recordset.length) return res.status(404).json({ success: false, message: "Material not found" });
+    res.json({ success: true, data: result.recordset[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const deleteMaterialDrawing = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await global.pool3.request()
+      .input("id", sql.Int, id)
+      .query(`SELECT DrawingPath FROM MaterialConfigs WHERE Id = @id`);
+
+    if (!existing.recordset.length) return res.status(404).json({ success: false, message: "Material not found" });
+
+    const oldPath = existing.recordset[0].DrawingPath;
+    if (oldPath) {
+      const fullPath = path.join(UPLOADS_DIR, oldPath.replace(/^\/uploads\//, ""));
+      if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+    }
+
+    await global.pool3.request()
+      .input("id", sql.Int, id)
+      .query(`UPDATE MaterialConfigs SET DrawingPath = NULL, UpdatedAt = GETDATE() WHERE Id = @id`);
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

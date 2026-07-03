@@ -36,6 +36,7 @@ import {
   TrendingUp,
   TrendingDown,
   Shield,
+  ListOrdered,
 } from "lucide-react";
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -81,6 +82,12 @@ const normalizeArray = (data) => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
   return [];
+};
+
+const deriveBIS = (modelName) => {
+  if (!modelName) return "Non BIS";
+  const first = modelName.trim().charAt(0).toUpperCase();
+  return first === "F" || first === "D" ? "BIS" : "Non BIS";
 };
 
 // ─── Spinner ───────────────────────────────────────────────────────────────────
@@ -425,6 +432,164 @@ const ShiftAnalysisPanel = ({ data }) => {
   );
 };
 
+// ─── Model Summary Panel ──────────────────────────────────────────────────────
+
+const SummaryRow = ({ label, rows, isBisGroup = false }) => {
+  const prod = rows.reduce((s, r) => s + (r.ModelCount || 0), 0);
+  const lpt = rows.reduce((s, r) => s + (r.LPT || 0), 0);
+  const tested = rows.reduce((s, r) => s + (r.SampleInspected || 0), 0);
+  const pending = lpt - tested;
+  const isOver = pending < 0;
+  return (
+    <tr className={`font-bold text-center ${isBisGroup ? "bg-slate-50" : "bg-slate-100"}`}>
+      <td
+        className={`px-3 py-2 text-left text-[11px] uppercase tracking-wide ${
+          isBisGroup ? "border-t border-slate-200 text-slate-500 pl-4" : "border-t-2 border-slate-300 text-slate-700"
+        }`}
+        colSpan={isBisGroup ? 1 : 1}
+      >
+        {label}
+      </td>
+      <td className={`px-3 py-2 text-slate-600 ${isBisGroup ? "border-t border-slate-200" : "border-t-2 border-slate-300"}`}>{prod}</td>
+      <td className={`px-3 py-2 text-indigo-600 ${isBisGroup ? "border-t border-slate-200" : "border-t-2 border-slate-300"}`}>{lpt}</td>
+      <td className={`px-3 py-2 text-emerald-600 ${isBisGroup ? "border-t border-slate-200" : "border-t-2 border-slate-300"}`}>{tested}</td>
+      <td className={`px-3 py-2 ${isBisGroup ? "border-t border-slate-200" : "border-t-2 border-slate-300"}`}>
+        <span className={isOver ? "text-emerald-600" : "text-rose-600"}>
+          {isOver ? `(${Math.abs(pending)})` : pending}
+        </span>
+      </td>
+      <td className={`px-3 py-2 text-slate-700 ${isBisGroup ? "border-t border-slate-200" : "border-t-2 border-slate-300"}`}>
+        {lpt > 0 ? `${((tested / lpt) * 100).toFixed(2)}%` : "—"}
+      </td>
+    </tr>
+  );
+};
+
+const ModelSummaryPanel = ({ data }) => {
+  if (!data || data.length === 0) return null;
+
+  const bisGroup = data.filter((r) => deriveBIS(r.ModelName) === "BIS");
+  const nonBisGroup = data.filter((r) => deriveBIS(r.ModelName) === "Non BIS");
+
+  const renderRows = (rows) =>
+    rows.map((row, i) => {
+      const pending = row.PendingSample ?? (row.LPT - row.SampleInspected);
+      const pct = row.LPT_Percentage ?? 0;
+      const isOver = pending < 0;
+      const isComplete = pending <= 0;
+      return (
+        <tr key={i} className="hover:bg-indigo-50/50 transition-colors text-center">
+          <td className="px-3 py-2 border-b border-slate-100 font-bold text-slate-800 text-left whitespace-nowrap pl-6">
+            {row.ModelName}
+          </td>
+          <td className="px-3 py-2 border-b border-slate-100 font-semibold text-slate-600">
+            {row.ModelCount}
+          </td>
+          <td className="px-3 py-2 border-b border-slate-100 font-semibold text-indigo-600">
+            {row.LPT}
+          </td>
+          <td className="px-3 py-2 border-b border-slate-100 font-semibold text-emerald-600">
+            {row.SampleInspected}
+          </td>
+          <td className="px-3 py-2 border-b border-slate-100 font-bold">
+            <span className={isOver ? "text-emerald-600" : "text-rose-600"}>
+              {isOver ? `(${Math.abs(pending)})` : pending}
+            </span>
+          </td>
+          <td className="px-3 py-2 border-b border-slate-100">
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                isComplete
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                  : pct >= 50
+                    ? "bg-amber-50 text-amber-800 border-amber-200"
+                    : "bg-rose-50 text-rose-800 border-rose-200"
+              }`}
+            >
+              {pct}%
+            </span>
+          </td>
+        </tr>
+      );
+    });
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <ListOrdered className="w-3.5 h-3.5 text-indigo-500" />
+          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+            Model Summary
+          </span>
+        </div>
+        <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-[11px] font-semibold rounded-full border border-indigo-100">
+          {data.length} models
+        </span>
+      </div>
+
+      <div className="overflow-auto">
+        <table className="min-w-full text-xs text-left border-separate border-spacing-0">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-slate-100">
+              {["Model Name", "Production", "LPT", "Tested", "Pending", "LPT %"].map((h) => (
+                <th
+                  key={h}
+                  className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap text-center first:text-left"
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {/* ── BIS Group ── */}
+            {bisGroup.length > 0 && (
+              <>
+                <tr className="bg-blue-600">
+                  <td colSpan={6} className="px-4 py-2.5">
+                    <span className="inline-flex items-center gap-2 text-xs font-bold text-white uppercase tracking-widest">
+                      <Shield className="w-3.5 h-3.5" /> BIS
+                      <span className="ml-1 font-normal text-blue-200">({bisGroup.length} models)</span>
+                    </span>
+                  </td>
+                </tr>
+                {renderRows(bisGroup)}
+                <SummaryRow label="BIS Sub-total" rows={bisGroup} isBisGroup />
+              </>
+            )}
+
+            {/* ── Gap between groups ── */}
+            {bisGroup.length > 0 && nonBisGroup.length > 0 && (
+              <tr>
+                <td colSpan={6} className="py-2 bg-slate-100 border-y border-slate-200" />
+              </tr>
+            )}
+
+            {/* ── Non BIS Group ── */}
+            {nonBisGroup.length > 0 && (
+              <>
+                <tr className="bg-slate-500">
+                  <td colSpan={6} className="px-4 py-2.5">
+                    <span className="inline-flex items-center gap-2 text-xs font-bold text-white uppercase tracking-widest">
+                      <Shield className="w-3.5 h-3.5" /> Non BIS
+                      <span className="ml-1 font-normal text-slate-300">({nonBisGroup.length} models)</span>
+                    </span>
+                  </td>
+                </tr>
+                {renderRows(nonBisGroup)}
+                <SummaryRow label="Non BIS Sub-total" rows={nonBisGroup} isBisGroup />
+              </>
+            )}
+          </tbody>
+          <tfoot>
+            <SummaryRow label="Grand Total" rows={data} />
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 // ─── Empty State ───────────────────────────────────────────────────────────────
 
 const EmptyState = () => (
@@ -530,17 +695,18 @@ const LptReportTable = ({ data }) => {
                 { label: "Date & Time", key: "DateTime" },
                 { label: "Shift", key: "Shift" },
                 { label: "Model", key: "ModelName" },
+                { label: "BIS Type", key: null },
                 { label: "Assembly No", key: "AssemblyNo" },
               ].map(({ label, key }) => (
                 <th
                   key={label}
-                  onClick={() => toggleSort(key)}
-                  className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap text-center cursor-pointer hover:text-blue-600"
+                  onClick={() => key && toggleSort(key)}
+                  className={`px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap text-center ${key ? "cursor-pointer hover:text-blue-600" : ""}`}
                   rowSpan={2}
                 >
                   <span className="inline-flex items-center gap-1">
                     {label}
-                    {sort.key === key &&
+                    {key && sort.key === key &&
                       (sort.dir === "asc" ? (
                         <ArrowUp className="w-2.5 h-2.5" />
                       ) : (
@@ -613,6 +779,20 @@ const LptReportTable = ({ data }) => {
                 <td className="px-3 py-2 border-b border-slate-100 font-bold text-slate-800">
                   {row.ModelName}
                 </td>
+                <td className="px-3 py-2 border-b border-slate-100 text-center">
+                  {(() => {
+                    const bis = deriveBIS(row.ModelName);
+                    return (
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                        bis === "BIS"
+                          ? "bg-blue-50 text-blue-800 border-blue-200"
+                          : "bg-slate-50 text-slate-600 border-slate-200"
+                      }`}>
+                        {bis}
+                      </span>
+                    );
+                  })()}
+                </td>
                 <td className="px-3 py-2 border-b border-slate-100 font-bold text-slate-700">
                   {row.AssemblyNo}
                 </td>
@@ -661,7 +841,9 @@ const LPTReport = () => {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [selectedModelVariant, setSelectedModelVariant] = useState(null);
+  const [selectedBisType, setSelectedBisType] = useState("All");
   const [reportData, setReportData] = useState([]);
+  const [modelSummary, setModelSummary] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [details, setDetails] = useState("");
   const [lastFetched, setLastFetched] = useState(null);
@@ -687,13 +869,25 @@ const LPTReport = () => {
     return [];
   }, []);
 
+  const fetchModelSummary = useCallback(async (params) => {
+    const summaryParams = { startDate: params.startDate, endDate: params.endDate };
+    const res = await axios.get(`${baseURL}quality/lpt-model-summary`, { params: summaryParams });
+    if (res?.data?.success) return res.data.data || [];
+    return [];
+  }, []);
+
   const runQuery = useCallback(
     async (params) => {
       setLoading(true);
       setReportData([]);
+      setModelSummary([]);
       try {
-        const data = await fetchReport(params);
+        const [data, summary] = await Promise.all([
+          fetchReport(params),
+          fetchModelSummary(params),
+        ]);
         setReportData(data);
+        setModelSummary(summary);
         setLastFetched(new Date());
         if (data.length === 0) toast.success("No records found.");
         else toast.success(`Loaded ${data.length} records`);
@@ -704,17 +898,21 @@ const LPTReport = () => {
         setLoading(false);
       }
     },
-    [fetchReport],
+    [fetchReport, fetchModelSummary],
   );
+
+  const buildParams = (startDate, endDate) => {
+    const params = { startDate, endDate };
+    if (selectedModelVariant?.label) params.model = selectedModelVariant.label;
+    return params;
+  };
 
   const handleQuery = () => {
     if (!startTime || !endTime) {
       toast.error("Please select a time range.");
       return;
     }
-    const params = { startDate: startTime, endDate: endTime };
-    if (selectedModelVariant?.label) params.model = selectedModelVariant.label;
-    runQuery(params);
+    runQuery(buildParams(startTime, endTime));
   };
 
   const handleYesterdayQuery = () => {
@@ -723,56 +921,43 @@ const LPTReport = () => {
     today8AM.setHours(8, 0, 0, 0);
     const yesterday8AM = new Date(today8AM);
     yesterday8AM.setDate(today8AM.getDate() - 1);
-    const params = {
-      startDate: formatDate(yesterday8AM),
-      endDate: formatDate(today8AM),
-    };
-    if (selectedModelVariant?.label) params.model = selectedModelVariant.label;
-    runQuery(params);
+    runQuery(buildParams(formatDate(yesterday8AM), formatDate(today8AM)));
   };
 
   const handleTodayQuery = () => {
     const now = new Date();
     const today8AM = new Date(now);
     today8AM.setHours(8, 0, 0, 0);
-    const params = {
-      startDate: formatDate(today8AM),
-      endDate: formatDate(now),
-    };
-    if (selectedModelVariant?.label) params.model = selectedModelVariant.label;
-    runQuery(params);
+    runQuery(buildParams(formatDate(today8AM), formatDate(now)));
   };
 
   const handleMTDQuery = () => {
     const now = new Date();
-    const startOfMonth = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      1,
-      8,
-      0,
-      0,
-    );
-    const params = {
-      startDate: formatDate(startOfMonth),
-      endDate: formatDate(now),
-    };
-    if (selectedModelVariant?.label) params.model = selectedModelVariant.label;
-    runQuery(params);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 8, 0, 0);
+    runQuery(buildParams(formatDate(startOfMonth), formatDate(now)));
   };
 
   const filteredData = useMemo(() => {
     if (!Array.isArray(reportData)) return reportData;
-    if (!details) return reportData;
+    let data = reportData;
+    if (selectedBisType !== "All") {
+      data = data.filter((item) => deriveBIS(item.ModelName) === selectedBisType);
+    }
+    if (!details) return data;
     const q = details.toLowerCase();
-    return reportData.filter(
+    return data.filter(
       (item) =>
         item.ModelName?.toLowerCase().includes(q) ||
         item.AssemblyNo?.toLowerCase().includes(q) ||
         item.Shift?.toLowerCase().includes(q) ||
         item.Performance?.toLowerCase().includes(q),
     );
-  }, [reportData, details]);
+  }, [reportData, details, selectedBisType]);
+
+  const filteredModelSummary = useMemo(() => {
+    if (selectedBisType === "All") return modelSummary;
+    return modelSummary.filter((r) => deriveBIS(r.ModelName) === selectedBisType);
+  }, [modelSummary, selectedBisType]);
 
   if (variantsLoading) return <Loader />;
 
@@ -857,6 +1042,19 @@ const LPTReport = () => {
                   />
                 </div>
                 <div className="min-w-[170px] flex-1">
+                  <SelectField
+                    label="BIS Type"
+                    name="bisType"
+                    value={selectedBisType}
+                    onChange={(e) => setSelectedBisType(e.target.value)}
+                    options={[
+                      { label: "All", value: "All" },
+                      { label: "BIS", value: "BIS" },
+                      { label: "Non BIS", value: "Non BIS" },
+                    ]}
+                  />
+                </div>
+                <div className="min-w-[170px] flex-1">
                   <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
                     Search
                   </label>
@@ -906,49 +1104,52 @@ const LPTReport = () => {
             </div>
 
             {/* Right: Quick Filters */}
-            <div className="border-l border-slate-100 pl-5 flex flex-col justify-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <Zap className="w-3 h-3 text-amber-400" />
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                  Quick Select
-                </p>
+            <div className="border-l border-slate-100 pl-5 flex flex-col justify-center gap-2.5 min-w-[160px]">
+              <div>
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Zap className="w-3 h-3 text-amber-400" />
+                  <p className="text-[11px] font-bold text-slate-600 uppercase tracking-widest">
+                    Quick Filters
+                  </p>
+                </div>
+                <p className="text-[10px] text-slate-400">Select a preset time range.</p>
               </div>
               <div className="flex flex-col gap-2">
                 <button
                   onClick={handleYesterdayQuery}
                   disabled={loading}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all border ${
+                  className={`w-full flex flex-col items-center justify-center px-4 py-3 rounded-xl font-bold transition-all ${
                     loading
-                      ? "opacity-50 cursor-not-allowed bg-slate-50 text-slate-400 border-slate-200"
-                      : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                      ? "opacity-50 cursor-not-allowed bg-slate-200 text-slate-400"
+                      : "bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-200 active:scale-95"
                   }`}
                 >
-                  Yesterday
-                  <ChevronRight className="w-3 h-3" />
+                  <span className="text-sm font-extrabold uppercase tracking-wide leading-tight">Yesterday</span>
+                  <span className="text-[10px] font-normal opacity-90 mt-0.5">Prev day 08:00 → today 08:00</span>
                 </button>
                 <button
                   onClick={handleTodayQuery}
                   disabled={loading}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all border ${
+                  className={`w-full flex flex-col items-center justify-center px-4 py-3 rounded-xl font-bold transition-all ${
                     loading
-                      ? "opacity-50 cursor-not-allowed bg-slate-50 text-slate-400 border-slate-200"
-                      : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                      ? "opacity-50 cursor-not-allowed bg-slate-200 text-slate-400"
+                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 active:scale-95"
                   }`}
                 >
-                  Today
-                  <ChevronRight className="w-3 h-3" />
+                  <span className="text-sm font-extrabold uppercase tracking-wide leading-tight">Today</span>
+                  <span className="text-[10px] font-normal opacity-90 mt-0.5">08:00 → now</span>
                 </button>
                 <button
                   onClick={handleMTDQuery}
                   disabled={loading}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all border ${
+                  className={`w-full flex flex-col items-center justify-center px-4 py-3 rounded-xl font-bold transition-all ${
                     loading
-                      ? "opacity-50 cursor-not-allowed bg-slate-50 text-slate-400 border-slate-200"
-                      : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                      ? "opacity-50 cursor-not-allowed bg-slate-200 text-slate-400"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-200 active:scale-95"
                   }`}
                 >
-                  Month to Date
-                  <ChevronRight className="w-3 h-3" />
+                  <span className="text-sm font-extrabold uppercase tracking-wide leading-tight">MTD</span>
+                  <span className="text-[10px] font-normal opacity-90 mt-0.5">Month to date</span>
                 </button>
               </div>
             </div>
@@ -976,6 +1177,11 @@ const LPTReport = () => {
               </div>
               <LptSummary data={filteredData} />
             </div>
+
+            {/* Model Summary */}
+            {filteredModelSummary.length > 0 && (
+              <ModelSummaryPanel data={filteredModelSummary} />
+            )}
 
             {/* Analysis Panels */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">

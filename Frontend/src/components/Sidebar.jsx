@@ -1,13 +1,143 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { FaChevronDown, FaChevronUp, FaBars, FaTimes } from "react-icons/fa";
-import { Settings } from "lucide-react";
+import { ChevronRight, Settings, PanelLeftClose, PanelLeftOpen, Menu } from "lucide-react";
 import { useRoleAccess } from "../hooks/useRoleAccess.js";
 import { ROLES } from "../config/routes.config.js";
 
+// ── Per-module color palette (full class names for Tailwind JIT) ──────────────
+
+const PALETTE = [
+  {
+    iconBg: "bg-blue-100",    iconText: "text-blue-600",
+    activeIconBg: "bg-blue-600",    activeIconText: "text-white",
+    activeBg: "bg-blue-50",         activeText: "text-blue-700",
+    dot: "bg-blue-500",             border: "border-l-blue-500",
+    itemActiveBg: "bg-blue-50",     itemActiveText: "text-blue-700",
+    itemActiveDot: "bg-blue-500",   subheader: "text-blue-400",
+  },
+  {
+    iconBg: "bg-violet-100",  iconText: "text-violet-600",
+    activeIconBg: "bg-violet-600",  activeIconText: "text-white",
+    activeBg: "bg-violet-50",       activeText: "text-violet-700",
+    dot: "bg-violet-500",           border: "border-l-violet-500",
+    itemActiveBg: "bg-violet-50",   itemActiveText: "text-violet-700",
+    itemActiveDot: "bg-violet-500", subheader: "text-violet-400",
+  },
+  {
+    iconBg: "bg-emerald-100", iconText: "text-emerald-600",
+    activeIconBg: "bg-emerald-600", activeIconText: "text-white",
+    activeBg: "bg-emerald-50",      activeText: "text-emerald-700",
+    dot: "bg-emerald-500",          border: "border-l-emerald-500",
+    itemActiveBg: "bg-emerald-50",  itemActiveText: "text-emerald-700",
+    itemActiveDot: "bg-emerald-500",subheader: "text-emerald-400",
+  },
+  {
+    iconBg: "bg-orange-100",  iconText: "text-orange-600",
+    activeIconBg: "bg-orange-600",  activeIconText: "text-white",
+    activeBg: "bg-orange-50",       activeText: "text-orange-700",
+    dot: "bg-orange-500",           border: "border-l-orange-500",
+    itemActiveBg: "bg-orange-50",   itemActiveText: "text-orange-700",
+    itemActiveDot: "bg-orange-500", subheader: "text-orange-400",
+  },
+  {
+    iconBg: "bg-rose-100",    iconText: "text-rose-600",
+    activeIconBg: "bg-rose-600",    activeIconText: "text-white",
+    activeBg: "bg-rose-50",         activeText: "text-rose-700",
+    dot: "bg-rose-500",             border: "border-l-rose-500",
+    itemActiveBg: "bg-rose-50",     itemActiveText: "text-rose-700",
+    itemActiveDot: "bg-rose-500",   subheader: "text-rose-400",
+  },
+  {
+    iconBg: "bg-cyan-100",    iconText: "text-cyan-600",
+    activeIconBg: "bg-cyan-600",    activeIconText: "text-white",
+    activeBg: "bg-cyan-50",         activeText: "text-cyan-700",
+    dot: "bg-cyan-500",             border: "border-l-cyan-500",
+    itemActiveBg: "bg-cyan-50",     itemActiveText: "text-cyan-700",
+    itemActiveDot: "bg-cyan-500",   subheader: "text-cyan-400",
+  },
+  {
+    iconBg: "bg-amber-100",   iconText: "text-amber-600",
+    activeIconBg: "bg-amber-600",   activeIconText: "text-white",
+    activeBg: "bg-amber-50",        activeText: "text-amber-700",
+    dot: "bg-amber-500",            border: "border-l-amber-500",
+    itemActiveBg: "bg-amber-50",    itemActiveText: "text-amber-700",
+    itemActiveDot: "bg-amber-500",  subheader: "text-amber-400",
+  },
+  {
+    iconBg: "bg-indigo-100",  iconText: "text-indigo-600",
+    activeIconBg: "bg-indigo-600",  activeIconText: "text-white",
+    activeBg: "bg-indigo-50",       activeText: "text-indigo-700",
+    dot: "bg-indigo-500",           border: "border-l-indigo-500",
+    itemActiveBg: "bg-indigo-50",   itemActiveText: "text-indigo-700",
+    itemActiveDot: "bg-indigo-500", subheader: "text-indigo-400",
+  },
+  {
+    iconBg: "bg-teal-100",    iconText: "text-teal-600",
+    activeIconBg: "bg-teal-600",    activeIconText: "text-white",
+    activeBg: "bg-teal-50",         activeText: "text-teal-700",
+    dot: "bg-teal-500",             border: "border-l-teal-500",
+    itemActiveBg: "bg-teal-50",     itemActiveText: "text-teal-700",
+    itemActiveDot: "bg-teal-500",   subheader: "text-teal-400",
+  },
+  {
+    iconBg: "bg-pink-100",    iconText: "text-pink-600",
+    activeIconBg: "bg-pink-600",    activeIconText: "text-white",
+    activeBg: "bg-pink-50",         activeText: "text-pink-700",
+    dot: "bg-pink-500",             border: "border-l-pink-500",
+    itemActiveBg: "bg-pink-50",     itemActiveText: "text-pink-700",
+    itemActiveDot: "bg-pink-500",   subheader: "text-pink-400",
+  },
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const groupItems = (section) => {
+  const { items = [], subgroupConfig = [] } = section;
+  if (!subgroupConfig.length) return { ungrouped: items, subgroups: [] };
+  const ungrouped = items.filter((i) => !i.group);
+  const subgroups = subgroupConfig
+    .map((sg) => ({ ...sg, items: items.filter((i) => i.group === sg.key) }))
+    .filter((sg) => sg.items.length > 0);
+  return { ungrouped, subgroups };
+};
+
+// ── NavItem ───────────────────────────────────────────────────────────────────
+
+const NavItem = ({ item, active, color }) => (
+  <Link
+    to={item.path}
+    onClick={() => window.scrollTo(0, 0)}
+    className={`flex items-center gap-2.5 px-3 py-[7px] rounded-lg text-[12.5px] font-medium transition-all duration-150 group ${
+      active
+        ? `${color.itemActiveBg} ${color.itemActiveText} font-semibold`
+        : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+    }`}
+  >
+    <span
+      className={`w-1.5 h-1.5 rounded-full flex-shrink-0 transition-all ${
+        active ? `${color.itemActiveDot} scale-125` : "bg-slate-300 group-hover:bg-slate-400"
+      }`}
+    />
+    <span className="truncate leading-tight">{item.label}</span>
+  </Link>
+);
+
+// ── SubgroupHeader ────────────────────────────────────────────────────────────
+
+const SubgroupHeader = ({ label, color }) => (
+  <div className="flex items-center gap-2 px-1 pt-3 pb-1">
+    <span className={`text-[9px] font-bold uppercase tracking-[0.18em] whitespace-nowrap ${color.subheader}`}>
+      {label}
+    </span>
+    <span className="flex-1 h-px bg-slate-100" />
+  </div>
+);
+
+// ── Main Sidebar ──────────────────────────────────────────────────────────────
+
 const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
   const { accessibleMenu, userRole } = useRoleAccess();
-  const [expandedMenus, setExpandedMenus] = useState({});
+  const [expandedModules, setExpandedModules] = useState({});
   const [isMobile, setIsMobile] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -15,259 +145,219 @@ const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
 
   const isSuperAdmin = userRole === ROLES.SUPER_ADMIN;
   const isSettingsActive = location.pathname === "/settings";
+  const isExpanded = isSidebarExpanded || isMobile;
 
+  // Auto-expand the module containing the active route
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    const activeModule = accessibleMenu.find((m) =>
+      m.items.some((i) => location.pathname === i.path)
+    );
+    if (activeModule) {
+      setExpandedModules((prev) => ({ ...prev, [activeModule.key]: true }));
+    }
+  }, [location.pathname, accessibleMenu]);
+
+  // Mobile detection
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
   }, []);
 
+  // Close on navigate (mobile)
   useEffect(() => {
-    if (isMobile && isSidebarExpanded) {
-      toggleSidebar();
-    }
+    if (isMobile && isSidebarExpanded) toggleSidebar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
+  // Click outside to close (mobile)
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (
-        isMobile &&
-        isSidebarExpanded &&
-        sidebarRef.current &&
-        !sidebarRef.current.contains(e.target)
-      ) {
+    const handler = (e) => {
+      if (isMobile && isSidebarExpanded && sidebarRef.current && !sidebarRef.current.contains(e.target))
         toggleSidebar();
-      }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, [isMobile, isSidebarExpanded, toggleSidebar]);
 
-  const toggleMenu = (menuKey) => {
-    setExpandedMenus((prev) => ({
-      ...Object.keys(prev).reduce((acc, key) => ({ ...acc, [key]: false }), {}),
-      [menuKey]: !prev[menuKey],
-    }));
+  const toggleModule = (key) => {
+    if (!isExpanded) { toggleSidebar(); return; }
+    setExpandedModules((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const isActive = (path) => location.pathname === path;
-
-  const isSectionActive = (items) =>
-    items.some((item) => location.pathname.startsWith(item.path));
+  const isModuleActive = (items) => items.some((i) => location.pathname === i.path);
 
   return (
     <>
+      {/* Mobile overlay */}
       {isMobile && isSidebarExpanded && (
         <div
-          className="fixed inset-0 top-[64px] bg-black/50 z-30 transition-opacity duration-300"
+          className="fixed inset-0 top-16 bg-slate-900/40 z-30 backdrop-blur-sm"
           onClick={toggleSidebar}
-          aria-hidden="true"
         />
       )}
 
+      {/* Mobile open button */}
       {isMobile && !isSidebarExpanded && (
         <button
-          className="fixed top-[72px] left-4 z-30 bg-gray-900 text-white p-2 rounded-lg shadow-lg hover:bg-gray-700 transition-colors md:hidden"
+          className="fixed top-[72px] left-3 z-30 w-9 h-9 flex items-center justify-center bg-white text-slate-600 rounded-xl shadow-md hover:text-slate-900 transition-colors md:hidden border border-slate-200"
           onClick={toggleSidebar}
           aria-label="Open sidebar"
         >
-          <FaBars size={20} />
+          <Menu className="w-4 h-4" />
         </button>
       )}
 
       <aside
         ref={sidebarRef}
         className={`
-          fixed top-[64px] left-0 h-[calc(100vh-64px)] bg-gray-900 text-white z-40
-          flex flex-col shadow-xl
-          transition-all duration-300 ease-in-out
-          ${
-            isMobile
-              ? isSidebarExpanded
-                ? "w-72 translate-x-0"
-                : "w-72 -translate-x-full"
-              : isSidebarExpanded
-                ? "w-64"
-                : "w-16"
+          fixed top-16 left-0 h-[calc(100vh-64px)] z-40 flex flex-col
+          bg-white border-r border-slate-100 shadow-sm
+          transition-all duration-300 ease-in-out select-none
+          ${isMobile
+            ? isSidebarExpanded ? "w-72 translate-x-0 shadow-xl" : "w-72 -translate-x-full"
+            : isSidebarExpanded ? "w-64" : "w-[56px]"
           }
         `}
         role="navigation"
         aria-label="Main navigation"
       >
-        {/* ── Top toggle ─────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-700/50 flex-shrink-0">
-          <div
-            className={`overflow-hidden transition-all duration-300 ${
-              isSidebarExpanded || isMobile
-                ? "w-auto opacity-100"
-                : "w-0 opacity-0"
-            }`}
-          >
-            <h1 className="text-lg font-semibold tracking-wide whitespace-nowrap">
-              Dashboard Menu
-            </h1>
-          </div>
+        {/* ── Top bar ─────────────────────────────────────────────────── */}
+        <div
+          className={`flex items-center h-12 px-2.5 border-b border-slate-100 flex-shrink-0 ${
+            isExpanded ? "justify-between" : "justify-center"
+          }`}
+        >
+          {isExpanded && (
+            <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400 px-1">
+              Navigation
+            </span>
+          )}
           <button
-            className="text-gray-400 hover:text-white transition-colors p-1 rounded-md hover:bg-gray-700 cursor-pointer flex-shrink-0"
             onClick={toggleSidebar}
-            aria-label={
-              isSidebarExpanded ? "Collapse sidebar" : "Expand sidebar"
-            }
+            title={isExpanded ? "Collapse" : "Expand"}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all"
           >
-            {isSidebarExpanded || isMobile ? (
-              <FaTimes size={18} />
-            ) : (
-              <FaBars size={18} />
-            )}
+            {isExpanded
+              ? <PanelLeftClose className="w-4 h-4" />
+              : <PanelLeftOpen className="w-4 h-4" />
+            }
           </button>
         </div>
 
-        {/* ── Nav items ──────────────────────────────────────────────────── */}
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2">
-          <ul className="space-y-1 px-2">
-            {accessibleMenu.map((menu) => {
-              const MenuIcon = menu.icon;
-              const isExpanded = expandedMenus[menu.key];
-              const sectionActive = isSectionActive(menu.items);
+        {/* ── Navigation ──────────────────────────────────────────────── */}
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-0.5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200">
+          {accessibleMenu.map((menu, idx) => {
+            const color = PALETTE[idx % PALETTE.length];
+            const MenuIcon = menu.icon;
+            const moduleExpanded = !!expandedModules[menu.key];
+            const moduleActive = isModuleActive(menu.items);
+            const { ungrouped, subgroups } = groupItems(menu);
 
-              return (
-                <li key={menu.key}>
-                  <button
-                    className={`
-                      w-full flex items-center justify-between p-3 rounded-lg
-                      transition-all duration-200 cursor-pointer
-                      ${
-                        sectionActive
-                          ? "bg-blue-600/20 text-blue-400"
-                          : "text-gray-300 hover:bg-gray-800 hover:text-white"
-                      }
-                    `}
-                    onClick={() => {
-                      if (!isSidebarExpanded && !isMobile) {
-                        toggleSidebar();
-                      }
-                      toggleMenu(menu.key);
-                    }}
-                    aria-expanded={isExpanded}
-                    title={!isSidebarExpanded ? menu.label : undefined}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <MenuIcon className="flex-shrink-0 text-lg" />
-                      <span
-                        className={`font-medium whitespace-nowrap truncate transition-all duration-300 ${
-                          isSidebarExpanded || isMobile
-                            ? "opacity-100 w-auto"
-                            : "opacity-0 w-0 overflow-hidden"
-                        }`}
-                      >
-                        {menu.label}
-                      </span>
-                    </div>
-                    {(isSidebarExpanded || isMobile) && (
-                      <span className="flex-shrink-0 text-xs transition-transform duration-200">
-                        {isExpanded ? <FaChevronUp /> : <FaChevronDown />}
-                      </span>
-                    )}
-                  </button>
-
+            return (
+              <div key={menu.key}>
+                {/* Module button */}
+                <button
+                  onClick={() => toggleModule(menu.key)}
+                  title={!isExpanded ? menu.label : undefined}
+                  className={`
+                    relative w-full flex items-center gap-2.5 px-2 py-2 rounded-xl text-sm font-medium
+                    transition-all duration-200 cursor-pointer group border-l-2
+                    ${moduleActive
+                      ? `${color.activeBg} ${color.activeText} ${color.border} font-semibold`
+                      : "border-l-transparent text-slate-600 hover:text-slate-800 hover:bg-slate-50"
+                    }
+                  `}
+                >
+                  {/* Icon */}
                   <div
-                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                      isExpanded && (isSidebarExpanded || isMobile)
-                        ? "max-h-[2000px] opacity-100"
-                        : "max-h-0 opacity-0"
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${
+                      moduleActive
+                        ? `${color.activeIconBg} ${color.activeIconText} shadow-sm`
+                        : `${color.iconBg} ${color.iconText}`
                     }`}
                   >
-                    <ul className="mt-1 ml-4 pl-3 border-l border-gray-700/50 space-y-1 max-h-[calc(100vh-300px)] overflow-y-auto">
-                      {menu.items.map((item) => {
-                        const active = isActive(item.path);
-                        return (
-                          <li key={item.path}>
-                            <Link
-                              to={item.path}
-                              className={`
-                                block px-3 py-2 rounded-lg text-sm
-                                transition-all duration-200
-                                ${
-                                  active
-                                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
-                                    : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                                }
-                              `}
-                              onClick={() => window.scrollTo(0, 0)}
-                            >
-                              <span className="truncate">{item.label}</span>
-                            </Link>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <MenuIcon className="w-[15px] h-[15px]" />
                   </div>
-                </li>
-              );
-            })}
-          </ul>
+
+                  {/* Label + arrow */}
+                  {isExpanded && (
+                    <>
+                      <span className="flex-1 text-left truncate text-[13px]">
+                        {menu.label}
+                      </span>
+                      <ChevronRight
+                        className={`w-3.5 h-3.5 flex-shrink-0 text-slate-300 transition-transform duration-200 ${
+                          moduleExpanded ? "rotate-90" : ""
+                        }`}
+                      />
+                    </>
+                  )}
+
+                  {/* Active dot in collapsed mode */}
+                  {!isExpanded && moduleActive && (
+                    <span className={`absolute right-1 top-1 w-1.5 h-1.5 rounded-full ${color.dot}`} />
+                  )}
+                </button>
+
+                {/* Sub-items panel */}
+                {isExpanded && moduleExpanded && (
+                  <div className="mt-0.5 ml-[14px] pl-3 border-l-2 border-slate-100 pb-1.5">
+                    {ungrouped.map((item) => (
+                      <NavItem key={item.path} item={item} active={isActive(item.path)} color={color} />
+                    ))}
+                    {subgroups.map((sg) => (
+                      <div key={sg.key}>
+                        <SubgroupHeader label={sg.label} color={color} />
+                        {sg.items.map((item) => (
+                          <NavItem key={item.path} item={item} active={isActive(item.path)} color={color} />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
-        {/* ── Footer ─────────────────────────────────────────────────────── */}
-        <div className="flex-shrink-0 border-t border-gray-700/50">
-          {/* Settings gear — SUPER_ADMIN only */}
+        {/* ── Footer ──────────────────────────────────────────────────── */}
+        <div className="flex-shrink-0 border-t border-slate-100 p-2 space-y-0.5">
           {isSuperAdmin && (
-            <div className="px-3 pt-3 pb-1 flex justify-center">
-              <button
-                onClick={() => navigate("/settings")}
-                title="Permission Manager"
-                className={`
-          w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg
-          transition-all duration-200 group relative text-center cursor-pointer
-          ${
-            isSettingsActive
-              ? "bg-indigo-600/20 text-white"
-              : "text-white hover:bg-gray-800 hover:text-white"
-          }
-        `}
+            <button
+              onClick={() => navigate("/settings")}
+              title={!isExpanded ? "Permission Manager" : undefined}
+              className={`
+                w-full flex items-center gap-2.5 px-2 py-2 rounded-xl text-[13px] font-medium
+                transition-all duration-200 cursor-pointer group border-l-2
+                ${isSettingsActive
+                  ? "bg-indigo-50 text-indigo-700 border-l-indigo-500 font-semibold"
+                  : "border-l-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                }
+              `}
+            >
+              <div
+                className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${
+                  isSettingsActive ? "bg-indigo-600 text-white shadow-sm" : "bg-indigo-100 text-indigo-600"
+                }`}
               >
-                {/* Spinning gear on hover via CSS */}
                 <Settings
-                  size={18}
-                  className={`flex-shrink-0 transition-transform duration-500 ${
-                    isSettingsActive
-                      ? "rotate-45 text-white"
-                      : "group-hover:rotate-90 text-white"
+                  className={`w-[15px] h-[15px] transition-transform duration-500 ${
+                    isSettingsActive ? "rotate-45" : "group-hover:rotate-45"
                   }`}
                 />
-
-                <span
-                  className={`text-sm font-medium whitespace-nowrap transition-all duration-300 text-center text-white ${
-                    isSidebarExpanded || isMobile
-                      ? "opacity-100 w-auto"
-                      : "opacity-0 w-0 overflow-hidden"
-                  }`}
-                >
-                  Permission Manager
-                </span>
-
-                {/* Active indicator dot (collapsed mode) */}
-                {isSettingsActive && !isSidebarExpanded && !isMobile && (
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-white" />
-                )}
-              </button>
-            </div>
+              </div>
+              {isExpanded && <span>Permission Manager</span>}
+            </button>
           )}
 
-          {/* Copyright */}
-          <div className="p-3 flex justify-center">
-            <div
-              className={`text-xs text-white text-center transition-all duration-300 ${
-                isSidebarExpanded || isMobile ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              2025 Western Refrigeration
-            </div>
-          </div>
+          {isExpanded && (
+            <p className="px-3 py-2 text-[10px] text-slate-300 text-center">
+              © 2025 Western Refrigeration
+            </p>
+          )}
         </div>
       </aside>
     </>

@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { authenticate } from "../middlewares/auth.js";
-import { uploadMachineImage, handleMulterError } from "../middlewares/uploadMiddleware.js";
+import { uploadMachineImage, uploadMaterialDrawing, handleMulterError } from "../middlewares/uploadMiddleware.js";
 import {
   getMaterials, createMaterial, updateMaterial, deleteMaterial, bulkUpsertMaterials,
+  uploadMaterialDrawing as uploadMaterialDrawingHandler, deleteMaterialDrawing,
   getShifts, createShift, updateShift, deleteShift,
   getDowntimeReasons, createDowntimeReason, updateDowntimeReason, deleteDowntimeReason,
   getDepartments, createDepartment, updateDepartment, deleteDepartment,
@@ -17,11 +18,13 @@ import {
 const router = Router();
 
 // Materials
-router.get("/materials",       authenticate, getMaterials);
-router.post("/materials",      authenticate, createMaterial);
-router.post("/materials/bulk", authenticate, bulkUpsertMaterials);
-router.put("/materials/:id",   authenticate, updateMaterial);
-router.delete("/materials/:id",authenticate, deleteMaterial);
+router.get("/materials",                     authenticate, getMaterials);
+router.post("/materials",                    authenticate, createMaterial);
+router.post("/materials/bulk",               authenticate, bulkUpsertMaterials);
+router.put("/materials/:id",                 authenticate, updateMaterial);
+router.delete("/materials/:id",              authenticate, deleteMaterial);
+router.post("/materials/:id/drawing",        authenticate, uploadMaterialDrawing.single("drawing"), handleMulterError, uploadMaterialDrawingHandler);
+router.delete("/materials/:id/drawing",      authenticate, deleteMaterialDrawing);
 
 // Shifts
 router.get("/shifts",        authenticate, getShifts);

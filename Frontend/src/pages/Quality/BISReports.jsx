@@ -604,7 +604,7 @@ const BISReports = () => {
                     <input
                       type="text"
                       placeholder="Search model, year, status…"
-                      className="pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                      className="pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 w-64 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                       value={search.term}
                       onChange={(e) =>
                         setSearch((p) => ({ ...p, term: e.target.value }))
@@ -614,7 +614,7 @@ const BISReports = () => {
                   <div className="relative">
                     <FaFilter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
                     <select
-                      className="pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                      className="pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
                     >
@@ -624,7 +624,7 @@ const BISReports = () => {
                     </select>
                   </div>
                   <select
-                    className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                     value={yearFilter}
                     onChange={(e) => setYearFilter(e.target.value)}
                   >
@@ -762,7 +762,7 @@ const BISReports = () => {
                     <input
                       type="text"
                       placeholder="Search reports…"
-                      className="pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                      className="pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 w-64 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                       value={search.term}
                       onChange={(e) =>
                         setSearch((p) => ({ ...p, term: e.target.value }))
@@ -770,7 +770,7 @@ const BISReports = () => {
                     />
                   </div>
                   <select
-                    className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                     value={search.field}
                     onChange={(e) =>
                       setSearch((p) => ({ ...p, field: e.target.value }))

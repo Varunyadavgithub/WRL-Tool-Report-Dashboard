@@ -162,57 +162,42 @@ const SerialScan = () => {
     const serial = serialNumber.trim();
     if (!serial) return;
 
-    console.log("━━━━━━━━━━━━ Serial Scan ━━━━━━━━━━━━");
-    console.log("📥 Scanned serial:", serial);
-
     setScanning(true);
     try {
       let modelCode;
 
       if (serial.includes("-")) {
-        modelCode = serial.split("-")[0].toUpperCase();
-        console.log("🔀 Format: dash-serial → extracted model code:", modelCode);
+        // Dash-serial: "D525H223-rest" or "F-D525H223-rest"
+        // Find the first segment that is more than one character (skips
+        // single-letter family prefixes like "F" or "S").
+        const segment = serial.split("-").find((s) => s.trim().length > 1) || serial.split("-")[0];
+        modelCode = segment.trim().toUpperCase();
       } else {
-        console.log("🔢 Format: barcode → calling DB lookup...");
         const result = await fetchModelBySerial(serial).unwrap();
-        console.log("📦 DB lookup result:", result);
         if (!result || result.length === 0) {
-          console.warn("⚠️ No product found in DB for serial:", serial);
           toast.error(`No product found for serial: ${serial}`);
           return;
         }
-        modelCode = result[0].label.split("-")[0].toUpperCase();
-        console.log("✅ Model code from DB (m.Name → first segment):", result[0].label, "→", modelCode);
+        // DB label is sometimes prefixed with a single letter + space
+        // e.g. "F D525H223-..." or "S D525H223-..." — strip it first.
+        const label = result[0].label.replace(/^[A-Za-z]\s+/, "").trim();
+        modelCode = label.split("-")[0].trim().toUpperCase();
       }
-
-      console.log("🔍 Looking for template matching model:", modelCode);
-      console.log("📋 All loaded templates:", templates.map((t) => ({
-        id: t.id,
-        name: t.name,
-        approvalStatus: t.approvalStatus,
-        isActive: t.isActive,
-        models: t.models,
-      })));
 
       const isApproved = (t) =>
         t.isActive !== false && t.approvalStatus === "approved";
 
-      const approvedTemplates = templates.filter(isApproved);
-      console.log("✔️ Approved templates:", approvedTemplates.map((t) => ({ id: t.id, name: t.name, models: t.models })));
-
+      // Priority 1: exact match in the template's Applicable Models array
       const byModelsArray = templates.find(
         (t) => isApproved(t) && t.models?.length > 0 && t.models.includes(modelCode),
       );
-      console.log("🔎 Match via models[] array:", byModelsArray ? byModelsArray.name : "none");
 
+      // Priority 2: template name starts with the model code
       const byTemplateName = templates.find(
         (t) => isApproved(t) && t.name.toUpperCase().startsWith(modelCode.toUpperCase()),
       );
-      console.log("🔎 Match via template name startsWith:", byTemplateName ? byTemplateName.name : "none");
 
       const matched = byModelsArray || byTemplateName;
-      console.log("🏆 Final match:", matched ? `${matched.name} (id: ${matched.id})` : "NO MATCH");
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
       if (matched) {
         toast.success(`Template found: ${matched.name}`);
@@ -222,7 +207,6 @@ const SerialScan = () => {
         toast.error(`No approved template found for model: ${modelCode}`);
       }
     } catch (err) {
-      console.error("❌ Serial scan error:", err);
       toast.error("Failed to look up serial. Please try again.");
     } finally {
       setScanning(false);

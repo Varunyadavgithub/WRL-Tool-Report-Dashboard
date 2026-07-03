@@ -74,6 +74,12 @@ export const uploadMachineImage = multer({
   limits: { fileSize: UPLOAD_CONFIGS.machineImage.maxSize },
 });
 
+export const uploadMaterialDrawing = multer({
+  storage: createStorage("MaterialDrawings"),
+  fileFilter: createFileFilter("materialDrawing"),
+  limits: { fileSize: UPLOAD_CONFIGS.materialDrawing.maxSize },
+});
+
 /* ===================== ERROR HANDLER ===================== */
 
 export const handleMulterError = (err, _req, res, next) => {
