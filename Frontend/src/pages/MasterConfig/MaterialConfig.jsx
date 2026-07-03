@@ -1,8 +1,8 @@
 import { useState, useMemo, useRef } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import * as XLSX from "xlsx";
 import {
-  Package2, Upload, Download, Eye, X, Trash2,
+  Package2, Upload, Download, Eye, Trash2,
   CheckCircle2, AlertTriangle, FileSpreadsheet,
   Info, Loader2,
 } from "lucide-react";
@@ -11,10 +11,12 @@ import {
   inputCls, selectCls, Field, Modal,
   TableActions, PageHeader, EmptyState, TH, TD,
 } from "./_shared";
-import { selectMaterials } from "../../redux/slices/masterConfigSlice";
+import { selectMaterials, updateMaterial as updateMaterialSlice } from "../../redux/slices/masterConfigSlice";
 import {
   useAddMaterialMutation, useUpdateMaterialMutation, useDeleteMaterialMutation, useBulkAddMaterialsMutation,
+  useUploadMaterialDrawingMutation, useDeleteMaterialDrawingMutation,
 } from "../../redux/api/masterConfigApi";
+import { fileBaseURL } from "../../assets/assets";
 
 // ─── Static options ────────────────────────────────────────────────────────────
 const CATEGORIES = ["Compressor","Sheet Metal","Casting","Forging","Plastic","Rubber","Bought Out","Sub Assembly","PC WHITE"];
@@ -89,61 +91,6 @@ const autoMap = (headers) => {
   return map;
 };
 
-// ─── Drawing Viewer ────────────────────────────────────────────────────────────
-const DrawingViewer = ({ mat, onClose }) => (
-  <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-        <div>
-          <h2 className="text-base font-bold text-slate-800">{mat.partName}</h2>
-          <p className="text-[11px] text-slate-400">SAP: {mat.sapCode} · {mat.drawingNumber} · {mat.drawingRevision}</p>
-        </div>
-        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100"><X className="w-4 h-4 text-slate-500" /></button>
-      </div>
-      <div className="flex-1 overflow-auto p-6 flex flex-col gap-5">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            ["SAP Code",     mat.sapCode,        "text-blue-600"],
-            ["Category",     mat.category,       "text-slate-600"],
-            ["No of Sheet",  mat.noOfSheet,      "text-slate-600"],
-            ["Defined Cycle Time", mat.definedComponentCycleTime ? `${round2(+mat.definedComponentCycleTime)} s` : "—", "text-rose-600"],
-          ].map(([label, value, color]) => (
-            <div key={label} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-              <p className={`text-sm font-bold ${color}`}>{value || "—"}</p>
-            </div>
-          ))}
-        </div>
-        {mat.actualComponentsPerSheet > 0 && (
-          <div className="bg-violet-50/50 rounded-xl border border-violet-100 p-4">
-            <p className="text-[10px] font-bold text-violet-700 uppercase tracking-widest mb-2.5">Sheet-Based Production (Punching)</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                ["No of Component / Sheet", mat.actualComponentsPerSheet],
-                ["Loading/Unloading Time", `${mat.pncLoadingUnloading || 0} s`],
-                ["Defined Component Cycle Time", mat.definedComponentCycleTime ? `${round2(+mat.definedComponentCycleTime)} s` : "—"],
-              ].map(([label, value]) => (
-                <div key={label} className="bg-white rounded-lg p-2.5 border border-violet-100">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-                  <p className="text-sm font-bold text-violet-700">{value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        <div className="bg-slate-50 rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center py-12 gap-3">
-          <FileSpreadsheet className="w-10 h-10 text-slate-300" strokeWidth={1} />
-          <p className="text-sm font-semibold text-slate-400">{mat.drawingNumber || "No drawing number"} {mat.drawingRevision && `· ${mat.drawingRevision}`}</p>
-          <p className="text-xs text-slate-300">Drawing PDF not uploaded yet</p>
-          <button className="mt-1 px-4 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors">Upload Drawing PDF</button>
-        </div>
-      </div>
-      <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
-        <button onClick={onClose} className="px-4 py-2 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100">Close</button>
-      </div>
-    </div>
-  </div>
-);
 
 // ─── Bulk Upload Modal ─────────────────────────────────────────────────────────
 const FIELD_LABELS = {
@@ -514,13 +461,30 @@ const MaterialConfig = () => {
   const [deleteMaterial]   = useDeleteMaterialMutation();
   const [bulkAddMaterials] = useBulkAddMaterialsMutation();
 
+  const dispatch = useDispatch();
+  const [uploadDrawing, { isLoading: drawingUploading }] = useUploadMaterialDrawingMutation();
+  const [deleteDrawing]                       = useDeleteMaterialDrawingMutation();
+  const [uploadingId, setUploadingId]         = useState(null);
+
   const [modal, setModal]                     = useState({ open: false, mode: "add", row: null });
   const [form, setForm]                       = useState(INIT);
   const [noOfSheetEdited, setNoOfSheetEdited] = useState(false);
   const [search, setSearch]                   = useState("");
-  const [viewDrawing, setViewDrawing]         = useState(null);
   const [showBulk, setShowBulk]               = useState(false);
   const [confirmClear, setConfirmClear]       = useState(false);
+
+  const handleDirectUpload = async (r, file) => {
+    if (!file) return;
+    setUploadingId(r.id);
+    try {
+      const res = await uploadDrawing({ id: r.id, file }).unwrap();
+      dispatch(updateMaterialSlice({ ...r, drawingPath: res.data?.drawingPath }));
+      toast.success("Drawing uploaded.");
+    } catch (err) {
+      toast.error(err?.data?.message || "Upload failed");
+    }
+    setUploadingId(null);
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -657,6 +621,7 @@ const MaterialConfig = () => {
                   <TH center>Defined Component Cycle Time (Secs)</TH>
                   <TH>Drawing No.</TH>
                   <TH>Rev.</TH>
+                  <TH center>Drawing File</TH>
                   <TH center>Actions</TH>
                 </tr>
               </thead>
@@ -683,16 +648,42 @@ const MaterialConfig = () => {
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">{r.drawingRevision}</span>
                       )}
                     </TD>
+                    {/* Drawing File column */}
                     <TD center>
                       <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => setViewDrawing(r)} className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50 transition-colors" title="View Drawing">
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                        <TableActions onEdit={() => openEdit(r)} onDelete={() => handleDelete(r.id)} />
+                        {uploadingId === r.id ? (
+                          <span className="flex items-center gap-1 text-[10px] text-blue-500 font-semibold">
+                            <Loader2 className="w-3 h-3 animate-spin" /> Uploading…
+                          </span>
+                        ) : r.drawingPath ? (
+                          <>
+                            <a
+                              href={`${fileBaseURL}${r.drawingPath}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                              title="Open Drawing in New Tab"
+                            >
+                              <Eye className="w-3 h-3" /> View
+                            </a>
+                            <label className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer" title="Replace Drawing">
+                              <Upload className="w-3 h-3" /> Replace
+                              <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" hidden onChange={(e) => { handleDirectUpload(r, e.target.files?.[0]); e.target.value = ""; }} />
+                            </label>
+                          </>
+                        ) : (
+                          <label className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer" title="Upload Drawing">
+                            <Upload className="w-3 h-3" /> Upload
+                            <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" hidden onChange={(e) => { handleDirectUpload(r, e.target.files?.[0]); e.target.value = ""; }} />
+                          </label>
+                        )}
                       </div>
                     </TD>
+                    <TD center>
+                      <TableActions onEdit={() => openEdit(r)} onDelete={() => handleDelete(r.id)} />
+                    </TD>
                   </tr>
-                )) : <EmptyState colSpan={17} message="No materials found. Add or upload your first material." />}
+                )) : <EmptyState colSpan={18} message="No materials found. Add or upload your first material." />}
               </tbody>
             </table>
           </div>
@@ -751,9 +742,6 @@ const MaterialConfig = () => {
           </div>
         </Modal>
       )}
-
-      {/* Drawing viewer */}
-      {viewDrawing && <DrawingViewer mat={viewDrawing} onClose={() => setViewDrawing(null)} />}
 
       {/* Bulk upload modal */}
       {showBulk && (

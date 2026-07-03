@@ -5,12 +5,12 @@ import { useRoleAccess } from "./hooks/useRoleAccess.js";
 import { ROUTE_CONFIG, ROLES } from "./config/routes.config.js";
 import { initializePermissions } from "./utils/permissionStore";
 
-const Layout = lazy(() => import("./components/Layout"));
-const Login = lazy(() => import("./pages/Auth/Login"));
-const Home = lazy(() => import("./pages/Home"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+const Layout     = lazy(() => import("./components/Layout"));
+const Login      = lazy(() => import("./pages/Auth/Login"));
+const Home       = lazy(() => import("./pages/Home"));
+const NotFound   = lazy(() => import("./pages/NotFound"));
 const Monitoring = lazy(() => import("./pages/Display/Monitoring"));
-const Settings = lazy(() => import("./pages/Settings/Settings"));
+const Settings   = lazy(() => import("./pages/Settings/Settings"));
 
 // ── Seed permissions from routeConfig on first ever load ─────────────────────
 // This runs once. After that, the stored permissions are used.

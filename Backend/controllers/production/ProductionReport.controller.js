@@ -66,11 +66,13 @@ const buildFilteredDataCTE = (scPlaceholders, lcPlaceholders = null) => `
           pa.StationCode,
           pa.Operator,
           pa.Remark,
+          pl.Name,
           mb.Serial,
           mb.VSerial,
           mb.Serial2
       FROM MaterialBarcode mb
       JOIN ProcessActivity pa ON pa.PSNo = mb.DocNo
+      LEFT JOIN ProductionLine pl ON CAST(pl.LineCode AS NVARCHAR(50)) = pa.Remark
       WHERE mb.PrintStatus  = 1
         AND mb.Status       <> 99
         AND pa.ActivityType  = 5
@@ -165,7 +167,7 @@ export const fetchFGData = tryCatch(async (req, res) => {
           CASE WHEN SUBSTRING(fd.Serial, 1, 1) IN ('S','F','L') THEN '' ELSE fd.Serial END AS FG_SR,
           fd.ActivityOn           AS CreatedOn,
           u.UserName,
-          ISNULL(fd.Remark, '')   AS Remark,
+          ISNULL(fd.Name, '')     AS Name,
           ms.StartSerial,
           ms.EndSerial,
           ms.TotalCount
@@ -236,7 +238,7 @@ export const productionReportExportData = tryCatch(async (req, res) => {
           CASE WHEN SUBSTRING(fd.Serial, 1, 1) IN ('S','F','L') THEN '' ELSE fd.Serial END AS FG_SR,
           fd.ActivityOn           AS CreatedOn,
           u.UserName,
-          ISNULL(fd.Remark, '')   AS Remark,
+          ISNULL(fd.Name, '')     AS Name,
           ms.StartSerial,
           ms.EndSerial
       FROM FilteredData fd
@@ -303,7 +305,7 @@ export const fetchQuickFiltersData = tryCatch(async (req, res) => {
           CASE WHEN SUBSTRING(fd.Serial, 1, 1) IN ('S','F','L') THEN '' ELSE fd.Serial END AS FG_SR,
           fd.ActivityOn           AS CreatedOn,
           u.UserName,
-          ISNULL(fd.Remark, '')   AS Remark,
+          ISNULL(fd.Name, '')     AS Name,
           ms.StartSerial,
           ms.EndSerial,
           ms.TotalCount

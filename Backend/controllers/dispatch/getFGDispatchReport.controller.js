@@ -29,11 +29,16 @@ export const getFGDispatchReport = tryCatch(async (req, res) => {
   // ── The entire script is sent as ONE batch so temp tables survive across
   //    all EXEC / sp_executesql calls within the same connection scope. ─────
   const query = `
-    IF OBJECT_ID('tempdb..#Dispatch')       IS NOT NULL DROP TABLE #Dispatch;
+    IF OBJECT_ID('tempdb..#LabelPrint')     IS NOT NULL DROP TABLE #LabelPrint;
+    IF OBJECT_ID('tempdb..#Unloading')      IS NOT NULL DROP TABLE #Unloading;
     IF OBJECT_ID('tempdb..#DispatchMaster') IS NOT NULL DROP TABLE #DispatchMaster;
     IF OBJECT_ID('tempdb..#SerialBatch')    IS NOT NULL DROP TABLE #SerialBatch;
 
-    CREATE TABLE #Dispatch (
+    CREATE TABLE #LabelPrint (
+        FgserialNo     NVARCHAR(100),
+        LabelPrintDate DATETIME
+    );
+    CREATE TABLE #Unloading (
         FgserialNo    NVARCHAR(100),
         UnloadingDate DATETIME
     );
@@ -49,25 +54,30 @@ export const getFGDispatchReport = tryCatch(async (req, res) => {
         FgserialNo NVARCHAR(100)
     );
 
-    -- ── Step 1: Pull unloaded FG serials from linked server ────────────────
-    DECLARE @sql NVARCHAR(MAX);
-    SET @sql = N'
-    INSERT INTO #Dispatch (FgserialNo, UnloadingDate)
-    SELECT FgserialNo, DateTime
-    FROM OPENQUERY([10.100.95.134],
-        ''SELECT FgserialNo, DateTime
-          FROM WWMS.dbo.DispatchUnloading
-          WHERE DateTime >= ''''${istStart}''''
-            AND DateTime <= ''''${istEnd}'''' ''
-    )';
-    EXEC(@sql);
+    -- ── Step 1: Pull serials from local DB filtered by FG Label Printing date ─
+    DECLARE @start DATETIME = '${istStart}';
+    DECLARE @end   DATETIME = '${istEnd}';
+
+    INSERT INTO #LabelPrint (FgserialNo, LabelPrintDate)
+    SELECT b.Serial, lp.MaxLabelDate
+    FROM MaterialBarcode b
+    INNER JOIN (
+        SELECT PSNo, MAX(CompletedOn) AS MaxLabelDate
+        FROM   ProcessRouting
+        WHERE  StationCode IN (1220010, 1230017)
+          AND  Status      = 2
+          AND  CompletedOn >= @start
+          AND  CompletedOn <= @end
+        GROUP BY PSNo
+    ) lp ON lp.PSNo = b.DocNo
+    WHERE b.Type NOT IN (200, 0);
 
     -- ── Step 2: Number the serials for batch iteration ─────────────────────
     INSERT INTO #SerialBatch (RowNum, FgserialNo)
     SELECT ROW_NUMBER() OVER (ORDER BY FgserialNo), FgserialNo
-    FROM #Dispatch;
+    FROM #LabelPrint;
 
-    -- ── Step 3: Fetch DispatchMaster in batches of 200 ────────────────────
+    -- ── Step 3: Fetch DispatchUnloading dates from linked server ───────────
     DECLARE @batchSize INT = 200;
     DECLARE @offset    INT = 1;
     DECLARE @maxRow    INT;
@@ -76,6 +86,41 @@ export const getFGDispatchReport = tryCatch(async (req, res) => {
     DECLARE @outerSQL  NVARCHAR(MAX);
 
     SELECT @maxRow = MAX(RowNum) FROM #SerialBatch;
+
+    WHILE @offset <= @maxRow
+    BEGIN
+        SET @inList   = NULL;
+        SET @innerSQL = NULL;
+        SET @outerSQL = NULL;
+
+        SELECT @inList = STUFF((
+            SELECT ',' + '''' + REPLACE(FgserialNo, '''', '''''') + ''''
+            FROM #SerialBatch
+            WHERE RowNum BETWEEN @offset AND (@offset + @batchSize - 1)
+            FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 1, '');
+
+        IF @inList IS NOT NULL
+        BEGIN
+            SET @innerSQL =
+                'SELECT FgserialNo, DateTime ' +
+                'FROM WWMS.dbo.DispatchUnloading ' +
+                'WHERE FgserialNo IN (' + @inList + ')';
+
+            SET @innerSQL = REPLACE(@innerSQL, '''', '''''');
+
+            SET @outerSQL =
+                'INSERT INTO #Unloading (FgserialNo, UnloadingDate) ' +
+                'SELECT FgserialNo, DateTime ' +
+                'FROM OPENQUERY([10.100.95.134], ''' + @innerSQL + ''')';
+
+            EXEC sp_executesql @outerSQL;
+        END;
+
+        SET @offset = @offset + @batchSize;
+    END;
+
+    -- ── Step 4: Fetch DispatchMaster in batches of 200 ────────────────────
+    SET @offset = 1;
 
     WHILE @offset <= @maxRow
     BEGIN
@@ -111,7 +156,7 @@ export const getFGDispatchReport = tryCatch(async (req, res) => {
         SET @offset = @offset + @batchSize;
     END;
 
-    -- ── Step 4: Final report ───────────────────────────────────────────────
+    -- ── Step 5: Final report ───────────────────────────────────────────────
     ;WITH MB AS (
         SELECT
             b.DocNo,
@@ -120,23 +165,16 @@ export const getFGDispatchReport = tryCatch(async (req, res) => {
         FROM MaterialBarcode b
         INNER JOIN material c ON c.matcode = b.material
         WHERE b.Type NOT IN (200, 0)
-          AND b.Serial IN (SELECT FgserialNo FROM #Dispatch)
+          AND b.Serial IN (SELECT FgserialNo FROM #LabelPrint)
     )
     SELECT
         mb.Serial                                               AS FGSerialNo,
         mb.MaterialName,
         mb.DocNo,
 
-        -- FG Label Printing
-        CASE WHEN EXISTS (
-                SELECT 1 FROM ProcessRouting p
-                WHERE p.PSNo = mb.DocNo AND p.Status = 2
-                  AND p.StationCode IN (1220010, 1230017))
-             THEN 'SCANNED' ELSE 'NOT SCANNED'
-        END                                                     AS FG_LabelPrinting,
-        (SELECT MAX(p.CompletedOn) FROM ProcessRouting p
-         WHERE p.PSNo = mb.DocNo AND p.Status = 2
-           AND p.StationCode IN (1220010, 1230017))             AS FG_LabelPrinting_Date,
+        -- FG Label Printing (always SCANNED — it is the filter criterion)
+        'SCANNED'                                               AS FG_LabelPrinting,
+        lp.LabelPrintDate                                       AS FG_LabelPrinting_Date,
 
         -- FG Auto Scan
         CASE WHEN EXISTS (
@@ -149,9 +187,11 @@ export const getFGDispatchReport = tryCatch(async (req, res) => {
          WHERE p.PSNo = mb.DocNo AND p.Status = 2
            AND p.StationCode IN (1220009, 1230018))             AS FG_Auto_Scan_Date,
 
-        -- FG Unloading (always SCANNED — record only exists if unloaded)
-        'SCANNED'                                               AS FG_Unloading,
-        d.UnloadingDate                                         AS FG_Unloading_Date,
+        -- FG Unloading (may not have been dispatched yet)
+        CASE WHEN u.FgserialNo IS NOT NULL
+             THEN 'SCANNED' ELSE 'NOT SCANNED'
+        END                                                     AS FG_Unloading,
+        u.UnloadingDate                                         AS FG_Unloading_Date,
 
         -- Vehicle / Dispatch info
         dm.Session_ID,
@@ -160,9 +200,10 @@ export const getFGDispatchReport = tryCatch(async (req, res) => {
         dm.AddedOn                                              AS Vehicle_Entry_Time
 
     FROM MB mb
-    INNER JOIN #Dispatch       d  ON d.FgserialNo  = mb.Serial
-    LEFT  JOIN #DispatchMaster dm ON dm.FGSerialNo = mb.Serial
-    ORDER BY d.UnloadingDate DESC;
+    INNER JOIN #LabelPrint      lp ON lp.FgserialNo  = mb.Serial
+    LEFT  JOIN #Unloading       u  ON u.FgserialNo   = mb.Serial
+    LEFT  JOIN #DispatchMaster  dm ON dm.FGSerialNo  = mb.Serial
+    ORDER BY lp.LabelPrintDate DESC;
   `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();

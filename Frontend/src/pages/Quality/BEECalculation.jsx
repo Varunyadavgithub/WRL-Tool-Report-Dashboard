@@ -628,7 +628,7 @@ export default function BEECalculation() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                 <input
                   placeholder="Search model..."
-                  className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
+                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
                   value={searchModel}
                   onChange={(e) => setSearchModel(e.target.value.toLowerCase())}
                 />
@@ -669,7 +669,7 @@ export default function BEECalculation() {
                           <input
                             type="number"
                             value={m.volume}
-                            className="border border-slate-300 rounded-md px-2 py-1 w-20 text-xs outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                            className="border border-slate-200 rounded-lg px-2 py-1.5 w-20 text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
                             onChange={(e) => {
                               const arr = [...models];
                               arr[i].volume = e.target.value;
@@ -681,7 +681,7 @@ export default function BEECalculation() {
                           <div className="relative">
                             <select
                               value={m.type || "Not Defined"}
-                              className="appearance-none border border-slate-300 rounded-md px-2 py-1 pr-7 text-xs outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 w-full"
+                              className="appearance-none border border-slate-200 rounded-lg px-2 py-1.5 pr-7 text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all w-full"
                               onChange={(e) => {
                                 const arr = [...models];
                                 arr[i].type = e.target.value;
@@ -736,7 +736,7 @@ export default function BEECalculation() {
                   onChange={(e) =>
                     setNewModel({ ...newModel, model: e.target.value })
                   }
-                  className="flex-1 min-w-[140px] border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                  className="flex-1 min-w-[140px] border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
                 />
                 <input
                   placeholder="Volume"
@@ -745,7 +745,7 @@ export default function BEECalculation() {
                   onChange={(e) =>
                     setNewModel({ ...newModel, volume: e.target.value })
                   }
-                  className="w-24 border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                  className="w-24 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
                 />
                 <div className="relative">
                   <select
@@ -753,7 +753,7 @@ export default function BEECalculation() {
                     onChange={(e) =>
                       setNewModel({ ...newModel, type: e.target.value })
                     }
-                    className="appearance-none border border-slate-300 rounded-lg px-3 py-2 pr-8 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 w-36"
+                    className="appearance-none border border-slate-200 rounded-lg px-3 py-2 pr-8 text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all w-36"
                   >
                     <option value="Not Defined">Not Defined</option>
                     <option value="Hard Top">Hard Top</option>

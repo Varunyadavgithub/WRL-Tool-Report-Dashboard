@@ -646,8 +646,10 @@ const Overview = () => {
                     </tr>
                   </thead>
                   <tbody>
+                   
                     {filteredProductionData.length > 0 ? (
                       filteredProductionData.map((item, idx) => {
+                        
                         const isLast =
                           !isQuickMode &&
                           idx === filteredProductionData.length - 1;
@@ -688,7 +690,7 @@ const Overview = () => {
                               {item.CreatedOn?.replace("T", " ").replace("Z", "")}
                             </td>
                             <td className="px-3 py-2 border-b border-slate-100 text-slate-600 whitespace-nowrap">
-                              {item.Remark || "—"}
+                              {item.Name || "—"}
                             </td>
                           </tr>
                         );

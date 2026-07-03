@@ -189,16 +189,13 @@ export default function Settings() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
 
-      {/* ── Sticky Header — mirrors FPA header exactly ───────────────────── */}
-      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
+      {/* ── Sticky Header ─────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0 gap-4">
         <div>
-          <h1 className="text-lg font-bold text-gray-900 leading-none">
-            Permission Manager
-          </h1>
-          <p className="text-xs text-gray-400">
-            Role Access Control · Super Admin Only
-          </p>
+          <h1 className="text-lg font-bold text-gray-900 leading-none">Permission Manager</h1>
+          <p className="text-xs text-gray-400">Role Access Control · Super Admin Only</p>
         </div>
+
         <div className="flex items-center gap-2">
           <span
             className="px-3 py-1 rounded-full text-xs font-bold"
@@ -463,46 +460,105 @@ export default function Settings() {
                   {isExpanded && (
                     <div className="border-t border-gray-100 p-4 space-y-4">
 
-                      {/* Visible pages */}
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2.5">
-                          Pages
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-                          {visibleItems.map((item) => {
-                            const checked = permissions[section.key]?.[item.path] === true;
-                            return (
-                              <label
-                                key={item.path}
-                                className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer border-2 transition-all duration-150 ${
-                                  checked
-                                    ? "bg-indigo-50 border-indigo-200"
-                                    : "bg-slate-50 border-transparent hover:border-gray-200 hover:bg-white"
-                                }`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => toggleItem(section.key, item.path)}
-                                  className="sr-only"
-                                />
-                                {checked
-                                  ? <CheckSquare className="w-4 h-4 text-indigo-600 flex-shrink-0 mt-0.5" />
-                                  : <Square className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" />
-                                }
-                                <div className="min-w-0">
-                                  <p className={`text-xs font-semibold truncate ${checked ? "text-indigo-800" : "text-gray-600"}`}>
-                                    {item.label}
-                                  </p>
-                                  <p className="text-[10px] text-gray-400 font-mono truncate mt-0.5">
-                                    {item.path}
-                                  </p>
+                      {/* Visible pages — with optional subgroup grouping */}
+                      {(() => {
+                        const subgroupConfig = section.subgroupConfig ?? [];
+                        const ungrouped = visibleItems.filter((i) => !i.group);
+                        const subgroups = subgroupConfig
+                          .map((sg) => ({ ...sg, items: visibleItems.filter((i) => i.group === sg.key) }))
+                          .filter((sg) => sg.items.length > 0);
+
+                        const ItemCard = ({ item }) => {
+                          const checked = permissions[section.key]?.[item.path] === true;
+                          return (
+                            <label
+                              key={item.path}
+                              className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer border-2 transition-all duration-150 ${
+                                checked
+                                  ? "bg-indigo-50 border-indigo-200"
+                                  : "bg-slate-50 border-transparent hover:border-gray-200 hover:bg-white"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleItem(section.key, item.path)}
+                                className="sr-only"
+                              />
+                              {checked
+                                ? <CheckSquare className="w-4 h-4 text-indigo-600 flex-shrink-0 mt-0.5" />
+                                : <Square className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" />
+                              }
+                              <div className="min-w-0">
+                                <p className={`text-xs font-semibold truncate ${checked ? "text-indigo-800" : "text-gray-600"}`}>
+                                  {item.label}
+                                </p>
+                                <p className="text-[10px] text-gray-400 font-mono truncate mt-0.5">
+                                  {item.path}
+                                </p>
+                              </div>
+                            </label>
+                          );
+                        };
+
+                        if (!subgroups.length) {
+                          return (
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2.5">Pages</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                                {visibleItems.map((item) => <ItemCard key={item.path} item={item} />)}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="space-y-4">
+                            {ungrouped.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2.5">General</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                                  {ungrouped.map((item) => <ItemCard key={item.path} item={item} />)}
                                 </div>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
+                              </div>
+                            )}
+                            {subgroups.map((sg) => {
+                              const sgGranted = sg.items.filter((i) => permissions[section.key]?.[i.path]).length;
+                              const sgAllOn = sgGranted === sg.items.length;
+                              return (
+                                <div key={sg.key}>
+                                  <div className="flex items-center justify-between mb-2.5">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{sg.label}</p>
+                                      <span className="text-[10px] text-gray-300">{sgGranted}/{sg.items.length}</span>
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        const next = {};
+                                        sg.items.forEach((i) => { next[i.path] = !sgAllOn; });
+                                        setPermissions((prev) => ({
+                                          ...prev,
+                                          [section.key]: { ...prev[section.key], ...next },
+                                        }));
+                                        setHasChanges(true);
+                                        setSaved(false);
+                                      }}
+                                      className={`text-[10px] px-2 py-0.5 rounded font-semibold transition-colors ${sgAllOn ? "bg-indigo-100 text-indigo-600 hover:bg-indigo-200" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+                                    >
+                                      {sgAllOn ? "Deselect" : "Select all"}
+                                    </button>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                                    {sg.items.map((item) => <ItemCard key={item.path} item={item} />)}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+
 
                       {/* System / hidden routes */}
                       {hiddenItems.length > 0 && (

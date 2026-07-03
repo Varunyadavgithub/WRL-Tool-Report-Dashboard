@@ -74,6 +74,7 @@ export const insertLptRecipe = tryCatch(async (req, res) => {
     maxCurr,
     minPow,
     maxPow,
+    bis,
   } = req.body;
 
   if (
@@ -104,11 +105,12 @@ export const insertLptRecipe = tryCatch(async (req, res) => {
       .input("MinCurrent", sql.VarChar, minCurr)
       .input("MaxCurrent", sql.VarChar, maxCurr)
       .input("MinPower", sql.VarChar, minPow)
-      .input("MaxPower", sql.VarChar, maxPow);
+      .input("MaxPower", sql.VarChar, maxPow)
+      .input("BIS", sql.VarChar, bis || "Non BIS");
 
     await request.query(`
-      INSERT INTO LPTRecipe (Matcode, ModelName, MinTemp, MaxTemp, MinCurrent, MaxCurrent, MinPower, MaxPower)
-      VALUES (@matcode, @modelName, @MinTemp, @MaxTemp, @MinCurrent, @MaxCurrent, @MinPower, @MaxPower)
+      INSERT INTO LPTRecipe (Matcode, ModelName, MinTemp, MaxTemp, MinCurrent, MaxCurrent, MinPower, MaxPower, BIS)
+      VALUES (@matcode, @modelName, @MinTemp, @MaxTemp, @MinCurrent, @MaxCurrent, @MinPower, @MaxPower, @BIS)
     `);
 
     res
@@ -126,7 +128,7 @@ export const insertLptRecipe = tryCatch(async (req, res) => {
 
 export const updateLptRecipe = tryCatch(async (req, res) => {
   const { modelName } = req.params;
-  const { minTemp, maxTemp, minCurr, maxCurr, minPow, maxPow } = req.body;
+  const { minTemp, maxTemp, minCurr, maxCurr, minPow, maxPow, bis } = req.body;
 
   if (!minTemp || !maxTemp || !minCurr || !maxCurr || !minPow || !maxPow) {
     throw new AppError(
@@ -146,17 +148,19 @@ export const updateLptRecipe = tryCatch(async (req, res) => {
       .input("MinCurrent", sql.VarChar, minCurr)
       .input("MaxCurrent", sql.VarChar, maxCurr)
       .input("MinPower", sql.VarChar, minPow)
-      .input("MaxPower", sql.VarChar, maxPow);
+      .input("MaxPower", sql.VarChar, maxPow)
+      .input("BIS", sql.VarChar, bis || "Non BIS");
 
     await request.query(`
   UPDATE LPTRecipe
-  SET 
+  SET
     MinTemp = @MinTemp,
     MaxTemp = @MaxTemp,
     MinCurrent = @MinCurrent,
     MaxCurrent = @MaxCurrent,
     MinPower = @MinPower,
-    MaxPower = @MaxPower
+    MaxPower = @MaxPower,
+    BIS = @BIS
   WHERE ModelName = @modelName
 `);
 

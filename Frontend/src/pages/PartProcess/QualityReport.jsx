@@ -66,6 +66,7 @@ const PartProcessQualityReport = () => {
   const [showRaw, setShowRaw]     = useState(false);
   const donutChartRef = useRef(null);
   const modelBarChartRef = useRef(null);
+  const defectBarChartRef = useRef(null);
 
   const fetchData = useCallback(async (start, end, setLoadFn) => {
     const startMs = new Date(start.replace(" ", "T") + ":00").getTime();
@@ -210,6 +211,53 @@ const PartProcessQualityReport = () => {
     return { inspected, accepted, rejected, passRate, hasData: inspected > 0 };
   }, [qualityLogByModel, analysis.totalComponentQty]);
 
+  // ── Defect-wise aggregation ──────────────────────────────────────────────
+  const defectAnalysis = useMemo(() => {
+    if (!dbQLogs.length) return [];
+    const map = {};
+    dbQLogs.forEach((e) => {
+      const code = e.DefectCode || e.defectCode || "Unknown";
+      const name = e.DefectName || e.defectName || "Unknown";
+      const rej  = parseInt(e.RejectedQty ?? e.rejectedQty ?? 0, 10);
+      const sev  = e.Severity || e.severity || "";
+      if (!map[code]) map[code] = { code, name, rejected: 0, occurrences: 0, critical: 0, major: 0, minor: 0 };
+      map[code].rejected    += rej;
+      map[code].occurrences += 1;
+      if (sev === "Critical") map[code].critical += rej;
+      else if (sev === "Major") map[code].major   += rej;
+      else if (sev === "Minor") map[code].minor   += rej;
+    });
+    return Object.values(map).sort((a, b) => b.rejected - a.rejected);
+  }, [dbQLogs]);
+
+  const defectBarData = useMemo(() => {
+    if (!defectAnalysis.length) return null;
+    const DEFECT_COLORS = ["#f43f5e","#f97316","#eab308","#a78bfa","#3b82f6","#06b6d4","#10b981","#64748b"];
+    return {
+      labels: defectAnalysis.map((d) => d.code ? `${d.code} · ${d.name}` : d.name),
+      datasets: [{
+        label: "Rejected Qty",
+        data: defectAnalysis.map((d) => d.rejected),
+        backgroundColor: defectAnalysis.map((_, i) => DEFECT_COLORS[i % DEFECT_COLORS.length]),
+        borderRadius: 4,
+      }],
+    };
+  }, [defectAnalysis]);
+
+  const defectBarOptions = {
+    indexAxis: "y",
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: (ctx) => ` ${ctx.parsed.x} rejected` } },
+    },
+    scales: {
+      x: { ticks: { font: { size: 10 } }, title: { display: true, text: "Rejected Qty", font: { size: 10 } } },
+      y: { ticks: { font: { size: 10 } } },
+    },
+  };
+
   const donutData = useMemo(() => {
     if (qualityLogTotals.hasData) {
       return {
@@ -289,6 +337,17 @@ const PartProcessQualityReport = () => {
     { label: "Remarks", align: "left", value: (e) => e.Remarks || e.remarks || "" },
   ];
 
+  const defectColumns = [
+    { label: "Defect Code",  align: "left",   value: (d) => d.code },
+    { label: "Defect Name",  align: "left",   value: (d) => d.name },
+    { label: "Occurrences",  align: "center", value: (d) => d.occurrences },
+    { label: "Rejected Qty", align: "center", value: (d) => d.rejected },
+    { label: "Critical",     align: "center", value: (d) => d.critical || 0 },
+    { label: "Major",        align: "center", value: (d) => d.major || 0 },
+    { label: "Minor",        align: "center", value: (d) => d.minor || 0 },
+    { label: "% of Total",   align: "center", value: (d) => qualityLogTotals.rejected > 0 ? ((d.rejected / qualityLogTotals.rejected) * 100).toFixed(1) + "%" : "—" },
+  ];
+
   const buildExportBlocks = () => {
     const blocks = [
       { type: "table", heading: "Model-wise Quality", columns: exportColumns, rows: analysis.modelBreakdown },
@@ -305,6 +364,16 @@ const PartProcessQualityReport = () => {
         type: "image", heading: "Accepted vs Rejected",
         dataUrl: modelBarChartRef.current?.toBase64Image?.(),
         width: 500, height: Math.max(160, modelBarData.labels.length * 36),
+      });
+    }
+    if (defectAnalysis.length > 0) {
+      blocks.push({ type: "table", heading: "Defect-wise Analysis", columns: defectColumns, rows: defectAnalysis });
+    }
+    if (defectBarData) {
+      blocks.push({
+        type: "image", heading: "Rejections by Defect",
+        dataUrl: defectBarChartRef.current?.toBase64Image?.(),
+        width: 500, height: Math.max(160, defectBarData.labels.length * 36),
       });
     }
     if (dbQLogs.length > 0) {
@@ -572,6 +641,74 @@ const PartProcessQualityReport = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* ── DEFECT-WISE ANALYSIS ── */}
+        {defectAnalysis.length > 0 && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {/* Defect summary table */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100">
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Defect-wise Analysis</span>
+                <span className="ml-1 text-[10px] text-slate-400">· {defectAnalysis.length} defect type{defectAnalysis.length !== 1 ? "s" : ""}</span>
+              </div>
+              <div className="overflow-auto">
+                <table className="min-w-full text-xs border-separate border-spacing-0">
+                  <thead className="sticky top-0 z-10 bg-slate-50">
+                    <tr>
+                      {["Defect Code", "Defect Name", "Occurrences", "Rejected Qty", "Critical", "Major", "Minor", "% of Total"].map((h) => (
+                        <th key={h} className={`px-3 py-2.5 text-[11px] font-semibold border-b border-slate-200 whitespace-nowrap text-left ${h === "Rejected Qty" ? "text-rose-500" : h === "Critical" ? "text-red-600" : h === "Major" ? "text-orange-600" : h === "Minor" ? "text-amber-600" : "text-slate-600"}`}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {defectAnalysis.map((d, i) => {
+                      const pct = qualityLogTotals.rejected > 0 ? ((d.rejected / qualityLogTotals.rejected) * 100).toFixed(1) : "0.0";
+                      return (
+                        <tr key={i} className="hover:bg-rose-50/30 transition-colors even:bg-slate-50/30">
+                          <td className="px-3 py-2 border-b border-slate-100 font-mono font-bold text-violet-600">{d.code}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 font-semibold text-slate-700">{d.name}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-500 text-center">{d.occurrences}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 font-bold font-mono text-rose-500 text-center">{d.rejected}</td>
+                          <td className="px-3 py-2 border-b border-slate-100 font-mono text-center">
+                            {d.critical > 0 ? <span className="font-bold text-red-600">{d.critical}</span> : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 font-mono text-center">
+                            {d.major > 0 ? <span className="font-bold text-orange-600">{d.major}</span> : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 font-mono text-center">
+                            {d.minor > 0 ? <span className="font-bold text-amber-600">{d.minor}</span> : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-3 py-2 border-b border-slate-100 text-center">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-rose-400 rounded-full" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="font-bold font-mono text-slate-600 w-10 text-right">{pct}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Defect bar chart */}
+            {defectBarData && (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100">
+                  <BarChart2 className="w-3.5 h-3.5 text-rose-500" />
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Rejections by Defect</span>
+                </div>
+                <div className="p-3" style={{ height: `${Math.max(200, defectBarData.labels.length * 40)}px` }}>
+                  <Bar ref={defectBarChartRef} data={defectBarData} options={defectBarOptions} />
+                </div>
+              </div>
+            )}
           </div>
         )}
 

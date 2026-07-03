@@ -3,6 +3,9 @@ import { FaHistory, FaChevronRight } from "react-icons/fa";
 import toast from "react-hot-toast";
 import useAuditData from "../../../../hooks/useAuditData";
 import BeforeAfterCard from "./BeforeAfterCard";
+import { getActionConfig } from "../constants/historyConfig";
+import { HistoryStatusBadge, HistoryTypeBadge as TypeBadge } from "./diff/HistoryBadges";
+import { fmtDateLong as fmtDate } from "../../utils/formatters";
 
 // Consolidated "Change History" timeline — previously duplicated independently
 // in TemplateList.jsx, TemplateBuilder.jsx, and TemplateApproval.jsx. Renders
@@ -14,54 +17,10 @@ import BeforeAfterCard from "./BeforeAfterCard";
 //   "inline-grid" — inside a card (TemplateList/TemplateApproval grid view)
 //   "inline-list" — inside an expanded table row (TemplateList/TemplateApproval list view)
 //   "panel"       — inside TemplateBuilder's review-mode section (own chrome already)
-
-const ACTION_CFG = {
-  created: { label: "Created", color: "text-indigo-600", dot: "bg-indigo-400", type: "new" },
-  updated: { label: "Updated", color: "text-blue-600", dot: "bg-blue-400", type: "edit" },
-  submitted_for_approval: { label: "Submitted for Approval", color: "text-amber-600", dot: "bg-amber-400", type: "edit" },
-  status_changed: { label: "Status Changed", color: "text-violet-600", dot: "bg-violet-400", type: "edit" },
-  approved: { label: "Approved", color: "text-green-600", dot: "bg-green-500", type: "edit" },
-  rejected: { label: "Rejected", color: "text-red-600", dot: "bg-red-500", type: "edit" },
-  deleted: { label: "Deleted", color: "text-gray-500", dot: "bg-gray-400", type: "edit" },
-  re_drafted: { label: "Re-drafted (was Approved)", color: "text-orange-600", dot: "bg-orange-400", type: "edit" },
-  version_created: { label: "New Version Created", color: "text-blue-600", dot: "bg-blue-400", type: "edit" },
-  duplicated_as_new: { label: "Duplicated as New Template", color: "text-indigo-600", dot: "bg-indigo-400", type: "new" },
-  duplicated_as_version: { label: "Version Created via Duplicate", color: "text-blue-600", dot: "bg-blue-400", type: "edit" },
-};
-
-const STATUS_LABELS = {
-  draft: { label: "Draft", cls: "bg-gray-100 text-gray-700 border-gray-300" },
-  pending_approval: { label: "Pending", cls: "bg-amber-100 text-amber-700 border-amber-300" },
-  approved: { label: "Approved", cls: "bg-green-100 text-green-700 border-green-300" },
-  rejected: { label: "Rejected", cls: "bg-red-100 text-red-700 border-red-300" },
-};
-
-const fmtDate = (d) => {
-  if (!d) return "—";
-  return new Date(d).toLocaleString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true,
-  });
-};
-
-const HistoryStatusBadge = ({ status }) => {
-  const cfg = STATUS_LABELS[status] || { label: "Not Set", cls: "bg-slate-100 text-slate-600 border-slate-200" };
-  return (
-    <span className={`inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${cfg.cls}`}>
-      {cfg.label}
-    </span>
-  );
-};
-
-const TypeBadge = ({ type }) =>
-  type === "new" ? (
-    <span className="inline-flex items-center text-[9px] font-black px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 uppercase tracking-wide">
-      New Template
-    </span>
-  ) : (
-    <span className="inline-flex items-center text-[9px] font-black px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-wide">
-      Template Edit
-    </span>
-  );
+//
+// Action/status config + badges now live in Template/constants/historyConfig.js
+// and Template/components/diff/HistoryBadges.jsx — shared with the full-page
+// TemplateChangeLog view so both render history identically.
 
 const OUTER_CLASSES = {
   "inline-grid": "mt-3 border-t border-indigo-100 pt-3",
@@ -114,7 +73,7 @@ const TemplateHistoryPanel = ({ templateId, isOpen, variant = "inline-grid", tit
       ) : (
         <div className="relative border-l-2 border-indigo-100 ml-2 space-y-1.5">
           {history.map((entry) => {
-            const cfg = ACTION_CFG[entry.Action?.toLowerCase()] || ACTION_CFG.updated;
+            const cfg = getActionConfig(entry.Action);
             return (
               <div key={entry.Id} className="relative pl-4">
                 <div className={`absolute -left-[5px] top-2 w-2 h-2 rounded-full ring-1 ring-white ${cfg.dot}`} />

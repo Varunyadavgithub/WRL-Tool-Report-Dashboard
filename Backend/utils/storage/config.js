@@ -14,6 +14,7 @@ export const DIRS = {
   auditImages: path.resolve(UPLOADS_DIR, "AuditImages"),
   auditTemplates: path.resolve(UPLOADS_DIR, "AuditTemplates"),
   machineImages: path.resolve(UPLOADS_DIR, "MachineImages"),
+  materialDrawings: path.resolve(UPLOADS_DIR, "MaterialDrawings"),
 };
 
 /* ===================== ENSURE DIRS EXIST ===================== */
@@ -85,6 +86,15 @@ export const UPLOAD_CONFIGS = {
     ...FILE_TYPES.image,
     errorMessage: "Only JPEG, JPG or PNG images are allowed",
     maxSize: FILE_TYPES.image.maxSize, // 10MB
+  },
+
+  materialDrawing: {
+    allowedMimes: [
+      ...FILE_TYPES.pdf.allowedMimes,
+      ...FILE_TYPES.image.allowedMimes,
+    ],
+    errorMessage: "Only PDF or image files (JPG, PNG) are allowed for drawings",
+    maxSize: 20 * 1024 * 1024, // 20MB
   },
 };
 

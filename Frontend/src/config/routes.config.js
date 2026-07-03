@@ -14,6 +14,14 @@ import {
   FileText,
   Cog,
   Settings2,
+  BarChart2,
+  Shield,
+  Activity,
+  Network,
+  Users,
+  Clock,
+  BookOpen,
+  Database,
 } from "lucide-react";
 
 // Lazy loaded components
@@ -163,6 +171,7 @@ const PartProcessHourlyReport  = lazy(() => import("../pages/PartProcess/HourlyR
 const PartProcessQualityReport = lazy(() => import("../pages/PartProcess/QualityReport"));
 const PartProcessDowntimeReport = lazy(() => import("../pages/PartProcess/DowntimeReport"));
 const FactoryMonitor           = lazy(() => import("../pages/PartProcess/FactoryMonitor"));
+const PartProcessOEEReport     = lazy(() => import("../pages/PartProcess/OEEReport"));
 
 // ─── Role Constants ───────────────────────────────────────────────────────────
 export const ROLES = {
@@ -253,67 +262,24 @@ export const ROUTE_CONFIG = [
     icon: Factory,
     label: "Production",
     basePath: "/production",
+    subgroupConfig: [
+      { key: "operations", label: "Operations" },
+      { key: "reports",    label: "Reports" },
+      { key: "traceability", label: "Traceability" },
+    ],
     items: [
-      {
-        path: "/production/overview",
-        label: "Production Report",
-        component: ProductionOverview,
-      },
-      {
-        path: "/production/component-traceability-report",
-        label: "Component Traceability Report",
-        component: ComponentTraceabilityReport,
-      },
-      {
-        path: "/production/hourly-report",
-        label: "Hourly Report",
-        component: HourlyReport,
-      },
-      {
-        path: "/production/line-hourly-report",
-        label: "Line Hourly Report",
-        component: LineHourlyReport,
-      },
-      {
-        path: "/production/line-wise-report",
-        label: "Line Wise Report",
-        component: LineWiseReport,
-      },
-      {
-        path: "/production/consolidated-report",
-        label: "Consolidated Report",
-        component: ConsolidatedReport,
-      },
-      {
-        path: "/production/model-name-update",
-        label: "Model Name Update",
-        component: ModelNameUpdate,
-      },
-      {
-        path: "/production/nfc-report",
-        label: "NFC Report",
-        component: NFCReport,
-      },
-      {
-        path: "/production/total-production",
-        label: "Total Production",
-        component: TotalProduction,
-      },
-      {
-        path: "/production/stop-loss-report",
-        label: "Stop Loss Report",
-        component: StopLossReport,
-      },
-      {
-        path: "/production/manpower-report",
-        label: "Manpower Report",
-        component: ManpowerReport,
-      },
-      {
-        path: "/production/wip-capture",
-        label: "WIP Capture",
-        component: WIPCapture,
-      },
+      { path: "/production/overview",                    label: "Production Report",             component: ProductionOverview,             group: "operations" },
+      { path: "/production/wip-capture",                 label: "WIP Capture",                   component: WIPCapture,                     group: "operations" },
+      { path: "/production/model-name-update",           label: "Model Name Update",              component: ModelNameUpdate,                group: "operations" },
+      { path: "/production/hourly-report",               label: "Hourly Report",                 component: HourlyReport,                   group: "reports" },
+      { path: "/production/line-hourly-report",          label: "Line Hourly Report",             component: LineHourlyReport,               group: "reports" },
+      { path: "/production/line-wise-report",            label: "Line Wise Report",               component: LineWiseReport,                 group: "reports" },
+      { path: "/production/consolidated-report",         label: "Consolidated Report",            component: ConsolidatedReport,             group: "reports" },
+      { path: "/production/nfc-report",                  label: "NFC Report",                    component: NFCReport,                      group: "reports" },
+      { path: "/production/total-production",            label: "Total Production",               component: TotalProduction,                group: "reports" },
+      { path: "/production/stop-loss-report",            label: "Stop Loss Report",               component: StopLossReport,                 group: "reports" },
+      { path: "/production/manpower-report",             label: "Manpower Report",               component: ManpowerReport,                 group: "reports" },
+      { path: "/production/component-traceability-report", label: "Component Traceability Report", component: ComponentTraceabilityReport,  group: "traceability" },
     ],
   },
 
@@ -323,17 +289,21 @@ export const ROUTE_CONFIG = [
     icon: Settings2,
     label: "Master Config",
     basePath: "/master-config",
+    subgroupConfig: [
+      { key: "config", label: "Configuration" },
+      { key: "admin",  label: "Admin" },
+    ],
     items: [
-      { path: "/master-config/overview",  label: "Overview",                component: MasterConfigOverview },
-      { path: "/master-config/material",  label: "Material Configuration",  component: MaterialConfig       },
-      { path: "/master-config/checkpoint-library", label: "Checkpoint Library", component: CheckpointLibraryConfig },
-      { path: "/master-config/shift",     label: "Shift Configuration",     component: ShiftConfig          },
-      { path: "/master-config/downtime",  label: "Downtime Configuration",  component: DowntimeConfig       },
-      { path: "/master-config/quality",   label: "Quality Configuration",   component: QualityConfig        },
-      { path: "/master-config/machine",   label: "Machine Configuration",   component: MachineConfig        },
-      { path: "/master-config/planning",  label: "Planning Configuration",  component: PlanningConfig       },
-      { path: "/master-config/mail",      label: "Mail & Notifications",    component: MailConfig           },
-      { path: "/master-config/audit",     label: "Audit Trail",             component: AuditTrail           },
+      { path: "/master-config/overview",            label: "Overview",                 component: MasterConfigOverview,      group: "admin"   },
+      { path: "/master-config/mail",                label: "Mail & Notifications",     component: MailConfig,                group: "admin"   },
+      { path: "/master-config/audit",               label: "Audit Trail",              component: AuditTrail,                group: "admin"   },
+      { path: "/master-config/material",            label: "Material",                 component: MaterialConfig,            group: "config"  },
+      { path: "/master-config/checkpoint-library",  label: "Checkpoint Library",       component: CheckpointLibraryConfig,   group: "config"  },
+      { path: "/master-config/shift",               label: "Shift",                    component: ShiftConfig,               group: "config"  },
+      { path: "/master-config/downtime",            label: "Downtime",                 component: DowntimeConfig,            group: "config"  },
+      { path: "/master-config/quality",             label: "Quality",                  component: QualityConfig,             group: "config"  },
+      { path: "/master-config/machine",             label: "Machine",                  component: MachineConfig,             group: "config"  },
+      { path: "/master-config/planning",            label: "Planning",                 component: PlanningConfig,            group: "config"  },
     ],
   },
 
@@ -370,6 +340,11 @@ export const ROUTE_CONFIG = [
         component: PartProcessDowntimeReport,
       },
       {
+        path: "/part-process/oee-report",
+        label: "OEE Report",
+        component: PartProcessOEEReport,
+      },
+      {
         path: "/part-process/factory-monitor",
         label: "Factory Monitor",
         component: FactoryMonitor,
@@ -389,97 +364,31 @@ export const ROUTE_CONFIG = [
     icon: ShieldCheck,
     label: "Quality",
     basePath: "/quality",
+    subgroupConfig: [
+      { key: "general", label: "General" },
+      { key: "lpt",     label: "LPT" },
+      { key: "fpa",     label: "FPA" },
+      { key: "bis",     label: "BIS" },
+    ],
     items: [
-      {
-        path: "/quality/rework-report",
-        label: "Rework Report",
-        component: ReworkReport,
-      },
-      {
-        path: "/quality/gas-charging-report",
-        label: "Gas Charging Report",
-        component: GasChargingReport,
-      },
-      {
-        path: "/quality/est-report",
-        label: "EST Report",
-        component: ESTReport,
-      },
-      {
-        path: "/quality/cpt-report",
-        label: "CPT Report",
-        component: CPTReport,
-      },
-      {
-        path: "/quality/fpa",
-        label: "FPA",
-        component: FPA,
-      },
-      {
-        path: "/quality/fpa-report",
-        label: "FPA Report",
-        component: FPAReports,
-      },
-      {
-        path: "/quality/fpa-history",
-        label: "FPA History",
-        component: FPAHistory,
-      },
-      {
-        path: "/quality/fpa-defect-report",
-        label: "FPA Defect Report",
-        component: FPADefectReport,
-      },
-      {
-        path: "/quality/lpt",
-        label: "LPT",
-        component: LPT,
-      },
-      {
-        path: "/quality/lpt-report",
-        label: "LPT Report",
-        component: LPTReport,
-      },
-      {
-        path: "/quality/mass-flow-report",
-        label: "Mass Flow Report",
-        component: MassFlowReport,
-      },
-      {
-        path: "/quality/lpt-recipe",
-        label: "LPT Recipe",
-        component: LPTRecipe,
-      },
-      {
-        path: "/quality/dispatch-hold",
-        label: "Dispatch Hold",
-        component: DispatchHold,
-      },
-      {
-        path: "/quality/hold-cabinate-details",
-        label: "Hold Cabinet Details",
-        component: HoldCabinateDetails,
-      },
-      {
-        path: "/quality/tag-update",
-        label: "Tag Update",
-        component: TagUpdate,
-      },
-      {
-        path: "/quality/upload-bis-report",
-        label: "Upload BIS Report",
-        component: UploadBISReport,
-      },
-      {
-        path: "/quality/bis-reports",
-        label: "BIS Reports",
-        component: BISReports,
-      },
-      {
-        path: "/quality/bee-calculation",
-        label: "BEE Calculation",
-        component: BEECalculation,
-      },
+      { path: "/quality/rework-report",       label: "Rework Report",       component: ReworkReport,       group: "general" },
+      { path: "/quality/gas-charging-report", label: "Gas Charging Report", component: GasChargingReport,  group: "general" },
+      { path: "/quality/est-report",          label: "EST Report",          component: ESTReport,          group: "general" },
+      { path: "/quality/cpt-report",          label: "CPT Report",          component: CPTReport,          group: "general" },
+      { path: "/quality/dispatch-hold",       label: "Dispatch Hold",       component: DispatchHold,       group: "general" },
+      { path: "/quality/hold-cabinate-details", label: "Hold Cabinet Details", component: HoldCabinateDetails, group: "general" },
+      { path: "/quality/tag-update",          label: "Tag Update",          component: TagUpdate,          group: "general" },
+      { path: "/quality/lpt",                 label: "LPT",                 component: LPT,                group: "lpt" },
+      { path: "/quality/lpt-report",          label: "LPT Report",          component: LPTReport,          group: "lpt" },
+      { path: "/quality/lpt-recipe",          label: "LPT Recipe",          component: LPTRecipe,          group: "lpt" },
+      { path: "/quality/mass-flow-report",    label: "Mass Flow Report",    component: MassFlowReport,     group: "lpt" },
+      { path: "/quality/fpa",                 label: "FPA",                 component: FPA,                group: "fpa" },
+      { path: "/quality/fpa-report",          label: "FPA Report",          component: FPAReports,         group: "fpa" },
+      { path: "/quality/fpa-history",         label: "FPA History",         component: FPAHistory,         group: "fpa" },
+      { path: "/quality/fpa-defect-report",   label: "FPA Defect Report",   component: FPADefectReport,    group: "fpa" },
+      { path: "/quality/upload-bis-report",   label: "Upload BIS Report",   component: UploadBISReport,    group: "bis" },
+      { path: "/quality/bis-reports",         label: "BIS Reports",         component: BISReports,         group: "bis" },
+      { path: "/quality/bee-calculation",     label: "BEE Calculation",     component: BEECalculation,     group: "bis" },
     ],
   },
 
@@ -600,37 +509,17 @@ export const ROUTE_CONFIG = [
     icon: ClipboardCheck,
     label: "Audit Report",
     basePath: "/auditreport",
+    subgroupConfig: [
+      { key: "templates", label: "Templates" },
+      { key: "audits",    label: "Audits" },
+    ],
     items: [
-      {
-        path: "/auditreport/templates",
-        label: "Templates",
-        component: TemplateList,
-      },
-      {
-        path: "/auditreport/approval",
-        label: "Template Approval",
-        component: TemplateApproval,
-      },
-      {
-        path: "/auditreport/serial-scan",
-        label: "Serial Scan",
-        component: SerialScan,
-      },
-      {
-        path: "/auditreport/audits",
-        label: "Audits",
-        component: AuditList,
-      },
-      {
-        path: "/auditreport/audit-approval",
-        label: "Audit Approval",
-        component: AuditApproval,
-      },
-      {
-        path: "/auditreport/dashboard",
-        label: "Dashboard",
-        component: AuditDashboard,
-      },
+      { path: "/auditreport/templates",      label: "Templates",         component: TemplateList,     group: "templates" },
+      { path: "/auditreport/approval",       label: "Template Approval", component: TemplateApproval, group: "templates" },
+      { path: "/auditreport/serial-scan",    label: "Serial Scan",       component: SerialScan,       group: "templates" },
+      { path: "/auditreport/audits",         label: "Audits",            component: AuditList,        group: "audits" },
+      { path: "/auditreport/audit-approval", label: "Audit Approval",    component: AuditApproval,    group: "audits" },
+      { path: "/auditreport/dashboard",      label: "Dashboard",         component: AuditDashboard,   group: "audits" },
     ],
     hiddenItems: [
       {
@@ -699,47 +588,19 @@ export const ROUTE_CONFIG = [
     icon: FileText,
     label: "Forms",
     basePath: "/forms",
+    subgroupConfig: [
+      { key: "hr",         label: "HR & Manpower" },
+      { key: "attendance", label: "Attendance" },
+    ],
     items: [
-      {
-        path: "/forms/manpower-form",
-        label: "Manpower Form",
-        component: ManpowerForm,
-      },
-      {
-        path: "/forms/manpower-approval",
-        label: "Manpower Approval",
-        component: ManpowerApproval,
-      },
-      {
-        path: "/forms/security-manpower",
-        label: "Security Manpower List",
-        component: SecurityManpowerList,
-      },
-      {
-        path: "/forms/attendance",
-        label: "Attendance Register",
-        component: AttendanceRegister,
-      },
-      {
-        path: "/forms/my-attendance",
-        label: "My Attendance",
-        component: MyAttendance,
-      },
-      {
-        path: "/forms/attendance-dashboard",
-        label: "Attendance Dashboard",
-        component: AttendanceDashboard,
-      },
-      {
-        path: "/forms/leave-application",
-        label: "Leave Application",
-        component: LeaveApplication,
-      },
-      {
-        path: "/forms/leave-approval",
-        label: "Leave Approval",
-        component: LeaveApproval,
-      },
+      { path: "/forms/manpower-form",        label: "Manpower Form",          component: ManpowerForm,          group: "hr" },
+      { path: "/forms/manpower-approval",    label: "Manpower Approval",      component: ManpowerApproval,      group: "hr" },
+      { path: "/forms/security-manpower",    label: "Security Manpower List", component: SecurityManpowerList,  group: "hr" },
+      { path: "/forms/attendance",           label: "Attendance Register",    component: AttendanceRegister,    group: "attendance" },
+      { path: "/forms/my-attendance",        label: "My Attendance",          component: MyAttendance,          group: "attendance" },
+      { path: "/forms/attendance-dashboard", label: "Attendance Dashboard",   component: AttendanceDashboard,   group: "attendance" },
+      { path: "/forms/leave-application",    label: "Leave Application",      component: LeaveApplication,      group: "attendance" },
+      { path: "/forms/leave-approval",       label: "Leave Approval",         component: LeaveApproval,         group: "attendance" },
     ],
   },
 ];
