@@ -1,4 +1,5 @@
 import express from "express";
+import { authenticate } from "../middlewares/auth.js";
 import {
   componentTraceabilityExportData,
   generateReport,
@@ -99,109 +100,109 @@ import {
 const router = express.Router();
 
 // -----------------> Component Details
-router.get("/component-details", getComponentDetails);
+router.get("/component-details", authenticate, getComponentDetails);
 // -----------------> Component Traceability
-router.get("/component-traceability", generateReport);
-router.get("/export-component-traceability", componentTraceabilityExportData);
+router.get("/component-traceability", authenticate, generateReport);
+router.get("/export-component-traceability", authenticate, componentTraceabilityExportData);
 // -----------------> Hourly Report
-router.get("/hourly-summary", getHourlySummary);
-router.get("/hourly-model-count", getHourlyModelCount);
-router.get("/hourly-category-count", getHourlyCategoryCount);
+router.get("/hourly-summary", authenticate, getHourlySummary);
+router.get("/hourly-model-count", authenticate, getHourlyModelCount);
+router.get("/hourly-category-count", authenticate, getHourlyCategoryCount);
 // -----------------> Line Hourly Report
 // Final Loading Routes
-router.get("/final-loading-hp-frz", getFinalLoadingHPFrz);
-router.get("/final-loading-hp-choc", getFinalLoadingHPChoc);
-router.get("/final-loading-hp-sus", getFinalLoadingHPSUS);
-router.get("/final-loading-hp-cat", getFinalLoadingHPCAT);
+router.get("/final-loading-hp-frz", authenticate, getFinalLoadingHPFrz);
+router.get("/final-loading-hp-choc", authenticate, getFinalLoadingHPChoc);
+router.get("/final-loading-hp-sus", authenticate, getFinalLoadingHPSUS);
+router.get("/final-loading-hp-cat", authenticate, getFinalLoadingHPCAT);
 
 // Final Line Routes
-router.get("/final-hp-frz", getFinalHPFrz);
-router.get("/final-hp-choc", getFinalHPChoc);
-router.get("/final-hp-sus", getFinalHPSUS);
-router.get("/final-hp-cat", getFinalHPCAT);
+router.get("/final-hp-frz", authenticate, getFinalHPFrz);
+router.get("/final-hp-choc", authenticate, getFinalHPChoc);
+router.get("/final-hp-sus", authenticate, getFinalHPSUS);
+router.get("/final-hp-cat", authenticate, getFinalHPCAT);
 
 // Post Foaming Routes
-router.get("/post-hp-GrpA", getPostGrpAHPFrz);
-router.get("/post-hp-GrpB", getPostGrpBHPFrz);
-router.get("/post-hp-Choc", getPostChocHP);
-router.get("/post-hp-FOW", getPostFOWHP);
-router.get("/post-hp-sus", getPostHPSUS);
-router.get("/post-hp-cat", getPostHPCAT);
+router.get("/post-hp-GrpA", authenticate, getPostGrpAHPFrz);
+router.get("/post-hp-GrpB", authenticate, getPostGrpBHPFrz);
+router.get("/post-hp-Choc", authenticate, getPostChocHP);
+router.get("/post-hp-FOW", authenticate, getPostFOWHP);
+router.get("/post-hp-sus", authenticate, getPostHPSUS);
+router.get("/post-hp-cat", authenticate, getPostHPCAT);
 
 // Foaming Routes
-router.get("/Foaming-hp-fom-a", getFoamingHpFomA);
-router.get("/Foaming-hp-fom-b", getFoamingHpFomB);
-router.get("/Foaming-hp-fom-cat", getFoamingHpFomCat);
+router.get("/Foaming-hp-fom-a", authenticate, getFoamingHpFomA);
+router.get("/Foaming-hp-fom-b", authenticate, getFoamingHpFomB);
+router.get("/Foaming-hp-fom-cat", authenticate, getFoamingHpFomCat);
 
 // VISI Cooler Routes (merged into existing tabs — no new tab)
-router.get("/visi-loading-hp", getFinalLoadingHPVISI);
-router.get("/visi-final-hp", getFinalHPVISI);
-router.get("/visi-post-hp", getPostHPVISI);
+router.get("/visi-loading-hp", authenticate, getFinalLoadingHPVISI);
+router.get("/visi-final-hp", authenticate, getFinalHPVISI);
+router.get("/visi-post-hp", authenticate, getPostHPVISI);
 
 // -----------------> Model Name Update
-router.get("/get-model-name", getModelName);
-router.put("/update-model-name", modelNameUpdate);
+router.get("/get-model-name", authenticate, getModelName);
+router.put("/update-model-name", authenticate, modelNameUpdate);
 // -----------------> NFC Report
-router.get("/nfc-details", getNfcReoprts);
-router.get("/export-nfc-report", nfcReportExportData);
-router.get("/yday-nfc-report", getQuickFiltersNfcReports);
-router.get("/today-nfc-report", getQuickFiltersNfcReports);
-router.get("/month-nfc-report", getQuickFiltersNfcReports);
+router.get("/nfc-details", authenticate, getNfcReoprts);
+router.get("/export-nfc-report", authenticate, nfcReportExportData);
+router.get("/yday-nfc-report", authenticate, getQuickFiltersNfcReports);
+router.get("/today-nfc-report", authenticate, getQuickFiltersNfcReports);
+router.get("/month-nfc-report", authenticate, getQuickFiltersNfcReports);
 // -----------------> Production Report
-router.get("/fgdata", fetchFGData);
-router.get("/export-production-report", productionReportExportData);
-router.get("/yday-fgdata", fetchQuickFiltersData);
-router.get("/today-fgdata", fetchQuickFiltersData);
-router.get("/month-fgdata", fetchQuickFiltersData);
+router.get("/fgdata", authenticate, fetchFGData);
+router.get("/export-production-report", authenticate, productionReportExportData);
+router.get("/yday-fgdata", authenticate, fetchQuickFiltersData);
+router.get("/today-fgdata", authenticate, fetchQuickFiltersData);
+router.get("/month-fgdata", authenticate, fetchQuickFiltersData);
 // -----------------> Consolidated Report
-router.get("/stage-history", getCurrentStageStatus);
-router.get("/logistic-status", getLogisticStatus);
-router.get("/history-card", getHistoryCard);
-router.get("/rework-report", getReworkReport);
-router.get("/reprint-history", getReprintHistory);
-router.get("/component-details", getComponentDetails);
-router.get("/functional-test", getFunctionalTest);
-router.get("/serial-numbers", getSerialNumbers);
+router.get("/stage-history", authenticate, getCurrentStageStatus);
+router.get("/logistic-status", authenticate, getLogisticStatus);
+router.get("/history-card", authenticate, getHistoryCard);
+router.get("/rework-report", authenticate, getReworkReport);
+router.get("/reprint-history", authenticate, getReprintHistory);
+router.get("/component-details", authenticate, getComponentDetails);
+router.get("/functional-test", authenticate, getFunctionalTest);
+router.get("/serial-numbers", authenticate, getSerialNumbers);
 // -----------------> Total Production
-router.get("/barcode-details", getBarcodeDetails);
-router.get("/export-total-production", totalProductionExportData);
-router.get("/yday-total-production", getQuickFiltersBarcodeDetails);
-router.get("/today-total-production", getQuickFiltersBarcodeDetails);
-router.get("/month-total-production", getQuickFiltersBarcodeDetails);
+router.get("/barcode-details", authenticate, getBarcodeDetails);
+router.get("/export-total-production", authenticate, totalProductionExportData);
+router.get("/yday-total-production", authenticate, getQuickFiltersBarcodeDetails);
+router.get("/today-total-production", authenticate, getQuickFiltersBarcodeDetails);
+router.get("/month-total-production", authenticate, getQuickFiltersBarcodeDetails);
 // -----------------> Stop Loss Report
-router.get("/stop-loss/summary", getStopLossSummary);
-router.get("/stop-loss/detail", getStopLossDetail);
-router.get("/stop-loss/lines", getStopLossLines);
-router.get("/stop-loss/locations", getStopLossLocations);
-router.get("/stop-loss/stations", getStopLossStations);
-router.get("/stop-loss/live", getStopLossLive);
-router.get("/stop-loss/today", getStopLossToday); // ← new
-router.get("/stop-loss/yesterday", getStopLossYesterday); // ← new
-router.get("/stop-loss/mtd", getStopLossMTD); // ← new
+router.get("/stop-loss/summary", authenticate, getStopLossSummary);
+router.get("/stop-loss/detail", authenticate, getStopLossDetail);
+router.get("/stop-loss/lines", authenticate, getStopLossLines);
+router.get("/stop-loss/locations", authenticate, getStopLossLocations);
+router.get("/stop-loss/stations", authenticate, getStopLossStations);
+router.get("/stop-loss/live", authenticate, getStopLossLive);
+router.get("/stop-loss/today", authenticate, getStopLossToday); // ← new
+router.get("/stop-loss/yesterday", authenticate, getStopLossYesterday); // ← new
+router.get("/stop-loss/mtd", authenticate, getStopLossMTD); // ← new
 // Final Loading — model breakdown
-router.get("/final-loading-model", getFinalLoadingModelBreakdown);
-router.get("/final-loading-hp-frz-model", getFinalLoadingHPFrzModelBreakdown);
-router.get("/final-loading-hp-choc-model", getFinalLoadingHPChocModelBreakdown);
-router.get("/final-loading-hp-visi-model", getFinalLoadingHPVISIModelBreakdown);
-router.get("/final-loading-hp-sus-model", getFinalLoadingHPSUSModelBreakdown);
+router.get("/final-loading-model", authenticate, getFinalLoadingModelBreakdown);
+router.get("/final-loading-hp-frz-model", authenticate, getFinalLoadingHPFrzModelBreakdown);
+router.get("/final-loading-hp-choc-model", authenticate, getFinalLoadingHPChocModelBreakdown);
+router.get("/final-loading-hp-visi-model", authenticate, getFinalLoadingHPVISIModelBreakdown);
+router.get("/final-loading-hp-sus-model", authenticate, getFinalLoadingHPSUSModelBreakdown);
 
 // Final Line — model breakdown
-router.get("/final-hp-frz-model", getFinalHPFrzModelBreakdown);
-router.get("/final-hp-choc-model", getFinalHPChocModelBreakdown);
-router.get("/visi-final-hp-model", getFinalHPVISIModelBreakdown);
-router.get("/final-hp-sus-model", getFinalHPSUSModelBreakdown);
+router.get("/final-hp-frz-model", authenticate, getFinalHPFrzModelBreakdown);
+router.get("/final-hp-choc-model", authenticate, getFinalHPChocModelBreakdown);
+router.get("/visi-final-hp-model", authenticate, getFinalHPVISIModelBreakdown);
+router.get("/final-hp-sus-model", authenticate, getFinalHPSUSModelBreakdown);
 
 // Post Foaming — model breakdown
-router.get("/post-Grp-A-model", getPostHPGrpAModelBreakdown);
-router.get("/post-Grp-B-model", getPostHPGrpBModelBreakdown);
-router.get("/post-Choc-model", getChocPostHPModelBreakdown);
-router.get("/post-FOW-model", getFOWPostHPModelBreakdown);
-router.get("/visi-post-hp-model", getPostHPVISIModelBreakdown);
-router.get("/post-hp-sus-model", getPostHPSUSModelBreakdown);
+router.get("/post-Grp-A-model", authenticate, getPostHPGrpAModelBreakdown);
+router.get("/post-Grp-B-model", authenticate, getPostHPGrpBModelBreakdown);
+router.get("/post-Choc-model", authenticate, getChocPostHPModelBreakdown);
+router.get("/post-FOW-model", authenticate, getFOWPostHPModelBreakdown);
+router.get("/visi-post-hp-model", authenticate, getPostHPVISIModelBreakdown);
+router.get("/post-hp-sus-model", authenticate, getPostHPSUSModelBreakdown);
 
 // Foaming — model breakdown
-router.get("/Foaming-hp-fom-a-model", getFoamingHpFomAModelBreakdown);
-router.get("/Foaming-hp-fom-b-model", getFoamingHpFomBModelBreakdown);
+router.get("/Foaming-hp-fom-a-model", authenticate, getFoamingHpFomAModelBreakdown);
+router.get("/Foaming-hp-fom-b-model", authenticate, getFoamingHpFomBModelBreakdown);
 
 //router.get("/manpower", getManpower);
 
@@ -209,7 +210,7 @@ router.get("/Foaming-hp-fom-b-model", getFoamingHpFomBModelBreakdown);
 //router.get("/manpower-report", getManpowerReport);
 
 // WIP Capture
-router.post("/wip-capture", captureWIP);
-router.get("/wip-latest", getLatestWIPCaptures);
+router.post("/wip-capture", authenticate, captureWIP);
+router.get("/wip-latest", authenticate, getLatestWIPCaptures);
 
 export default router;

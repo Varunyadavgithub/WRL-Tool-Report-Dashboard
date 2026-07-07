@@ -16,6 +16,7 @@ import { startManpowerCron } from "../Backend/cron/manpower.cron.js";
 import { startShiftEndReportCron } from "./cron/shiftEndReport.cron.js";
 import { globalErrorHandler } from "./middlewares/errorHandler.js";
 import { runMigrations } from "./config/migrations.js";
+import { runGarudaMigrations } from "./config/garudaMigrations.js";
 // const _dirname = path.resolve();
 
 const app = express();
@@ -37,13 +38,26 @@ app.use("/uploads", express.static(path.resolve("uploads"))); // Static files
 (async () => {
   try {
     global.pool1 = await connectToDB(dbConfig1);
-    global.pool2 = await connectToDB(dbConfig2);
     global.pool3 = await connectToDB(dbConfig3);
-    global.pool4 = await connectToDB(dbConfig4);
-    console.log("Successfully connected to all databases.");
+    console.log("Successfully connected to Server 1 and Server 3.");
 
+    await runGarudaMigrations(global.pool1);
     await runMigrations(global.pool3);
 
+    // Server 2 (WWMS) and Server 4 (CLMS) are remote-only with no local backup —
+    // skip them instead of crashing the app when offline.
+    try {
+      global.pool2 = await connectToDB(dbConfig2);
+      console.log("Successfully connected to Server 2.");
+    } catch (error) {
+      console.warn("Server 2 (WWMS) unreachable, skipping:", error.message);
+    }
+    try {
+      global.pool4 = await connectToDB(dbConfig4);
+      console.log("Successfully connected to Server 4.");
+    } catch (error) {
+      console.warn("Server 4 (CLMS) unreachable, skipping:", error.message);
+    }
   } catch (error) {
     console.error("Database connection failed:", error);
     process.exit(1);

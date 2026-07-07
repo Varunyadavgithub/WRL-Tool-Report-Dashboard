@@ -1,4 +1,5 @@
 import express from "express";
+import { authenticate } from "../middlewares/auth.js";
 import {
   addProductionPlaningData,
   getModelName,
@@ -14,14 +15,14 @@ import {
 const router = express.Router();
 
 // -----------------> Production Planing Routes
-router.get("/plan-month-year", getPlanMonth);
-router.get("/production-planing", productionPlaningData);
-router.put("/update-production-plan", updateProductionPlaningData);
-router.post("/add-production-plan", addProductionPlaningData);
-router.get("/model-name", getModelName);
+router.get("/plan-month-year", authenticate, getPlanMonth);
+router.get("/production-planing", authenticate, productionPlaningData);
+router.put("/update-production-plan", authenticate, updateProductionPlaningData);
+router.post("/add-production-plan", authenticate, addProductionPlaningData);
+router.get("/model-name", authenticate, getModelName);
 
 // -----------------> Daily Plan Routes
-router.post("/upload-daily-plan", addDailyPlans);
-router.get("/daily-plans", fetchDailyPlans);
+router.post("/upload-daily-plan", authenticate, addDailyPlans);
+router.get("/daily-plans", authenticate, fetchDailyPlans);
 
 export default router;

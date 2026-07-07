@@ -1,0 +1,2 @@
+# Local SQL Server backup/data files used for dev DB restores — tens of GB, never commit.
+DATABASE/

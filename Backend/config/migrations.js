@@ -740,5 +740,56 @@ export const runMigrations = async (pool3) => {
     END
   `);
 
+  // ── ChatSessions / ChatMessages: AI assistant conversation storage ────────
+  await pool3.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ChatSessions')
+    BEGIN
+      CREATE TABLE ChatSessions (
+        Id         INT IDENTITY(1,1) PRIMARY KEY,
+        UserId     NVARCHAR(50)   NOT NULL,
+        Title      NVARCHAR(200)  NULL,
+        CreatedAt  DATETIME       NOT NULL DEFAULT GETDATE(),
+        UpdatedAt  DATETIME       NOT NULL DEFAULT GETDATE()
+      );
+      PRINT 'Migration: Created ChatSessions table';
+    END
+  `);
+
+  await pool3.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ChatMessages')
+    BEGIN
+      CREATE TABLE ChatMessages (
+        Id          INT IDENTITY(1,1) PRIMARY KEY,
+        SessionId   INT            NOT NULL,
+        Role        NVARCHAR(20)   NOT NULL, -- 'system' | 'user' | 'assistant' | 'tool'
+        Content     NVARCHAR(MAX)  NULL,
+        ToolCalls   NVARCHAR(MAX)  NULL,      -- JSON trace, nullable
+        CreatedAt   DATETIME       NOT NULL DEFAULT GETDATE()
+      );
+      CREATE INDEX IX_ChatMessages_SessionId ON ChatMessages(SessionId);
+      PRINT 'Migration: Created ChatMessages table';
+    END
+  `);
+
+  // ── Alerts: smart-alert log (threshold breaches detected at shift-end) ────
+  await pool3.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='Alerts')
+    BEGIN
+      CREATE TABLE Alerts (
+        Id             INT IDENTITY(1,1) PRIMARY KEY,
+        ShiftName      NVARCHAR(100)  NOT NULL,
+        AlertDate      DATE           NOT NULL,
+        AlertType      NVARCHAR(50)   NOT NULL,
+        MetricValue    DECIMAL(10,2)  NULL,
+        ThresholdValue DECIMAL(10,2)  NULL,
+        Message        NVARCHAR(MAX)  NULL,
+        SentTo         NVARCHAR(MAX)  NULL,
+        CreatedAt      DATETIME       NOT NULL DEFAULT GETDATE()
+      );
+      CREATE INDEX IX_Alerts_ShiftDate ON Alerts(AlertDate, ShiftName);
+      PRINT 'Migration: Created Alerts table';
+    END
+  `);
+
   console.log("Migrations completed.");
 };

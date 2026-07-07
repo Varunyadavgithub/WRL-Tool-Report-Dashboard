@@ -1,4 +1,5 @@
 import express from "express";
+import { authenticate } from "../middlewares/auth.js";
 import {
   getDispatchCategoryModelCount,
   getDispatchCategorySummary,
@@ -25,32 +26,32 @@ import { getFGDispatchReport } from "../controllers/dispatch/getFGDispatchReport
 const router = express.Router();
 
 // -----------------> Performance Report Routes
-router.get("/vehicle-uph", getDispatchVehicleUPH);
-router.get("/vehicle-summary", getDispatchVehicleSummary);
-router.get("/model-count", getDispatchModelCount);
-router.get("/model-summary", getDispatchModelSummary);
-router.get("/category-model-count", getDispatchCategoryModelCount);
-router.get("/category-summary", getDispatchCategorySummary);
+router.get("/vehicle-uph", authenticate, getDispatchVehicleUPH);
+router.get("/vehicle-summary", authenticate, getDispatchVehicleSummary);
+router.get("/model-count", authenticate, getDispatchModelCount);
+router.get("/model-summary", authenticate, getDispatchModelSummary);
+router.get("/category-model-count", authenticate, getDispatchCategoryModelCount);
+router.get("/category-summary", authenticate, getDispatchCategorySummary);
 
 // -----------------> Dispatch Report Routes
-router.get("/fg-unloading", getFgUnloading);
-router.get("/fg-dispatch", getFgDispatch);
-router.get("/quick-fg-unloading", getQuickFgUnloading);
-router.get("/quick-fg-dispatch", getQuickFgDispatch);
+router.get("/fg-unloading", authenticate, getFgUnloading);
+router.get("/fg-dispatch", authenticate, getFgDispatch);
+router.get("/quick-fg-unloading", authenticate, getQuickFgUnloading);
+router.get("/quick-fg-dispatch", authenticate, getQuickFgDispatch);
 
 // -----------------> FG Casting Routes
-router.get("/fg-casting", getDispatchMasterBySession);
+router.get("/fg-casting", authenticate, getDispatchMasterBySession);
 
 // -----------------> Gate Entry Routes
-router.post("/material-gate-entry", sendMaterialGateEntryAlertEmail);
+router.post("/material-gate-entry", authenticate, sendMaterialGateEntryAlertEmail);
 
-router.get("/fg-dispatch-report", getFGDispatchReport);
+router.get("/fg-dispatch-report", authenticate, getFGDispatchReport);
 
 // -----------------> Error Log Routes
-router.get("/error-log", getDispatchErrorLog);
+router.get("/error-log", authenticate, getDispatchErrorLog);
 
 // -----------------> Remove Dispatch Error Serials
-router.post("/fetch-error-serials", fetchDispatchErrorSerials);
-router.post("/remove-error-serials", removeDispatchErrorSerials);
+router.post("/fetch-error-serials", authenticate, fetchDispatchErrorSerials);
+router.post("/remove-error-serials", authenticate, removeDispatchErrorSerials);
 
 export default router;

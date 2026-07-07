@@ -13,6 +13,7 @@ import { gasChargingApi } from "./api/gasChargingApi.js";
 import { fpaReportApi } from "./api/fpaReportApi.js";
 import { partProcessApi } from "./api/partProcessApi.js";
 import { masterConfigApi } from "./api/masterConfigApi.js";
+import { aiApi } from "./api/aiApi.js";
 
 import {
   persistReducer,
@@ -56,6 +57,7 @@ const persistConfig = {
     permissionApi.reducerPath,
     partProcessApi.reducerPath,
     masterConfigApi.reducerPath,
+    aiApi.reducerPath,
   ],
 };
 
@@ -76,6 +78,7 @@ const rootReducer = combineReducers({
   [permissionApi.reducerPath]: permissionApi.reducer,
   [partProcessApi.reducerPath]: partProcessApi.reducer,
   [masterConfigApi.reducerPath]: masterConfigApi.reducer,
+  [aiApi.reducerPath]: aiApi.reducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
@@ -96,6 +99,7 @@ const store = configureStore({
       permissionApi.middleware,
       partProcessApi.middleware,
       masterConfigApi.middleware,
+      aiApi.middleware,
     ),
 });
 

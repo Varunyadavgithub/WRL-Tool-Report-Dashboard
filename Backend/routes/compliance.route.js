@@ -1,4 +1,5 @@
 import express from "express";
+import { authenticate } from "../middlewares/auth.js";
 import {
   getAllAssets,
   addAsset,
@@ -22,26 +23,28 @@ const router = express.Router();
 // ADD or UPDATE ASSET + FILE
 router.post(
   "/addAsset",
+  authenticate,
   uploadCalibrationFile.single("file"),
   handleMulterError,
   addAsset,
 );
 
 // GET ALL ASSETS
-router.get("/assets", getAllAssets);
+router.get("/assets", authenticate, getAllAssets);
 
 // ADD NEW CALIBRATION CYCLE (NO FILE)
-router.post("/addCycle", addCalibrationRecord);
+router.post("/addCycle", authenticate, addCalibrationRecord);
 
 // GET ASSET + HISTORY
-router.get("/asset/:id", getAssetWithHistory);
+router.get("/asset/:id", authenticate, getAssetWithHistory);
 
 // GET CALIBRATION HISTORY
-router.get("/certs/:id", getCertificates);
+router.get("/certs/:id", authenticate, getCertificates);
 
 // UPLOAD CERTIFICATE ONLY
 router.post(
   "/uploadCert/:id",
+  authenticate,
   uploadCalibrationFile.single("file"),
   handleMulterError,
   uploadCertificate,
@@ -50,12 +53,13 @@ router.post(
 // UPLOAD CALIBRATION REPORT
 router.post(
   "/uploadReport/:id",
+  authenticate,
   uploadCalibrationFile.single("file"),
   handleMulterError,
   uploadCalibrationReport,
 );
 
 // GET CALIBRATION USERS
-router.get("/users/calibration", getCalibrationUsers);
+router.get("/users/calibration", authenticate, getCalibrationUsers);
 
 export default router;

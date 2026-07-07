@@ -1,4 +1,5 @@
 import express from "express";
+import { authenticate } from "../middlewares/auth.js";
 import {
   getDehumidifierStatus,
   getDehumidifierTrend,
@@ -10,11 +11,11 @@ const router = express.Router();
 // ==================== Routes ====================
 
 // live table
-router.get("/", getDehumidifierStatus);
+router.get("/", authenticate, getDehumidifierStatus);
 
 // graph data  ← ADD THIS
-router.get("/machine-reading", getDehumidifierTrend);
+router.get("/machine-reading", authenticate, getDehumidifierTrend);
 
-router.get("/machine-summary", getDehumidifierSummary);
+router.get("/machine-summary", authenticate, getDehumidifierSummary);
 
 export default router;

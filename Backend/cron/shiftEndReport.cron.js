@@ -15,6 +15,8 @@ import cron from "node-cron";
 import { buildShiftReport } from "../services/shiftReport.service.js";
 import { sendShiftEndReportMail } from "../emailTemplates/PartProcess_System/shiftEndReport.template.js";
 import { buildReportAttachments, REPORT_NAMES } from "../services/reportAttachments.service.js";
+import { evaluateShiftAlerts } from "../services/alertDetection.service.js";
+import { sendShiftAlerts } from "../services/alertNotification.service.js";
 
 // Dedup guard so a shift's report is sent at most once per occurrence
 // (the minute-resolution match window could otherwise double-fire).
@@ -71,6 +73,17 @@ const checkShiftEnds = async () => {
         if (!report) {
           console.log(`[ShiftReport] No production data for ${shift.ShiftName} on ${dateStr} — skipping.`);
           continue;
+        }
+
+        // Smart alerts — never let a failure here block the existing report email.
+        try {
+          const breaches = await evaluateShiftAlerts(pool, report);
+          if (breaches.length) {
+            const result = await sendShiftAlerts(pool, { shiftName: shift.ShiftName }, dateStr, breaches);
+            console.log(`[SmartAlert] ${shift.ShiftName} (${dateStr}): ${breaches.length} breach(es), sent=${result.sent}, reason=${result.reason || "n/a"}`);
+          }
+        } catch (err) {
+          console.error(`[SmartAlert] Failed for ${shift.ShiftName} (${dateStr}):`, err.message);
         }
 
         const subsRes = await pool.request().query(`SELECT Email, Subscriptions FROM MailSubscribers WHERE Status = 1`);
