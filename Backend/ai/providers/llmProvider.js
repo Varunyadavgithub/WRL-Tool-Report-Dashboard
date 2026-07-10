@@ -4,7 +4,7 @@
  * writing a new file that satisfies this shape and pointing AI_PROVIDER at it,
  * not touching agent.js/tools/controllers.
  *
- * chatOnce({ messages, tools }) => Promise<{ role: "assistant", content: string|null, tool_calls?: [{ id, function: { name, arguments } }] }>
+ * chatOnce({ messages, tools, signal? }) => Promise<{ role: "assistant", content: string|null, tool_calls?: [{ id, function: { name, arguments } }] }>
  * chatStream({ messages, tools }) => AsyncGenerator yielding { contentDelta?: string, done?: boolean }
  */
 export class LlmProvider {

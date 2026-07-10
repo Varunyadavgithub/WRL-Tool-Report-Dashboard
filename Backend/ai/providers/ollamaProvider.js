@@ -1,5 +1,5 @@
 import { LlmProvider } from "./llmProvider.js";
-import { AI_MODEL_NAME, OLLAMA_BASE_URL, AI_NUM_CTX } from "../config.js";
+import { AI_MODEL_NAME, OLLAMA_BASE_URL, AI_NUM_CTX, AI_TEMPERATURE } from "../config.js";
 
 // Ollama's /api/chat returns tool_calls with `arguments` already as an object
 // (unlike OpenAI's string-encoded JSON) — normalize so callers always get an object.
@@ -12,11 +12,12 @@ const normalizeArgs = (args) => {
 };
 
 class OllamaProvider extends LlmProvider {
-  async chatOnce({ messages, tools }) {
+  async chatOnce({ messages, tools, signal }) {
     const res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: AI_MODEL_NAME, messages, tools, stream: false, options: { num_ctx: AI_NUM_CTX } }),
+      body: JSON.stringify({ model: AI_MODEL_NAME, messages, tools, stream: false, options: { num_ctx: AI_NUM_CTX, temperature: AI_TEMPERATURE } }),
+      signal,
     });
     if (!res.ok) {
       throw new Error(`Ollama request failed (${res.status}): ${await res.text()}`);
@@ -37,7 +38,7 @@ class OllamaProvider extends LlmProvider {
     const res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: AI_MODEL_NAME, messages, tools, stream: true, options: { num_ctx: AI_NUM_CTX } }),
+      body: JSON.stringify({ model: AI_MODEL_NAME, messages, tools, stream: true, options: { num_ctx: AI_NUM_CTX, temperature: AI_TEMPERATURE } }),
     });
     if (!res.ok || !res.body) {
       throw new Error(`Ollama stream request failed (${res.status}): ${await res.text()}`);

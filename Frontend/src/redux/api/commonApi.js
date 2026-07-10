@@ -5,6 +5,7 @@ export const commonApi = createApi({
   reducerPath: "commonApi",
   baseQuery: fetchBaseQuery({
     baseUrl: baseURL,
+    credentials: "include",
   }),
   tagTypes: ["Common"],
   endpoints: (builder) => ({

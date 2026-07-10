@@ -1,4 +1,5 @@
-import { combineReducers, configureStore } from "@reduxjs/toolkit";
+import { combineReducers, configureStore, isRejectedWithValue } from "@reduxjs/toolkit";
+import { handleSessionExpired } from "../utils/authExpiry.js";
 import authSlice from "./slices/authSlice.js";
 import estReportSlice from "./slices/estReportSlice.js";
 import gasChargingSlice from "./slices/gasChargingSlice.js";
@@ -14,6 +15,7 @@ import { fpaReportApi } from "./api/fpaReportApi.js";
 import { partProcessApi } from "./api/partProcessApi.js";
 import { masterConfigApi } from "./api/masterConfigApi.js";
 import { aiApi } from "./api/aiApi.js";
+import { insightsApi } from "./api/insightsApi.js";
 
 import {
   persistReducer,
@@ -58,6 +60,7 @@ const persistConfig = {
     partProcessApi.reducerPath,
     masterConfigApi.reducerPath,
     aiApi.reducerPath,
+    insightsApi.reducerPath,
   ],
 };
 
@@ -79,9 +82,20 @@ const rootReducer = combineReducers({
   [partProcessApi.reducerPath]: partProcessApi.reducer,
   [masterConfigApi.reducerPath]: masterConfigApi.reducer,
   [aiApi.reducerPath]: aiApi.reducer,
+  [insightsApi.reducerPath]: insightsApi.reducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
+
+// Catches a 401 from ANY RTK Query slice — the other fetch path (raw axios,
+// still used by many older pages) is covered by the equivalent interceptor
+// in main.jsx. Both funnel into the same handleSessionExpired.
+const authExpiryMiddleware = ({ dispatch }) => (next) => (action) => {
+  if (isRejectedWithValue(action) && action.payload?.status === 401) {
+    handleSessionExpired(dispatch);
+  }
+  return next(action);
+};
 
 const store = configureStore({
   reducer: persistedReducer,
@@ -100,6 +114,8 @@ const store = configureStore({
       partProcessApi.middleware,
       masterConfigApi.middleware,
       aiApi.middleware,
+      insightsApi.middleware,
+      authExpiryMiddleware,
     ),
 });
 

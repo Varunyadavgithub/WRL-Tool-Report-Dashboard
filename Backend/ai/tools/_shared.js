@@ -29,7 +29,7 @@ const dateRange = (start, end) => {
 // shift-reports — floods the pool and each request queues behind the last
 // instead of failing, so the assistant just goes quiet for a very long time.
 // Bound both the range size and the in-flight concurrency.
-const MAX_RANGE_DAYS = 45;
+export const MAX_RANGE_DAYS = 45;
 const CONCURRENCY = 4;
 
 const mapWithConcurrency = async (items, limit, fn) => {

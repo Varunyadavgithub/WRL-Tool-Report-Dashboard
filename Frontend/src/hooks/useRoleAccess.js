@@ -1,26 +1,20 @@
-import { useEffect, useMemo } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useMemo } from "react";
+import { useSelector } from "react-redux";
 import { ROUTE_CONFIG, ROLES } from "../config/routes.config.js";
 import { useGetMyPermissionsQuery } from "../redux/api/permissionApi";
-import { logoutUser } from "../redux/slices/authSlice.js";
 
 const SUPER_ADMIN_ROLE = ROLES.SUPER_ADMIN;
 
 export const useRoleAccess = () => {
-  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const userRole = user?.roleName?.toLowerCase?.() ?? "";
 
-  const { data, isError, error } = useGetMyPermissionsQuery(undefined, {
+  // A stale redux-persist login (user cached but the session cookie expired/
+  // cleared) is handled globally now — see authExpiryMiddleware (redux/store.js)
+  // — no need for a one-off 401 handler on this specific query anymore.
+  const { data } = useGetMyPermissionsQuery(undefined, {
     skip: !user || userRole === SUPER_ADMIN_ROLE,
   });
-
-  // Stale redux-persist state: user in localStorage but cookie expired → clear it
-  useEffect(() => {
-    if (isError && error?.status === 401) {
-      dispatch(logoutUser());
-    }
-  }, [isError, error, dispatch]);
 
   // Backend returns permissions as an object: { [SectionKey]: { [Path]: boolean } }
   const permissionMap = useMemo(() => {

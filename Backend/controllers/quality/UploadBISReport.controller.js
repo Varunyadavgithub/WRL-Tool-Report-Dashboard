@@ -125,7 +125,7 @@ export const getBisPdfFiles = tryCatch(async (_, res) => {
       testFrequency: file.TestFrequency,      // ← correct casing
       description:   file.Description,
       fileName:      file.FileName,
-      url:           `/uploads-bis-pdf/${file.FileName}`,
+      url:           `/uploads/BISReport/${file.FileName}`,
       uploadAt:      file.UploadAt,           // ← correct casing
     }));
 
@@ -366,7 +366,7 @@ export const getBisReportStatus = tryCatch(async (_, res) => {
       testFrequency: file.TestFrequency,
       description:   file.Description,
       fileName:      file.FileName,
-      url:           `/uploads-bis-pdf/${file.FileName}`,
+      url:           `/uploads/BISReport/${file.FileName}`,
       // BUG (was): file.UploadAT — the column is UploadAt (see INSERT above).
       // The wrong casing returns undefined for every row.
       uploadAt:      file.UploadAt,
@@ -463,7 +463,7 @@ export const getBisReportStatus = tryCatch(async (_, res) => {
 
     const status = statusResult.recordset.map((item) => ({
       ...item,
-      fileUrl: item.FileName ? `/uploads-bis-pdf/${item.FileName}` : null,
+      fileUrl: item.FileName ? `/uploads/BISReport/${item.FileName}` : null,
     }));
 
     res.status(200).json({

@@ -240,10 +240,20 @@ const ImageZone = ({ onFile, uploadRef }) => {
   const [open, setOpen]         = useState(false);
   const [dragging, setDragging] = useState(false);
   const [showCam, setShowCam]   = useState(false);
-  const zoneRef       = useRef(null);
-  const videoRef      = useRef(null);
-  const streamRef     = useRef(null);
-  const nativeCamRef  = useRef(null);
+  const zoneRef        = useRef(null);
+  const videoRef       = useRef(null);
+  const streamRef      = useRef(null);
+  const nativeCamRef   = useRef(null);
+  const localUploadRef = useRef(null);
+
+  // uploadRef comes in as a plain callback (parent stores the node in a ref
+  // map keyed by cell, used later to reset .value after upload) — mirror the
+  // node into it while also keeping a local ref we can call .click() on.
+  const setUploadRef = (el) => {
+    localUploadRef.current = el;
+    if (typeof uploadRef === "function") uploadRef(el);
+    else if (uploadRef) uploadRef.current = el;
+  };
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -335,15 +345,26 @@ const ImageZone = ({ onFile, uploadRef }) => {
           <span className="text-[9px] text-gray-400 mt-1 font-medium">Add Photo</span>
         </button>
 
+        {/* Hidden file inputs — kept permanently mounted (not inside the
+            dropdown below) so they survive `open` flipping to false. The
+            native camera intent can take several seconds; if these lived
+            inside the conditional dropdown, React would unmount them the
+            moment the dropdown closes and the returning photo's change
+            event would have no element left to land on. */}
+        <input ref={setUploadRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={onFile} />
+        <input ref={nativeCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} />
+
         {open && (
           <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden w-38 min-w-[140px]">
             {/* Upload from file */}
-            <label className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-indigo-50 cursor-pointer transition-colors" onClick={() => setOpen(false)}>
+            <button
+              type="button"
+              onClick={() => { setOpen(false); localUploadRef.current?.click(); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-indigo-50 transition-colors"
+            >
               <FaCloudUploadAlt size={13} className="text-indigo-500 flex-shrink-0" />
               <span className="text-xs font-semibold text-gray-700">Upload File</span>
-              <input ref={uploadRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={onFile} />
-              <input ref={nativeCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} />
-            </label>
+            </button>
             <div className="h-px bg-gray-100 mx-3" />
             {/* Open camera via getUserMedia */}
             <button

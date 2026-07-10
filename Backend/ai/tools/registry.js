@@ -12,6 +12,9 @@ import * as getReworkSummary from "./getReworkSummary.tool.js";
 import * as getDispatchSummary from "./getDispatchSummary.tool.js";
 import * as getCalibrationStatus from "./getCalibrationStatus.tool.js";
 import * as getVisitorStats from "./getVisitorStats.tool.js";
+import * as listAvailableMetrics from "./listAvailableMetrics.tool.js";
+import * as getMetricTimeSeries from "./getMetricTimeSeries.tool.js";
+import * as correlateMetrics from "./correlateMetrics.tool.js";
 
 // Hand-picked, fixed list — every tool wraps an existing data service rather
 // than exposing raw SQL. Add new tools here as they're built (see the plan's
@@ -20,6 +23,7 @@ const TOOLS = [
   getProductionSummary, compareProductionRanges, getDowntimeAnalysis, getAuditSummary,
   getTotalProduction, getLineProduction, getFpaSummary, getLptSummary, getEstSummary,
   getGasChargingSummary, getReworkSummary, getDispatchSummary, getCalibrationStatus, getVisitorStats,
+  listAvailableMetrics, getMetricTimeSeries, correlateMetrics,
 ];
 
 export const getToolDefinitions = () => TOOLS.map((t) => t.definition);

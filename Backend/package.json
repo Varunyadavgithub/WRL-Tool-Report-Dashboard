@@ -12,6 +12,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
     "@napi-rs/canvas": "^1.0.1",
     "agenda": "^5.0.0",
     "bcryptjs": "^3.0.3",
@@ -28,6 +29,7 @@
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.12",
     "pdfkit": "^0.17.2",
+    "simple-statistics": "^7.9.3",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

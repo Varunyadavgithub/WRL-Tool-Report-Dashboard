@@ -4,7 +4,7 @@ import { baseURL } from "../../assets/assets.js";
 
 export const fpaReportApi = createApi({
   reducerPath: "fpaReportApi",
-  baseQuery: fetchBaseQuery({ baseUrl: `${baseURL}quality` }),
+  baseQuery: fetchBaseQuery({ baseUrl: `${baseURL}quality`, credentials: "include" }),
   tagTypes: ["FpaHistory", "FpaModel", "FpaDefects"],
 
   endpoints: (builder) => ({

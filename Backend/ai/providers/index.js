@@ -1,8 +1,12 @@
 import { AI_PROVIDER } from "../config.js";
 import ollamaProvider from "./ollamaProvider.js";
+import anthropicProvider from "./anthropicProvider.js";
+import groqProvider from "./groqProvider.js";
 
 const PROVIDERS = {
   ollama: ollamaProvider,
+  anthropic: anthropicProvider,
+  groq: groqProvider,
 };
 
 // Sole swap point: point AI_PROVIDER at a different key (and register it above)
