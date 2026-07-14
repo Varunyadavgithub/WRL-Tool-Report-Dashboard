@@ -87,7 +87,7 @@ const ensureDowntimeLogTable = async () => {
       CREATE TABLE PartProcessDowntimeLog (
         Id           INT IDENTITY(1,1) PRIMARY KEY,
         SrNo         NVARCHAR(20)   NULL,
-        EventId      INT            NULL,
+        EventId      NVARCHAR(50)   NULL,
         ShiftName    NVARCHAR(50)   NULL,
         EventDate    DATE           NULL,
         StartTime    NVARCHAR(20)   NULL,
@@ -110,7 +110,16 @@ const ensureDowntimeLogTable = async () => {
       WHERE TABLE_NAME = 'PartProcessDowntimeLog' AND COLUMN_NAME = 'EventId'
     )
     BEGIN
-      ALTER TABLE PartProcessDowntimeLog ADD EventId INT NULL
+      ALTER TABLE PartProcessDowntimeLog ADD EventId NVARCHAR(50) NULL
+    END
+    IF EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'PartProcessDowntimeLog'
+        AND COLUMN_NAME = 'EventId'
+        AND DATA_TYPE IN ('int', 'bigint', 'smallint')
+    )
+    BEGIN
+      ALTER TABLE PartProcessDowntimeLog ALTER COLUMN EventId NVARCHAR(50) NULL
     END
   `);
 };
@@ -127,7 +136,7 @@ export const createDowntimeLog = async (req, res) => {
 
     const result = await global.pool3.request()
       .input("srNo",         srNo                              || null)
-      .input("eventId",      eventId ? parseInt(eventId, 10)  : null)
+      .input("eventId",      eventId != null ? String(eventId) : null)
       .input("shiftName",    shift                             || null)
       .input("eventDate",    eventDate                         || null)
       .input("startTime",    startTime                         || null)
@@ -172,14 +181,21 @@ export const getDowntimeLogs = async (req, res) => {
       .input("endDate",   endDate   || null)
       .input("shift",     shift     || null)
       .query(`
-        SELECT Id, SrNo, EventId, ShiftName, EventDate, StartTime, EndTime, Duration,
-               Model, FromModel, IsChangeover, ReasonCode, ReasonName,
-               Category, Planned, Remarks, LoggedAt, CreatedAt
-        FROM PartProcessDowntimeLog
-        WHERE (@startDate IS NULL OR EventDate >= @startDate)
-          AND (@endDate   IS NULL OR EventDate <= @endDate)
-          AND (@shift     IS NULL OR ShiftName = @shift)
-        ORDER BY LoggedAt DESC
+        SELECT l.Id, l.SrNo, l.EventId, l.ShiftName,
+               COALESCE(l.EventDate, e.EventDate, CAST(l.LoggedAt AS DATE)) AS EventDate,
+               l.StartTime, l.EndTime, l.Duration, l.Model, l.FromModel,
+               l.IsChangeover, l.ReasonCode, l.ReasonName, l.Category,
+               l.Planned, l.Remarks, l.LoggedAt, l.CreatedAt
+        FROM PartProcessDowntimeLog l
+        -- Source event IDs may be alphanumeric (for example D1771521929),
+        -- while older downtime-log rows store a numeric EventId. Compare as
+        -- text so a non-numeric source ID cannot fail the entire log query.
+        LEFT JOIN PartProcessEvents e
+          ON CONVERT(NVARCHAR(50), e.EventId) = CONVERT(NVARCHAR(50), l.EventId)
+        WHERE (@startDate IS NULL OR COALESCE(l.EventDate, e.EventDate, CAST(l.LoggedAt AS DATE)) >= @startDate)
+          AND (@endDate   IS NULL OR COALESCE(l.EventDate, e.EventDate, CAST(l.LoggedAt AS DATE)) <= @endDate)
+          AND (@shift     IS NULL OR l.ShiftName = @shift)
+        ORDER BY l.LoggedAt DESC
       `);
 
     res.json({ success: true, data: result.recordset });

@@ -207,7 +207,22 @@ const MACHINE_POWER_KW = 5;
 export const aggregateRecords = (records, materials, dateStr) => {
   if (!records.length) return [];
 
-  const enriched = enrichRecords(records);
+  // Downtime rows do not carry a model. Keep each stop with the model that
+  // ran immediately before it in the same shift instead of discarding it as
+  // an UNKNOWN row.
+  const lastModelByShift = new Map();
+  const enriched = enrichRecords(records).map((record) => {
+    const shiftKey = record.shift || "__unassigned_shift__";
+    if (record.state === "Production" && record.model) {
+      lastModelByShift.set(shiftKey, record.model);
+      return record;
+    }
+    if (record.state === "Downtime" && !record.model) {
+      const model = lastModelByShift.get(shiftKey);
+      if (model) return { ...record, model };
+    }
+    return record;
+  });
 
   const map = {};
   enriched.forEach((r) => {
@@ -260,27 +275,26 @@ export const aggregateRecords = (records, materials, dateStr) => {
       const downMins = Math.round(row.downtimeSecs / 60);
       const idleMins = Math.round(row.idleSecs / 60);
       const lossMins = downMins + idleMins + coSt.overrunMins;
-      const prodTimeMins   = Math.round((row.actualQty * avgCycleSecs) / 60);
-      const actualTimeMins = prodTimeMins + downMins + idleMins;
-
       const planQty    = row.planQty > 0 ? row.planQty : Math.ceil(row.actualQty * 1.05);
       const reqTimeMins = Math.round((planQty * row.definedCycleTime) / 60);
 
-      const availSecs = actualTimeMins * 60;
-      const A = availSecs > 0
-        ? Math.max(0, (availSecs - row.downtimeSecs) / availSecs)
-        : 1;
-      const runSecs = availSecs - row.downtimeSecs;
-      const P = runSecs > 0 && row.definedCycleTime > 0
-        ? Math.min(1, (row.actualQty * row.definedCycleTime) / runSecs)
+      const availableTimeSecs = planQty * row.definedCycleTime;
+      const totalDowntimeSecs = row.downtimeSecs + row.idleSecs;
+      const actualTimeMins = Math.round((row.actualQty * avgCycleSecs) / 60);
+      const A = availableTimeSecs > 0
+        ? Math.max(0, Math.min(1, (availableTimeSecs - totalDowntimeSecs) / availableTimeSecs))
+        : 0;
+      const netOperatingSecs = Math.max(1, availableTimeSecs - totalDowntimeSecs);
+      const P = row.definedCycleTime > 0
+        ? Math.max(0, Math.min(1, (row.actualQty * row.definedCycleTime) / netOperatingSecs))
         : 1;
       const Q = row.actualQty > 0
         ? Math.min(1, row.goodQty / row.actualQty)
         : 1;
-      const oee = Math.round(A * P * Q * 1000) / 10;
       const availability = Math.round(A * 1000) / 10;
       const performance   = Math.round(P * 1000) / 10;
       const quality       = Math.round(Q * 1000) / 10;
+      const oee = Math.round((availability * performance * quality / 10000) * 10) / 10;
 
       const rejects = row.actualQty - row.goodQty;
 

@@ -123,7 +123,23 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
   if (!records.length) return [];
 
   // Enrich first — classifies Downtime >= 5 min as "Idle"
-  const enriched = enrichRecords(records);
+  // Downtime events do not carry a model. Attribute each stop to the most
+  // recently produced model in the same shift so it affects that model's OEE.
+  const lastModelByShift = new Map();
+  const enriched = [...enrichRecords(records)]
+    .sort((a, b) => (a._absMs ?? 0) - (b._absMs ?? 0))
+    .map((record) => {
+    const shiftKey = record.shift || "__unassigned_shift__";
+    if (record.state === "Production" && record.model) {
+      lastModelByShift.set(shiftKey, record.model);
+      return record;
+    }
+    if (record.state === "Downtime" && !record.model) {
+      const model = lastModelByShift.get(shiftKey);
+      if (model) return { ...record, model };
+    }
+      return record;
+    });
 
   const map = {};
   enriched.forEach((r) => {
@@ -141,6 +157,8 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
         // every row to the query's start date (fixes multi-day collapse).
         dateFrom: r._prodDay || null,
         dateTo: r._prodDay || null,
+        startedAtMs: r._absMs ?? null, completedAtMs: r._absMsEnd ?? r._absMs ?? null,
+        startedAt: r.startTime || "", completedAt: r.endTime || r.startTime || "",
         planQty: 0, actualQty: 0, goodQty: 0,
         downtimeSecs: 0, downtimeCount: 0, // brief downtime (<5m)
         idleSecs: 0,    idleCount: 0,      // idle (>=5m)
@@ -154,6 +172,15 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
     if (r._prodDay) {
       if (!g.dateFrom || r._prodDay < g.dateFrom) g.dateFrom = r._prodDay;
       if (!g.dateTo   || r._prodDay > g.dateTo)   g.dateTo   = r._prodDay;
+    }
+    if (r._absMs != null && (g.startedAtMs == null || r._absMs < g.startedAtMs)) {
+      g.startedAtMs = r._absMs;
+      g.startedAt = r.startTime || "";
+    }
+    const recordEndMs = r._absMsEnd ?? r._absMs;
+    if (recordEndMs != null && (g.completedAtMs == null || recordEndMs > g.completedAtMs)) {
+      g.completedAtMs = recordEndMs;
+      g.completedAt = r.endTime || r.startTime || "";
     }
 
     if (r.state === "Production") {
@@ -218,8 +245,8 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
       //   Available Time = Plan Qty       × Defined CT
       //   Actual Time    = Actual Prod    × Actual CT
       //
-      //   A% = Actual Time   / Available Time
-      //   P% = Actual Prod   / Plan Qty
+      //   A% = (Available Time - Downtime) / Available Time
+      //   P% = (Actual Components × Defined CT) / Net Operating Time
       //   Q% = Accepted Qty  / Actual Qty
       // ============================================================
       const actualCompCT = compCT != null ? compCT : avgCycleSecs;
@@ -238,17 +265,26 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
       const rejects  = logRejects != null ? logRejects : fallbackRejects;
       const accepted = Math.max(0, compQty - rejects);
 
-      // A% = Actual Time / Available Time  (capped at 100% for the OEE product)
-      const A = availableTimeSecs > 0 ? Math.min(1, actualTimeSecs / availableTimeSecs) : 0;
-      // P% = Actual Prod / Plan Qty
-      const P = planQty > 0 ? Math.min(1, compQty / planQty) : 0;
+      // Same availability rule as the Dashboard: planned time less every
+      // recorded stop, including stops classified as Idle.
+      const totalDowntimeSecs = row.downtimeSecs + row.idleSecs;
+      const totalDowntimeMins = Math.round(totalDowntimeSecs / 60);
+      const A = availableTimeSecs > 0
+        ? Math.max(0, Math.min(1, (availableTimeSecs - totalDowntimeSecs) / availableTimeSecs))
+        : 0;
+      // Performance uses ideal production time divided by the net operating
+      // time, matching the Dashboard OEE calculation.
+      const netOperatingSecs = Math.max(1, availableTimeSecs - totalDowntimeSecs);
+      const P = row.definedCycleTime > 0
+        ? Math.max(0, Math.min(1, (compQty * row.definedCycleTime) / netOperatingSecs))
+        : 1;
       // Q% = Accepted Qty / Actual Qty   (both in component units)
       const Q = compQty > 0 ? Math.min(1, accepted / compQty) : 1;
 
-      const oee = Math.round(A * P * Q * 1000) / 10;
       const availability = Math.round(A * 1000) / 10;
       const performance  = Math.round(P * 1000) / 10;
       const quality      = Math.round(Q * 1000) / 10;
+      const oee = Math.round((availability * performance * quality / 10000) * 10) / 10;
 
       const goodComp = accepted;
 
@@ -261,6 +297,8 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
         dateFrom: row.dateFrom,
         dateTo: row.dateTo,
         date: row.dateFrom,                       // back-compat
+        startedAt: fmtAbs(row.startedAtMs, row.startedAt),
+        completedAt: fmtAbs(row.completedAtMs, row.completedAt),
         sapCode: row.sapCode,
         itemDescription: row.itemDescription,
         model: row.model,
@@ -283,12 +321,12 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
         actualChangeovers: coSt.count,
         coOverrunMins: coSt.overrunMins,
         coOverrunCount: coSt.overrunCount,
-        idleMins, downMins, rejects, accepted, lossMins,
+        idleMins, downMins, totalDowntimeMins, rejects, accepted, lossMins,
         oee: isNaN(oee) ? 0 : oee,
         availability, performance, quality,
         idealEnergyWh, actualEnergyWh,
         // OEE breakdown inputs (component units) — surfaced in the UI
-        actualCompCT, availableTimeSecs, actualTimeSecs,
+        actualCompCT, availableTimeSecs, actualTimeSecs, netOperatingSecs,
         downtimeSecs: row.downtimeSecs, idleSecs: row.idleSecs,
         goodQty: row.goodQty,
       };
@@ -368,6 +406,12 @@ const buildColumns = (materials) => [
       </span>
     ),
     csv: (r) => (r.dateFrom === r.dateTo ? r.dateFrom : `${r.dateFrom}..${r.dateTo}`) },
+  { key: "startedAt", label: "Started", group: "info", sortable: true, align: "left",
+    cell: (r) => <span className="text-[11px] font-mono text-slate-600 whitespace-nowrap">{r.startedAt || "-"}</span>,
+    csv: (r) => r.startedAt || "" },
+  { key: "completedAt", label: "Completed", group: "info", sortable: true, align: "left",
+    cell: (r) => <span className="text-[11px] font-mono text-slate-600 whitespace-nowrap">{r.completedAt || "-"}</span>,
+    csv: (r) => r.completedAt || "" },
   { key: "sapCode", label: "SAP Code", group: "info", sortable: true, align: "left",
     cell: (r) => <span className="font-mono font-bold text-blue-600 text-xs">{r.sapCode}</span>,
     csv: (r) => r.sapCode },
@@ -419,6 +463,9 @@ const buildColumns = (materials) => [
   { key: "actualTimeMins", label: "Actual Time", group: "time", sortable: true, align: "center",
     cell: (r) => <span className={`font-mono font-semibold ${r.actualTimeMins > r.reqTimeMins ? "text-amber-600" : "text-violet-600"}`}>{r.actualTimeMins}</span>,
     csv: (r) => r.actualTimeMins },
+  { key: "totalDowntimeMins", label: "Downtime", group: "time", sortable: true, align: "center",
+    cell: (r) => <span className="font-mono font-semibold text-rose-600">{r.totalDowntimeMins} min</span>,
+    csv: (r) => r.totalDowntimeMins },
   { key: "definedCycleTime", label: "Standard CT", group: "ct", sortable: true, align: "center",
     cell: (r) => <span className="font-mono font-semibold text-cyan-600">{r.definedCycleTime > 0 ? r.definedCycleTime : "-"}</span>,
     csv: (r) => r.definedCycleTime },
@@ -457,21 +504,21 @@ const buildColumns = (materials) => [
   { key: "availability", label: "A (%)", group: "oee", sortable: true, align: "center",
     cell: (r) => (
       <div className="text-center font-mono font-semibold text-slate-600">{r.availability}%
-        <div className="text-[9px] font-mono text-slate-400">{r.actualTimeMins} ÷ {r.reqTimeMins} m</div>
+        <div className="text-[9px] font-mono text-slate-400 whitespace-nowrap">({r.reqTimeMins} - {r.totalDowntimeMins}) / {r.reqTimeMins} x 100</div>
       </div>
     ),
     csv: (r) => r.availability },
   { key: "performance", label: "P (%)", group: "oee", sortable: true, align: "center",
     cell: (r) => (
       <div className="text-center font-mono font-semibold text-slate-600">{r.performance}%
-        <div className="text-[9px] font-mono text-slate-400">{r.componentQty} ÷ {r.planQty}</div>
+        <div className="text-[9px] font-mono text-slate-400 whitespace-nowrap">({r.componentQty} x {r.definedCycleTime}) / (({r.reqTimeMins} - {r.totalDowntimeMins}) x 60) x 100</div>
       </div>
     ),
     csv: (r) => r.performance },
   { key: "quality", label: "Q (%)", group: "oee", sortable: true, align: "center",
     cell: (r) => (
       <div className="text-center font-mono font-semibold text-slate-600">{r.quality}%
-        <div className="text-[9px] font-mono text-slate-400">{r.accepted} ÷ {r.componentQty}</div>
+        <div className="text-[9px] font-mono text-slate-400 whitespace-nowrap">{r.accepted} / {r.componentQty} x 100</div>
       </div>
     ),
     csv: (r) => r.quality },
@@ -484,7 +531,7 @@ const buildColumns = (materials) => [
             <div className={`h-full rounded-full ${oeeBarColor(r.oee)}`} style={{ width: `${r.oee}%` }} />
           </div>
         </div>
-        <div className="text-[9px] font-mono text-slate-400 mt-0.5">{r.availability}×{r.performance}×{r.quality}</div>
+        <div className="text-[9px] font-mono text-slate-400 mt-0.5 whitespace-nowrap">{r.availability} x {r.performance} x {r.quality} / 10,000</div>
       </div>
     ),
     csv: (r) => r.oee },
@@ -514,7 +561,7 @@ const groupSpans = (cols) => {
  * 7. Export helpers
  * ================================================================== */
 // Which summary columns are additive (SUM) vs averaged (AVG) for footer rows.
-const AGG_SUM = new Set(["planQty", "componentQty", "actualQty", "reqTimeMins", "actualTimeMins", "accepted", "rejected"]);
+const AGG_SUM = new Set(["planQty", "componentQty", "actualQty", "reqTimeMins", "actualTimeMins", "totalDowntimeMins", "accepted", "rejected"]);
 const AGG_AVG = new Set(["availability", "performance", "quality", "oee"]);
 
 const computeTotals = (rows, columns) => {
@@ -897,6 +944,7 @@ const PartProcessProductionReport = () => {
       rejects: sum((r) => r.rejects),
       accepted: sum((r) => r.accepted),
       lossMins: sum((r) => r.lossMins),
+      totalDowntimeMins: sum((r) => r.totalDowntimeMins),
       idleMins: sum((r) => r.idleMins),
       availability: (sum((r) => r.availability) / n).toFixed(1),
       performance: (sum((r) => r.performance) / n).toFixed(1),
@@ -948,6 +996,7 @@ const PartProcessProductionReport = () => {
             <StatCard icon={FiGrid} label="Components" value={totals.componentQty.toLocaleString()} tone="violet" />
             <StatCard icon={FiPackage} label="Sheets" value={totals.actualQty.toLocaleString()} tone="blue" />
             <StatCard icon={FiAlertTriangle} label="Rejects" value={totals.rejects.toLocaleString()} tone="rose" />
+            <StatCard icon={FiClock} label="Downtime" value={`${totals.totalDowntimeMins} min`} tone="amber" />
             <StatCard icon={FiActivity} label="Avg OEE" value={`${totals.oee}%`} tone="emerald" />
           </div>
         )}
