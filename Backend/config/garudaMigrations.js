@@ -20,5 +20,27 @@ export const runGarudaMigrations = async (pool1) => {
     END
   `);
 
+  // ── BISUpload: energy-consumption values auto-extracted from the uploaded
+  //    lab-report PDF at upload time (declared/measured kWh, deviation %,
+  //    and that check's PASS/FAIL) — best-effort, so all four stay nullable.
+  for (const col of [
+    { name: "DeclaredAnnualEnergy",   def: "DECIMAL(12,3) NULL" },
+    { name: "MeasuredAnnualEnergy",   def: "DECIMAL(12,3) NULL" },
+    { name: "EnergyDeviationPercent", def: "DECIMAL(6,2)  NULL" },
+    { name: "TestResult",             def: "NVARCHAR(20)  NULL" },
+  ]) {
+    await pool1.request().query(`
+      IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'BISUpload')
+      AND NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = 'BISUpload' AND COLUMN_NAME = '${col.name}'
+      )
+      BEGIN
+        ALTER TABLE BISUpload ADD ${col.name} ${col.def};
+        PRINT 'Migration: Added ${col.name} column to BISUpload (GARUDA)';
+      END
+    `);
+  }
+
   console.log("GARUDA migrations completed.");
 };

@@ -36,6 +36,7 @@ import {
 import {
   uploadBisPdfFile, getBisPdfFiles, downloadBisPdfFile,
   deleteBisPdfFile, updateBisPdfFile, getBisReportStatus,
+  updateBisEnergyData, fetchBisEnergyData,
 } from "../controllers/quality/UploadBISReport.controller.js";
 import { getDispatchHoldDetails } from "../controllers/quality/holdCabinetDetails.controller.js";
 import { getCPTReport } from "../controllers/quality/cptReport.controller.js";
@@ -124,6 +125,8 @@ router.get("/download-bis-file/:srNo", authenticate, downloadBisPdfFile);
 router.delete("/delete-bis-file/:srNo", authenticate, deleteBisPdfFile);
 router.put("/update-bis-file/:srNo", authenticate, uploadBISReportPDF.single("file"), handleMulterError, updateBisPdfFile);
 router.get("/bis-status", authenticate, getBisReportStatus);
+router.put("/bis-energy-data/:srNo", authenticate, updateBisEnergyData);
+router.post("/bis-fetch-energy-data/:srNo", authenticate, fetchBisEnergyData);
 
 // BEE Calculation
 router.get("/bee/models", authenticate, getBeeModels);

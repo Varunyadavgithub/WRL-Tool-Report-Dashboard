@@ -4,6 +4,7 @@ import sql from "mssql";
 import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { extractBisEnergyData } from "../../utils/bisPdfExtractor.js";
 
 const uploadDir = path.resolve("uploads", "BISReport");
 
@@ -65,31 +66,47 @@ export const uploadBisPdfFile = tryCatch(async (req, res) => {
   }
 
   const uploadedAt = getISTDate();
+  // Best-effort: a parse failure must never block the upload — extraction
+  // already swallows its own errors and returns all-null fields.
+  const energyData = await extractBisEnergyData(req.file.path);
   let pool;
 
   try {
     pool = await sql.connect(dbConfig1);
 
     const query = `
-      INSERT INTO BISUpload (ModelName, Year, Month, TestFrequency, Description, FileName, UploadAt)
-      VALUES (@ModelName, @Year, @Month, @TestFrequency, @Description, @FileName, @UploadAt)
+      INSERT INTO BISUpload (
+        ModelName, Year, Month, TestFrequency, Description, FileName, UploadAt,
+        DeclaredAnnualEnergy, MeasuredAnnualEnergy, EnergyDeviationPercent, TestResult
+      )
+      OUTPUT INSERTED.SrNo
+      VALUES (
+        @ModelName, @Year, @Month, @TestFrequency, @Description, @FileName, @UploadAt,
+        @DeclaredAnnualEnergy, @MeasuredAnnualEnergy, @EnergyDeviationPercent, @TestResult
+      )
     `;
 
-    await pool
+    const insertResult = await pool
       .request()
-      .input("ModelName",     sql.VarChar,  modelName)
-      .input("Year",          sql.VarChar,  year)
-      .input("Month",         sql.VarChar,  month)
-      .input("TestFrequency", sql.VarChar,  testFrequency)
-      .input("Description",   sql.VarChar,  description)
-      .input("FileName",      sql.VarChar,  fileName)
-      .input("UploadAt",      sql.DateTime, uploadedAt)
+      .input("ModelName",             sql.VarChar,  modelName)
+      .input("Year",                  sql.VarChar,  year)
+      .input("Month",                 sql.VarChar,  month)
+      .input("TestFrequency",         sql.VarChar,  testFrequency)
+      .input("Description",           sql.VarChar,  description)
+      .input("FileName",              sql.VarChar,  fileName)
+      .input("UploadAt",              sql.DateTime, uploadedAt)
+      .input("DeclaredAnnualEnergy",  sql.Decimal(12, 3), energyData.declaredAnnualEnergy)
+      .input("MeasuredAnnualEnergy",  sql.Decimal(12, 3), energyData.measuredAnnualEnergy)
+      .input("EnergyDeviationPercent", sql.Decimal(6, 2), energyData.energyDeviationPercent)
+      .input("TestResult",            sql.VarChar(20), energyData.testResult)
       .query(query);
 
     res.status(200).json({
       success: true,
+      srNo: insertResult.recordset[0].SrNo,
       filename: req.file.originalname,
       fileUrl: `/uploads/BISReport/${req.file.filename}`,
+      energyData,
       message: "Uploaded successfully",
     });
   } catch (error) {
@@ -111,22 +128,27 @@ export const getBisPdfFiles = tryCatch(async (_, res) => {
     // BUG (was): SELECT * — always use explicit columns so schema changes
     // don't silently break the mapping below.
     const query = `
-      SELECT SrNo, ModelName, Year, Month, TestFrequency, Description, FileName, UploadAt
+      SELECT SrNo, ModelName, Year, Month, TestFrequency, Description, FileName, UploadAt,
+             DeclaredAnnualEnergy, MeasuredAnnualEnergy, EnergyDeviationPercent, TestResult
       FROM BISUpload
       ORDER BY SrNo DESC
     `;
     const result = await pool.request().query(query);
 
     const files = result.recordset.map((file) => ({
-      srNo:          file.SrNo,
-      modelName:     file.ModelName,
-      year:          file.Year,
-      month:         file.Month,
-      testFrequency: file.TestFrequency,      // ← correct casing
-      description:   file.Description,
-      fileName:      file.FileName,
-      url:           `/uploads/BISReport/${file.FileName}`,
-      uploadAt:      file.UploadAt,           // ← correct casing
+      srNo:                   file.SrNo,
+      modelName:               file.ModelName,
+      year:                    file.Year,
+      month:                   file.Month,
+      testFrequency:           file.TestFrequency,      // ← correct casing
+      description:             file.Description,
+      fileName:                file.FileName,
+      url:                     `/uploads/BISReport/${file.FileName}`,
+      uploadAt:                file.UploadAt,           // ← correct casing
+      declaredAnnualEnergy:    file.DeclaredAnnualEnergy,
+      measuredAnnualEnergy:    file.MeasuredAnnualEnergy,
+      energyDeviationPercent:  file.EnergyDeviationPercent,
+      testResult:              file.TestResult,
     }));
 
     res.status(200).json({
@@ -285,7 +307,12 @@ export const updateBisPdfFile = tryCatch(async (req, res) => {
     const oldFileName  = existingResult.recordset[0].FileName;
     const finalFileName = newFile ? newFile.filename : oldFileName;
 
-    await pool
+    // Re-extract energy data only when a new PDF was uploaded — a
+    // metadata-only edit (name/year/description) keeps whatever was parsed
+    // from the file already on record.
+    const energyData = newFile ? await extractBisEnergyData(newFile.path) : null;
+
+    const updateRequest = pool
       .request()
       .input("ModelName",     sql.VarChar, modelName)
       .input("Year",          sql.VarChar, year)
@@ -293,17 +320,32 @@ export const updateBisPdfFile = tryCatch(async (req, res) => {
       .input("TestFrequency", sql.VarChar, testFrequency)
       .input("Description",   sql.VarChar, description)
       .input("FileName",      sql.VarChar, finalFileName)
-      .input("SrNo",          sql.Int,     parseInt(srNo, 10))
-      .query(`
-        UPDATE BISUpload
-        SET ModelName     = @ModelName,
-            Year          = @Year,
-            Month         = @Month,
-            TestFrequency = @TestFrequency,
-            Description   = @Description,
-            FileName      = @FileName
-        WHERE SrNo = @SrNo
-      `);
+      .input("SrNo",          sql.Int,     parseInt(srNo, 10));
+
+    let energySetClause = "";
+    if (energyData) {
+      updateRequest
+        .input("DeclaredAnnualEnergy",   sql.Decimal(12, 3), energyData.declaredAnnualEnergy)
+        .input("MeasuredAnnualEnergy",   sql.Decimal(12, 3), energyData.measuredAnnualEnergy)
+        .input("EnergyDeviationPercent", sql.Decimal(6, 2),  energyData.energyDeviationPercent)
+        .input("TestResult",             sql.VarChar(20),    energyData.testResult);
+      energySetClause = `,
+            DeclaredAnnualEnergy   = @DeclaredAnnualEnergy,
+            MeasuredAnnualEnergy   = @MeasuredAnnualEnergy,
+            EnergyDeviationPercent = @EnergyDeviationPercent,
+            TestResult             = @TestResult`;
+    }
+
+    await updateRequest.query(`
+      UPDATE BISUpload
+      SET ModelName     = @ModelName,
+          Year          = @Year,
+          Month         = @Month,
+          TestFrequency = @TestFrequency,
+          Description   = @Description,
+          FileName      = @FileName${energySetClause}
+      WHERE SrNo = @SrNo
+    `);
 
     // Only delete old file AFTER successful DB update
     if (newFile && oldFileName) {
@@ -350,7 +392,8 @@ export const getBisReportStatus = tryCatch(async (_, res) => {
     // ── Files ─────────────────────────────────────────────────────────
     // BUG (was): SELECT * — use explicit columns
     const filesResult = await pool.request().query(`
-      SELECT SrNo, ModelName, Year, Month, TestFrequency, Description, FileName, UploadAt
+      SELECT SrNo, ModelName, Year, Month, TestFrequency, Description, FileName, UploadAt,
+             DeclaredAnnualEnergy, MeasuredAnnualEnergy, EnergyDeviationPercent, TestResult
       FROM BISUpload
       ORDER BY SrNo DESC
     `);
@@ -369,7 +412,11 @@ export const getBisReportStatus = tryCatch(async (_, res) => {
       url:           `/uploads/BISReport/${file.FileName}`,
       // BUG (was): file.UploadAT — the column is UploadAt (see INSERT above).
       // The wrong casing returns undefined for every row.
-      uploadAt:      file.UploadAt,
+      uploadAt:               file.UploadAt,
+      declaredAnnualEnergy:   file.DeclaredAnnualEnergy,
+      measuredAnnualEnergy:   file.MeasuredAnnualEnergy,
+      energyDeviationPercent: file.EnergyDeviationPercent,
+      testResult:             file.TestResult,
     }));
 
     // ── Status ────────────────────────────────────────────────────────
@@ -474,6 +521,98 @@ export const getBisReportStatus = tryCatch(async (_, res) => {
     });
   } catch (error) {
     throw new AppError(`Failed to fetch BIS Report status data: ${error.message}`, 500);
+  } finally {
+    await closePool(pool);
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CONFIRM / EDIT ENERGY DATA
+   Lets the user review the auto-extracted (OCR-derived) energy values right
+   after upload and correct anything OCR got wrong, without re-uploading the
+   file or touching the other BISUpload fields.
+═══════════════════════════════════════════════════════════════════════ */
+const toNullableNumber = (v) => (v === "" || v === undefined || v === null ? null : Number(v));
+
+export const updateBisEnergyData = tryCatch(async (req, res) => {
+  const { srNo } = req.params;
+  const { declaredAnnualEnergy, measuredAnnualEnergy, energyDeviationPercent, testResult } = req.body;
+
+  if (!srNo) throw new AppError("Missing required field: SrNo.", 400);
+
+  let pool;
+
+  try {
+    pool = await sql.connect(dbConfig1);
+
+    const result = await pool
+      .request()
+      .input("SrNo",                   sql.Int,            parseInt(srNo, 10))
+      .input("DeclaredAnnualEnergy",   sql.Decimal(12, 3), toNullableNumber(declaredAnnualEnergy))
+      .input("MeasuredAnnualEnergy",   sql.Decimal(12, 3), toNullableNumber(measuredAnnualEnergy))
+      .input("EnergyDeviationPercent", sql.Decimal(6, 2),  toNullableNumber(energyDeviationPercent))
+      .input("TestResult",             sql.VarChar(20),    testResult || null)
+      .query(`
+        UPDATE BISUpload
+        SET DeclaredAnnualEnergy   = @DeclaredAnnualEnergy,
+            MeasuredAnnualEnergy   = @MeasuredAnnualEnergy,
+            EnergyDeviationPercent = @EnergyDeviationPercent,
+            TestResult             = @TestResult
+        WHERE SrNo = @SrNo
+      `);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ success: false, message: "Record not found." });
+    }
+
+    res.status(200).json({ success: true, message: "Energy data confirmed." });
+  } catch (error) {
+    throw new AppError(`Failed to update BIS energy data: ${error.message}`, 500);
+  } finally {
+    await closePool(pool);
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FETCH ENERGY DATA (re-extract from an already-uploaded PDF)
+   For records uploaded before this feature existed, or where extraction
+   was skipped/failed the first time — re-runs extraction against the file
+   already on disk. Does NOT write to the DB; the caller reviews the result
+   in the same confirm dialog used post-upload and saves it explicitly via
+   updateBisEnergyData above.
+═══════════════════════════════════════════════════════════════════════ */
+export const fetchBisEnergyData = tryCatch(async (req, res) => {
+  const { srNo } = req.params;
+  if (!srNo) throw new AppError("Missing required field: SrNo.", 400);
+
+  let pool;
+
+  try {
+    pool = await sql.connect(dbConfig1);
+
+    const result = await pool
+      .request()
+      .input("SrNo", sql.Int, parseInt(srNo, 10))
+      .query(`SELECT FileName FROM BISUpload WHERE SrNo = @SrNo`);
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: "Record not found." });
+    }
+
+    const filePath = path.join(uploadDir, result.recordset[0].FileName);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: "File not found on disk." });
+    }
+
+    const energyData = await extractBisEnergyData(filePath);
+
+    res.status(200).json({
+      success: true,
+      message: "Energy data extracted.",
+      energyData,
+    });
+  } catch (error) {
+    throw new AppError(`Failed to fetch BIS energy data: ${error.message}`, 500);
   } finally {
     await closePool(pool);
   }
