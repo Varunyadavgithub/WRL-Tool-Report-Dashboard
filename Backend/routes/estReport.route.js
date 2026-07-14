@@ -1,4 +1,5 @@
 import express from "express";
+import { authenticate } from "../middlewares/auth.js";
 import {
   getEstReport,
   getEstReportByRefNo,
@@ -18,30 +19,30 @@ import {
 const router = express.Router();
 
 // Main report routes
-router.get("/", getEstReport);
-router.get("/summary", getEstReportSummary);
-router.get("/export", exportEstReport);
+router.get("/", authenticate, getEstReport);
+router.get("/summary", authenticate, getEstReportSummary);
+router.get("/export", authenticate, exportEstReport);
 
 // Quick filter routes
-router.get("/quick/:filter", getEstReportQuickFilter);
+router.get("/quick/:filter", authenticate, getEstReportQuickFilter);
 
 // Dropdown data routes
-router.get("/models", getDistinctModels);
-router.get("/operators", getDistinctOperators);
+router.get("/models", authenticate, getDistinctModels);
+router.get("/operators", authenticate, getDistinctOperators);
 
 // Statistics routes
-router.get("/model-stats", getModelWiseStats);
-router.get("/operator-stats", getOperatorWiseStats);
-router.get("/failure-analysis", getFailureAnalysis);
+router.get("/model-stats", authenticate, getModelWiseStats);
+router.get("/operator-stats", authenticate, getOperatorWiseStats);
+router.get("/failure-analysis", authenticate, getFailureAnalysis);
 
 // Trend routes
-router.get("/hourly-trend", getHourlyTrend);
-router.get("/daily-trend", getDailyTrend);
+router.get("/hourly-trend", authenticate, getHourlyTrend);
+router.get("/daily-trend", authenticate, getDailyTrend);
 
 // Failure routes
-router.get("/failures", getFailedTests);
+router.get("/failures", authenticate, getFailedTests);
 
 // Single record route (keep at end to avoid conflicts)
-router.get("/:refNo", getEstReportByRefNo);
+router.get("/:refNo", authenticate, getEstReportByRefNo);
 
 export default router;

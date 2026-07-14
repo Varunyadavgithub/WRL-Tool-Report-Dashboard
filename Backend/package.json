@@ -12,8 +12,10 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
     "@napi-rs/canvas": "^1.0.1",
     "agenda": "^5.0.0",
+    "bcryptjs": "^3.0.3",
     "chart.js": "^4.5.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -26,7 +28,10 @@
     "mysql": "^2.18.1",
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.12",
+    "pdf-parse": "^2.4.5",
     "pdfkit": "^0.17.2",
+    "simple-statistics": "^7.9.3",
+    "tesseract.js": "^7.0.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

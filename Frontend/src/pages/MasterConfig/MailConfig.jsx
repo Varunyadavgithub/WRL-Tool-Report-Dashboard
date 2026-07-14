@@ -9,7 +9,7 @@ import { useAddMailSubscriberMutation, useUpdateMailSubscriberMutation, useDelet
 
 const DEPTS       = ["Production","Quality","Maintenance","Operations","Store","HR","Logistics","Manufacturing Engineering"];
 const FREQUENCIES = ["Hourly","Shift-wise","Daily","Weekly","Monthly"];
-const REPORTS = ["Production Report","Quality Report","Downtime Report","Hourly Report"];
+const REPORTS = ["Production Report","Quality Report","Downtime Report","Hourly Report","Smart Alerts"];
 
 const INIT = { empName:"", empId:"", department:"Production", designation:"", email:"", mobile:"", subscriptions:[], frequency:"Shift-wise", whatsapp:false, sms:false, status:true };
 

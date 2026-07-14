@@ -5,6 +5,7 @@ export const estReportApi = createApi({
   reducerPath: "estReportApi",
   baseQuery: fetchBaseQuery({
     baseUrl: `${baseURL}est-report`,
+    credentials: "include",
     prepareHeaders: (headers, { getState }) => {
       const token = getState()?.auth?.token;
       if (token) {

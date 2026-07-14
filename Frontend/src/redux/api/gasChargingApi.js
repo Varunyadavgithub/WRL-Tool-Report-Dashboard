@@ -5,6 +5,7 @@ export const gasChargingApi = createApi({
   reducerPath: "gasChargingApi",
   baseQuery: fetchBaseQuery({
     baseUrl: baseURL,
+    credentials: "include",
     prepareHeaders: (headers, { getState }) => {
       const token = getState().auth?.token;
       if (token) {

@@ -25,6 +25,7 @@ import {
 import { mapDbRecord } from "../../utils/mapDbRecord.js";
 import { PART_PROCESS_API } from "../../utils/factoryOsClient";
 import { getWrlLogoBase64 } from "../../utils/reportLogo.js";
+import ShiftInsightPanel from "../../components/PartProcess/ShiftInsightPanel";
 
 /* ==================================================================
  * 1. Date / time helpers
@@ -1050,6 +1051,14 @@ const PartProcessProductionReport = () => {
             </div>
           </div>
         </SectionCard>
+
+        {hasData && (
+          <ShiftInsightPanel
+            start={startTime}
+            end={endTime}
+            shiftName={shiftFilter !== "ALL" ? shiftFilter : undefined}
+          />
+        )}
 
         {/* ----- VIEW TABS + EXPORT ----- */}
         <div className="flex items-center justify-between gap-3 shrink-0 flex-wrap">

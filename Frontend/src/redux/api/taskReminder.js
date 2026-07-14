@@ -5,6 +5,7 @@ export const taskReminderApi = createApi({
   reducerPath: "taskReminderApi",
   baseQuery: fetchBaseQuery({
     baseUrl: baseURL,
+    credentials: "include",
   }),
   tagTypes: ["TaskReminder"],
   endpoints: (builder) => ({

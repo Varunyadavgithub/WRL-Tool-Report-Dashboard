@@ -29,6 +29,7 @@ export const dbConfig1 = {
   password: process.env.DB_PASSWORD1,
   server:   process.env.DB_SERVER1,
   database: process.env.DB_NAME1,
+  ...(process.env.DB_PORT1 ? { port: Number(process.env.DB_PORT1) } : {}),
   ...baseOptions,
 };
 
@@ -37,6 +38,7 @@ export const dbConfig2 = {
   password: process.env.DB_PASSWORD2,
   server:   process.env.DB_SERVER2,
   database: process.env.DB_NAME2,
+  ...(process.env.DB_PORT2 ? { port: Number(process.env.DB_PORT2) } : {}),
   ...baseOptions,
 };
 
@@ -45,6 +47,7 @@ export const dbConfig3 = {
   password: process.env.DB_PASSWORD3,
   server:   process.env.DB_SERVER3,
   database: process.env.DB_NAME3,
+  ...(process.env.DB_PORT3 ? { port: Number(process.env.DB_PORT3) } : {}),
   ...baseOptions,
 };
 
@@ -53,6 +56,7 @@ export const dbConfig4 = {
   password: process.env.DB_PASSWORD4,
   server:   process.env.DB_SERVER4,
   database: process.env.DB_NAME4,
+  ...(process.env.DB_PORT4 ? { port: Number(process.env.DB_PORT4) } : {}),
   ...baseOptions,
 };
 

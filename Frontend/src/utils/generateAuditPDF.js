@@ -1,24 +1,43 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import logoUrl from "../assets/logo.png";
+import { getWrlLogoBase64, LOGO_ASPECT } from "./reportLogo.js";
+import { baseURL } from "../assets/assets.js";
 
-// ── Convert local image asset to base64 for jsPDF ────────────────────────────
-const loadImageAsBase64 = (url) =>
-  new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width  = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      canvas.getContext("2d").drawImage(img, 0, 0);
-      resolve(canvas.toDataURL("image/png"));
-    };
-    img.onerror = () => resolve(null);
-    img.src = url;
-  });
+// ── Fetch a checkpoint image (served from the backend) and convert to base64 ─
+const fetchImageAsBase64 = async (url) => {
+  try {
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+};
 
-// ── Colour palette ────────────────────────────────────────────────────────────
+// Checkpoint image values are either a filename string or an object
+// { name, data } (data already base64) — normalise to a cache key.
+const imageKey = (val) => {
+  if (!val) return null;
+  if (typeof val === "object") return val.name || JSON.stringify(val);
+  return String(val);
+};
+
+const imageFormat = (dataUrl) => {
+  const match = /^data:image\/(\w+);base64,/.exec(dataUrl || "");
+  const ext = (match?.[1] || "jpeg").toLowerCase();
+  if (ext === "png") return "PNG";
+  if (ext === "webp") return "WEBP";
+  if (ext === "gif") return "GIF";
+  return "JPEG";
+};
+
+// ── Colour palette (light theme) ──────────────────────────────────────────────
 const C = {
   primary:     [63,  81,  181],   // indigo-600
   primaryDark: [40,  53,  147],   // indigo-800
@@ -28,6 +47,7 @@ const C = {
   info:        [59,  130, 246],   // blue-500
   gray:        [107, 114, 128],   // gray-500
   lightGray:   [243, 244, 246],   // gray-100
+  headerBg:    [237, 239, 253],   // very light indigo tint
   white:       [255, 255, 255],
   black:       [17,  24,  39],    // gray-900
   border:      [209, 213, 219],   // gray-300
@@ -61,7 +81,7 @@ const cpStatusColor = (s) => {
 
 export const generateAuditPDF = async (audit) => {
   // Load WRL logo
-  const logoBase64 = await loadImageAsBase64(logoUrl);
+  const logoBase64 = await getWrlLogoBase64();
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const W = doc.internal.pageSize.getWidth();   // 297
   const H = doc.internal.pageSize.getHeight();  // 210
@@ -107,12 +127,13 @@ export const generateAuditPDF = async (audit) => {
     const pg    = doc.internal.getCurrentPageInfo().pageNumber;
     const total = doc.internal.getNumberOfPages();
 
-    fillRect(0, H - 14, W, 14, C.primaryDark);
+    fillRect(0, H - 14, W, 14, C.lightGray);
+    drawLine(0, H - 14, W, H - 14, C.border, 0.3);
 
     // Left column — report name + audit code
-    setFont(7, "bold", C.white);
+    setFont(7, "bold", C.primaryDark);
     text(audit.reportName || "Audit Report", margin, H - 9);
-    setFont(6.5, "normal", [180, 190, 250]);
+    setFont(6.5, "normal", C.gray);
     text(audit.auditCode || "", margin, H - 4);
 
     // Centre — Format No  |  Rev. No  |  Rev. Date
@@ -123,31 +144,34 @@ export const generateAuditPDF = async (audit) => {
       audit.revDate  ? `Rev. Date: ${fmt(audit.revDate)}` : null,
     ].filter(Boolean).join("   |   ");
 
-    setFont(6.5, "bold", [220, 230, 255]);
+    setFont(6.5, "bold", C.primaryDark);
     text(revParts, centre, H - 9, { align: "center" });
-    setFont(6, "normal", [160, 175, 230]);
+    setFont(6, "normal", C.gray);
     text("Western Refrigeration Ltd — Product Quality Report", centre, H - 4, { align: "center" });
 
     // Right — page number + generated timestamp
-    setFont(6.5, "normal", [180, 190, 250]);
+    setFont(6.5, "normal", C.primaryDark);
     text(`Page ${pg} / ${total}`, W - margin, H - 9, { align: "right" });
-    setFont(6, "normal", [160, 175, 230]);
+    setFont(6, "normal", C.gray);
     text(`Generated: ${new Date().toLocaleString("en-IN")}`, W - margin, H - 4, { align: "right" });
   };
 
   // ── 1. HEADER BAND ──────────────────────────────────────────────────────────
 
-  fillRect(0, 0, W, 30, C.primaryDark);
+  fillRect(0, 0, W, 30, C.headerBg);
+  drawLine(0, 30, W, 30, C.primary, 0.6);
 
-  // Left: WRL logo + title
-  const logoH = 20, logoW = 20;
+  // Left: WRL logo (native 512x256 asset — keep true 2:1 aspect ratio) + title
+  const logoW = 22;
+  const logoH = logoW / LOGO_ASPECT;
+  const logoY = (30 - logoH) / 2;
   if (logoBase64) {
-    doc.addImage(logoBase64, "PNG", margin, 5, logoW, logoH);
+    doc.addImage(logoBase64, "PNG", margin, logoY, logoW, logoH);
   }
   const titleX = logoBase64 ? margin + logoW + 4 : margin;
-  setFont(15, "bold", C.white);
+  setFont(15, "bold", C.primaryDark);
   text("QUALITY AUDIT REPORT", titleX, 13);
-  setFont(8, "normal", [180, 190, 250]);
+  setFont(8, "normal", C.gray);
   text("Western Refrigeration Ltd — Product Quality Report", titleX, 21);
 
   // Right: audit code + status badge
@@ -158,7 +182,7 @@ export const generateAuditPDF = async (audit) => {
   setFont(7, "bold", C.white);
   text(statusLabel, W - margin - 19, 10.5, { align: "center" });
 
-  setFont(9, "bold", [220, 220, 255]);
+  setFont(9, "bold", C.primaryDark);
   text(audit.auditCode || "", W - margin, 22, { align: "right" });
 
   y = 35;
@@ -252,9 +276,39 @@ export const generateAuditPDF = async (audit) => {
     content: c.name.toUpperCase(),
     styles: {
       halign: ["status", "image"].includes(c.type) ? "center" : "left",
-      cellWidth: c.type === "status" ? 18 : c.id === "checkPoint" ? 38 : "auto",
+      cellWidth: c.type === "status" ? 18 : c.type === "image" ? 22 : c.id === "checkPoint" ? 38 : "auto",
     },
   }));
+
+  // Pre-resolve every checkpoint image (filename → base64) so it can be
+  // drawn synchronously inside autoTable's didDrawCell hook below.
+  const imageColIds = new Set(columns.filter((c) => c.type === "image").map((c) => c.id));
+  const imageCache = new Map();
+  if (imageColIds.size > 0) {
+    const toFetch = new Map();
+    sections.forEach((section) => {
+      (section?.stages || []).forEach((st) => {
+        (st.checkPoints || []).forEach((cp) => {
+          imageColIds.forEach((colId) => {
+            const val = cp[colId];
+            const key = imageKey(val);
+            if (key && !toFetch.has(key)) toFetch.set(key, val);
+          });
+        });
+      });
+    });
+    await Promise.all(
+      [...toFetch.entries()].map(async ([key, val]) => {
+        let result = null;
+        if (typeof val === "object" && val.data) {
+          result = val.data;
+        } else if (typeof val === "string") {
+          result = await fetchImageAsBase64(`${baseURL}audit-report/images/${val}`);
+        }
+        imageCache.set(key, result);
+      }),
+    );
+  }
 
   sections.forEach((section) => {
     if (!section) return;
@@ -265,9 +319,10 @@ export const generateAuditPDF = async (audit) => {
     checkY(18);
 
     // Section header
-    fillRect(margin, y, W - margin * 2, 7, C.primary);
-    setFont(8.5, "bold", C.white);
-    text((section.sectionName || "Section").toUpperCase(), margin + 3, y + 5);
+    fillRect(margin, y, W - margin * 2, 7, C.headerBg);
+    fillRect(margin, y, 2, 7, C.primary);
+    setFont(8.5, "bold", C.primaryDark);
+    text((section.sectionName || "Section").toUpperCase(), margin + 5, y + 5);
     y += 9;
 
     // Build rows for this section
@@ -279,6 +334,11 @@ export const generateAuditPDF = async (audit) => {
         if (col.id === "stage") return cp.stageName !== prevStage ? cp.stageName : "";
         const val = cp[col.id] ?? "—";
         if (col.id === "status") return { content: (String(val)).toUpperCase(), styles: { halign: "center", textColor: cpStatusColor(cp.status), fontStyle: "bold" } };
+        if (col.type === "image") {
+          const key = imageKey(cp[col.id]);
+          const hasImage = key && imageCache.get(key);
+          return { content: hasImage ? "" : key ? "Unavailable" : "—", styles: { halign: "center", fontSize: 6, textColor: C.gray } };
+        }
         return String(val === undefined || val === null || val === "" ? "—" : val);
       });
       prevStage = cp.stageName;
@@ -307,9 +367,11 @@ export const generateAuditPDF = async (audit) => {
         lineColor: C.border,
       },
       alternateRowStyles: { fillColor: [249, 250, 251] },
-      columnStyles: {
-        0: columns[0]?.id === "stage" ? { cellWidth: 22, fontStyle: "bold", textColor: C.gray } : {},
-      },
+      columnStyles: columns.reduce((acc, col, idx) => {
+        if (idx === 0 && col.id === "stage") acc[0] = { cellWidth: 22, fontStyle: "bold", textColor: C.gray };
+        if (col.type === "image") acc[idx] = { ...(acc[idx] || {}), cellWidth: 22, minCellHeight: 20 };
+        return acc;
+      }, {}),
       tableLineColor: C.border,
       tableLineWidth: 0.2,
       margin: { left: margin, right: margin },
@@ -321,6 +383,23 @@ export const generateAuditPDF = async (audit) => {
             data.cell.styles.textColor = cpStatusColor(status);
             data.cell.styles.fontStyle = "bold";
           }
+        }
+      },
+      didDrawCell: (data) => {
+        if (data.section !== "body") return;
+        const colDef = columns[data.column.index];
+        if (colDef?.type !== "image") return;
+        const key = imageKey(allCPs[data.row.index]?.[colDef.id]);
+        const b64 = key ? imageCache.get(key) : null;
+        if (!b64) return;
+        const pad = 1.5;
+        const size = Math.min(data.cell.width - pad * 2, data.cell.height - pad * 2);
+        const ix = data.cell.x + (data.cell.width - size) / 2;
+        const iy = data.cell.y + (data.cell.height - size) / 2;
+        try {
+          doc.addImage(b64, imageFormat(b64), ix, iy, size, size);
+        } catch {
+          // malformed image data — leave cell blank
         }
       },
     });
@@ -336,9 +415,10 @@ export const generateAuditPDF = async (audit) => {
   const total = sum.total || 0;
   const passRate = total > 0 ? Math.round((sum.pass / total) * 100) : 0;
 
-  fillRect(margin, y, W - margin * 2, 6, C.primaryDark);
-  setFont(8, "bold", C.white);
-  text("AUDIT SUMMARY", margin + 3, y + 4.5);
+  fillRect(margin, y, W - margin * 2, 6, C.headerBg);
+  fillRect(margin, y, 2, 6, C.primary);
+  setFont(8, "bold", C.primaryDark);
+  text("AUDIT SUMMARY", margin + 5, y + 4.5);
   y += 8;
 
   const summaryItems = [

@@ -1,2 +1,5 @@
 node_modules
 .env
+
+# tesseract.js OCR language model — downloaded on first use, ~5MB, regenerable
+*.traineddata

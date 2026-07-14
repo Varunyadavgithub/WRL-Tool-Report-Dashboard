@@ -104,7 +104,6 @@ export const addLptDefect = tryCatch(async (req, res) => {
     Performance,
     currentDateTime,
     shift,
-    LPTType,
   } = req.body;
 
   // Convert to IST (UTC+5:30)
@@ -112,9 +111,9 @@ export const addLptDefect = tryCatch(async (req, res) => {
 
   const query = `
       INSERT INTO LPTReport
-      (DateTime, Shift, ModelName, AssemblyNo, Defect, Remark, MinTemp, MaxTemp, ActualTemp, MinCurrent, MaxCurrent, ActualCurrent, MinPower, MaxPower, ActualPower, Performance, LPTType)
-      VALUES
-      (@DateTime, @Shift, @ModelName, @AssemblyNo, @Defect, @Remark, @MinTemp, @MaxTemp, @ActualTemp, @MinCurrent, @MaxCurrent, @ActualCurrent, @MinPower, @MaxPower, @ActualPower, @Performance, @LPTType)
+      (DateTime, Shift, ModelName, AssemblyNo, Defect, Remark, MinTemp, MaxTemp, ActualTemp, MinCurrent, MaxCurrent, ActualCurrent, MinPower, MaxPower, ActualPower, Performance)
+      VALUES 
+      (@DateTime, @Shift, @ModelName, @AssemblyNo, @Defect, @Remark, @MinTemp, @MaxTemp, @ActualTemp, @MinCurrent, @MaxCurrent, @ActualCurrent, @MinPower, @MaxPower, @ActualPower, @Performance)
   `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();
@@ -138,8 +137,7 @@ export const addLptDefect = tryCatch(async (req, res) => {
       .input("MaxPower", sql.NVarChar, MaxPower ?? null)
       .input("ActualPower", sql.NVarChar, ActualPower ?? null)
       .input("Performance", sql.NVarChar, Performance ?? null)
-      .input("Category", sql.NVarChar, Category?.trim() || null)
-      .input("LPTType", sql.NVarChar, LPTType?.trim() || "LPT");
+      .input("Category", sql.NVarChar, Category?.trim() || null);
 
     await request.query(query);
 

@@ -9,8 +9,23 @@ import { Provider } from "react-redux";
 import store from "./redux/store.js";
 import { PersistGate } from "redux-persist/integration/react";
 import { persistStore } from "redux-persist";
+import { handleSessionExpired } from "./utils/authExpiry.js";
 
 axios.defaults.withCredentials = true;
+
+// Covers the many pages that call the backend via raw axios rather than RTK
+// Query — see the equivalent RTK Query middleware in redux/store.js for the
+// other fetch path. Both funnel into the same handleSessionExpired so there's
+// one place that decides what "expired session" means.
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      handleSessionExpired(store.dispatch);
+    }
+    return Promise.reject(error);
+  },
+);
 
 let persistor = persistStore(store);
 

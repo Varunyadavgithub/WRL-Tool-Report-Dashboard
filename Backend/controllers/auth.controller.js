@@ -1,8 +1,11 @@
 import sql from "mssql";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 import { dbConfig1 } from "../config/db.config.js";
 import { tryCatch } from "../utils/tryCatch.js";
 import { AppError } from "../utils/AppError.js";
+
+const BCRYPT_SALT_ROUNDS = 10;
 
 // ================= SIGNUP =================
 export const signup = tryCatch(async (req, res) => {
@@ -95,17 +98,24 @@ export const signup = tryCatch(async (req, res) => {
     const userCode = `${Series}${year}${padded}`;
 
     // 8. Insert user (inactive)
+    // NOTE: Password stays plaintext here (unchanged) since GARUDA/Users may
+    // have consumers outside this app that expect to read it — PasswordHash
+    // is additive, so this app can verify via bcrypt without touching that.
+    const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+
     await pool
       .request()
       .input("UserCode", sql.VarChar, userCode)
       .input("UserID", sql.VarChar, empcod)
       .input("UserName", sql.VarChar, username)
-      .input("Password", sql.VarChar, password).query(`
+      .input("Password", sql.VarChar, password)
+      .input("PasswordHash", sql.VarChar, passwordHash).query(`
         INSERT INTO Users (
           UserCode,
           UserID,
           UserName,
           Password,
+          PasswordHash,
           UserRole,
           Employee,
           LastActivityOn,
@@ -122,6 +132,7 @@ export const signup = tryCatch(async (req, res) => {
           @UserID,
           @UserName,
           @Password,
+          @PasswordHash,
           223009,
           NULL,
           NULL,
@@ -178,25 +189,51 @@ export const login = tryCatch(async (req, res) => {
       throw new AppError("Account is locked", 403);
     }
 
-    // 2. Validate password
+    // 2. Fetch the user's stored credentials — no password in the WHERE
+    // clause anymore, since the match is now done in JS (bcrypt or, for
+    // rows not yet migrated, a legacy plaintext fallback below).
     const result = await pool
       .request()
-      .input("empcod", sql.VarChar, empcod)
-      .input("password", sql.VarChar, password).query(`
-        SELECT 
-          U.UserCode, 
-          U.UserName, 
-          U.UserID, 
-          U.UserRole, 
-          R.RoleName 
+      .input("empcod", sql.VarChar, empcod).query(`
+        SELECT
+          U.UserCode,
+          U.UserName,
+          U.UserID,
+          U.UserRole,
+          U.Password,
+          U.PasswordHash,
+          R.RoleName
         FROM Users U
         JOIN UserRoles R ON U.UserRole = R.RoleCode
-        WHERE U.UserID = @empcod AND U.Password = @password
+        WHERE U.UserID = @empcod
       `);
 
     const user = result.recordset[0];
 
     if (!user) {
+      throw new AppError("Invalid credentials", 401);
+    }
+
+    let passwordMatches = false;
+
+    if (user.PasswordHash) {
+      // Already migrated — verify against the bcrypt hash.
+      passwordMatches = await bcrypt.compare(password, user.PasswordHash);
+    } else if (user.Password === password) {
+      // Legacy row, never migrated. Plaintext still matches — accept this
+      // login, then transparently backfill PasswordHash so this user is on
+      // bcrypt from their next login onward. Password (plaintext) is left
+      // untouched — only the new, additive column is written here.
+      passwordMatches = true;
+      const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+      await pool
+        .request()
+        .input("empcod", sql.VarChar, empcod)
+        .input("passwordHash", sql.VarChar, passwordHash)
+        .query(`UPDATE Users SET PasswordHash = @passwordHash WHERE UserID = @empcod`);
+    }
+
+    if (!passwordMatches) {
       throw new AppError("Invalid credentials", 401);
     }
 

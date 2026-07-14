@@ -34,7 +34,7 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import { baseURL } from "../../assets/assets";
+import { baseURL, fileBaseURL } from "../../assets/assets";
 
 /* ─────────────────────────── helpers ─────────────────────────── */
 
@@ -724,10 +724,7 @@ const BISReports = () => {
                                 <td className="px-4 py-3">
                                   {item.FileName ? (
                                     <a
-                                      href={`${baseURL}${item.fileUrl?.replace(
-                                        /^\//,
-                                        ""
-                                      )}`}
+                                      href={`${fileBaseURL}${item.fileUrl}`}
                                       target="_blank"
                                       rel="noreferrer"
                                       className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 font-semibold text-xs"

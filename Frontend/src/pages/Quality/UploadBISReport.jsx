@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import {
   Upload,
   FileUp,
@@ -20,6 +20,12 @@ import {
   PackageOpen,
   X,
   Filter,
+  FileSearch,
+  CheckCircle2,
+  Sparkles,
+  ChevronDown,
+  Zap,
+  Tag,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
@@ -37,6 +43,8 @@ import {
   Pie,
   Cell,
   Legend,
+  ReferenceLine,
+  LabelList,
 } from "recharts";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -56,6 +64,34 @@ const MONTHS = [
 ];
 
 const PIE_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6"];
+
+// Categorical (identity) — Declared vs Measured are two distinct series, not
+// a good/bad pair, so they take fixed categorical slots, not status colors.
+const ENERGY_SERIES_COLORS = { declared: "#6366f1", measured: "#8b5cf6" };
+
+// Status (state) — reserved meaning, always paired with a label. PASS/FAIL
+// and the deviation-vs-threshold check both encode good/bad, so both wear
+// these same two tokens rather than a generic categorical color.
+const STATUS_COLORS = { good: "#10b981", critical: "#ef4444" };
+
+// The BIS pass rule printed on the report itself: declared must not exceed
+// measured by more than this — used to color the deviation chart.
+const DEVIATION_THRESHOLD_PCT = 10;
+
+// Cosmetic-only step list shown while the upload request is in flight —
+// extraction genuinely happens server-side in that one request/response
+// (OCR for scanned PDFs can take several seconds), but the client has no
+// real progress signal mid-request, so these advance on a fixed timer and
+// hold at the last step until the response actually comes back.
+const SCAN_STEPS = [
+  "Uploading PDF…",
+  "Scanning document pages…",
+  "Locating Energy Consumption Test section…",
+  "Reading declared annual energy…",
+  "Reading measured annual energy…",
+  "Calculating deviation…",
+  "Determining pass/fail result…",
+];
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from(
   { length: CURRENT_YEAR - 2021 + 2 },
@@ -78,6 +114,191 @@ const FreqBadge = ({ freq }) => {
   );
 };
 
+// ── Energy Result ──────────────────────────────────────────────────────────────
+// Declared vs measured annual energy consumption + PASS/FAIL, auto-extracted
+// from the uploaded PDF at upload time. Any of these can be null when the
+// PDF layout didn't match the expected report format — render "—" then.
+const EnergyResult = ({ file, compact }) => {
+  const hasEnergy = file.declaredAnnualEnergy != null && file.measuredAnnualEnergy != null;
+  const hasResult = !!file.testResult;
+  if (!hasEnergy && !hasResult) return compact ? <span className="text-slate-300">—</span> : null;
+
+  return (
+    <div className={compact ? "flex items-center gap-2" : "flex items-center justify-between gap-2 text-[10px] bg-slate-50 border border-slate-100 rounded-lg px-2 py-1.5"}>
+      <span className="text-slate-500 font-mono">
+        {hasEnergy ? `${file.declaredAnnualEnergy} → ${file.measuredAnnualEnergy} kWh` : "—"}
+        {file.energyDeviationPercent != null && (
+          <span className={file.energyDeviationPercent <= 0 ? "text-emerald-600" : "text-amber-600"}>
+            {" "}
+            ({file.energyDeviationPercent > 0 ? "+" : ""}
+            {file.energyDeviationPercent}%)
+          </span>
+        )}
+      </span>
+      {hasResult && (
+        <span
+          className={`shrink-0 font-bold px-1.5 py-0.5 rounded-full text-[9px] ${
+            file.testResult === "PASS"
+              ? "bg-emerald-100 text-emerald-700"
+              : "bg-red-100 text-red-700"
+          }`}
+        >
+          {file.testResult}
+        </span>
+      )}
+    </div>
+  );
+};
+
+// ── Multi-select Dropdown ──────────────────────────────────────────────────────
+// Generic checklist dropdown — used for both the Model and Year energy filters.
+const MultiSelectDropdown = ({ label, options, selected, onChange, placeholder = "All" }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggle = (opt) =>
+    onChange(selected.includes(opt) ? selected.filter((o) => o !== opt) : [...selected, opt]);
+  const clearAll = () => onChange([]);
+  const allSelected = selected.length === options.length && options.length > 0;
+
+  return (
+    <div className="relative min-w-[170px]" ref={ref}>
+      <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">
+        {label}
+      </label>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border bg-white text-xs font-semibold text-slate-700 hover:border-blue-300 transition-all ${
+          selected.length > 0 ? "border-blue-400 ring-1 ring-blue-100" : "border-slate-200"
+        }`}
+      >
+        <span className="flex items-center gap-1.5 truncate">
+          {selected.length > 0 && <Tag className="w-3 h-3 text-blue-500 shrink-0" />}
+          <span className="truncate">
+            {selected.length === 0
+              ? placeholder
+              : selected.length === 1
+                ? selected[0]
+                : `${selected.length} selected`}
+          </span>
+        </span>
+        <span className="flex items-center gap-1 shrink-0">
+          {selected.length > 0 && (
+            <span
+              role="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                clearAll();
+              }}
+              className="w-4 h-4 rounded-full bg-slate-200 hover:bg-red-100 text-slate-500 hover:text-red-600 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <X className="w-2.5 h-2.5" />
+            </span>
+          )}
+          <ChevronDown
+            className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-150 ${open ? "rotate-180" : ""}`}
+          />
+        </span>
+      </button>
+
+      {open && (
+        <div className="absolute top-full mt-1 left-0 z-50 w-56 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+          <div className="px-3 py-1.5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => (allSelected ? clearAll() : onChange([...options]))}
+              className="text-[10px] font-semibold text-blue-600 hover:underline"
+            >
+              {allSelected ? "Deselect all" : "Select all"}
+            </button>
+            {selected.length > 0 && (
+              <span className="text-[10px] text-slate-400">{selected.length} selected</span>
+            )}
+          </div>
+          <div className="py-1 max-h-52 overflow-auto">
+            {options.length === 0 ? (
+              <p className="px-3 py-3 text-[11px] text-slate-400 text-center">No options</p>
+            ) : (
+              options.map((opt) => {
+                const active = selected.includes(opt);
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => toggle(opt)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left transition-colors ${
+                      active ? "bg-blue-50 text-blue-700" : "text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span
+                      className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                        active ? "bg-blue-600 border-blue-600" : "border-slate-300 bg-white"
+                      }`}
+                    >
+                      {active && <CheckCircle2 className="w-3 h-3 text-white" strokeWidth={3} />}
+                    </span>
+                    {opt}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Scanning Modal ─────────────────────────────────────────────────────────────
+// Shown while the upload (file save + PDF extraction) request is in flight.
+const ScanningModal = ({ step }) => (
+  <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+      <div className="flex flex-col items-center text-center mb-5">
+        <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mb-3">
+          <FileSearch className="w-7 h-7 text-blue-600 animate-pulse" />
+        </div>
+        <h3 className="text-sm font-bold text-slate-800">Reading your BIS report…</h3>
+        <p className="text-[11px] text-slate-400 mt-1">
+          Scanned PDFs can take a few extra seconds
+        </p>
+      </div>
+      <div className="space-y-2.5">
+        {SCAN_STEPS.map((label, i) => {
+          const done = i < step;
+          const active = i === step;
+          return (
+            <div
+              key={label}
+              className={`flex items-center gap-2.5 text-xs transition-opacity ${i > step ? "opacity-35" : "opacity-100"}`}
+            >
+              {done ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+              ) : active ? (
+                <span className="w-4 h-4 shrink-0 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+              ) : (
+                <span className="w-4 h-4 shrink-0 rounded-full border-2 border-slate-200" />
+              )}
+              <span className={done ? "text-slate-400" : active ? "text-slate-800 font-semibold" : "text-slate-400"}>
+                {label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  </div>
+);
+
 // ── Field Label ────────────────────────────────────────────────────────────────
 const FieldLabel = ({ children }) => (
   <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
@@ -89,8 +310,123 @@ const FieldLabel = ({ children }) => (
 const inputCls =
   "w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all";
 
+// ── Confirm Energy Modal ──────────────────────────────────────────────────────
+// Lets the user review what was auto-extracted from the PDF (OCR on scanned
+// reports isn't perfect) and fix any field before it's treated as final.
+const ConfirmEnergyModal = ({ data, onChange, onConfirm, onCancel, saving }) => {
+  const allBlank =
+    data.declaredAnnualEnergy === "" &&
+    data.measuredAnnualEnergy === "" &&
+    data.energyDeviationPercent === "" &&
+    !data.testResult;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="px-5 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center gap-2.5">
+          <Sparkles className="w-4 h-4" />
+          <div>
+            <h3 className="text-sm font-black">Confirm Extracted Values</h3>
+            <p className="text-[11px] text-blue-100 mt-0.5">
+              Review what we read from the PDF — edit anything that's wrong.
+            </p>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {allBlank && (
+            <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              Nothing could be read automatically from this PDF. You can fill the values in
+              manually below, or leave them blank.
+            </p>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <FieldLabel>Declared Annual Energy (kWh)</FieldLabel>
+              <input
+                type="number"
+                step="any"
+                value={data.declaredAnnualEnergy}
+                onChange={(e) => onChange({ ...data, declaredAnnualEnergy: e.target.value })}
+                className={inputCls}
+                placeholder="e.g. 1066"
+              />
+            </div>
+            <div>
+              <FieldLabel>Measured Annual Energy (kWh)</FieldLabel>
+              <input
+                type="number"
+                step="any"
+                value={data.measuredAnnualEnergy}
+                onChange={(e) => onChange({ ...data, measuredAnnualEnergy: e.target.value })}
+                className={inputCls}
+                placeholder="e.g. 1061.519"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <FieldLabel>Deviation (%)</FieldLabel>
+              <input
+                type="number"
+                step="any"
+                value={data.energyDeviationPercent}
+                onChange={(e) => onChange({ ...data, energyDeviationPercent: e.target.value })}
+                className={inputCls}
+                placeholder="e.g. -0.42"
+              />
+            </div>
+            <div>
+              <FieldLabel>Result</FieldLabel>
+              <div className="flex gap-2">
+                {["PASS", "FAIL"].map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => onChange({ ...data, testResult: r })}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-all ${
+                      data.testResult === r
+                        ? r === "PASS"
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-red-600 text-white border-red-600"
+                        : "border-slate-200 text-slate-500 hover:border-slate-300 bg-slate-50"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-5 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold transition-all"
+          >
+            Skip
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={saving}
+            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+          >
+            {saving && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+            {saving ? "Saving…" : "Confirm & Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── File Card ──────────────────────────────────────────────────────────────────
-const FileCard = ({ file, onEdit, onDownload, onDelete }) => (
+const FileCard = ({ file, onEdit, onDownload, onDelete, onFetchData }) => (
   <div className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all flex flex-col">
     <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
       <div className="flex items-center gap-2 min-w-0">
@@ -103,6 +439,13 @@ const FileCard = ({ file, onEdit, onDownload, onDelete }) => (
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
+        <button
+          onClick={() => onFetchData(file)}
+          title="Fetch data from PDF"
+          className="p-1.5 rounded-lg text-violet-500 hover:bg-violet-50 transition-colors"
+        >
+          <FileSearch className="w-3 h-3" />
+        </button>
         <button
           onClick={() => onEdit(file)}
           title="Edit"
@@ -137,6 +480,7 @@ const FileCard = ({ file, onEdit, onDownload, onDelete }) => (
       <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
         {file.description || "No description provided"}
       </p>
+      <EnergyResult file={file} />
       <div className="flex items-center justify-between pt-1">
         <p className="text-[10px] text-slate-400 truncate max-w-[60%] font-mono">
           {file.fileName}
@@ -190,6 +534,27 @@ const UploadBISReport = () => {
     selectedFile: null,
   });
 
+  // ── Post-upload: scanning animation + extracted-value confirmation ────────
+  const [showScanningModal, setShowScanningModal] = useState(false);
+  const [scanStep, setScanStep] = useState(0);
+  const [confirmData, setConfirmData] = useState(null); // { srNo, declaredAnnualEnergy, measuredAnnualEnergy, energyDeviationPercent, testResult } | null
+  const [confirmSaving, setConfirmSaving] = useState(false);
+
+  useEffect(() => {
+    if (!showScanningModal) {
+      setScanStep(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setScanStep((s) => Math.min(s + 1, SCAN_STEPS.length - 1));
+    }, 900);
+    return () => clearInterval(timer);
+  }, [showScanningModal]);
+
+  // ── Energy Analysis tab filters ────────────────────────────────────────────
+  const [energyModelFilter, setEnergyModelFilter] = useState([]); // [] = all models
+  const [energyYearFilter, setEnergyYearFilter] = useState([]); // [] = all years
+
   // ── Derived ──────────────────────────────────────────────────────────────
   const filteredFiles = useMemo(() => {
     const { term = "", field = "all" } = searchParams;
@@ -235,6 +600,95 @@ const UploadBISReport = () => {
       })),
     };
   }, [uploadedFiles]);
+
+  // ── Energy Analysis: filter options + filtered set ─────────────────────────
+  const energyModelOptions = useMemo(
+    () => [...new Set(uploadedFiles.map((f) => f.modelName).filter(Boolean))].sort(),
+    [uploadedFiles],
+  );
+  const energyYearOptions = useMemo(
+    () => [...new Set(uploadedFiles.map((f) => String(f.year)).filter(Boolean))].sort(),
+    [uploadedFiles],
+  );
+
+  const energyFilteredFiles = useMemo(() => {
+    return uploadedFiles.filter((f) => {
+      const matchModel = energyModelFilter.length === 0 || energyModelFilter.includes(f.modelName);
+      const matchYear = energyYearFilter.length === 0 || energyYearFilter.includes(String(f.year));
+      return matchModel && matchYear;
+    });
+  }, [uploadedFiles, energyModelFilter, energyYearFilter]);
+
+  // Cap chart bars so long filter-free lists stay readable — filters narrow it down.
+  const CHART_ROW_CAP = 20;
+
+  const energyAnalysis = useMemo(() => {
+    const withEnergy = energyFilteredFiles.filter(
+      (f) => f.declaredAnnualEnergy != null && f.measuredAnnualEnergy != null,
+    );
+    const withDeviation = energyFilteredFiles.filter((f) => f.energyDeviationPercent != null);
+    const withResult = energyFilteredFiles.filter((f) => f.testResult);
+
+    const modelYearData = [...withEnergy]
+      .sort((a, b) => (b.declaredAnnualEnergy || 0) - (a.declaredAnnualEnergy || 0))
+      .slice(0, CHART_ROW_CAP)
+      .map((f) => ({
+        label: `${f.modelName} (${f.year})`,
+        declared: f.declaredAnnualEnergy,
+        measured: f.measuredAnnualEnergy,
+      }));
+
+    const deviationData = [...withDeviation]
+      .sort((a, b) => Math.abs(b.energyDeviationPercent) - Math.abs(a.energyDeviationPercent))
+      .slice(0, CHART_ROW_CAP)
+      .map((f) => ({
+        label: `${f.modelName} (${f.year})`,
+        deviation: f.energyDeviationPercent,
+        breach: Math.abs(f.energyDeviationPercent) > DEVIATION_THRESHOLD_PCT,
+      }));
+
+    const yearMap = {};
+    withResult.forEach((f) => {
+      const y = String(f.year);
+      if (!yearMap[y]) yearMap[y] = { year: y, PASS: 0, FAIL: 0 };
+      if (f.testResult === "PASS") yearMap[y].PASS++;
+      else yearMap[y].FAIL++;
+    });
+    const yearPassFailData = Object.values(yearMap).sort((a, b) => a.year.localeCompare(b.year));
+
+    const modelMap = {};
+    withResult.forEach((f) => {
+      if (!modelMap[f.modelName]) modelMap[f.modelName] = { model: f.modelName, pass: 0, total: 0 };
+      modelMap[f.modelName].total++;
+      if (f.testResult === "PASS") modelMap[f.modelName].pass++;
+    });
+    const modelPassRateData = Object.values(modelMap)
+      .map((m) => ({ ...m, passRate: Math.round((m.pass / m.total) * 100) }))
+      .sort((a, b) => b.passRate - a.passRate || b.total - a.total)
+      .slice(0, CHART_ROW_CAP);
+
+    const passCount = withResult.filter((f) => f.testResult === "PASS").length;
+    const failCount = withResult.length - passCount;
+    const avgDeviation = withDeviation.length
+      ? withDeviation.reduce((sum, f) => sum + f.energyDeviationPercent, 0) / withDeviation.length
+      : null;
+
+    return {
+      totalFiltered: energyFilteredFiles.length,
+      withEnergyCount: withEnergy.length,
+      missingCount: energyFilteredFiles.length - withEnergy.length,
+      passCount,
+      failCount,
+      passRate: withResult.length ? Math.round((passCount / withResult.length) * 100) : null,
+      avgDeviation,
+      modelYearData,
+      deviationData,
+      yearPassFailData,
+      modelPassRateData,
+      truncatedModelYear: withEnergy.length > CHART_ROW_CAP,
+      truncatedDeviation: withDeviation.length > CHART_ROW_CAP,
+    };
+  }, [energyFilteredFiles]);
 
   // ── API ───────────────────────────────────────────────────────────────────
   const fetchUploadedFiles = async () => {
@@ -283,6 +737,7 @@ const UploadBISReport = () => {
 
     try {
       setLoading(true);
+      setShowScanningModal(true);
       const res = await axios.post(
         `${baseURL}quality/upload-bis-pdf`,
         formData,
@@ -298,11 +753,65 @@ const UploadBISReport = () => {
         setSelectedFile(null);
         fetchUploadedFiles();
         setActiveTab("reports");
+
+        const energyData = res.data.energyData || {};
+        setConfirmData({
+          srNo: res.data.srNo,
+          declaredAnnualEnergy: energyData.declaredAnnualEnergy ?? "",
+          measuredAnnualEnergy: energyData.measuredAnnualEnergy ?? "",
+          energyDeviationPercent: energyData.energyDeviationPercent ?? "",
+          testResult: energyData.testResult || "",
+        });
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to upload BIS Report");
     } finally {
       setLoading(false);
+      setShowScanningModal(false);
+    }
+  };
+
+  const handleConfirmEnergyData = async () => {
+    if (!confirmData?.srNo) return;
+    try {
+      setConfirmSaving(true);
+      await axios.put(`${baseURL}quality/bis-energy-data/${confirmData.srNo}`, {
+        declaredAnnualEnergy: confirmData.declaredAnnualEnergy,
+        measuredAnnualEnergy: confirmData.measuredAnnualEnergy,
+        energyDeviationPercent: confirmData.energyDeviationPercent,
+        testResult: confirmData.testResult,
+      });
+      toast.success("Energy data confirmed");
+      setConfirmData(null);
+      fetchUploadedFiles();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to save energy data");
+    } finally {
+      setConfirmSaving(false);
+    }
+  };
+
+  // Re-runs extraction against a PDF that's already on the server (records
+  // uploaded before this feature existed, or where it found nothing the
+  // first time) — same scanning animation + confirm dialog as a fresh upload.
+  const handleFetchEnergyData = async (file) => {
+    try {
+      setShowScanningModal(true);
+      const res = await axios.post(`${baseURL}quality/bis-fetch-energy-data/${file.srNo}`);
+      if (res?.data?.success) {
+        const energyData = res.data.energyData || {};
+        setConfirmData({
+          srNo: file.srNo,
+          declaredAnnualEnergy: energyData.declaredAnnualEnergy ?? "",
+          measuredAnnualEnergy: energyData.measuredAnnualEnergy ?? "",
+          energyDeviationPercent: energyData.energyDeviationPercent ?? "",
+          testResult: energyData.testResult || "",
+        });
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to fetch data from PDF");
+    } finally {
+      setShowScanningModal(false);
     }
   };
 
@@ -404,6 +913,7 @@ const UploadBISReport = () => {
   const TABS = [
     { key: "upload", label: "Upload Report", icon: CloudUpload },
     { key: "reports", label: "All Reports", icon: Table2 },
+    { key: "energy", label: "Energy Analysis", icon: Zap },
     { key: "analytics", label: "Analytics", icon: BarChart2 },
   ];
 
@@ -777,6 +1287,7 @@ const UploadBISReport = () => {
                     onEdit={handleUpdate}
                     onDownload={handleDownload}
                     onDelete={handleDeleteFile}
+                    onFetchData={handleFetchEnergyData}
                   />
                 ))}
               </div>
@@ -795,6 +1306,8 @@ const UploadBISReport = () => {
                         "Month",
                         "Frequency",
                         "Description",
+                        "Energy (Declared → Measured)",
+                        "Result",
                         "File",
                         "Uploaded",
                         "Actions",
@@ -832,6 +1345,37 @@ const UploadBISReport = () => {
                         <td className="px-3 py-2.5 border-b border-slate-100 text-slate-500 max-w-[200px] truncate">
                           {file.description}
                         </td>
+                        <td className="px-3 py-2.5 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">
+                          {file.declaredAnnualEnergy != null && file.measuredAnnualEnergy != null ? (
+                            <>
+                              {file.declaredAnnualEnergy} → {file.measuredAnnualEnergy} kWh
+                              {file.energyDeviationPercent != null && (
+                                <span className={file.energyDeviationPercent <= 0 ? "text-emerald-600" : "text-amber-600"}>
+                                  {" "}
+                                  ({file.energyDeviationPercent > 0 ? "+" : ""}
+                                  {file.energyDeviationPercent}%)
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 border-b border-slate-100">
+                          {file.testResult ? (
+                            <span
+                              className={`font-bold px-2 py-0.5 rounded-full text-[10px] ${
+                                file.testResult === "PASS"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}
+                            >
+                              {file.testResult}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
                         <td className="px-3 py-2.5 border-b border-slate-100">
                           <a
                             href={file.url}
@@ -854,6 +1398,13 @@ const UploadBISReport = () => {
                         </td>
                         <td className="px-3 py-2.5 border-b border-slate-100">
                           <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleFetchEnergyData(file)}
+                              title="Fetch data from PDF"
+                              className="p-1.5 rounded text-violet-500 hover:bg-violet-50"
+                            >
+                              <FileSearch className="w-3 h-3" />
+                            </button>
                             <button
                               onClick={() => handleUpdate(file)}
                               className="p-1.5 rounded text-blue-500 hover:bg-blue-50"
@@ -882,6 +1433,308 @@ const UploadBISReport = () => {
             )}
           </div>
         )}
+
+        {/* ══════════════════════════════════════════════════════
+            TAB: ENERGY ANALYSIS
+        ══════════════════════════════════════════════════════ */}
+        {activeTab === "energy" &&
+          (uploadedFiles.length === 0 ? (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
+              <Zap className="w-12 h-12 opacity-20" strokeWidth={1.2} />
+              <p className="text-sm text-slate-500">
+                No data available for energy analysis yet.
+              </p>
+              <p className="text-xs text-slate-400">
+                Upload some BIS reports to see charts.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {/* Filters */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-wrap items-end gap-3">
+                <MultiSelectDropdown
+                  label="Model"
+                  options={energyModelOptions}
+                  selected={energyModelFilter}
+                  onChange={setEnergyModelFilter}
+                  placeholder="All models"
+                />
+                <MultiSelectDropdown
+                  label="Year"
+                  options={energyYearOptions}
+                  selected={energyYearFilter}
+                  onChange={setEnergyYearFilter}
+                  placeholder="All years"
+                />
+                {(energyModelFilter.length > 0 || energyYearFilter.length > 0) && (
+                  <button
+                    onClick={() => {
+                      setEnergyModelFilter([]);
+                      setEnergyYearFilter([]);
+                    }}
+                    className="h-9 text-xs text-blue-600 hover:underline font-semibold"
+                  >
+                    Clear filters
+                  </button>
+                )}
+                <span className="ml-auto h-9 flex items-center text-[11px] text-slate-400">
+                  {energyAnalysis.totalFiltered} record
+                  {energyAnalysis.totalFiltered !== 1 ? "s" : ""} matched
+                </span>
+              </div>
+
+              {/* Stat cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  {
+                    icon: Zap,
+                    label: "With Energy Data",
+                    value: energyAnalysis.withEnergyCount,
+                    cls: "bg-indigo-50 border-indigo-100",
+                    txt: "text-indigo-700",
+                    sub: "text-indigo-500",
+                  },
+                  {
+                    icon: AlertTriangle,
+                    label: "Missing Data",
+                    value: energyAnalysis.missingCount,
+                    cls: "bg-amber-50 border-amber-100",
+                    txt: "text-amber-700",
+                    sub: "text-amber-500",
+                  },
+                  {
+                    icon: CheckCircle,
+                    label: "Pass Rate",
+                    value: energyAnalysis.passRate != null ? `${energyAnalysis.passRate}%` : "—",
+                    cls: "bg-emerald-50 border-emerald-100",
+                    txt: "text-emerald-700",
+                    sub: "text-emerald-500",
+                  },
+                  {
+                    icon: BarChart2,
+                    label: "Avg. Deviation",
+                    value:
+                      energyAnalysis.avgDeviation != null
+                        ? `${energyAnalysis.avgDeviation > 0 ? "+" : ""}${energyAnalysis.avgDeviation.toFixed(2)}%`
+                        : "—",
+                    cls: "bg-violet-50 border-violet-100",
+                    txt: "text-violet-700",
+                    sub: "text-violet-500",
+                  },
+                ].map(({ icon: Icon, label, value, cls, txt, sub }) => (
+                  <div
+                    key={label}
+                    className={`flex flex-col items-center px-4 py-2.5 rounded-xl border ${cls}`}
+                  >
+                    <Icon className={`w-4 h-4 mb-1 ${txt}`} />
+                    <span className={`text-2xl font-bold font-mono ${txt}`}>{value}</span>
+                    <span className={`text-[10px] font-medium uppercase tracking-wide ${sub}`}>
+                      {label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {energyAnalysis.withEnergyCount === 0 && energyAnalysis.passCount + energyAnalysis.failCount === 0 ? (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
+                  <FileSearch className="w-10 h-10 opacity-20" />
+                  <p className="text-sm text-slate-500">
+                    No records with extracted energy data match these filters.
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Use "Fetch Data" on a report in All Reports to extract it.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Row 1 */}
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Zap className="w-3.5 h-3.5 text-indigo-500" />
+                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                          Declared vs Measured Annual Energy
+                        </span>
+                      </div>
+                      {energyAnalysis.modelYearData.length === 0 ? (
+                        <p className="text-xs text-slate-400 text-center py-16">No matching records</p>
+                      ) : (
+                        <>
+                          <ResponsiveContainer
+                            width="100%"
+                            height={Math.max(200, energyAnalysis.modelYearData.length * 32)}
+                          >
+                            <BarChart
+                              data={energyAnalysis.modelYearData}
+                              layout="vertical"
+                              margin={{ left: 8, right: 16 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                              <XAxis type="number" tick={{ fontSize: 10 }} unit=" kWh" />
+                              <YAxis type="category" dataKey="label" tick={{ fontSize: 10 }} width={150} />
+                              <Tooltip
+                                contentStyle={tooltipStyle}
+                                formatter={(v, name) => [`${v} kWh`, name === "declared" ? "Declared" : "Measured"]}
+                              />
+                              <Legend
+                                iconType="circle"
+                                iconSize={8}
+                                formatter={(v) => (
+                                  <span className="text-xs font-semibold text-slate-600">
+                                    {v === "declared" ? "Declared" : "Measured"}
+                                  </span>
+                                )}
+                              />
+                              <Bar dataKey="declared" fill={ENERGY_SERIES_COLORS.declared} radius={[0, 4, 4, 0]} />
+                              <Bar dataKey="measured" fill={ENERGY_SERIES_COLORS.measured} radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                          {energyAnalysis.truncatedModelYear && (
+                            <p className="text-[10px] text-slate-400 text-center mt-1">
+                              Showing top {CHART_ROW_CAP} by declared value — refine filters to see more
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                          Pass / Fail by Year
+                        </span>
+                      </div>
+                      {energyAnalysis.yearPassFailData.length === 0 ? (
+                        <p className="text-xs text-slate-400 text-center py-16">No matching records</p>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={220}>
+                          <BarChart data={energyAnalysis.yearPassFailData} barCategoryGap="30%">
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                            <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+                            <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                            <Tooltip contentStyle={tooltipStyle} />
+                            <Legend
+                              iconType="circle"
+                              iconSize={8}
+                              formatter={(v) => (
+                                <span className="text-xs font-semibold text-slate-600">{v}</span>
+                              )}
+                            />
+                            <Bar dataKey="PASS" fill={STATUS_COLORS.good} radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="FAIL" fill={STATUS_COLORS.critical} radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Row 2 */}
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                          Declared vs Measured Deviation
+                        </span>
+                      </div>
+                      {energyAnalysis.deviationData.length === 0 ? (
+                        <p className="text-xs text-slate-400 text-center py-16">No matching records</p>
+                      ) : (
+                        <>
+                          <ResponsiveContainer
+                            width="100%"
+                            height={Math.max(200, energyAnalysis.deviationData.length * 32)}
+                          >
+                            <BarChart
+                              data={energyAnalysis.deviationData}
+                              layout="vertical"
+                              margin={{ left: 8, right: 24 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                              <XAxis type="number" tick={{ fontSize: 10 }} unit="%" />
+                              <YAxis type="category" dataKey="label" tick={{ fontSize: 10 }} width={150} />
+                              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v}%`, "Deviation"]} />
+                              <ReferenceLine x={0} stroke="#c3c2b7" />
+                              <ReferenceLine
+                                x={DEVIATION_THRESHOLD_PCT}
+                                stroke={STATUS_COLORS.critical}
+                                strokeDasharray="4 4"
+                                label={{
+                                  value: `${DEVIATION_THRESHOLD_PCT}% limit`,
+                                  fontSize: 9,
+                                  fill: STATUS_COLORS.critical,
+                                  position: "insideTopRight",
+                                }}
+                              />
+                              <Bar dataKey="deviation" radius={[0, 4, 4, 0]}>
+                                {energyAnalysis.deviationData.map((d, i) => (
+                                  <Cell key={i} fill={d.breach ? STATUS_COLORS.critical : STATUS_COLORS.good} />
+                                ))}
+                                <LabelList
+                                  dataKey="deviation"
+                                  position="right"
+                                  formatter={(v) => `${v}%`}
+                                  style={{ fontSize: 9, fill: "#52514e" }}
+                                />
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                          {energyAnalysis.truncatedDeviation && (
+                            <p className="text-[10px] text-slate-400 text-center mt-1">
+                              Showing top {CHART_ROW_CAP} by |deviation| — refine filters to see more
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Layers className="w-3.5 h-3.5 text-blue-500" />
+                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                          Pass Rate by Model
+                        </span>
+                      </div>
+                      {energyAnalysis.modelPassRateData.length === 0 ? (
+                        <p className="text-xs text-slate-400 text-center py-16">No matching records</p>
+                      ) : (
+                        <ResponsiveContainer
+                          width="100%"
+                          height={Math.max(200, energyAnalysis.modelPassRateData.length * 32)}
+                        >
+                          <BarChart
+                            data={energyAnalysis.modelPassRateData}
+                            layout="vertical"
+                            margin={{ left: 8, right: 24 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                            <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} unit="%" />
+                            <YAxis type="category" dataKey="model" tick={{ fontSize: 10 }} width={150} />
+                            <Tooltip
+                              contentStyle={tooltipStyle}
+                              formatter={(v, _n, entry) => [
+                                `${v}% (${entry.payload.pass}/${entry.payload.total})`,
+                                "Pass rate",
+                              ]}
+                            />
+                            <Bar dataKey="passRate" fill={ENERGY_SERIES_COLORS.declared} radius={[0, 4, 4, 0]}>
+                              <LabelList
+                                dataKey="passRate"
+                                position="right"
+                                formatter={(v) => `${v}%`}
+                                style={{ fontSize: 9, fill: "#52514e" }}
+                              />
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
 
         {/* ══════════════════════════════════════════════════════
             TAB: ANALYTICS
@@ -1263,6 +2116,20 @@ const UploadBISReport = () => {
           onCancel={() => setShowDeleteModal(false)}
           icon={<AlertTriangle className="w-10 h-10 text-red-500 mx-auto" />}
           confirmButtonColor="bg-red-600 hover:bg-red-700"
+        />
+      )}
+
+      {/* ── SCANNING MODAL (shown while the upload/extraction request is in flight) ── */}
+      {showScanningModal && <ScanningModal step={scanStep} />}
+
+      {/* ── CONFIRM EXTRACTED ENERGY DATA ── */}
+      {confirmData && (
+        <ConfirmEnergyModal
+          data={confirmData}
+          onChange={setConfirmData}
+          onConfirm={handleConfirmEnergyData}
+          onCancel={() => setConfirmData(null)}
+          saving={confirmSaving}
         />
       )}
     </div>
