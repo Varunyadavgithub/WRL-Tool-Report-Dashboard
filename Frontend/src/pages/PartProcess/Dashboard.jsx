@@ -860,6 +860,7 @@ const QuickDowntimeForm = ({
   downtimeReasons,
   downtimeEntries = [],
   changeovers = [],
+  eventDate,
   onSave,
   onClose,
 }) => {
@@ -903,9 +904,12 @@ const QuickDowntimeForm = ({
   const [form, setForm] = useState({ reasonId: "", remarks: "" });
   const sf = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  const filteredList = (
-    shiftFilter ? allEvents.filter((e) => e.shift === shiftFilter) : allEvents
-  ).filter((e) => !loggedSrNos.has(String(e.srNo)));
+  // Keep saved events visible in the Dashboard list. They are marked as
+  // logged and cannot be selected again, rather than disappearing after the
+  // form resets.
+  const filteredList = shiftFilter
+    ? allEvents.filter((e) => e.shift === shiftFilter)
+    : allEvents;
 
   // Changeovers don't require a reason code (they are self-explanatory)
   const canSave =
@@ -925,6 +929,7 @@ const QuickDowntimeForm = ({
       srNo: selected.srNo,
       eventId: selected.eventId || selected.id || null,
       shift: selected.shift,
+      eventDate,
       startTime: selected.startTime,
       endTime: selected.endTime,
       duration: selected.duration,
@@ -1019,6 +1024,7 @@ const QuickDowntimeForm = ({
           ) : (
             filteredList.map((r, idx) => {
               const isCO = r._type === "Changeover";
+              const isLogged = loggedSrNos.has(String(r.srNo));
               const isPending =
                 !isCO && (!r.downtimeReason || r.downtimeReason === "Assign");
               const isSel =
@@ -1026,11 +1032,12 @@ const QuickDowntimeForm = ({
               return (
                 <button
                   key={idx}
+                  disabled={isLogged}
                   onClick={() => {
                     setSelected(r);
                     setForm({ reasonId: "", remarks: "" });
                   }}
-                  className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
+                  className={`w-full text-left p-3 rounded-xl border-2 transition-all ${isLogged ? "border-emerald-200 bg-emerald-50/60 cursor-not-allowed" : ""} ${
                     isSel
                       ? "border-rose-500 bg-rose-50 shadow-sm"
                       : isCO
@@ -1052,12 +1059,16 @@ const QuickDowntimeForm = ({
                           ? r.isOverrun
                             ? "bg-red-100 text-red-700"
                             : "bg-amber-100 text-amber-700"
+                          : isLogged
+                            ? "bg-emerald-100 text-emerald-700"
                           : isPending
                             ? "bg-amber-100 text-amber-700"
                             : "bg-slate-100 text-slate-500"
                       }`}
                     >
-                      {isCO
+                      {isLogged
+                        ? "✓ LOGGED"
+                        : isCO
                         ? r.isOverrun
                           ? "⏱ OVERRUN"
                           : "↔ CHANGEOVER"
@@ -1993,15 +2004,15 @@ const PartProcessDashboard = () => {
     const fetch = async () => {
       try {
         const [dtRes, qRes] = await Promise.all([
-          axios.get(
-            `${PART_PROCESS_API}/downtime-log?startDate=${selectedDate}&endDate=${selectedDate}`,
-            { withCredentials: true },
-          ),
+          axios.get(`${PART_PROCESS_API}/downtime-log`, { withCredentials: true }),
           axios.get(
             `${PART_PROCESS_API}/quality-log?startDate=${selectedDate}&endDate=${selectedDate}`,
             { withCredentials: true },
           ),
         ]);
+        // The database is the source of truth for logged entries. Do not
+        // discard rows by the currently loaded event/date range; doing so made
+        // saved entries disappear whenever the Dashboard was refreshed.
         setDbDTLogs(dtRes.data?.data ?? []);
         setDbQLogs(qRes.data?.data ?? []);
       } catch (err) {
@@ -2049,6 +2060,41 @@ const PartProcessDashboard = () => {
     return out;
   }, [dbQLogs, qualityEntries]);
 
+  // Persisted logs are fetched without a server filter so a saved entry never
+  // disappears after refresh. Scope them here, alongside the event records,
+  // before they feed any dashboard card or graph.
+  const scopedLogEntries = useMemo(() => {
+    const normaliseShift = (value) => String(value || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+    const selectedShiftName = normaliseShift(selectedShift?.shiftName);
+    const eventIdsInRange = new Set(
+      records.map((r) => String(r.eventId ?? r.id)).filter(Boolean),
+    );
+
+    const belongsToActiveScope = (entry) => {
+      const eventDate = String(entry.eventDate ?? entry.EventDate ?? "").slice(0, 10);
+      const eventId = entry.eventId ?? entry.EventId;
+      // Older saved rows may not have EventDate. Keep them only when their
+      // linked production event is in the currently loaded range.
+      if (eventDate ? eventDate !== selectedDate : !eventIdsInRange.has(String(eventId))) {
+        return false;
+      }
+      if (!selectedShiftName) return true;
+      const entryShift = normaliseShift(entry.shift ?? entry.ShiftName);
+      return !entryShift || entryShift === selectedShiftName;
+    };
+
+    return {
+      downtime: mergedDTEntries.filter(belongsToActiveScope),
+      quality: mergedQEntries.filter(belongsToActiveScope),
+    };
+  }, [mergedDTEntries, mergedQEntries, records, selectedDate, selectedShift]);
+
+  const scopedDTEntries = scopedLogEntries.downtime;
+  const scopedQEntries = scopedLogEntries.quality;
+
   // ── OEE time-series graph ───────────────────────────────────────────────
   // Minute-resolution "now" — recomputing the chart on every second tick of
   // useClock() would be wasteful since the graph buckets are 30 minutes wide.
@@ -2084,11 +2130,11 @@ const PartProcessDashboard = () => {
 
     // Use quality log pass rate (if any entries exist) to override Q in the graph
     let qOverride = null;
-    if (mergedQEntries.length > 0) {
+    if (scopedQEntries.length > 0) {
       let insp = 0,
         rej = 0;
       const byKey = {};
-      mergedQEntries.forEach((e) => {
+      scopedQEntries.forEach((e) => {
         const key = e.partName || e.PartName || e.model || e.Model || "_";
         if (!byKey[key]) byKey[key] = { insp: 0, rej: 0 };
         byKey[key].insp = Math.max(
@@ -2124,23 +2170,12 @@ const PartProcessDashboard = () => {
     shifts,
     isToday,
     nowMins,
-    mergedQEntries,
+    scopedQEntries,
   ]);
 
   // ── Department loss ──────────────────────────────────────────────────────
   const deptLoss = useMemo(() => {
-    const src = selectedShift
-      ? shiftRecords.filter((r) => r.state === "Downtime")
-      : records.filter(
-          (r) => r.eventDate === selectedDate && r.state === "Downtime",
-        );
-
     // Build fast eventId → logged entry map
-    const byId = {};
-    mergedDTEntries.forEach((e) => {
-      if (e.eventId) byId[String(e.eventId)] = e;
-    });
-
     // Build reason name → department from config (fallback for old entries without category saved)
     const rNameToDept = {};
     downtimeReasons.forEach((r) => {
@@ -2148,23 +2183,18 @@ const PartProcessDashboard = () => {
     });
 
     const map = {};
-    src.forEach((r) => {
-      const logged = r.eventId ? byId[String(r.eventId)] : null;
+    scopedDTEntries.forEach((r) => {
       const dept =
-        logged?.category ||
-        (logged?.reasonName && rNameToDept[logged.reasonName]) ||
-        null;
-      if (!dept) return;
-      map[dept] = (map[dept] || 0) + parseDurSecs(r.duration);
+        r.category ||
+        r.Category ||
+        rNameToDept[r.reasonName || r.ReasonName] ||
+        "Unassigned";
+      map[dept] = (map[dept] || 0) + parseDurSecs(r.duration || r.Duration);
     });
 
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
   }, [
-    shiftRecords,
-    records,
-    selectedShift,
-    selectedDate,
-    mergedDTEntries,
+    scopedDTEntries,
     downtimeReasons,
   ]);
 
@@ -2184,7 +2214,7 @@ const PartProcessDashboard = () => {
   // qualityByModel keyed by partName (primary) or model string (fallback)
   const qualityByModel = useMemo(() => {
     const map = {};
-    mergedQEntries.forEach((e) => {
+    scopedQEntries.forEach((e) => {
       const key = e.partName || e.PartName || e.model || e.Model || "";
       if (!key) return;
       if (!map[key]) map[key] = { inspected: 0, rejected: 0 };
@@ -2197,7 +2227,7 @@ const PartProcessDashboard = () => {
       map[key].rejected += rej;
     });
     return map;
-  }, [mergedQEntries]);
+  }, [scopedQEntries]);
 
   const qualityTotals = useMemo(() => {
     let inspected = 0,
@@ -2464,7 +2494,7 @@ const PartProcessDashboard = () => {
 
   return (
     <>
-      <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
+      <div className="part-process-dashboard h-full flex flex-col bg-slate-100 overflow-hidden">
         {/* ── STICKY HEADER ── */}
         <div className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm shrink-0">
           {loading && loadProgress.total > 0 && (
@@ -3644,7 +3674,7 @@ const PartProcessDashboard = () => {
           </div>
 
           {/* ── Logged Entries ── */}
-          {(mergedDTEntries.length > 0 || mergedQEntries.length > 0) && (
+          {(scopedDTEntries.length > 0 || scopedQEntries.length > 0) && (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
               {/* Downtime / Changeover Logs */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -3654,10 +3684,10 @@ const PartProcessDashboard = () => {
                     Downtime Log
                   </span>
                   <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
-                    {mergedDTEntries.length}
+                    {scopedDTEntries.length}
                   </span>
                 </div>
-                {mergedDTEntries.length === 0 ? (
+                {scopedDTEntries.length === 0 ? (
                   <p className="px-4 py-6 text-xs text-slate-300 text-center">
                     No downtime entries logged yet.
                   </p>
@@ -3683,7 +3713,7 @@ const PartProcessDashboard = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {mergedDTEntries.map((e, i) => {
+                        {scopedDTEntries.map((e, i) => {
                           const reason = e.reasonName || e.ReasonName;
                           const isCO = e.isChangeover || e.IsChangeover;
                           return (
@@ -3734,10 +3764,10 @@ const PartProcessDashboard = () => {
                     Quality Log
                   </span>
                   <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-200">
-                    {mergedQEntries.length}
+                    {scopedQEntries.length}
                   </span>
                 </div>
-                {mergedQEntries.length === 0 ? (
+                {scopedQEntries.length === 0 ? (
                   <p className="px-4 py-6 text-xs text-slate-300 text-center">
                     No quality entries logged yet.
                   </p>
@@ -3764,7 +3794,7 @@ const PartProcessDashboard = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {mergedQEntries.map((e, i) => {
+                        {scopedQEntries.map((e, i) => {
                           const rej = parseInt(
                             e.rejectedQty ?? e.RejectedQty ?? 0,
                             10,
@@ -3931,8 +3961,9 @@ const PartProcessDashboard = () => {
             <QuickDowntimeForm
               records={records}
               downtimeReasons={downtimeReasons}
-              downtimeEntries={mergedDTEntries}
+              downtimeEntries={scopedDTEntries}
               changeovers={changeovers}
+              eventDate={selectedDate}
               onSave={async (entry) => {
                 dispatch(logDowntimeEntry(entry));
                 try {
@@ -3940,10 +3971,9 @@ const PartProcessDashboard = () => {
                     withCredentials: true,
                   });
                   toast.success("Downtime logged.");
-                  const r = await axios.get(
-                    `${PART_PROCESS_API}/downtime-log?startDate=${selectedDate}&endDate=${selectedDate}`,
-                    { withCredentials: true },
-                  );
+                  const r = await axios.get(`${PART_PROCESS_API}/downtime-log`, {
+                    withCredentials: true,
+                  });
                   setDbDTLogs(r.data?.data ?? []);
                 } catch (err) {
                   console.error("[Dashboard] downtime-log save:", err.message);
@@ -4067,7 +4097,7 @@ const PartProcessDashboard = () => {
             <QuickQualityForm
               records={records}
               qualityDefects={qualityDefects}
-              qualityEntries={mergedQEntries}
+              qualityEntries={scopedQEntries}
               materials={materials}
               onSave={async (entry) => {
                 const fullEntry = { ...entry, eventDate: selectedDate };
