@@ -72,3 +72,18 @@
 .alarm-animate {
   animation: alarmPulse 1.5s infinite;
 }
+
+/* Part Process Dashboard: make operational data easier to read at a glance. */
+.part-process-dashboard {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.part-process-dashboard :where(p, span, td, th, label, button, input, select, textarea) {
+  font-weight: 600;
+}
+
+.part-process-dashboard .text-slate-300 { color: #64748b; }
+.part-process-dashboard .text-slate-400 { color: #475569; }
+.part-process-dashboard .text-slate-500 { color: #334155; }
+.part-process-dashboard .text-slate-600 { color: #1e293b; }

@@ -63,6 +63,14 @@ const nextDateStr = (dateStr) => {
   return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 };
 
+// FactoryOS supplies ShiftName on each event. Prefer that persisted identity
+// over deriving a shift from the clock: it stays correct for custom ranges and
+// for events whose displayed time contains a full datetime string.
+const normaliseShiftName = (value) => String(value || "")
+  .trim()
+  .replace(/\s+/g, " ")
+  .toLowerCase();
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PUNCHING COMPONENT HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -161,7 +169,9 @@ export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials })
   const qUnverified    = !hasQualityData;
   const Q              = qty > 0 ? Math.min(100, Math.round((good / qty) * 100)) : 100;
 
-  const OEE = Math.round((A / 100) * (P / 100) * (Q / 100) * 100);
+  // A, P and Q are percentages, so convert their product back to a
+  // percentage with the standard OEE formula: A × P × Q ÷ 10,000.
+  const OEE = Math.round((A * P * Q) / 10000);
 
   const componentQty = Math.round(
     prodRecords.reduce((s, r) => {
@@ -325,7 +335,24 @@ export const usePartProcessOEE = () => {
   // ── Shift-filtered records ──────────────────────────────────────────────
   const shiftRecords = useMemo(() => {
     if (!selectedShift) return records;
-    if (!selectedShift.startTime || !selectedShift.endTime) return records;
+
+    const selectedShiftName = normaliseShiftName(selectedShift.shiftName);
+    const recordsWithShiftName = selectedShiftName
+      ? records.filter((r) => normaliseShiftName(r.shift) && normaliseShiftName(r.shift) !== "—")
+      : [];
+
+    // When the source contains ShiftName, use it as the authoritative filter.
+    // The previous implementation only inspected clock time; if a shift's
+    // configuration was incomplete it returned the complete record set, so all
+    // shift buttons displayed the same KPI values.
+    if (recordsWithShiftName.length > 0) {
+      return records.filter(
+        (r) => normaliseShiftName(r.shift) === selectedShiftName,
+      );
+    }
+
+    // Older imports without ShiftName are still supported by the time window.
+    if (!selectedShift.startTime || !selectedShift.endTime) return [];
 
     const ssm    = sliceToMins(selectedShift.startTime);
     const sem    = sliceToMins(selectedShift.endTime);
