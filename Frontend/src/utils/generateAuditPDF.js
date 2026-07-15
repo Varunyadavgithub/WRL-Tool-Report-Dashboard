@@ -1,32 +1,9 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getWrlLogoBase64, LOGO_ASPECT } from "./reportLogo.js";
-import { baseURL } from "../assets/assets.js";
-
-// ── Fetch a checkpoint image (served from the backend) and convert to base64 ─
-const fetchImageAsBase64 = async (url) => {
-  try {
-    const res = await fetch(url, { credentials: "include" });
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
-};
-
-// Checkpoint image values are either a filename string or an object
-// { name, data } (data already base64) — normalise to a cache key.
-const imageKey = (val) => {
-  if (!val) return null;
-  if (typeof val === "object") return val.name || JSON.stringify(val);
-  return String(val);
-};
+import { imageKey, resolveCheckpointImages } from "./auditImageResolver.js";
+import { formatDuration } from "./dateUtils.js";
+import { buildAuditFilename } from "./auditFilename.js";
 
 const imageFormat = (dataUrl) => {
   const match = /^data:image\/(\w+);base64,/.exec(dataUrl || "");
@@ -62,9 +39,19 @@ const fmt = (d) => {
   } catch { return "—"; }
 };
 
+const fmtTime = (d) => {
+  if (!d) return "—";
+  try {
+    const dt = new Date(d);
+    if (isNaN(dt)) return "—";
+    return dt.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true });
+  } catch { return "—"; }
+};
+
 const statusColor = (s) => {
   if (s === "approved")  return C.success;
   if (s === "rejected")  return C.danger;
+  if (s === "rework")    return C.warning;
   if (s === "submitted") return C.info;
   return C.gray;
 };
@@ -218,6 +205,29 @@ export const generateAuditPDF = async (audit) => {
 
   y += 24;
 
+  // ── 2b. TIME TRACKING ROW — start / completion / total test duration ──────
+
+  fillRect(0, y, W, 14, C.headerBg);
+  drawLine(0, y, W, y, C.border, 0.3);
+  drawLine(0, y + 14, W, y + 14, C.border, 0.3);
+
+  const timeFields = [
+    { label: "Start Time",     value: fmtTime(audit.startedAt) },
+    { label: "Completed Time", value: fmtTime(audit.submittedAt) },
+    { label: "Total Time",     value: formatDuration(audit.startedAt, audit.submittedAt) },
+  ];
+  const timeColW = (W - margin * 2) / timeFields.length;
+  timeFields.forEach((f, i) => {
+    const mx = margin + i * timeColW;
+    if (i > 0) drawLine(mx, y + 1, mx, y + 13, C.border, 0.2);
+    setFont(6.5, "bold", C.primaryDark);
+    text(f.label.toUpperCase(), mx + 2, y + 5.5);
+    setFont(8.5, "bold", C.black);
+    text(f.value, mx + 2, y + 11.5);
+  });
+
+  y += 18;
+
   // ── 3. INFO FIELDS TABLE (serialNo, modelName, shift, date, etc.) ──────────
 
   const infoData = audit.infoData || {};
@@ -251,7 +261,7 @@ export const generateAuditPDF = async (audit) => {
         styles: { fontSize: 7.5, cellPadding: 2.5 },
         columnStyles: {
           0: { fontStyle: "bold", textColor: C.gray,  cellWidth: halfW * 0.38, fillColor: C.lightGray },
-          1: { textColor: C.black, cellWidth: halfW * 0.62 },
+          1: { fontStyle: "bold", textColor: C.black, cellWidth: halfW * 0.62 },
         },
         theme: "plain",
         tableLineColor: C.border,
@@ -268,8 +278,11 @@ export const generateAuditPDF = async (audit) => {
   // ── 4. CHECKPOINT SECTIONS ──────────────────────────────────────────────────
 
   const sections = audit.sections || [];
+  // "section" is shown as its own group-header band below, not a table
+  // column — but "stage" stays (see the col.id === "stage" merge logic
+  // further down), matching the on-screen AuditEntry table.
   const columns  = (audit.columns || []).filter(
-    (c) => c.visible && c.id !== "section" && c.id !== "stage",
+    (c) => c.visible && c.id !== "section",
   );
 
   const colHeaders = columns.map((c) => ({
@@ -280,35 +293,10 @@ export const generateAuditPDF = async (audit) => {
     },
   }));
 
-  // Pre-resolve every checkpoint image (filename → base64) so it can be
-  // drawn synchronously inside autoTable's didDrawCell hook below.
+  // Pre-resolve every checkpoint image (filename → EXIF-corrected base64) so
+  // it can be drawn synchronously inside autoTable's didDrawCell hook below.
   const imageColIds = new Set(columns.filter((c) => c.type === "image").map((c) => c.id));
-  const imageCache = new Map();
-  if (imageColIds.size > 0) {
-    const toFetch = new Map();
-    sections.forEach((section) => {
-      (section?.stages || []).forEach((st) => {
-        (st.checkPoints || []).forEach((cp) => {
-          imageColIds.forEach((colId) => {
-            const val = cp[colId];
-            const key = imageKey(val);
-            if (key && !toFetch.has(key)) toFetch.set(key, val);
-          });
-        });
-      });
-    });
-    await Promise.all(
-      [...toFetch.entries()].map(async ([key, val]) => {
-        let result = null;
-        if (typeof val === "object" && val.data) {
-          result = val.data;
-        } else if (typeof val === "string") {
-          result = await fetchImageAsBase64(`${baseURL}audit-report/images/${val}`);
-        }
-        imageCache.set(key, result);
-      }),
-    );
-  }
+  const imageCache = await resolveCheckpointImages(sections, imageColIds);
 
   sections.forEach((section) => {
     if (!section) return;
@@ -353,6 +341,7 @@ export const generateAuditPDF = async (audit) => {
       body: bodyRows,
       styles: {
         fontSize: 7,
+        fontStyle: "bold",
         cellPadding: { top: 2.5, right: 3, bottom: 2.5, left: 3 },
         overflow: "linebreak",
         lineColor: C.border,
@@ -360,7 +349,7 @@ export const generateAuditPDF = async (audit) => {
       },
       headStyles: {
         fillColor: [232, 234, 252],
-        textColor: C.primaryDark,
+        textColor: C.black,
         fontStyle: "bold",
         fontSize: 6.5,
         lineWidth: 0.2,
@@ -368,7 +357,7 @@ export const generateAuditPDF = async (audit) => {
       },
       alternateRowStyles: { fillColor: [249, 250, 251] },
       columnStyles: columns.reduce((acc, col, idx) => {
-        if (idx === 0 && col.id === "stage") acc[0] = { cellWidth: 22, fontStyle: "bold", textColor: C.gray };
+        if (idx === 0 && col.id === "stage") acc[0] = { cellWidth: 22, fontStyle: "bold", textColor: C.black };
         if (col.type === "image") acc[idx] = { ...(acc[idx] || {}), cellWidth: 22, minCellHeight: 20 };
         return acc;
       }, {}),
@@ -480,7 +469,7 @@ export const generateAuditPDF = async (audit) => {
     setFont(8, "bold", C.danger);
     text("REJECTION REMARKS", margin + 3, y + 4.5);
     y += 8;
-    setFont(7.5, "normal", C.black);
+    setFont(7.5, "bold", C.black);
     const lines = doc.splitTextToSize(audit.approvalComments, W - margin * 2 - 6);
     lines.forEach((line) => {
       checkY(6);
@@ -531,6 +520,5 @@ export const generateAuditPDF = async (audit) => {
 
   // ── Save ────────────────────────────────────────────────────────────────────
 
-  const filename = `${audit.auditCode || "audit"}_${audit.reportName?.replace(/\s+/g, "_") || "report"}.pdf`;
-  doc.save(filename);
+  doc.save(buildAuditFilename(audit, "pdf"));
 };

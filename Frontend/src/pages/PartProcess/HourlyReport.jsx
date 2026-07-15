@@ -3,16 +3,17 @@ import { Bar } from "react-chartjs-2";
 import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from "chart.js";
 import {
   Search, Calendar, Clock, Filter, Loader2, PackageOpen,
-  BarChart2, List, AlertTriangle, CheckCircle2, FileSpreadsheet, FileText,
+  BarChart2, List, AlertTriangle, CheckCircle2, FileSpreadsheet, FileText, ArrowLeft,
 } from "lucide-react";
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets.js";
 import { useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { mapDbRecord } from "../../utils/mapDbRecord.js";
 import { PART_PROCESS_API } from "../../utils/factoryOsClient";
-import { selectMaterials, selectShifts, getMaterialByModel, extractSapCode, toMins, getShiftWindow } from "../../redux/slices/masterConfigSlice";
+import { selectMaterials, selectShifts, getMaterialByModel, extractSapCode, toMins } from "../../redux/slices/masterConfigSlice";
 import { componentQtyFromMachine } from "../../utils/productionLogic.js";
 import { exportSectionsToExcel, exportMultiSectionPDF } from "../../utils/reportExport.js";
 
@@ -77,6 +78,7 @@ const resolveShift = (startTimeHHMM, configShifts) => {
 };
 
 const PartProcessHourlyReport = () => {
+  const navigate = useNavigate();
   const materials     = useSelector(selectMaterials);
   const configShifts  = useSelector(selectShifts).filter(s => s.status);
   const [startTime, setStartTime] = useState(`${todayStr()} 08:00`);
@@ -84,7 +86,6 @@ const PartProcessHourlyReport = () => {
   const [loading, setLoading]           = useState(false);
   const [ydayLoading, setYdayLoading]   = useState(false);
   const [todayLoading, setTodayLoading] = useState(false);
-  const [shiftLoading, setShiftLoading] = useState(null);
   const [records, setRecords]           = useState([]);
   const [rawRecords, setRawRecords]     = useState([]);
   const [dbQLogs, setDbQLogs]           = useState([]);
@@ -176,17 +177,7 @@ const PartProcessHourlyReport = () => {
     const start = `${offsetDate(-1)} 08:00`; const end = `${todayStr()} 08:00`;
     setStartTime(start); setEndTime(end); fetchData(start, end, setYdayLoading);
   };
-  const handleShiftSelect = (shift) => {
-    const curMins = new Date().getHours() * 60 + new Date().getMinutes();
-    const ssm = toMins(shift.startTime); const sem = toMins(shift.endTime);
-    const isON = sem <= ssm;
-    const baseDate = isON && curMins < sem ? offsetDate(-1) : todayStr();
-    const win = getShiftWindow(shift, baseDate);
-    if (!win) return;
-    setStartTime(win.startDatetime); setEndTime(win.endDatetime);
-    fetchData(win.startDatetime, win.endDatetime, (v) => setShiftLoading(v ? shift.shiftName : null));
-  };
-  const isAnyLoading = loading || ydayLoading || todayLoading || shiftLoading !== null;
+  const isAnyLoading = loading || ydayLoading || todayLoading;
 
   // Aggregate records by SHIFT + HOUR, sorted by shift name then hour
   const hourlyData = useMemo(() => {
@@ -399,9 +390,15 @@ const PartProcessHourlyReport = () => {
     <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
       {/* HEADER */}
       <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
-        <div>
-          <h1 className="text-lg font-bold text-slate-800 leading-tight">Part Process - Hourly Report</h1>
-          <p className="text-[11px] text-slate-400">Hour-by-hour part production &amp; downtime breakdown</p>
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate("/part-process/dashboard")}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors">
+            <ArrowLeft className="w-3.5 h-3.5" /> Back
+          </button>
+          <div>
+            <h1 className="text-lg font-bold text-slate-800 leading-tight">Part Process - Hourly Report</h1>
+            <p className="text-[11px] text-slate-400">Hour-by-hour part production &amp; downtime breakdown</p>
+          </div>
         </div>
         {totalQty > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
@@ -449,13 +446,6 @@ const PartProcessHourlyReport = () => {
               <DateTimePicker label="End Time" name="end" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
             </div>
             <div className="flex gap-2 pb-0.5 shrink-0 flex-wrap">
-              {configShifts.map(sh => (
-                <button key={sh.shiftName} onClick={() => handleShiftSelect(sh)} disabled={isAnyLoading}
-                  style={!isAnyLoading ? { backgroundColor: sh.color || "#6366f1", borderColor: sh.color || "#6366f1" } : {}}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border text-white transition-all ${isAnyLoading ? "bg-slate-200 border-slate-200 text-slate-400 cursor-not-allowed" : "opacity-90 hover:opacity-100"}`}>
-                  {shiftLoading === sh.shiftName ? <Spinner /> : <Clock className="w-3.5 h-3.5" />} {sh.shiftName}
-                </button>
-              ))}
               <button onClick={handleYesterday} disabled={isAnyLoading}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${isAnyLoading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-amber-500 hover:bg-amber-600 text-white"}`}>
                 {ydayLoading ? <Spinner /> : <Calendar className="w-3.5 h-3.5" />} Yesterday
@@ -773,57 +763,6 @@ const PartProcessHourlyReport = () => {
             </>
           )}
         </div>
-        )}
-
-        {/* ── RAW DATA VERIFICATION ── */}
-        {rawRecords.length > 0 && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden shrink-0">
-            <button onClick={() => setShowRaw(v => !v)}
-              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition-colors">
-              <div className="flex items-center gap-2">
-                <Search className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Raw DB Data — {rawRecords.length} records</span>
-                <span className="text-[9px] text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded font-bold">Unprocessed</span>
-              </div>
-              <span className="text-[10px] text-slate-400">{showRaw ? "Hide ▲" : "Show ▼"}</span>
-            </button>
-            {showRaw && (
-              <div className="overflow-auto max-h-96 border-t border-slate-100">
-                <table className="min-w-full text-[10px] border-separate border-spacing-0">
-                  <thead className="sticky top-0 z-10">
-                    <tr className="bg-amber-50">
-                      {["#","Date","Shift","Type","Program / Barcode","Start","End","Duration","Qty","Quality","DT Reason","Asset","Line"].map(h => (
-                        <th key={h} className="px-2 py-2 text-left text-[9px] font-bold text-amber-700 border-b border-amber-200 whitespace-nowrap">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rawRecords.map((r, i) => (
-                      <tr key={i} className={`hover:bg-amber-50/30 ${i%2===0?"bg-white":"bg-slate-50/50"}`}>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-400 font-mono">{i+1}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">{r._fetchDate}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 whitespace-nowrap text-slate-600">{r.ShiftName||"—"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 whitespace-nowrap">
-                          <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] ${r.EventType==="Production"?"bg-emerald-50 text-emerald-700":"bg-rose-50 text-rose-600"}`}>{r.EventType}</span>
-                        </td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-700 max-w-[200px] truncate" title={r.Barcode||""}>{r.Barcode||"—"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap">{r.StartTime}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-600 whitespace-nowrap">{r.EndTime}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap">{r.Duration}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 font-mono font-bold text-slate-700">{r.PartsQty??"-"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 whitespace-nowrap">
-                          {r.PartsQuality?<span className={`text-[9px] font-bold px-1 rounded ${r.PartsQuality==="GOOD"?"text-emerald-700 bg-emerald-50":"text-rose-600 bg-rose-50"}`}>{r.PartsQuality}</span>:<span className="text-slate-300">—</span>}
-                        </td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-rose-600 whitespace-nowrap">{r.DowntimeReason||"—"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-500 whitespace-nowrap">{r.AssetName||"—"}</td>
-                        <td className="px-2 py-1.5 border-b border-slate-100 text-slate-500 whitespace-nowrap">{r.LineName||"—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
         )}
 
       </div>

@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Import FactoryOS daily-summary events into SQL Server PartProcessEvents.
 
-The job uses EventId as its idempotency key: rerunning a date updates the
-current FactoryOS values rather than adding duplicate rows.
+The job uses FactoryOS's per-record "id" (a UUID) as its idempotency key:
+rerunning a date updates the current FactoryOS values rather than adding
+duplicate rows. FactoryOS's own "event_id" field is NOT used for this because
+it is only unique for Production events — Downtime and Shift Break events can
+share the same "event_id", which previously caused distinct downtime events to
+collapse into one row and silently drop data.
 
 Examples (run from Backend):
     python scripts/sync_factoryos_part_process_events.py --date 2026-07-14
@@ -125,9 +129,14 @@ def number(value: Any, default: float = 0) -> float:
 
 def to_row(record: dict, requested_date: str) -> tuple:
     """Map FactoryOS's snake_case payload to the local PartProcessEvents schema."""
-    event_id = get_value(record, "event_id", "id")
+    # FactoryOS's own "event_id" is only unique for Production events; Downtime
+    # and Shift Break events reuse a shared, non-unique value there (observed:
+    # multiple distinct downtime periods sharing the same "D<timestamp>" id).
+    # "id" is a per-record UUID that's unique across every event type, so it's
+    # the only safe idempotency key.
+    event_id = get_value(record, "id", "event_id")
     if event_id is None:
-        raise ValueError("FactoryOS event has no event_id")
+        raise ValueError("FactoryOS event has no id")
     event_date = text(get_value(record, "event_date", "date", default=requested_date), 10) or requested_date
     shift = get_value(record, "shift.shift_name", "shift_name")
     return (

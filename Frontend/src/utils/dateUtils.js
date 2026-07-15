@@ -209,3 +209,22 @@ export const formatISODateString = (dateString) => {
 
   return dateString.replace("T", " ").replace("Z", "");
 };
+
+/**
+ * Format the elapsed time between two dates as "Xh Ym" (or "Ym" alone under
+ * an hour) — used to show total audit duration (start → completion).
+ * @param {string|Date} startDate
+ * @param {string|Date} endDate
+ * @returns {string} e.g. "1h 24m", "38m", or "-" if either date is missing/invalid
+ */
+export const formatDuration = (startDate, endDate) => {
+  if (!startDate || !endDate) return "-";
+  const start = new Date(startDate).getTime();
+  const end = new Date(endDate).getTime();
+  if (isNaN(start) || isNaN(end) || end < start) return "-";
+  const totalMinutes = Math.round((end - start) / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  return `${hours}h ${minutes}m`;
+};

@@ -77,11 +77,15 @@ const safeJsonParse = (str, defaultVal) => {
   }
 };
 
+// Prefers the user's display name — CreatedBy/UpdatedBy/SubmittedBy are shown
+// to other users in the UI (audit history, "created by" labels), so a name
+// reads far better there than a user code. Falls back through usercode/id
+// only when the JWT payload is missing a name (e.g. a "SYSTEM" actor).
 const getRequestUserIdentifier = (req) => {
   const rawValue =
+    req.user?.name ||
     req.user?.usercode ||
     req.user?.userCode ||
-    req.user?.name ||
     req.user?.id ||
     "SYSTEM";
   const result = (rawValue != null && String(rawValue).trim()) ? String(rawValue).trim() : "SYSTEM";
@@ -143,11 +147,11 @@ export const getAllAudits = tryCatch(async (req, res) => {
 
     const result = await request.query(`
       WITH AuditData AS (
-        SELECT 
+        SELECT
           Id, AuditCode, TemplateId, TemplateName, ReportName,
           FormatNo, RevNo, RevDate, Notes, Status,
           InfoData, Sections, Summary, Signatures, Columns, InfoFields, HeaderConfig,
-          CreatedBy, CreatedAt, UpdatedBy, UpdatedAt,
+          StartedAt, CreatedBy, CreatedAt, UpdatedBy, UpdatedAt,
           SubmittedBy, SubmittedAt, ApprovedBy, ApprovedAt, ApprovalComments,
           ROW_NUMBER() OVER (ORDER BY CreatedAt DESC) AS RowNum
         FROM Audits
@@ -193,12 +197,12 @@ export const getAuditById = tryCatch(async (req, res) => {
   try {
     pool = await new sql.ConnectionPool(dbConfig3).connect();
     const result = await pool.request().input("id", sql.Int, id).query(`
-      SELECT 
+      SELECT
         Id, AuditCode, TemplateId, TemplateName, ReportName,
         FormatNo, RevNo, RevDate, Notes, Status,
         InfoData, Sections, Columns, InfoFields, HeaderConfig,
         Signatures, Summary,
-        CreatedBy, CreatedAt, UpdatedBy, UpdatedAt,
+        StartedAt, CreatedBy, CreatedAt, UpdatedBy, UpdatedAt,
         SubmittedBy, SubmittedAt, ApprovedBy, ApprovedAt, ApprovalComments
       FROM Audits
       WHERE Id = @id AND IsDeleted = 0
@@ -327,19 +331,19 @@ export const createAudit = tryCatch(async (req, res) => {
       .input("formatNo", sql.NVarChar(50), formatNo || null)
       .input("revNo", sql.NVarChar(50), revNo || null)
       .input("revDate", sql.Date, revDate ? new Date(revDate) : null)
-      .input("notes", sql.NVarChar, notes || null)
+      .input("notes", sql.NVarChar(sql.MAX), notes || null)
       .input("status", sql.NVarChar(50), status)
-      .input("infoData", sql.NVarChar, JSON.stringify(infoData || {}))
-      .input("sections", sql.NVarChar, JSON.stringify(processedSections || []))
-      .input("columns", sql.NVarChar, JSON.stringify(finalColumns || []))
-      .input("infoFields", sql.NVarChar, JSON.stringify(finalInfoFields || []))
+      .input("infoData", sql.NVarChar(sql.MAX), JSON.stringify(infoData || {}))
+      .input("sections", sql.NVarChar(sql.MAX), JSON.stringify(processedSections || []))
+      .input("columns", sql.NVarChar(sql.MAX), JSON.stringify(finalColumns || []))
+      .input("infoFields", sql.NVarChar(sql.MAX), JSON.stringify(finalInfoFields || []))
       .input(
         "headerConfig",
-        sql.NVarChar,
+        sql.NVarChar(sql.MAX),
         JSON.stringify(finalHeaderConfig || {}),
       )
-      .input("signatures", sql.NVarChar, JSON.stringify(signatures || {}))
-      .input("summary", sql.NVarChar, JSON.stringify(summary))
+      .input("signatures", sql.NVarChar(sql.MAX), JSON.stringify(signatures || {}))
+      .input("summary", sql.NVarChar(sql.MAX), JSON.stringify(summary))
       .input("startedAt", sql.DateTime, startedAt ? new Date(startedAt) : null)
       .input("submittedAt", sql.DateTime, status === "submitted" ? new Date() : null)
       .input("submittedBy", sql.NVarChar(200), status === "submitted" ? createdBy : null)
@@ -477,7 +481,7 @@ export const updateAudit = tryCatch(async (req, res) => {
       )
       .input(
         "notes",
-        sql.NVarChar,
+        sql.NVarChar(sql.MAX),
         notes !== undefined ? notes : currentAudit.Notes,
       )
       .input("status", sql.NVarChar(50), status || currentAudit.Status)
@@ -489,22 +493,22 @@ export const updateAudit = tryCatch(async (req, res) => {
           ? updatedBy : currentAudit.SubmittedBy || null)
       .input(
         "infoData",
-        sql.NVarChar,
+        sql.NVarChar(sql.MAX),
         infoData ? JSON.stringify(infoData) : currentAudit.InfoData,
       )
       .input(
         "sections",
-        sql.NVarChar,
+        sql.NVarChar(sql.MAX),
         processedSections
           ? JSON.stringify(processedSections)
           : currentAudit.Sections,
       )
       .input(
         "signatures",
-        sql.NVarChar,
+        sql.NVarChar(sql.MAX),
         signatures ? JSON.stringify(signatures) : currentAudit.Signatures,
       )
-      .input("summary", sql.NVarChar, JSON.stringify(summary))
+      .input("summary", sql.NVarChar(sql.MAX), JSON.stringify(summary))
       .input("updatedBy", sql.NVarChar(200), updatedBy).query(`
         UPDATE Audits
         SET

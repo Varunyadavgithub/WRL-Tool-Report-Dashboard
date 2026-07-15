@@ -50,6 +50,7 @@ import useAuditData from "../../../hooks/useAuditData.js";
 import { useGetModelVariantsByAssemblyQuery } from "../../../redux/api/commonApi.js";
 import toast from "react-hot-toast";
 import { getCurrentShift } from "../../../utils/shiftUtils.js";
+import { formatDuration } from "../../../utils/dateUtils.js";
 import { baseURL } from "../../../assets/assets.js";
 import { ROLES } from "../../../config/routes.config";
 
@@ -443,6 +444,16 @@ const AuditEntry = () => {
   const [saving, setSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState("idle");
   const [initialLoading, setInitialLoading] = useState(true);
+  const autosaveTimerRef = useRef(null);
+  const hasAutosaveStartedRef = useRef(false);
+  // Tracks the created/loaded audit id synchronously (unlike React state,
+  // which wouldn't be visible yet to a persistAudit call that starts before
+  // the previous one's setState has flushed). Image upload/remove fire an
+  // immediate silent save on top of the debounced autosave; without this,
+  // two overlapping "create" calls could both see no id and create
+  // duplicate audit rows for the same draft.
+  const persistedIdRef = useRef(id || null);
+  const saveQueueRef = useRef(Promise.resolve());
   const [template, setTemplate] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -599,38 +610,12 @@ const AuditEntry = () => {
     if (!file) return;
     try {
       const imageData = await processImageFile(file);
-      setSections((prev) =>
-        prev.map((section) =>
-          section.id === sectionId
-            ? {
-                ...section,
-                stages: section.stages.map((stage) =>
-                  stage.id === stageId
-                    ? {
-                        ...stage,
-                        checkPoints: stage.checkPoints.map((cp) =>
-                          cp.id === checkpointId
-                            ? { ...cp, [columnId]: imageData }
-                            : cp,
-                        ),
-                      }
-                    : stage,
-                ),
-              }
-            : section,
-        ),
-      );
-      toast.success("Image uploaded!");
-    } catch (err) {
-      toast.error(err.message);
-    }
-    const refKey = `${sectionId}-${stageId}-${checkpointId}-${columnId}`;
-    if (fileInputRefs.current[refKey]) fileInputRefs.current[refKey].value = "";
-  };
 
-  const handleImageRemove = (sectionId, stageId, checkpointId, columnId) => {
-    setSections((prev) =>
-      prev.map((section) =>
+      // Compute the updated sections tree up front (rather than only inside
+      // the setSections updater) so we have a fresh, non-stale copy we can
+      // hand straight to persistAudit below — the `sections` state won't
+      // reflect this change until the next render, so we can't rely on it.
+      const updatedSections = sections.map((section) =>
         section.id === sectionId
           ? {
               ...section,
@@ -640,7 +625,7 @@ const AuditEntry = () => {
                       ...stage,
                       checkPoints: stage.checkPoints.map((cp) =>
                         cp.id === checkpointId
-                          ? { ...cp, [columnId]: null }
+                          ? { ...cp, [columnId]: imageData }
                           : cp,
                       ),
                     }
@@ -648,9 +633,69 @@ const AuditEntry = () => {
               ),
             }
           : section,
-      ),
+      );
+
+      setSections(updatedSections);
+      toast.success("Image uploaded!");
+
+      // Persist the image immediately as part of a silent draft autosave —
+      // don't wait for the debounced autosave effect to notice the section
+      // change on the next render. persistAudit is declared further down
+      // the component via useCallback, but since this handler only runs in
+      // response to a user's file-selection event (well after the initial
+      // render), persistAudit is always fully initialized by the time this
+      // executes.
+      if (canEdit && auditData.templateId) {
+        persistAudit({
+          status: "draft",
+          silent: true,
+          showToast: false,
+          showBusyUi: false,
+          overrideSections: updatedSections,
+        });
+      }
+    } catch (err) {
+      toast.error(err.message);
+    }
+    const refKey = `${sectionId}-${stageId}-${checkpointId}-${columnId}`;
+    if (fileInputRefs.current[refKey]) fileInputRefs.current[refKey].value = "";
+  };
+
+  const handleImageRemove = (sectionId, stageId, checkpointId, columnId) => {
+    const updatedSections = sections.map((section) =>
+      section.id === sectionId
+        ? {
+            ...section,
+            stages: section.stages.map((stage) =>
+              stage.id === stageId
+                ? {
+                    ...stage,
+                    checkPoints: stage.checkPoints.map((cp) =>
+                      cp.id === checkpointId
+                        ? { ...cp, [columnId]: null }
+                        : cp,
+                    ),
+                  }
+                : stage,
+            ),
+          }
+        : section,
     );
+
+    setSections(updatedSections);
     toast.success("Image removed.");
+
+    // Persist the removal immediately, same reasoning as handleImageUpload —
+    // don't wait for the debounced autosave effect to pick up the change.
+    if (canEdit && auditData.templateId) {
+      persistAudit({
+        status: "draft",
+        silent: true,
+        showToast: false,
+        showBusyUi: false,
+        overrideSections: updatedSections,
+      });
+    }
   };
 
   // ==================== Migrate structures ====================
@@ -726,6 +771,60 @@ const AuditEntry = () => {
         ],
       };
     });
+  }, []);
+
+  // After a save, the server has replaced any freshly-uploaded base64 image
+  // objects with saved filenames. Merge those filenames back into local
+  // state — otherwise the same base64 blob lingers in `sections` and gets
+  // re-uploaded (as a brand new file) on every later autosave, with the
+  // previous file deleted out from under it by cleanupRemovedImages.
+  // Returns the original `localSections` reference untouched when nothing
+  // needed merging, so callers can skip a state update.
+  const mergeSavedImageFilenames = useCallback((localSections, savedSections) => {
+    if (!Array.isArray(localSections) || !Array.isArray(savedSections)) return localSections;
+    const savedSectionById = new Map(savedSections.map((s) => [s.id, s]));
+    let changed = false;
+
+    const merged = localSections.map((section) => {
+      const savedSection = savedSectionById.get(section.id);
+      if (!savedSection || !Array.isArray(section.stages)) return section;
+      const savedStageById = new Map((savedSection.stages || []).map((st) => [st.id, st]));
+
+      let sectionChanged = false;
+      const mergedStages = section.stages.map((stage) => {
+        const savedStage = savedStageById.get(stage.id);
+        if (!savedStage || !Array.isArray(stage.checkPoints)) return stage;
+        const savedCpById = new Map((savedStage.checkPoints || []).map((cp) => [cp.id, cp]));
+
+        let stageChanged = false;
+        const mergedCheckPoints = stage.checkPoints.map((cp) => {
+          const savedCp = savedCpById.get(cp.id);
+          if (!savedCp) return cp;
+
+          let cpChanged = false;
+          const mergedCp = { ...cp };
+          for (const [key, value] of Object.entries(cp)) {
+            const isUnsavedImage = value !== null && typeof value === "object" && typeof value.data === "string";
+            if (isUnsavedImage && typeof savedCp[key] === "string") {
+              mergedCp[key] = savedCp[key];
+              cpChanged = true;
+            }
+          }
+          if (cpChanged) stageChanged = true;
+          return cpChanged ? mergedCp : cp;
+        });
+
+        if (!stageChanged) return stage;
+        sectionChanged = true;
+        return { ...stage, checkPoints: mergedCheckPoints };
+      });
+
+      if (!sectionChanged) return section;
+      changed = true;
+      return { ...section, stages: mergedStages };
+    });
+
+    return changed ? merged : localSections;
   }, []);
 
   // Load template or existing audit
@@ -1043,6 +1142,166 @@ const AuditEntry = () => {
     return true;
   };
 
+  const buildAuditPayload = useCallback(
+    (status = "draft", overrideSections = null) => {
+      const finalInfoData = {
+        ...infoData,
+        serialNo: serialNo.trim() || "",
+        serial: serialNo.trim() || "",
+        shift: infoData.shift || currentShift.value,
+        date: infoData.date || currentDate,
+      };
+
+      return {
+        templateId: auditData.templateId ? parseInt(auditData.templateId, 10) : null,
+        templateName: auditData.templateName,
+        reportName: auditData.reportName || "Draft Audit",
+        formatNo: auditData.formatNo || null,
+        revNo: auditData.revNo || null,
+        revDate: auditData.revDate || null,
+        notes: auditData.notes || null,
+        status,
+        startedAt: auditData.startedAt || startedAtRef.current,
+        infoData: finalInfoData,
+        // Prefer freshly computed sections (e.g. right after an image
+        // upload/removal) over the sections state, which may not have
+        // re-rendered yet at the moment this is called.
+        sections: overrideSections || sections,
+        signatures,
+        columns: template?.columns || [],
+        infoFields: template?.infoFields || [],
+        headerConfig: template?.headerConfig || {},
+      };
+    },
+    [auditData.templateId, auditData.templateName, auditData.reportName, auditData.formatNo, auditData.revNo, auditData.revDate, auditData.notes, auditData.startedAt, infoData, serialNo, currentShift.value, currentDate, sections, signatures, template?.columns, template?.infoFields, template?.headerConfig],
+  );
+
+  const persistAudit = useCallback(
+    async ({
+      status = "draft",
+      silent = true,
+      showToast = false,
+      navigateAfterSave = false,
+      showBusyUi = false,
+      overrideSections = null,
+    } = {}) => {
+      if (!auditData.templateId) {
+        if (!silent) toast.error("Template is required");
+        return null;
+      }
+
+      // Chain onto the previous save instead of firing in parallel — image
+      // upload/remove trigger an immediate save on top of the debounced
+      // autosave, and running them concurrently would let two "create" calls
+      // both see a not-yet-set persistedIdRef and create duplicate audit rows.
+      const run = async () => {
+        if (showBusyUi) setSaving(true);
+        setAutoSaveStatus("saving");
+        try {
+          const currentSections = overrideSections || sections;
+          const payload = buildAuditPayload(status, currentSections);
+          const targetId = id || persistedIdRef.current;
+          const savedAudit = targetId
+            ? await updateAudit(targetId, payload)
+            : await createAudit(payload);
+
+          if (!targetId && savedAudit?.id) {
+            persistedIdRef.current = savedAudit.id;
+            setAuditData((prev) => ({ ...prev, status: "draft" }));
+          }
+
+          // Replace any just-uploaded base64 image data in local state with
+          // the filenames the server actually persisted to disk.
+          if (Array.isArray(savedAudit?.sections)) {
+            setSections((prev) => mergeSavedImageFilenames(prev, savedAudit.sections));
+          }
+
+          setAutoSaveStatus("idle");
+          if (showToast) {
+            const message = status === "submitted" ? "Audit submitted successfully!" : "Audit saved as draft";
+            toast.success(message);
+          }
+          if (navigateAfterSave) {
+            setTimeout(() => navigate("/auditreport/audits"), 500);
+          }
+          return savedAudit;
+        } catch (error) {
+          console.error("Audit save error:", error);
+          setAutoSaveStatus("error");
+          if (!silent) {
+            toast.error(error.message || (status === "submitted" ? "Error submitting audit." : "Error saving audit as draft."));
+          }
+          throw error;
+        } finally {
+          if (showBusyUi) setSaving(false);
+        }
+      };
+
+      const result = saveQueueRef.current.then(run, run);
+      saveQueueRef.current = result.then(
+        () => {},
+        () => {},
+      );
+      return result;
+    },
+    [auditData.templateId, buildAuditPayload, createAudit, id, mergeSavedImageFilenames, navigate, sections, setAuditData, updateAudit],
+  );
+
+  // ── Autosave (debounced) — MUST be declared after persistAudit so the
+  // dependency array below can reference the real, already-initialized
+  // `persistAudit` binding (avoids the "Cannot access before initialization"
+  // TDZ error that occurs if this effect sits above the useCallback that
+  // defines persistAudit). ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (initialLoading) return;
+    if (!canEdit) return;
+    if (!auditData.templateId) return;
+    if (!hasAutosaveStartedRef.current) {
+      hasAutosaveStartedRef.current = true;
+      return;
+    }
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    autosaveTimerRef.current = setTimeout(() => {
+      persistAudit({ status: "draft", silent: true, showToast: false, showBusyUi: false });
+    }, 1200);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, [
+    auditData.templateId,
+    auditData.templateName,
+    auditData.reportName,
+    auditData.formatNo,
+    auditData.revNo,
+    auditData.revDate,
+    auditData.notes,
+    infoData,
+    sections,
+    signatures,
+    serialNo,
+    currentShift.value,
+    currentDate,
+    canEdit,
+    initialLoading,
+    persistAudit,
+  ]);
+
+  // Clear any pending autosave timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, []);
+
   // Submit
   const handleSubmit = async () => {
     if (!serialNo.trim()) {
@@ -1053,102 +1312,17 @@ const AuditEntry = () => {
       toast.error("Waiting for model to be fetched");
       return;
     }
-    if (!auditData.templateId) {
-      toast.error("Template is required");
-      return;
-    }
     if (!auditData.reportName?.trim()) {
       toast.error("Report name is required");
       return;
     }
 
-    setSaving(true);
-    setAutoSaveStatus("saving");
-    try {
-      const finalInfoData = {
-        ...infoData,
-        serialNo: serialNo.trim(),
-        serial: serialNo.trim(),
-        shift: infoData.shift || currentShift.value,
-        date: infoData.date || currentDate,
-      };
-      const auditPayload = {
-        templateId: parseInt(auditData.templateId, 10),
-        templateName: auditData.templateName,
-        reportName: auditData.reportName,
-        formatNo: auditData.formatNo || null,
-        revNo: auditData.revNo || null,
-        revDate: auditData.revDate || null,
-        notes: auditData.notes || null,
-        status: "submitted",
-        startedAt: auditData.startedAt || startedAtRef.current,
-        infoData: finalInfoData,
-        sections,
-        signatures,
-        columns: template?.columns || [],
-        infoFields: template?.infoFields || [],
-        headerConfig: template?.headerConfig || {},
-      };
-      if (id) await updateAudit(id, auditPayload);
-      else await createAudit(auditPayload);
-      setAutoSaveStatus("idle");
-      toast.success("Audit submitted successfully! ?");
-      setTimeout(() => navigate("/auditreport/audits"), 500);
-    } catch (error) {
-      console.error("Submit error:", error);
-      setAutoSaveStatus("error");
-      toast.error(error.message || "Error submitting audit.");
-    } finally {
-      setSaving(false);
-    }
+    await persistAudit({ status: "submitted", silent: false, showToast: true, navigateAfterSave: true, showBusyUi: true });
   };
 
   // Save as Draft
   const handleSaveAsDraft = async () => {
-    if (!auditData.templateId) {
-      toast.error("Template is required");
-      return;
-    }
-
-    setSaving(true);
-    setAutoSaveStatus("saving");
-    try {
-      const finalInfoData = {
-        ...infoData,
-        serialNo: serialNo.trim() || "",
-        serial: serialNo.trim() || "",
-        shift: infoData.shift || currentShift.value,
-        date: infoData.date || currentDate,
-      };
-      const auditPayload = {
-        templateId: parseInt(auditData.templateId, 10),
-        templateName: auditData.templateName,
-        reportName: auditData.reportName || "Draft Audit",
-        formatNo: auditData.formatNo || null,
-        revNo: auditData.revNo || null,
-        revDate: auditData.revDate || null,
-        notes: auditData.notes || null,
-        status: "draft",
-        startedAt: auditData.startedAt || startedAtRef.current,
-        infoData: finalInfoData,
-        sections,
-        signatures,
-        columns: template?.columns || [],
-        infoFields: template?.infoFields || [],
-        headerConfig: template?.headerConfig || {},
-      };
-      if (id) await updateAudit(id, auditPayload);
-      else await createAudit(auditPayload);
-      setAutoSaveStatus("idle");
-      toast.success("Audit saved as draft");
-      setTimeout(() => navigate("/auditreport/audits"), 500);
-    } catch (error) {
-      console.error("Save as draft error:", error);
-      setAutoSaveStatus("error");
-      toast.error(error.message || "Error saving audit as draft.");
-    } finally {
-      setSaving(false);
-    }
+    await persistAudit({ status: "draft", silent: false, showToast: true, navigateAfterSave: true, showBusyUi: true });
   };
 
   // Field icon
@@ -1407,20 +1581,49 @@ const AuditEntry = () => {
       );
     }
 
+    // imageData is either a filename string (already saved to disk by the
+    // server) or an unsaved base64 object { data, name } — cover both, since
+    // an image starts as base64 and gets swapped for its filename once
+    // autosave persists it (see mergeSavedImageFilenames).
+    const isFilename = typeof imageData === "string" && imageData.length > 0;
+    const isBase64 = !!(imageData && typeof imageData === "object" && imageData.data);
+    const imgSrc = isFilename
+      ? `${baseURL}audit-report/images/${imageData}`
+      : isBase64
+        ? imageData.data
+        : null;
+    const imgName = isFilename ? imageData : imageData?.name || "img";
+    const previewPayload = isFilename
+      ? { fileName: imageData, data: imgSrc, name: imageData, size: null }
+      : imageData;
+
+    // Photo evidence is only meaningful for checkpoints the template marks
+    // as required, or ones that just failed — don't offer an upload zone on
+    // every routine pass/N/A row. Some templates were authored marking a
+    // checkpoint "required" by typing a leading "*" into its text instead of
+    // ticking the Required checkbox, so honor that convention too.
+    const checkPointText = typeof checkpoint.checkPoint === "string" ? checkpoint.checkPoint.trim() : "";
+    const isRequiredCheckpoint = !!checkpoint.required || checkPointText.startsWith("*");
+    const canUploadImage = isRequiredCheckpoint || checkpoint.status === "fail";
+
     return (
       <td key={column.id} className="px-3 py-2 border-r border-gray-100">
         <div className="flex justify-center">
-          {imageData && imageData.data ? (
+          {imgSrc ? (
             <div className="relative group">
               <img
-                src={imageData.data}
-                alt={imageData.name || "img"}
+                src={imgSrc}
+                alt={imgName}
                 className="w-20 h-20 object-cover rounded-xl border-2 border-gray-200 cursor-pointer group-hover:border-indigo-400 transition-all"
-                onClick={() => setImagePreview(imageData)}
+                onClick={() => setImagePreview(previewPayload)}
+                onError={(e) => {
+                  e.target.src =
+                    "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzljYTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkVycm9yPC90ZXh0Pjwvc3ZnPg==";
+                }}
               />
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 rounded-xl transition-all flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100">
                 <button
-                  onClick={() => setImagePreview(imageData)}
+                  onClick={() => setImagePreview(previewPayload)}
                   className="p-1.5 bg-white rounded-full text-indigo-600 shadow"
                   title="View"
                 >
@@ -1443,12 +1646,12 @@ const AuditEntry = () => {
               </div>
               <p
                 className="text-[10px] text-gray-400 mt-1 truncate max-w-[80px] text-center"
-                title={imageData.name}
+                title={imgName}
               >
-                {imageData.name}
+                {imgName}
               </p>
             </div>
-          ) : (
+          ) : canUploadImage ? (
             <ImageZone
               uploadRef={(el) => (fileInputRefs.current[refKey] = el)}
               onFile={(e) =>
@@ -1461,6 +1664,13 @@ const AuditEntry = () => {
                 )
               }
             />
+          ) : (
+            <span
+              className="text-[10px] text-gray-300 italic text-center"
+              title="Image only required for required checkpoints or on fail"
+            >
+              Not required
+            </span>
           )}
         </div>
       </td>
@@ -2008,6 +2218,20 @@ const AuditEntry = () => {
                     </span>
                   </div>
                 </div>
+                {/* Total Time */}
+                {auditData.submittedAt && (
+                  <div className="p-3.5 flex items-center gap-3">
+                    <FaHourglassHalf className="text-lg text-purple-500 flex-shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-gray-400 uppercase tracking-widest block">
+                        Total Time
+                      </span>
+                      <span className="font-bold text-gray-700 text-sm">
+                        {formatDuration(auditData.startedAt || startedAtRef.current, auditData.submittedAt)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
