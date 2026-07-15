@@ -298,6 +298,26 @@ export const runMigrations = async (pool3) => {
     END
   `);
 
+  // ── PartProcessSyncLog: FactoryOS import history ─────────────────────────
+  await pool3.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'PartProcessSyncLog'
+    )
+    BEGIN
+      CREATE TABLE PartProcessSyncLog (
+        Id            INT IDENTITY(1,1) PRIMARY KEY,
+        SyncDate      DATE           NOT NULL,
+        StartedAt     DATETIME       NOT NULL,
+        CompletedAt   DATETIME       NOT NULL DEFAULT GETDATE(),
+        Status        NVARCHAR(20)   NOT NULL,
+        RecordsSynced INT            NULL,
+        Message       NVARCHAR(MAX)  NULL
+      );
+      CREATE INDEX IX_PPSL_CompletedAt ON PartProcessSyncLog (CompletedAt DESC);
+      PRINT 'Migration: Created PartProcessSyncLog table';
+    END
+  `);
+
   // ── MaterialConfigs: Master Config > Material Config ─────────────────────
   await pool3.request().query(`
     IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='MaterialConfigs')

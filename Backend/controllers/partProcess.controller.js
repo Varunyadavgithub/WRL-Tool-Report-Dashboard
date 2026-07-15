@@ -75,6 +75,21 @@ export const getRecordsRange = async (req, res) => {
   }
 };
 
+// ── GET /api/v1/part-process/sync-log ───────────────────────────────────────
+export const getSyncLog = async (_req, res) => {
+  try {
+    const result = await global.pool3.request().query(`
+      SELECT TOP 100 Id, SyncDate, StartedAt, CompletedAt, Status, RecordsSynced, Message
+      FROM PartProcessSyncLog
+      ORDER BY CompletedAt DESC, Id DESC
+    `);
+    res.json({ success: true, data: result.recordset });
+  } catch (err) {
+    console.error("[PartProcess] getSyncLog:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // ── PartProcessDowntimeLog table helpers ─────────────────────────────────────
 
 const ensureDowntimeLogTable = async () => {

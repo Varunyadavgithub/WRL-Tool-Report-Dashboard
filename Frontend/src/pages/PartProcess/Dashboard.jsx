@@ -25,6 +25,8 @@ import {
   Loader2,
   Search,
   RefreshCw,
+  Maximize2,
+  Minimize2,
   Timer,
 } from "lucide-react";
 import axios from "axios";
@@ -1928,6 +1930,7 @@ const PartProcessDashboard = () => {
   const [pwdError, setPwdError] = useState(false);
   const [dbDTLogs, setDbDTLogs] = useState([]);
   const [dbQLogs, setDbQLogs] = useState([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const {
     time,
@@ -2023,6 +2026,24 @@ const PartProcessDashboard = () => {
     fetch();
   }, [selectedDate]);
 
+  useEffect(() => {
+    const onFull = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFull);
+    return () => document.removeEventListener("fullscreenchange", onFull);
+  }, []);
+
+  const toggleFullScreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (err) {
+      console.error("fullscreen toggle failed", err);
+    }
+  };
+
   // Merge Redux + DB entries (DB wins on eventId match; Redux wins for brand-new entries not yet in DB)
   const mergedDTEntries = useMemo(() => {
     const map = {};
@@ -2074,7 +2095,15 @@ const PartProcessDashboard = () => {
     );
 
     const belongsToActiveScope = (entry) => {
-      const eventDate = String(entry.eventDate ?? entry.EventDate ?? "").slice(0, 10);
+      const rawEventDate = entry.eventDate ?? entry.EventDate ?? "";
+      let eventDate = "";
+      if (rawEventDate) {
+        try {
+          eventDate = new Date(String(rawEventDate)).toISOString().slice(0, 10);
+        } catch {
+          eventDate = String(rawEventDate).slice(0, 10);
+        }
+      }
       const eventId = entry.eventId ?? entry.EventId;
       // Older saved rows may not have EventDate. Keep them only when their
       // linked production event is in the currently loaded range.
@@ -2496,7 +2525,7 @@ const PartProcessDashboard = () => {
     <>
       <div className="part-process-dashboard h-full flex flex-col bg-slate-100 overflow-hidden">
         {/* ── STICKY HEADER ── */}
-        <div className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm shrink-0">
+          <div className={`sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm shrink-0 ${isFullscreen ? "hidden" : ""}`}>
           {loading && loadProgress.total > 0 && (
             <div className="bg-blue-600 shrink-0">
               <div className="flex items-center justify-between px-5 py-1 text-[11px] text-white/80">
@@ -2731,9 +2760,31 @@ const PartProcessDashboard = () => {
                   <RefreshCw className="w-4 h-4" />
                 )}
               </button>
+              <button
+                onClick={toggleFullScreen}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                title={isFullscreen ? "Exit fullscreen" : "Open fullscreen"}
+              >
+                {isFullscreen ? (
+                  <Minimize2 className="w-4 h-4" />
+                ) : (
+                  <Maximize2 className="w-4 h-4" />
+                )}
+              </button>
+              {/* floating exit button moved below so it's not hidden with header */}
             </div>
           </div>
         </div>
+
+        {isFullscreen && (
+          <button
+            onClick={toggleFullScreen}
+            className="fixed top-2 right-2 z-50 p-2 rounded bg-white/80 shadow-md"
+            title="Exit fullscreen"
+          >
+            <Minimize2 className="w-4 h-4" />
+          </button>
+        )}
 
         {/* ── SCROLLABLE CONTENT ── */}
         <div className="flex-1 overflow-auto p-4 flex flex-col gap-4 relative">
@@ -2886,10 +2937,10 @@ const PartProcessDashboard = () => {
                 <div className="flex gap-2 shrink-0">
                   {[
                     {
-                      label: "Qty",
-                      value: shiftOEE.qty,
-                      color: "text-blue-600",
-                    },
+                        label: "Qty",
+                        value: displayComponentQty.toLocaleString(),
+                        color: "text-blue-600",
+                      },
                     {
                       label: "Good",
                       value: shiftOEE.good,
@@ -2948,11 +2999,7 @@ const PartProcessDashboard = () => {
                 <p className="text-2xl font-bold font-mono text-slate-800">
                   {displayComponentQty.toLocaleString()}
                 </p>
-                {displayComponentQty !== displayQty && (
-                  <p className="text-[11px] font-semibold text-violet-600">
-                    {displayQty.toLocaleString()} sheets
-                  </p>
-                )}
+                {/* Showing component count only (sheets hidden) */}
                 <p className="text-[11px] text-slate-400">
                   {totalProdRecords} production events
                 </p>
@@ -3193,13 +3240,6 @@ const PartProcessDashboard = () => {
                       color: "text-blue-600",
                     },
                     {
-                      label: "Inspected Count",
-                      value: qualityTotals.hasData
-                        ? qualityTotals.inspected
-                        : "—",
-                      color: "text-violet-600",
-                    },
-                    {
                       label: "Accepted Count",
                       value: qualityTotals.hasData
                         ? qualityTotals.accepted
@@ -3258,13 +3298,6 @@ const PartProcessDashboard = () => {
                       value: curMat
                         ? `${curMat.definedComponentCycleTime} s`
                         : "N/A",
-                    },
-                    {
-                      label: "Sheet CT (Machine)",
-                      value:
-                        activeAvgCycleSecs > 0
-                          ? `${activeAvgCycleSecs} s`
-                          : "N/A",
                     },
                     {
                       label: "Component CT",

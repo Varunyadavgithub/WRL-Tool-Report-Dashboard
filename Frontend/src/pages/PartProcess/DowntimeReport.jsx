@@ -399,6 +399,30 @@ const PartProcessDowntimeReport = () => {
       || "Unassigned";
   };
 
+  // Scope logged DB entries to the same date range as fetched `records` so the
+  // Logged Entries list only shows rows relevant to the current query.
+  const selectedDate = appliedRange?.startDate ?? String(startTime).slice(0,10);
+  const eventIdsInRange = useMemo(() => new Set(records.filter((r)=>r.eventId).map((r)=>String(r.eventId))), [records]);
+
+  const scopedLoggedEntries = useMemo(() => {
+    return downtimeEntries.filter((entry) => {
+      const rawEventDate = entry.eventDate ?? entry.EventDate ?? "";
+      let eventDate = "";
+      if (rawEventDate) {
+        try {
+          eventDate = new Date(String(rawEventDate)).toISOString().slice(0,10);
+        } catch {
+          eventDate = String(rawEventDate).slice(0,10);
+        }
+      }
+      const eventId = entry.eventId ?? entry.EventId;
+      // If saved entry carries an eventDate, it must match selectedDate. Otherwise
+      // accept it only when its linked eventId is present in the currently loaded records.
+      if (eventDate ? eventDate !== selectedDate : !eventIdsInRange.has(String(eventId))) return false;
+      return true;
+    });
+  }, [downtimeEntries, eventIdsInRange, selectedDate]);
+
   const reasonMap = useMemo(()=>{
     const m={};
     allDT.forEach((r)=>{ const k=effectiveReason(r); m[k]=(m[k]||0)+parseDurSecs(r.duration); });
@@ -487,7 +511,7 @@ const PartProcessDowntimeReport = () => {
   const tabs = [
     { key:"downtime",   label:"Downtime Events", count:allDT.length,       icon:TimerOff },
     { key:"changeover", label:"Changeovers",      count:changeovers.length,  icon:ArrowRight },
-    { key:"logged",     label:"Logged Entries",   count:downtimeEntries.length, icon:ListChecks },
+    { key:"logged",     label:"Logged Entries",   count:scopedLoggedEntries.length, icon:ListChecks },
   ];
 
   const exportMeta = () => `${startTime} to ${endTime}  |  Generated ${new Date().toLocaleString()}`;
@@ -508,7 +532,7 @@ const PartProcessDowntimeReport = () => {
       start: c.startTime, end: c.endTime, duration: `${c.durationMins.toFixed(1)}m`,
       status: c.isOverrun ? `+${c.overrunMins.toFixed(1)}m overrun` : "Within std",
     }));
-    const loggedRows = downtimeEntries.map((e, idx) => ({
+    const loggedRows = scopedLoggedEntries.map((e, idx) => ({
       idx: idx + 1, shift: e.shift,
       type: e.isChangeover ? "Changeover" : "Downtime",
       start: e.startTime || "—", end: e.endTime || "—", duration: e.duration || "—",
@@ -926,7 +950,7 @@ const PartProcessDowntimeReport = () => {
 
               {/* ── TAB: Logged Entries ── */}
               {activeTab==="logged" && (
-                downtimeEntries.length===0 ? (
+                scopedLoggedEntries.length===0 ? (
                   <div className="py-12 text-center text-slate-400">
                     <ListChecks className="w-8 h-8 opacity-20 mx-auto mb-2" strokeWidth={1.2}/>
                     <p className="text-sm">No downtime entries logged yet.</p>
@@ -943,7 +967,7 @@ const PartProcessDowntimeReport = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {downtimeEntries.map((e,idx)=>(
+                        {scopedLoggedEntries.map((e,idx)=>(
                           <tr key={e.id||idx} className={`transition-colors ${e.isChangeover?"hover:bg-amber-50/40 bg-amber-50/10":"hover:bg-slate-50"}`}>
                             <td className="px-3 py-2.5 border-b border-slate-100 font-mono text-slate-400">{idx+1}</td>
                             <td className="px-3 py-2.5 border-b border-slate-100"><ShiftPill name={e.shift}/></td>
