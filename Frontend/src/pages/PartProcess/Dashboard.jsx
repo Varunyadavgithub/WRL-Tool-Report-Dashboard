@@ -28,6 +28,7 @@ import {
   Maximize2,
   Minimize2,
   Timer,
+  ArrowLeft,
 } from "lucide-react";
 import axios from "axios";
 import { fileBaseURL } from "../../assets/assets.js";
@@ -2561,6 +2562,12 @@ const PartProcessDashboard = () => {
           )}
 
           <div className="flex items-center gap-3 px-5 py-2.5 flex-wrap">
+            <button
+              onClick={() => navigate("/part-process/overview")}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Back
+            </button>
             <div className="flex items-center gap-2.5">
               <div className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 overflow-hidden">
                 {currentMachine?.imagePath ? (

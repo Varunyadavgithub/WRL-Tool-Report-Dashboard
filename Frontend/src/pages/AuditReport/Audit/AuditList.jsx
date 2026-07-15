@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import {
   FaPlus,
   FaEdit,
-  FaTrash,
   FaEye,
   FaSearch,
   FaFilter,
@@ -268,14 +267,13 @@ const AuditList = () => {
   const {
     audits,
     templates,
-    deleteAudit,
     loadAudits,
     loadTemplates,
     getAuditById,
   } = useAuditData();
 
   const { user } = useSelector((store) => store.auth);
-  // Quality Auditor can only view — no create, edit, or delete
+  // Quality Auditor can only view — no create or edit
   const isViewOnly = [user?.role, user?.roleName].includes(
     ROLES.QUALITY_AUDITOR,
   );
@@ -310,9 +308,6 @@ const AuditList = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState("table"); // "table" | "card"
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [auditToDelete, setAuditToDelete] = useState(null);
-  const [actionLoading, setActionLoading] = useState(false);
 
   // Bulk select
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -653,49 +648,6 @@ const AuditList = () => {
     else setSelectedIds(new Set(paginated.map((a) => a.id)));
   };
 
-  const handleBulkDelete = () => {
-    const locked = [...selectedIds].filter((id) => {
-      const a = enrichedAudits.find((x) => x.id === id);
-      return a?.status === "approved";
-    });
-    if (locked.length > 0) {
-      toast.error(`${locked.length} approved audit(s) cannot be deleted`);
-      return;
-    }
-    setAuditToDelete({ bulk: true, ids: [...selectedIds] });
-    setShowDeleteModal(true);
-  };
-
-  // ==================== DELETE ====================
-  const confirmDelete = (audit) => {
-    if (audit.status === "approved") {
-      toast.error("Cannot delete an approved audit");
-      return;
-    }
-    setAuditToDelete(audit);
-    setShowDeleteModal(true);
-  };
-
-  const handleDelete = async () => {
-    setActionLoading(true);
-    try {
-      if (auditToDelete?.bulk) {
-        await Promise.all(auditToDelete.ids.map((id) => deleteAudit(id)));
-        toast.success(`${auditToDelete.ids.length} audits deleted`);
-        setSelectedIds(new Set());
-      } else {
-        await deleteAudit(auditToDelete.id);
-        toast.success("Audit deleted");
-      }
-      setShowDeleteModal(false);
-      setAuditToDelete(null);
-    } catch (err) {
-      toast.error(`Delete failed: ${err.message}`);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   // ==================== EXPORT ====================
   const handleExport = () => {
     const rows =
@@ -774,89 +726,9 @@ const AuditList = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans">
-      {/* ==================== DELETE MODAL ==================== */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="p-5 bg-gradient-to-r from-red-600 to-red-700 text-white">
-              <h3 className="text-lg font-bold flex items-center gap-2">
-                <FaTrash size={14} />
-                {auditToDelete?.bulk
-                  ? `Delete ${auditToDelete.ids.length} Audits`
-                  : "Delete Audit"}
-              </h3>
-              <p className="text-red-200 text-xs mt-1">
-                This action is permanent and cannot be undone.
-              </p>
-            </div>
-            <div className="p-6">
-              <p className="text-sm text-gray-600 mb-3">
-                You are about to permanently delete:
-              </p>
-              <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-                {auditToDelete?.bulk ? (
-                  <p className="font-semibold text-gray-800">
-                    {auditToDelete.ids.length} selected audit records
-                  </p>
-                ) : (
-                  <>
-                    <p className="font-semibold text-gray-800">
-                      {auditToDelete?.reportName}
-                    </p>
-                    {auditToDelete?.auditCode && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Code: {auditToDelete.auditCode}
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-              <div className="mt-4 flex items-start gap-2 text-red-600 bg-red-50 rounded-xl p-3 border border-red-100">
-                <FaExclamationTriangle
-                  className="mt-0.5 flex-shrink-0"
-                  size={12}
-                />
-                <p className="text-xs font-medium">
-                  All associated data including checkpoint results and images
-                  will be permanently removed.
-                </p>
-              </div>
-            </div>
-            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setAuditToDelete(null);
-                }}
-                disabled={actionLoading}
-                className="px-4 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={actionLoading}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center gap-2 transition-all"
-              >
-                {actionLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{" "}
-                    Deleting…
-                  </>
-                ) : (
-                  <>
-                    <FaTrash size={11} /> Delete
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ==================== STICKY HEADER ==================== */}
       <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3 max-w-[1600px] mx-auto">
+        <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3 w-full">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-indigo-50 rounded-xl">
@@ -992,7 +864,7 @@ const AuditList = () => {
         </div>
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-4 py-5 space-y-4">
+      <div className="w-full px-4 py-5 space-y-4">
         {/* ==================== STAT CARDS ==================== */}
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           <StatCard
@@ -1188,14 +1060,6 @@ const AuditList = () => {
               >
                 <FaDownload size={11} /> Export Selected
               </button>
-              {!isViewOnly && (
-                <button
-                  onClick={handleBulkDelete}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 rounded-lg text-xs font-bold transition-all"
-                >
-                  <FaTrash size={11} /> Delete Selected
-                </button>
-              )}
             </div>
           </div>
         )}
@@ -1462,15 +1326,6 @@ const AuditList = () => {
                                 <FaEdit size={12} />
                               </button>
                             )}
-                            {(!isViewOnly || audit.status === "draft") && audit.status !== "approved" && (
-                              <button
-                                onClick={() => confirmDelete(audit)}
-                                className="p-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-400 hover:text-red-600 transition-all"
-                                title="Delete"
-                              >
-                                <FaTrash size={12} />
-                              </button>
-                            )}
                           </div>
                         </td>
                       </tr>
@@ -1717,15 +1572,6 @@ const AuditList = () => {
                             title="Edit"
                           >
                             <FaEdit size={11} />
-                          </button>
-                        )}
-                        {(!isViewOnly || audit.status === "draft") && audit.status !== "approved" && (
-                          <button
-                            onClick={() => confirmDelete(audit)}
-                            className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-400 transition-all"
-                            title="Delete"
-                          >
-                            <FaTrash size={11} />
                           </button>
                         )}
                       </div>

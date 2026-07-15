@@ -33,6 +33,7 @@ import {
   FaShieldAlt,
   FaLink,
   FaCheckDouble,
+  FaHourglassHalf,
 } from "react-icons/fa";
 import { MdFormatListNumbered, MdUpdate, MdDateRange } from "react-icons/md";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
@@ -45,7 +46,10 @@ import { baseURL } from "../../../assets/assets.js";
 import {
   formatDateForDisplay,
   formatDateTimeForDisplay,
+  formatDuration,
 } from "../../../utils/dateUtils.js";
+import { generateAuditPDF } from "../../../utils/generateAuditPDF.js";
+import { generateAuditExcel } from "../../../utils/generateAuditExcel.js";
 
 // ==================== CONSTANTS ====================
 const STATUS_CONFIG = {
@@ -120,6 +124,12 @@ const AUDIT_STATUS = {
     bg: "bg-red-50",
     text: "text-red-700",
     dot: "bg-red-500",
+  },
+  rework: {
+    label: "Rework",
+    bg: "bg-orange-50",
+    text: "text-orange-700",
+    dot: "bg-orange-500",
   },
 };
 
@@ -553,428 +563,35 @@ const AuditView = () => {
     );
   }, []);
 
-  // ==================== Export data builders ====================
-  const getExportTableData = useCallback(() => {
-    if (!audit || !template) return { headers: [], rows: [] };
-    const visibleCols = (template.columns || []).filter(
-      (c) => c.visible && c.type !== "image",
-    );
-    const headers = visibleCols.map((c) => c.name);
-    const rows = [];
-    let sections = audit.sections;
-    if (typeof sections === "string") {
-      try {
-        sections = JSON.parse(sections);
-      } catch {
-        sections = [];
-      }
-    }
-    if (!Array.isArray(sections)) return { headers, rows };
-
-    sections.forEach((section) => {
-      const pairs = section.stages
-        ? section.stages.flatMap((stage) =>
-            (stage.checkPoints || []).map((cp) => ({ section, stage, cp })),
-          )
-        : (section.checkPoints || []).map((cp) => ({
-            section,
-            stage: null,
-            cp,
-          }));
-
-      pairs.forEach(({ section: sec, stage, cp }) => {
-        const row = visibleCols.map((col) => {
-          if (col.id === "section") return sec.sectionName || "-";
-          if (col.id === "stage") return stage?.stageName || "-";
-          if (col.id === "status") {
-            const s = cp.status || "pending";
-            return s === "na" ? "N/A" : s.charAt(0).toUpperCase() + s.slice(1);
-          }
-          return cp[col.id] || "-";
-        });
-        rows.push(row);
-      });
-    });
-    return { headers, rows };
-  }, [audit, template]);
-
-  const getInfoDataForExport = useCallback(() => {
-    if (!audit || !template) return [];
-    return (template.infoFields?.filter((f) => f.visible) || []).map(
-      (field) => {
-        let v = getInfoFieldValue(field.id);
-        if (field.id === "date") v = formatDateForDisplay(v);
-        return [field.name, v];
-      },
-    );
-  }, [audit, template, getInfoFieldValue]);
-
-  const getSummaryForExport = useCallback(() => {
-    const s = summary;
-    return [
-      ["Total Checks", s.total],
-      ["Passed", s.pass],
-      ["Warnings", s.warning],
-      ["Failed", s.fail],
-      ["Not Applicable", s.na],
-      ["Pending", s.pending],
-      ["Pass Rate", s.total > 0 ? `${passRate}%` : "0%"],
-    ];
-  }, [summary, passRate]);
-
   // ==================== Export PDF ====================
+  // Delegates to the same generateAuditPDF used by the Audit List's download
+  // button — this page used to build its own plain, image-less PDF inline,
+  // so the same audit produced a visibly different report depending on
+  // where you exported it from.
   const handleExportPDF = useCallback(async () => {
     try {
-      const { default: jsPDF } = await import("jspdf");
-      const { default: autoTable } = await import("jspdf-autotable");
-      const doc = new jsPDF("l", "mm", "a4");
-      const pw = doc.internal.pageSize.getWidth();
-      let y = 15;
-
-      doc.setFontSize(18);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(30, 64, 175);
-      doc.text(audit.reportName || "Audit Report", pw / 2, y, {
-        align: "center",
-      });
-      y += 8;
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(100, 100, 100);
-      doc.text(`Template: ${audit.templateName || "-"}`, pw / 2, y, {
-        align: "center",
-      });
-      y += 5;
-      doc.setTextColor(0, 0, 0);
-      doc.text(
-        `Status: ${(audit.status || "").charAt(0).toUpperCase() + (audit.status || "").slice(1)}  |  Pass Rate: ${passRate}%`,
-        pw / 2,
-        y,
-        { align: "center" },
-      );
-      y += 5;
-      if (audit.auditCode) {
-        doc.text(`Audit Code: ${audit.auditCode}`, pw / 2, y, {
-          align: "center",
-        });
-        y += 5;
-      }
-
-      const headerMeta = [];
-      if (template?.headerConfig?.showFormatNo !== false && audit.formatNo)
-        headerMeta.push(`Format No: ${audit.formatNo}`);
-      if (template?.headerConfig?.showRevNo !== false && audit.revNo)
-        headerMeta.push(`Rev No: ${audit.revNo}`);
-      if (template?.headerConfig?.showRevDate !== false && audit.revDate)
-        headerMeta.push(`Rev Date: ${formatDateForDisplay(audit.revDate)}`);
-      if (headerMeta.length) {
-        doc.setFontSize(9);
-        doc.setTextColor(80, 80, 80);
-        doc.text(headerMeta.join("  |  "), pw / 2, y, { align: "center" });
-        y += 8;
-      } else {
-        y += 3;
-      }
-
-      const infoRows = getInfoDataForExport();
-      if (infoRows.length) {
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(0, 0, 0);
-        doc.text("Audit Information", 14, y);
-        y += 2;
-        autoTable(doc, {
-          startY: y,
-          head: [["Field", "Value"]],
-          body: infoRows,
-          theme: "grid",
-          headStyles: {
-            fillColor: [59, 130, 246],
-            textColor: 255,
-            fontSize: 9,
-            fontStyle: "bold",
-          },
-          bodyStyles: { fontSize: 9 },
-          columnStyles: { 0: { fontStyle: "bold", cellWidth: 60 } },
-          margin: { left: 14, right: 14 },
-        });
-        y = doc.lastAutoTable.finalY + 8;
-      }
-
-      if (audit.notes) {
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(0, 0, 0);
-        doc.text("Notes", 14, y);
-        y += 5;
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        const noteLines = doc.splitTextToSize(audit.notes, pw - 28);
-        doc.text(noteLines, 14, y);
-        y += noteLines.length * 5 + 8;
-      }
-
-      const { headers, rows } = getExportTableData();
-      if (headers.length && rows.length) {
-        if (y > doc.internal.pageSize.getHeight() - 40) {
-          doc.addPage();
-          y = 15;
-        }
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(0, 0, 0);
-        doc.text("Checkpoint Details", 14, y);
-        y += 2;
-        autoTable(doc, {
-          startY: y,
-          head: [headers],
-          body: rows,
-          theme: "grid",
-          headStyles: {
-            fillColor: [55, 65, 81],
-            textColor: 255,
-            fontSize: 8,
-            fontStyle: "bold",
-          },
-          bodyStyles: { fontSize: 8 },
-          alternateRowStyles: { fillColor: [245, 247, 250] },
-          margin: { left: 14, right: 14 },
-          didParseCell: (data) => {
-            const si = headers.indexOf("Status");
-            if (data.section === "body" && data.column.index === si) {
-              const v = (data.cell.raw || "").toLowerCase();
-              if (v === "pass") {
-                data.cell.styles.textColor = [21, 128, 61];
-                data.cell.styles.fillColor = [220, 252, 231];
-              }
-              if (v === "fail") {
-                data.cell.styles.textColor = [185, 28, 28];
-                data.cell.styles.fillColor = [254, 226, 226];
-              }
-              if (v === "warning") {
-                data.cell.styles.textColor = [161, 98, 7];
-                data.cell.styles.fillColor = [254, 249, 195];
-              }
-              if (v === "n/a") {
-                data.cell.styles.textColor = [29, 78, 216];
-                data.cell.styles.fillColor = [219, 234, 254];
-              }
-            }
-          },
-        });
-        y = doc.lastAutoTable.finalY + 8;
-      }
-
-      if (y > doc.internal.pageSize.getHeight() - 50) {
-        doc.addPage();
-        y = 15;
-      }
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(0, 0, 0);
-      doc.text("Audit Summary", 14, y);
-      y += 2;
-      autoTable(doc, {
-        startY: y,
-        head: [["Metric", "Value"]],
-        body: getSummaryForExport(),
-        theme: "grid",
-        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontSize: 9 },
-        bodyStyles: { fontSize: 9 },
-        columnStyles: { 0: { fontStyle: "bold", cellWidth: 60 } },
-        margin: { left: 14, right: 14 },
-        tableWidth: 150,
-      });
-      y = doc.lastAutoTable.finalY + 8;
-
-      if (y > doc.internal.pageSize.getHeight() - 40) {
-        doc.addPage();
-        y = 15;
-      }
-      const sigs = audit.signatures || {};
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.text("Signatures", 14, y);
-      y += 8;
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text("Auditor:", 14, y);
-      doc.setFont("helvetica", "normal");
-      doc.text(sigs.auditor?.name || audit.createdBy || "-", 60, y);
-      y += 5;
-      doc.setFontSize(9);
-      doc.setTextColor(100, 100, 100);
-      doc.text(
-        `Date: ${sigs.auditor?.date ? formatDateForDisplay(sigs.auditor.date) : formatDateForDisplay(audit.createdAt)}`,
-        60,
-        y,
-      );
-      y += 8;
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text("Approved By:", 14, y);
-      doc.setFont("helvetica", "normal");
-      doc.text(audit.approvedBy || sigs.approver?.name || "-", 60, y);
-      y += 5;
-      doc.setFontSize(9);
-      doc.setTextColor(100, 100, 100);
-      doc.text(
-        `Date: ${audit.approvedAt ? formatDateForDisplay(audit.approvedAt) : sigs.approver?.date ? formatDateForDisplay(sigs.approver.date) : "-"}`,
-        60,
-        y,
-      );
-
-      const pc = doc.internal.getNumberOfPages();
-      for (let i = 1; i <= pc; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(
-          `Generated ${formatDateForDisplay(new Date().toISOString())} | Page ${i} of ${pc}`,
-          pw / 2,
-          doc.internal.pageSize.getHeight() - 8,
-          { align: "center" },
-        );
-        doc.text(
-          "Confidential – Internal Use Only",
-          pw / 2,
-          doc.internal.pageSize.getHeight() - 4,
-          { align: "center" },
-        );
-      }
-
-      doc.save(
-        `${(audit.reportName || "Audit_Report").replace(/\s+/g, "_")}_${audit.auditCode || id}.pdf`,
-      );
+      await generateAuditPDF(audit);
       toast.success("PDF exported!");
     } catch (err) {
       console.error(err);
       toast.error("PDF export failed.");
     }
-  }, [
-    audit,
-    template,
-    id,
-    getExportTableData,
-    getInfoDataForExport,
-    getSummaryForExport,
-    passRate,
-  ]);
+  }, [audit]);
 
   // ==================== Export Excel ====================
+  // One formatted sheet (logo, colored headers, checkpoint photos) via the
+  // shared generateAuditExcel — replaces the old export, which used SheetJS
+  // (`xlsx`) and therefore could not embed images at all, and split
+  // everything across four bare, unstyled sheets.
   const handleExportExcel = useCallback(async () => {
     try {
-      const XLSX = await import("xlsx");
-      const wb = XLSX.utils.book_new();
-      const sigs = audit.signatures || {};
-
-      const infoData = [
-        ["Audit Report"],
-        [""],
-        ["Report Name", audit.reportName || "-"],
-        ["Template", audit.templateName || "-"],
-        [
-          "Status",
-          (audit.status || "").charAt(0).toUpperCase() +
-            (audit.status || "").slice(1),
-        ],
-        ["Audit Code", audit.auditCode || "-"],
-        ["Pass Rate", `${passRate}%`],
-      ];
-      if (template?.headerConfig?.showFormatNo !== false)
-        infoData.push(["Format No", audit.formatNo || "-"]);
-      if (template?.headerConfig?.showRevNo !== false)
-        infoData.push(["Rev No", audit.revNo || "-"]);
-      if (template?.headerConfig?.showRevDate !== false)
-        infoData.push(["Rev Date", formatDateForDisplay(audit.revDate)]);
-      infoData.push([""], ["--- Audit Information ---"]);
-      getInfoDataForExport().forEach((r) => infoData.push(r));
-      infoData.push([""], ["Notes", audit.notes || "No notes added."]);
-      infoData.push([""], ["--- Signatures ---"]);
-      infoData.push(["Auditor", sigs.auditor?.name || audit.createdBy || "-"]);
-      infoData.push([
-        "Auditor Date",
-        sigs.auditor?.date
-          ? formatDateForDisplay(sigs.auditor.date)
-          : formatDateForDisplay(audit.createdAt),
-      ]);
-      infoData.push([
-        "Approved By",
-        audit.approvedBy || sigs.approver?.name || "-",
-      ]);
-      infoData.push([
-        "Approval Date",
-        audit.approvedAt
-          ? formatDateForDisplay(audit.approvedAt)
-          : sigs.approver?.date
-            ? formatDateForDisplay(sigs.approver.date)
-            : "-",
-      ]);
-      if (audit.approvalComments)
-        infoData.push(["Approval Comments", audit.approvalComments]);
-
-      const infoSheet = XLSX.utils.aoa_to_sheet(infoData);
-      infoSheet["!cols"] = [{ wch: 22 }, { wch: 50 }];
-      XLSX.utils.book_append_sheet(wb, infoSheet, "Audit Info");
-
-      const { headers, rows } = getExportTableData();
-      if (headers.length) {
-        const cpSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-        cpSheet["!cols"] = headers.map((h) => ({
-          wch: Math.max(h.length + 5, 15),
-        }));
-        XLSX.utils.book_append_sheet(wb, cpSheet, "Checkpoints");
-      }
-
-      const summarySheet = XLSX.utils.aoa_to_sheet([
-        ["Audit Summary"],
-        [""],
-        ["Metric", "Value"],
-        ...getSummaryForExport(),
-      ]);
-      summarySheet["!cols"] = [{ wch: 22 }, { wch: 15 }];
-      XLSX.utils.book_append_sheet(wb, summarySheet, "Summary");
-
-      const metaData = [
-        ["Audit Metadata"],
-        [""],
-        ["Audit ID", audit.id || "-"],
-        ["Audit Code", audit.auditCode || "-"],
-        ["Template ID", audit.templateId || "-"],
-        ["Created By", audit.createdBy || "-"],
-        ["Created At", formatDateTimeForDisplay(audit.createdAt)],
-        ["Last Updated", formatDateTimeForDisplay(audit.updatedAt)],
-      ];
-      if (audit.submittedBy) metaData.push(["Submitted By", audit.submittedBy]);
-      if (audit.submittedAt)
-        metaData.push([
-          "Submitted At",
-          formatDateTimeForDisplay(audit.submittedAt),
-        ]);
-      metaData.push([""], ["Generated On", new Date().toLocaleString()]);
-      const metaSheet = XLSX.utils.aoa_to_sheet(metaData);
-      metaSheet["!cols"] = [{ wch: 22 }, { wch: 40 }];
-      XLSX.utils.book_append_sheet(wb, metaSheet, "Metadata");
-
-      XLSX.writeFile(
-        wb,
-        `${(audit.reportName || "Audit_Report").replace(/\s+/g, "_")}_${audit.auditCode || id}.xlsx`,
-      );
+      await generateAuditExcel(audit);
       toast.success("Excel exported!");
     } catch (err) {
       console.error(err);
       toast.error("Excel export failed.");
     }
-  }, [
-    audit,
-    template,
-    id,
-    getExportTableData,
-    getInfoDataForExport,
-    getSummaryForExport,
-    passRate,
-  ]);
+  }, [audit]);
 
   // ==================== Timeline events ====================
   const timelineEvents = useMemo(() => {
@@ -1253,7 +870,7 @@ const AuditView = () => {
 
       {/* ==================== STICKY HEADER ==================== */}
       <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-4 py-3 max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-3">
+        <div className="px-4 py-3 w-full flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate("/auditreport/audits")}
@@ -1394,7 +1011,7 @@ const AuditView = () => {
         </div>
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-4 py-5 flex gap-4">
+      <div className="w-full px-4 py-5 flex gap-4">
         {/* ==================== TIMELINE SIDEBAR ==================== */}
         {showTimeline && (
           <aside className="w-64 flex-shrink-0">
@@ -1581,6 +1198,45 @@ const AuditView = () => {
                       </span>
                       <span className="font-bold text-gray-700 text-sm">
                         {formatDateForDisplay(audit.revDate) || "—"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {audit.startedAt && (
+                  <div className="p-3.5 flex items-center gap-3">
+                    <FaClock className="text-xl text-indigo-500 flex-shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-gray-400 uppercase tracking-widest block">
+                        Start Time
+                      </span>
+                      <span className="font-bold text-gray-700 text-sm">
+                        {formatDateTimeForDisplay(audit.startedAt)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {audit.submittedAt && (
+                  <div className="p-3.5 flex items-center gap-3">
+                    <FaCheckCircle className="text-xl text-emerald-500 flex-shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-gray-400 uppercase tracking-widest block">
+                        Completed Time
+                      </span>
+                      <span className="font-bold text-gray-700 text-sm">
+                        {formatDateTimeForDisplay(audit.submittedAt)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {audit.startedAt && audit.submittedAt && (
+                  <div className="p-3.5 flex items-center gap-3">
+                    <FaHourglassHalf className="text-xl text-purple-500 flex-shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-gray-400 uppercase tracking-widest block">
+                        Total Time
+                      </span>
+                      <span className="font-bold text-gray-700 text-sm">
+                        {formatDuration(audit.startedAt, audit.submittedAt)}
                       </span>
                     </div>
                   </div>
@@ -2171,9 +1827,17 @@ const AuditView = () => {
                   label: "Submitted By",
                   value: audit.submittedBy,
                 },
+                audit.startedAt && {
+                  label: "Start Time",
+                  value: formatDateTimeForDisplay(audit.startedAt),
+                },
                 audit.submittedAt && {
-                  label: "Submitted At",
+                  label: "Completed Time",
                   value: formatDateTimeForDisplay(audit.submittedAt),
+                },
+                audit.startedAt && audit.submittedAt && {
+                  label: "Total Time",
+                  value: formatDuration(audit.startedAt, audit.submittedAt),
                 },
               ]
                 .filter(Boolean)
