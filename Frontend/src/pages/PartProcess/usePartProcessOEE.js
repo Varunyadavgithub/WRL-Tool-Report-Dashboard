@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import toast from "react-hot-toast";
 import {
   selectMaterials, selectShifts, getMaterialByModel,
-  isActiveShift, shiftElapsedMins, shiftDurationMins, toMins as sliceToMins,
+  isActiveShift, shiftElapsedMins, shiftDurationMins, shiftPlannedProductionMins, toMins as sliceToMins,
 } from "../../redux/slices/masterConfigSlice";
 import axios from "axios";
 import { mapDbRecord } from "../../utils/mapDbRecord.js";
@@ -401,10 +401,11 @@ export const usePartProcessOEE = () => {
     const prod = records.filter(r => r.state === "Production");
     const down = records.filter(r => r.state === "Downtime");
 
-    // plannedMins = sum of durations of all active shifts
-    // This ensures the denominator is correct for "All Shifts" view
+    // plannedMins = sum of net production time (shift duration minus
+    // configured breaks) of all active shifts. This ensures the denominator
+    // is correct for "All Shifts" view.
     const plannedMins = shifts.length > 0
-      ? shifts.reduce((s, sh) => s + shiftDurationMins(sh), 0)
+      ? shifts.reduce((s, sh) => s + shiftPlannedProductionMins(sh), 0)
       : 480; // fallback to 8 hours if no shifts configured
 
     return computeOEE({ prodRecords: prod, downRecords: down, plannedMins, materials });
@@ -417,7 +418,7 @@ export const usePartProcessOEE = () => {
     // Use shiftRecords directly — no extra date filter needed here.
     const prod = shiftRecords.filter(r => r.state === "Production");
     const down = shiftRecords.filter(r => r.state === "Downtime");
-    const plannedMins = selectedShift ? Math.max(1, shiftDurationMins(selectedShift)) : 480;
+    const plannedMins = selectedShift ? Math.max(1, shiftPlannedProductionMins(selectedShift)) : 480;
     return computeOEE({ prodRecords: prod, downRecords: down, plannedMins, materials });
   }, [shiftRecords, selectedShift, materials]);
 

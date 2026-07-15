@@ -12,7 +12,6 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.110.0",
     "@napi-rs/canvas": "^1.0.1",
     "agenda": "^5.0.0",
     "bcryptjs": "^3.0.3",

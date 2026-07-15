@@ -180,6 +180,31 @@ export const shiftDurationMins = (shift) => {
   return e - s;
 };
 
+// Tea breaks are configured as a count (0-3), not a duration — no length
+// field exists in ShiftConfigs, so a fixed per-break length is assumed.
+const TEA_BREAK_MINS = 15;
+
+// Total configured break minutes for a shift: the lunch/dinner window
+// (breakStart-breakEnd) plus assumed tea-break time.
+export const shiftBreakMins = (shift) => {
+  if (!shift) return 0;
+  let mins = 0;
+  if (shift.breakStart && shift.breakEnd) {
+    const s = toMins(shift.breakStart);
+    let e   = toMins(shift.breakEnd);
+    if (e <= s) e += 1440; // crosses midnight
+    mins += e - s;
+  }
+  mins += (parseInt(shift.teaBreaks, 10) || 0) * TEA_BREAK_MINS;
+  return mins;
+};
+
+// Shift duration minus configured breaks — the actual production time
+// available, used as the OEE planned-time denominator (NOT for wall-clock
+// displays like shift progress/remaining time, which use shiftDurationMins).
+export const shiftPlannedProductionMins = (shift) =>
+  Math.max(0, shiftDurationMins(shift) - shiftBreakMins(shift));
+
 // True when the current clock time falls inside this shift's window
 export const isActiveShift = (shift) => {
   if (!shift) return false;

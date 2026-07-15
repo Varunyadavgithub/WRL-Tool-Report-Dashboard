@@ -21,7 +21,7 @@ import {
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import {
   selectMaterials, selectShifts, getMaterialByModel,
-  shiftDurationMins, toMins,
+  shiftPlannedProductionMins, toMins,
 } from "../../redux/slices/masterConfigSlice";
 import { mapDbRecord } from "../../utils/mapDbRecord.js";
 import { enrichRecords } from "../../utils/productionLogic.js";
@@ -197,10 +197,11 @@ const PartProcessOEEReport = () => {
 
   const isAnyLoading = loading || todayLoading || ydayLoading;
 
-  // Configured shift capacity per day (sum of all active shifts).
+  // Configured net production capacity per day (sum of all active shifts,
+  // minus each shift's configured breaks).
   const totalPlannedMins = useMemo(() => {
     if (!configShifts.length) return 480;
-    return configShifts.reduce((s, sh) => s + shiftDurationMins(sh), 0);
+    return configShifts.reduce((s, sh) => s + shiftPlannedProductionMins(sh), 0);
   }, [configShifts]);
 
   // Actual time window the user queried (in minutes). Used as plannedMins for
