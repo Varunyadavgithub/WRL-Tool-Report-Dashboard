@@ -14,6 +14,7 @@ import {
 import { startCalibrationCron } from "./cron/calibrationEscalation.js";
 import { startManpowerCron } from "../Backend/cron/manpower.cron.js";
 import { startShiftEndReportCron } from "./cron/shiftEndReport.cron.js";
+import { startFactoryOsSyncCron } from "./cron/factoryOsSync.cron.js";
 import { globalErrorHandler } from "./middlewares/errorHandler.js";
 import { runMigrations } from "./config/migrations.js";
 import { runGarudaMigrations } from "./config/garudaMigrations.js";
@@ -87,3 +88,4 @@ app.listen(PORT, () => {
 startCalibrationCron();
 startManpowerCron();
 startShiftEndReportCron();
+startFactoryOsSyncCron();

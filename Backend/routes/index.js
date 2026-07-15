@@ -18,7 +18,6 @@ import apprenticeRoute from "./apprentice.route.js";
 import factoryOsRoute     from "./factoryOs.route.js";
 import partProcessRoute   from "./partProcess.route.js";
 import masterConfigRoute  from "./masterConfig.route.js";
-import aiRoute             from "./ai.route.js";
 import insightsRoute       from "./insights.route.js";
 
 const routers = Router();
@@ -42,7 +41,6 @@ routers.use("/apprentice",  apprenticeRoute);
 routers.use("/factory-os",   factoryOsRoute);
 routers.use("/part-process", partProcessRoute);
 routers.use("/master-config", masterConfigRoute);
-routers.use("/ai", aiRoute);
 routers.use("/insights", insightsRoute);
 
 export default routers;

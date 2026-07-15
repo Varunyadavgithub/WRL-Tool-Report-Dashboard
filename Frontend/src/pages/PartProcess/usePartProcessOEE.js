@@ -332,6 +332,14 @@ export const usePartProcessOEE = () => {
     if (rangeStart && rangeEnd) loadForRange(rangeStart, rangeEnd);
   }, [rangeStart, rangeEnd, loadForRange]);
 
+  // The FactoryOS importer updates PartProcessEvents in the background. Refresh
+  // the active dashboard range so newly synced cycles appear without a reload.
+  useEffect(() => {
+    if (!rangeStart || !rangeEnd) return undefined;
+    const timer = setInterval(() => loadForRange(rangeStart, rangeEnd), 60_000);
+    return () => clearInterval(timer);
+  }, [rangeStart, rangeEnd, loadForRange]);
+
   // ── Shift-filtered records ──────────────────────────────────────────────
   const shiftRecords = useMemo(() => {
     if (!selectedShift) return records;
@@ -436,7 +444,67 @@ export const usePartProcessOEE = () => {
   const curModel = latestProdRecord?.model ?? null;
   const curMat   = curModel ? getMaterialByModel(materials, curModel) : null;
   const curComponentCT = componentCTFromMaster(activeAvgCycleSecs, curMat);
-  const isRunning = (selectedShift ? shiftRecords : records)[0]?.state === "Production";
+
+  // Determine running status based on the most recent Production record's timestamp.
+  // Rationale: raw DB updates can interleave Downtime/Production rows — using the
+  // first array entry made the UI flip to OFFLINE incorrectly. Instead we look
+  // for the latest Production record (or fallback to the newest record) and
+  // consider the machine running only if that record is Production and
+  // occurred within a short recency window.
+  const srcRecords = selectedShift ? shiftRecords : records;
+  const parseRecordTs = (r) => {
+    if (!r) return null;
+    const s = String(r.startTime || "");
+    // Full datetime string
+    if (s.includes("T") || (s.length > 10 && s.includes(" "))) {
+      const t = Date.parse(s);
+      if (!Number.isNaN(t)) return t;
+    }
+    // Combine eventDate + startTime when startTime is time-only
+    if (r.eventDate && s) {
+      const t = Date.parse(`${r.eventDate}T${s}`);
+      if (!Number.isNaN(t)) return t;
+    }
+    // Fall back to syncedAt if available
+    if (r.syncedAt) {
+      const t = Date.parse(r.syncedAt);
+      if (!Number.isNaN(t)) return t;
+    }
+    return null;
+  };
+
+  let isRunning = false;
+  if (srcRecords && srcRecords.length > 0) {
+    const nowMs = time.getTime();
+    const THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
+    // Latest record of any state
+    const latestRecord = srcRecords.reduce((a, b) => (parseRecordTs(a) || 0) > (parseRecordTs(b) || 0) ? a : b);
+    const latestRecordTs = parseRecordTs(latestRecord);
+
+    // Latest Production record (if any)
+    const prodRecords = srcRecords.filter(r => r.state === "Production");
+    const latestProd = prodRecords.length > 0 ? prodRecords.reduce((a, b) => (parseRecordTs(a) || 0) > (parseRecordTs(b) || 0) ? a : b) : null;
+    const latestProdTs = parseRecordTs(latestProd);
+
+    // Prefer explicit DB event type: if the latest record is a recent Downtime,
+    // the machine is stopped. Otherwise if a recent Production exists treat
+    // the machine as running. Fall back to latest-record Production as last resort.
+    if (latestRecord && latestRecord.state === "Downtime" && latestRecordTs && (nowMs - latestRecordTs) < THRESHOLD_MS) {
+      isRunning = false;
+    } else if (latestProd && latestProdTs && (nowMs - latestProdTs) < THRESHOLD_MS) {
+      isRunning = true;
+    } else if (latestRecord && latestRecord.state === "Production" && latestRecordTs && (nowMs - latestRecordTs) < THRESHOLD_MS) {
+      isRunning = true;
+    } else {
+      isRunning = false;
+    }
+  }
+  // Latest record (any state) for consumers that want to display explicit
+  // event-type based status (e.g. "Downtime" → show STOPPED).
+  const latestRecord = (srcRecords && srcRecords.length > 0)
+    ? srcRecords.reduce((a, b) => (parseRecordTs(a) || 0) > (parseRecordTs(b) || 0) ? a : b)
+    : null;
 
   // ── Shift progress ──────────────────────────────────────────────────────
   const shiftProgress = useMemo(() => {
@@ -463,6 +531,7 @@ export const usePartProcessOEE = () => {
     activeOEE, activeA, activeP, activeQ, activePUnverified, activeQUnverified,
     displayQty, displayComponentQty, displayGood, displayBad, passR, dMins, activeAvgCycleSecs,
     curModel, curMat, curComponentCT, isRunning,
+    latestRecord,
     shiftProgress,
   };
 };

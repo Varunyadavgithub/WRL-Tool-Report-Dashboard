@@ -50,8 +50,8 @@ const PartProcessOverview = () => {
     rangeMode, handleToday, handleYesterday, loadToday,
     selectedShift, setSelectedShift, isToday,
     activeOEE, activeA, activeP, activeQ, activePUnverified, activeQUnverified,
-    displayGood, displayBad, passR, dMins,
-    curModel, curMat, isRunning,
+    displayGood, displayBad, displayComponentQty, passR, dMins,
+    curModel, curMat, isRunning, latestRecord,
     coStats, shiftProgress,
     records,
   } = usePartProcessOEE();
@@ -95,10 +95,10 @@ const PartProcessOverview = () => {
   };
 
   const statTiles = [
-    { label: "Good Parts", value: displayGood,     color: "#0069b4" },
-    { label: "NG Parts",   value: displayBad,       color: "#111827" },
-    { label: "Pass Rate",  value: `${passR || 0}%`, color: passR >= 95 ? "#008236" : oeeColor(passR) },
-    { label: "Downtime",   value: `${dMins || 0}m`, color: dMins > 0 ? "#ef4444" : "#111827" },
+    { label: "Components",   value: displayComponentQty?.toLocaleString() || 0, color: "#3b82f6" },
+    { label: "NG Parts",     value: displayBad,                    color: "#111827" },
+    { label: "Pass Rate",    value: `${passR || 0}%`,             color: passR >= 95 ? "#008236" : oeeColor(passR) },
+    { label: "Downtime",     value: `${dMins || 0}m`,             color: dMins > 0 ? "#ef4444" : "#111827" },
   ];
 
   // Scaffolding for a future multi-machine grid — each machine becomes one
@@ -239,10 +239,16 @@ const PartProcessOverview = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <span className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] font-extrabold tracking-wider ${isRunning ? "border-emerald-600 bg-emerald-50 text-emerald-700" : "border-rose-500 bg-rose-50 text-rose-600"}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${isRunning ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
-                    {isRunning ? "ONLINE" : "OFFLINE"}
-                  </span>
+                  {(() => {
+                    const statusLabel = isRunning ? "ONLINE" : (latestRecord?.state === "Downtime" ? "STOPPED" : "OFFLINE");
+                    const statusClass = isRunning ? "border-emerald-600 bg-emerald-50 text-emerald-700" : "border-rose-500 bg-rose-50 text-rose-600";
+                    return (
+                      <span className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] font-extrabold tracking-wider ${statusClass}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${isRunning ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
+                        {statusLabel}
+                      </span>
+                    );
+                  })()}
                   <button onClick={loadToday} disabled={loading} title="Refresh data"
                     className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 border border-slate-200">
                     {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" /> : <RefreshCw className="w-3.5 h-3.5" />}

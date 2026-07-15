@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import NavBar from "./Navbar";
 import Sidebar from "./Sidebar";
-import ChatWidget from "./ChatWidget/ChatWidget.jsx";
 import { useSyncMasterConfig } from "../hooks/useSyncMasterConfig.js";
 
 const Layout = () => {
@@ -49,8 +48,6 @@ const Layout = () => {
           </div>
         </main>
       </div>
-
-      <ChatWidget />
     </div>
   );
 };

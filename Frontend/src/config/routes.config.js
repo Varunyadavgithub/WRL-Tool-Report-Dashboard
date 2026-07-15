@@ -171,6 +171,7 @@ const PartProcessHourlyReport  = lazy(() => import("../pages/PartProcess/HourlyR
 const PartProcessQualityReport = lazy(() => import("../pages/PartProcess/QualityReport"));
 const PartProcessDowntimeReport = lazy(() => import("../pages/PartProcess/DowntimeReport"));
 const FactoryMonitor           = lazy(() => import("../pages/PartProcess/FactoryMonitor"));
+const FactoryOsSyncLog         = lazy(() => import("../pages/PartProcess/FactoryOsSyncLog"));
 const PartProcessOEEReport     = lazy(() => import("../pages/PartProcess/OEEReport"));
 
 // ─── Role Constants ───────────────────────────────────────────────────────────
@@ -348,6 +349,11 @@ export const ROUTE_CONFIG = [
         path: "/part-process/factory-monitor",
         label: "Factory Monitor",
         component: FactoryMonitor,
+      },
+      {
+        path: "/part-process/factoryos-sync-log",
+        label: "FactoryOS Sync Log",
+        component: FactoryOsSyncLog,
       },
     ],
     hiddenItems: [
