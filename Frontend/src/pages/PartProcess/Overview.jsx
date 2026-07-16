@@ -50,7 +50,7 @@ const PartProcessOverview = () => {
     rangeMode, handleToday, handleYesterday, loadToday,
     selectedShift, setSelectedShift, isToday,
     activeOEE, activeA, activeP, activeQ, activePUnverified, activeQUnverified,
-    displayGood, displayBad, displayComponentQty, passR, dMins,
+    displayComponentBad, displayComponentQty, passR, dMins,
     curModel, curMat, isRunning, latestRecord,
     coStats, shiftProgress,
     records,
@@ -96,7 +96,7 @@ const PartProcessOverview = () => {
 
   const statTiles = [
     { label: "Components",   value: displayComponentQty?.toLocaleString() || 0, color: "#3b82f6" },
-    { label: "NG Parts",     value: displayBad,                    color: "#111827" },
+    { label: "NG Parts",     value: displayComponentBad,           color: "#111827" },
     { label: "Pass Rate",    value: `${passR || 0}%`,             color: passR >= 95 ? "#008236" : oeeColor(passR) },
     { label: "Downtime",     value: `${dMins || 0}m`,             color: dMins > 0 ? "#ef4444" : "#111827" },
   ];
