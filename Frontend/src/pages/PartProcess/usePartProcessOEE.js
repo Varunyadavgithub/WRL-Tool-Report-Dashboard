@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import toast from "react-hot-toast";
 import {
   selectMaterials, selectShifts, getMaterialByModel,
-  isActiveShift, shiftElapsedMins, shiftDurationMins, toMins as sliceToMins,
+  isActiveShift, shiftElapsedMins, shiftDurationMins, shiftPlannedProductionMins, toMins as sliceToMins,
 } from "../../redux/slices/masterConfigSlice";
 import axios from "axios";
 import { mapDbRecord } from "../../utils/mapDbRecord.js";
@@ -118,7 +118,7 @@ export const useClock = () => {
 
 export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials }) => {
   const ZERO = {
-    qty: 0, good: 0, bad: 0, componentQty: 0, passRate: 0,
+    qty: 0, good: 0, bad: 0, componentQty: 0, componentGood: 0, componentBad: 0, passRate: 0,
     downCount: 0, downMins: 0, runTimeMins: 0, avgCycleSecs: 0,
     A: 0, P: 100, Q: 100, OEE: 0,
     pUnverified: true, qUnverified: true,
@@ -173,17 +173,26 @@ export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials })
   // percentage with the standard OEE formula: A × P × Q ÷ 10,000.
   const OEE = Math.round((A * P * Q) / 10000);
 
-  const componentQty = Math.round(
-    prodRecords.reduce((s, r) => {
-      const mat = getMaterialByModel(materials, r.model);
-      return s + componentQtyFromMaster(r.qty ?? 0, mat);
-    }, 0)
-  );
+  // componentGood/componentBad mirror good/bad but in component units (same
+  // sheet→component multiplier as componentQty), so "Accepted"/"Rejected"
+  // tiles agree with "Produced Part Count" instead of mixing machine-qty and
+  // component-qty numbers in the same panel.
+  let componentQty = 0;
+  let componentGood = 0;
+  prodRecords.forEach((r) => {
+    const mat = getMaterialByModel(materials, r.model);
+    const comp = componentQtyFromMaster(r.qty ?? 0, mat);
+    componentQty += comp;
+    if (!hasQualityData || r.quality === "GOOD") componentGood += comp;
+  });
+  componentQty  = Math.round(componentQty);
+  componentGood = Math.round(componentGood);
+  const componentBad = Math.max(0, componentQty - componentGood);
 
   const avgCycleSecs = prodRecords.length > 0 ? Math.round(runSecs / prodRecords.length) : 0;
 
   return {
-    qty, good, bad: Math.max(0, qty - good), componentQty,
+    qty, good, bad: Math.max(0, qty - good), componentQty, componentGood, componentBad,
     passRate: Math.round((good / qty) * 100),
     downCount: downRecords.length, downMins, runTimeMins, avgCycleSecs,
     A, P, Q, OEE, pUnverified, qUnverified,
@@ -401,10 +410,11 @@ export const usePartProcessOEE = () => {
     const prod = records.filter(r => r.state === "Production");
     const down = records.filter(r => r.state === "Downtime");
 
-    // plannedMins = sum of durations of all active shifts
-    // This ensures the denominator is correct for "All Shifts" view
+    // plannedMins = sum of net production time (shift duration minus
+    // configured breaks) of all active shifts. This ensures the denominator
+    // is correct for "All Shifts" view.
     const plannedMins = shifts.length > 0
-      ? shifts.reduce((s, sh) => s + shiftDurationMins(sh), 0)
+      ? shifts.reduce((s, sh) => s + shiftPlannedProductionMins(sh), 0)
       : 480; // fallback to 8 hours if no shifts configured
 
     return computeOEE({ prodRecords: prod, downRecords: down, plannedMins, materials });
@@ -417,7 +427,7 @@ export const usePartProcessOEE = () => {
     // Use shiftRecords directly — no extra date filter needed here.
     const prod = shiftRecords.filter(r => r.state === "Production");
     const down = shiftRecords.filter(r => r.state === "Downtime");
-    const plannedMins = selectedShift ? Math.max(1, shiftDurationMins(selectedShift)) : 480;
+    const plannedMins = selectedShift ? Math.max(1, shiftPlannedProductionMins(selectedShift)) : 480;
     return computeOEE({ prodRecords: prod, downRecords: down, plannedMins, materials });
   }, [shiftRecords, selectedShift, materials]);
 
@@ -435,6 +445,8 @@ export const usePartProcessOEE = () => {
   const displayComponentQty = activeOEEData.componentQty;
   const displayGood         = activeOEEData.good;
   const displayBad          = activeOEEData.bad;
+  const displayComponentGood = activeOEEData.componentGood;
+  const displayComponentBad  = activeOEEData.componentBad;
   const passR               = activeOEEData.passRate;
   const dMins               = activeOEEData.downMins;
   const activeAvgCycleSecs  = activeOEEData.avgCycleSecs;
@@ -529,7 +541,8 @@ export const usePartProcessOEE = () => {
     shiftRecords, changeoverRecords, shiftStartMins, changeovers, coStats,
     allShiftOEE, shiftOEE, activeOEEData,
     activeOEE, activeA, activeP, activeQ, activePUnverified, activeQUnverified,
-    displayQty, displayComponentQty, displayGood, displayBad, passR, dMins, activeAvgCycleSecs,
+    displayQty, displayComponentQty, displayGood, displayBad,
+    displayComponentGood, displayComponentBad, passR, dMins, activeAvgCycleSecs,
     curModel, curMat, curComponentCT, isRunning,
     latestRecord,
     shiftProgress,

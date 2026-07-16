@@ -1971,8 +1971,8 @@ const PartProcessDashboard = () => {
     activeQUnverified,
     displayQty,
     displayComponentQty,
-    displayGood,
-    displayBad,
+    displayComponentGood,
+    displayComponentBad,
     passR,
     dMins,
     activeAvgCycleSecs,
@@ -3069,7 +3069,7 @@ const PartProcessDashboard = () => {
                   <p className="text-xl font-bold font-mono text-emerald-600">
                     {qualityTotals.hasData
                       ? qualityTotals.accepted
-                      : displayGood}
+                      : displayComponentGood}
                   </p>
                   <p className="text-[10px] text-emerald-500 font-medium">
                     Accepted
@@ -3080,7 +3080,7 @@ const PartProcessDashboard = () => {
                   <p className="text-xl font-bold font-mono text-rose-500">
                     {qualityTotals.hasData
                       ? qualityTotals.rejected
-                      : displayBad}
+                      : displayComponentBad}
                   </p>
                   <p className="text-[10px] text-rose-400 font-medium">
                     Rejected
@@ -3113,7 +3113,7 @@ const PartProcessDashboard = () => {
                       className="h-full bg-emerald-500 rounded-full"
                       style={{ width: `${passR}%` }}
                     />
-                    {displayBad > 0 && (
+                    {displayComponentBad > 0 && (
                       <div
                         className="h-full bg-rose-400"
                         style={{ width: `${100 - passR}%` }}
@@ -3250,14 +3250,14 @@ const PartProcessDashboard = () => {
                       label: "Accepted Count",
                       value: qualityTotals.hasData
                         ? qualityTotals.accepted
-                        : displayGood,
+                        : displayComponentGood,
                       color: "text-emerald-600",
                     },
                     {
                       label: "Rejected Count",
                       value: qualityTotals.hasData
                         ? qualityTotals.rejected
-                        : displayBad,
+                        : displayComponentBad,
                       color: "text-rose-500",
                     },
                   ].map(({ label, value, color }) => (

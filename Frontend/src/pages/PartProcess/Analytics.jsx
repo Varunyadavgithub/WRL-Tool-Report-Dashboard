@@ -16,7 +16,7 @@ import {
   PackageOpen, AlertTriangle, TimerOff, ArrowRightLeft, Search, BarChart3,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { shiftDurationMins } from "../../redux/slices/masterConfigSlice";
+import { shiftPlannedProductionMins } from "../../redux/slices/masterConfigSlice";
 import { usePartProcessOEE, computeOEE, parseDurSecs } from "./usePartProcessOEE";
 import { detectChangeovers, changeoverStats } from "../../utils/productionLogic.js";
 import { getLastNDaysRange } from "../../utils/dateUtils.js";
@@ -113,7 +113,7 @@ const PartProcessAnalytics = () => {
       if (!r.eventDate) return;
       (byDate[r.eventDate] ??= []).push(r);
     });
-    const plannedMins = shifts.length > 0 ? shifts.reduce((s, sh) => s + shiftDurationMins(sh), 0) : 1440;
+    const plannedMins = shifts.length > 0 ? shifts.reduce((s, sh) => s + shiftPlannedProductionMins(sh), 0) : 1440;
 
     const days = [];
     const cos = [];

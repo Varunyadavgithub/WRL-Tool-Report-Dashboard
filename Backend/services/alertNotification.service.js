@@ -1,5 +1,4 @@
 import sql from "mssql";
-import { getProvider } from "../ai/providers/index.js";
 import { sendSmartAlertMail } from "../emailTemplates/Alert_System/smartAlert.template.js";
 
 const ALERT_SUBSCRIPTION_TOKEN = "Smart Alerts";
@@ -37,28 +36,9 @@ const getSubscriberEmails = async (pool3) => {
     .map((r) => r.Email);
 };
 
-const buildNarrative = async (shiftName, dateStr, breaches) => {
-  const provider = getProvider();
-  const response = await provider.chatOnce({
-    messages: [
-      {
-        role: "system",
-        content:
-          "You write short, plain-language alert summaries for factory shift supervisors. " +
-          "Given a list of KPI threshold breaches for one shift, write 2-3 sentences summarizing " +
-          "what went wrong and how far off target it is. Use only the units already given for each " +
-          "line (some are %, some are minutes) — never convert or reinterpret them. Plant-floor tone, " +
-          "no fabrication, no extra numbers beyond what's given.",
-      },
-      {
-        role: "user",
-        content: `Shift: ${shiftName}, Date: ${dateStr}\nBreaches:\n${breaches.map((b) => `- ${describeBreach(b)}`).join("\n")}`,
-      },
-    ],
-    tools: [],
-  });
-  return response.content || "One or more KPI thresholds were breached this shift — see the table below for details.";
-};
+const buildNarrative = (shiftName, dateStr, breaches) =>
+  `${shiftName} on ${dateStr} breached ${breaches.length} KPI threshold${breaches.length > 1 ? "s" : ""}: ` +
+  `${breaches.map((b) => describeBreach(b)).join("; ")}.`;
 
 /**
  * @param pool3    mssql pool (global.pool3)
@@ -71,7 +51,7 @@ export const sendShiftAlerts = async (pool3, shift, dateStr, breaches) => {
   if (!unsent.length) return { sent: false, reason: "already-sent" };
 
   const recipients = await getSubscriberEmails(pool3);
-  const narrative = await buildNarrative(shift.shiftName, dateStr, unsent);
+  const narrative = buildNarrative(shift.shiftName, dateStr, unsent);
 
   let emailSent = false;
   if (recipients.length) {
