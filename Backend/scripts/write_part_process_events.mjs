@@ -43,7 +43,13 @@ try {
       await request.query(UPSERT_SQL);
     }
     await transaction.commit();
-  } catch (error) { await transaction.rollback(); throw error; }
+  } catch (error) {
+    // If SQL Server already aborted the transaction server-side (e.g. after a
+    // batch-aborting error), rollback() itself throws EABORT — that would
+    // otherwise mask the real error below with an unrelated stack trace.
+    try { await transaction.rollback(); } catch { /* already aborted, ignore */ }
+    throw error;
+  }
   process.stdout.write(JSON.stringify({ synced: input.length }) + "\n");
 } finally {
   if (pool) await pool.close();

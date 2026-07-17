@@ -133,6 +133,9 @@ const AuditDashboard = lazy(() => import("../pages/AuditReport/Auditdashboard"))
 const DehumidifierDashboard = lazy(
   () => import("../pages/Readings/DehumidifierDashboard"),
 );
+const EnergyMeterDashboard = lazy(
+  () => import("../pages/Readings/EnergyMeterDashboard"),
+);
 
 const ManpowerForm = lazy(() => import("../pages/Forms/ManpowerForm"));
 const ManpowerApproval = lazy(() => import("../pages/Forms/ManpowerApproval"));
@@ -571,6 +574,11 @@ export const ROUTE_CONFIG = [
         path: "/reading/dehumidifier",
         label: "Utility Reading",
         component: DehumidifierDashboard,
+      },
+      {
+        path: "/reading/energy-meters",
+        label: "Energy Meters",
+        component: EnergyMeterDashboard,
       },
     ],
   },

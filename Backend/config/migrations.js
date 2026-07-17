@@ -781,5 +781,10 @@ export const runMigrations = async (pool3) => {
     END
   `);
 
+  // ── Energy Meters (PDP/Meter/LiveReading/ReadingHistory/ConsumptionSummary/
+  //    RollupCheckpoint/AlertLog) live under the pre-existing EnergyMon schema,
+  //    owned and populated by an external Modbus-polling service — not managed
+  //    here. See Backend/controllers/reading/energyMeter*.controller.js.
+
   console.log("Migrations completed.");
 };
