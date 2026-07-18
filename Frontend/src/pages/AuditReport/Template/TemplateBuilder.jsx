@@ -88,9 +88,23 @@ const makeStage = () => ({
   checkPoints: [makeCheckpoint()],
 });
 const makeSection = () => ({
-  id: genId(), sectionName: "",
+  id: genId(), sectionName: "", sectionType: "checklist",
   stages: [makeStage()],
 });
+
+// Image Capture is not one of many interchangeable sections — it's a single
+// fixed area pinned to the end of the template, under its own "Image
+// Capture" header. Every template gets exactly one (ensureImageCaptureSection
+// below guarantees that), independent of how many checklist sections exist.
+const makeImageCaptureSection = () => ({
+  id: genId(), sectionName: "Image Capture", sectionType: "imageCapture",
+  stages: [{ id: genId(), stageName: "Photos", checkPoints: [] }],
+});
+
+const ensureImageCaptureSection = (sections) =>
+  sections.some((s) => s.sectionType === "imageCapture")
+    ? sections
+    : [...sections, makeImageCaptureSection()];
 
 // ==================== CONSTANTS ====================
 const DEFAULT_COLUMNS = [
@@ -248,7 +262,10 @@ const TemplateBuilder = () => {
   });
   const [infoFields, setInfoFields] = useState(DEFAULT_INFO_FIELDS);
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
-  const [defaultSections, setDefaultSections] = useState([makeSection()]);
+  const [defaultSections, setDefaultSections] = useState(() => ensureImageCaptureSection([makeSection()]));
+  // Draft text for the "add image capture item" input, keyed by section id —
+  // kept outside defaultSections since it's transient UI state, not template data.
+  const [newImageItemDrafts, setNewImageItemDrafts] = useState({});
   const isApprovalReview = Boolean(id && templateMeta.approvalStatus === APPROVAL_STATUS.PENDING_APPROVAL);
   const isApprovedLocked = Boolean(id && templateMeta.approvalStatus === APPROVAL_STATUS.APPROVED && !unlockedForEdit);
   const isReadOnly = isApprovalReview || isApprovedLocked;
@@ -335,10 +352,10 @@ const TemplateBuilder = () => {
           if (tmpl.infoFields) setInfoFields(tmpl.infoFields);
           if (tmpl.columns) setColumns(tmpl.columns);
           if (tmpl.defaultSections) {
-            setDefaultSections(tmpl.defaultSections.map((section) => {
-              if (section.stages) return section;
-              return { id: section.id || genId(), sectionName: section.sectionName, stages: [{ id: genId(), stageName: section.stageName || "", checkPoints: section.checkPoints || [] }] };
-            }));
+            setDefaultSections(ensureImageCaptureSection(tmpl.defaultSections.map((section) => {
+              if (section.stages) return { sectionType: "checklist", ...section };
+              return { id: section.id || genId(), sectionName: section.sectionName, sectionType: "checklist", stages: [{ id: genId(), stageName: section.stageName || "", checkPoints: section.checkPoints || [] }] };
+            })));
           }
         }
       } catch (err) {
@@ -375,7 +392,10 @@ const TemplateBuilder = () => {
   };
 
   const deleteSection = (sectionId) => {
-    if (defaultSections.length <= 1) { toast.error("At least one section required"); return; }
+    // Image Capture is a fixed area, not counted toward "at least one
+    // section" — this guard only ever applies to checklist sections.
+    const checklistCount = defaultSections.filter((s) => s.sectionType !== "imageCapture").length;
+    if (checklistCount <= 1) { toast.error("At least one section required"); return; }
     setDefaultSections((prev) => prev.filter((s) => s.id !== sectionId));
   };
 
@@ -403,6 +423,18 @@ const TemplateBuilder = () => {
 
   const updateSectionName = (sectionId, value) => {
     setDefaultSections((prev) => prev.map((s) => s.id === sectionId ? { ...s, sectionName: value } : s));
+  };
+
+  const addImageCaptureItem = (sectionId) => {
+    const name = (newImageItemDrafts[sectionId] || "").trim();
+    if (!name) return;
+    setDefaultSections((prev) => prev.map((s) => {
+      if (s.id !== sectionId) return s;
+      const stage = s.stages[0] || makeStage();
+      const cp = { id: genId(), checkPoint: name, method: "", specification: "", required: true };
+      return { ...s, stages: [{ ...stage, checkPoints: [...stage.checkPoints, cp] }] };
+    }));
+    setNewImageItemDrafts((prev) => ({ ...prev, [sectionId]: "" }));
   };
 
   // ==================== Stage CRUD ====================
@@ -456,12 +488,21 @@ const TemplateBuilder = () => {
   };
 
   const deleteCheckpoint = (sectionId, stageId, cpId) => {
-    setDefaultSections((prev) => prev.map((s) => s.id !== sectionId ? s : {
-      ...s, stages: s.stages.map((st) => {
-        if (st.id !== stageId) return st;
-        if (st.checkPoints.length <= 1) { toast.error("At least one checkpoint required"); return st; }
-        return { ...st, checkPoints: st.checkPoints.filter((cp) => cp.id !== cpId) };
-      }),
+    setDefaultSections((prev) => prev.map((s) => {
+      if (s.id !== sectionId) return s;
+      return {
+        ...s,
+        stages: s.stages.map((st) => {
+          if (st.id !== stageId) return st;
+          // Image Capture items are an open-ended list — unlike checklist
+          // stages, it's fine to remove the last one and leave it empty.
+          if (s.sectionType !== "imageCapture" && st.checkPoints.length <= 1) {
+            toast.error("At least one checkpoint required");
+            return st;
+          }
+          return { ...st, checkPoints: st.checkPoints.filter((cp) => cp.id !== cpId) };
+        }),
+      };
     }));
   };
 
@@ -603,7 +644,12 @@ const TemplateBuilder = () => {
     reader.onload = async (evt) => {
       try {
         const XLSX = await import("xlsx");
-        const wb   = XLSX.read(evt.target.result, { type: "binary" });
+        // readAsArrayBuffer + { type: "array" } — not readAsBinaryString +
+        // { type: "binary" }. The binary-string path reads the file through
+        // an intermediate lossy single-byte string, which mangles any
+        // non-ASCII character in the sheet (e.g. µ/μ turning into а Cyrillic
+        // "ц") before XLSX's UTF-8-aware XML parser ever sees it.
+        const wb   = XLSX.read(evt.target.result, { type: "array" });
         const ws   = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
         if (!rows.length) { toast.error("The Excel file is empty."); return; }
@@ -622,7 +668,7 @@ const TemplateBuilder = () => {
         e.target.value = "";
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const applyExcelImport = (mode) => {
@@ -701,17 +747,28 @@ const TemplateBuilder = () => {
      cp.method?.toLowerCase().includes(searchQ) ||
      cp.specification?.toLowerCase().includes(searchQ)), [searchQ]);
 
+  // Checklist sections only — Image Capture is a fixed area rendered
+  // separately below, not part of the searchable/reorderable section list.
+  const checklistSections = useMemo(
+    () => defaultSections.filter((s) => s.sectionType !== "imageCapture"),
+    [defaultSections],
+  );
+  const imageCaptureSection = useMemo(
+    () => defaultSections.find((s) => s.sectionType === "imageCapture"),
+    [defaultSections],
+  );
+
   // Only filter at section level — all stages/checkpoints stay visible within a matched section
   const filteredSections = useMemo(() => {
-    if (!searchQ) return defaultSections;
-    return defaultSections.filter((s) =>
+    if (!searchQ) return checklistSections;
+    return checklistSections.filter((s) =>
       s.sectionName.toLowerCase().includes(searchQ) ||
       s.stages.some((st) =>
         st.stageName.toLowerCase().includes(searchQ) ||
         st.checkPoints.some((cp) => JSON.stringify(cp).toLowerCase().includes(searchQ))
       )
     );
-  }, [defaultSections, searchQ]);
+  }, [checklistSections, searchQ]);
 
   // Total match count for the badge
   const searchMatchCount = useMemo(() => {
@@ -1473,6 +1530,65 @@ const TemplateBuilder = () => {
           </div>
           );
         })}
+
+        {/* ==================== IMAGE CAPTURE ====================
+            A fixed area pinned to the end of every template — not one of
+            the reorderable/searchable sections above, and not something you
+            toggle a section into. Auditors capture one photo per item here,
+            no pass/fail. */}
+        {imageCaptureSection && (
+          <div className="bg-white rounded-xl border-2 border-pink-200 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-pink-100 bg-pink-50">
+              <FaImage className="text-pink-500 flex-shrink-0" />
+              <span className="font-black text-sm text-pink-800">Image Capture</span>
+              <span className="text-[10px] text-pink-400 font-semibold ml-1">
+                {imageCaptureSection.stages?.[0]?.checkPoints?.length || 0} items
+              </span>
+            </div>
+            <div className="p-4">
+              <p className="text-xs text-gray-500 mb-3">
+                Fixed at the end of every audit — auditors capture one photo per item below, no pass/fail, just evidence.
+              </p>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {(imageCaptureSection.stages[0]?.checkPoints || []).map((cp) => (
+                  <div key={cp.id} className="flex items-center gap-1.5 bg-pink-50 border border-pink-200 rounded-full pl-3 pr-1.5 py-1">
+                    {isReadOnly ? (
+                      <span className="text-xs font-medium text-pink-700">{cp.checkPoint || "Untitled"}</span>
+                    ) : (
+                      <input type="text" value={cp.checkPoint}
+                        onChange={(e) => updateCheckpoint(imageCaptureSection.id, imageCaptureSection.stages[0].id, cp.id, "checkPoint", e.target.value)}
+                        placeholder="Item name"
+                        className="text-xs font-medium text-pink-700 bg-transparent outline-none w-28" />
+                    )}
+                    {!isReadOnly && (
+                      <button type="button" onClick={() => deleteCheckpoint(imageCaptureSection.id, imageCaptureSection.stages[0].id, cp.id)}
+                        className="p-1 text-pink-400 hover:text-red-600 rounded-full hover:bg-white transition" title="Remove item">
+                        <FaTimes size={9} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {(imageCaptureSection.stages[0]?.checkPoints || []).length === 0 && (
+                  <span className="text-xs text-gray-400 italic">No items yet — add one below.</span>
+                )}
+              </div>
+              {!isReadOnly && (
+                <div className="flex items-center gap-2">
+                  <input type="text"
+                    value={newImageItemDrafts[imageCaptureSection.id] || ""}
+                    onChange={(e) => setNewImageItemDrafts((prev) => ({ ...prev, [imageCaptureSection.id]: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addImageCaptureItem(imageCaptureSection.id); } }}
+                    placeholder="e.g. FG Sticker, Machine Grill…"
+                    className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:border-indigo-400 outline-none" />
+                  <button type="button" onClick={() => addImageCaptureItem(imageCaptureSection.id)}
+                    className="px-3 py-1.5 bg-pink-600 text-white rounded text-xs font-semibold hover:bg-pink-700 transition flex items-center gap-1">
+                    <FaPlus size={10} /> Add Item
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Rejection Modal */}

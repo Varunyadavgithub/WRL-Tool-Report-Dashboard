@@ -1,136 +1,109 @@
 // ──────────────────────────────────────────────────────────────────────────
 // Compare Versions — redesigned.
 //
-// What changed and why: the previous version nested a differently-colored
-// bordered card at every level (section → stage → checkpoint → field),
-// which is what made a modestly-sized diff look overwhelming. This version
-// renders every level with the same row primitive (ChangeRow) and lets
-// indentation — not color-blocking — communicate depth. Everything below
-// the top level starts collapsed, so the page opens as a short scannable
-// list instead of a wall of expanded detail; an "Expand all" toggle is
-// there for when someone genuinely wants to see everything at once.
+// What changed and why: the previous version was a nested tree (section →
+// stage → checkpoint → field) that looked overwhelming even for a modest
+// diff. This version flattens the whole diff into one flat, sortable-by-eye
+// table — one row per atomic change — so every change is scannable at a
+// glance instead of requiring you to trace indentation levels.
 //
 // Data fetching, param handling, and the diff shape consumed from the API
 // are unchanged from the original implementation.
 // ──────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { FaArrowLeft, FaExchangeAlt, FaClipboardList, FaExpandAlt, FaCompressAlt, FaHistory } from "react-icons/fa";
+import { FaArrowLeft, FaExchangeAlt, FaClipboardList, FaHistory } from "react-icons/fa";
 import { HiClipboardDocumentCheck } from "react-icons/hi2";
 import toast from "react-hot-toast";
 import useAuditData from "../../../hooks/useAuditData";
-import BeforeAfterCard from "./components/BeforeAfterCard";
-import { ChangeRow, ChangeCountChip } from "./components/diff/ChangeRow";
+import { ChangeCountChip } from "./components/diff/ChangeRow";
+import { CHANGE_TYPE } from "./components/diff/changeType";
 import { EmptyState, SecondaryButton, CardSkeleton } from "../components/common";
 import { fmtDateLong as fmtDate } from "../utils/formatters";
 
-// ── Field-level diff shown when a modified checkpoint is expanded ────────
-const FieldDiffList = ({ fields }) => (
-  <div className="pl-[4.5rem] pb-2 space-y-2">
-    {fields.map((f, fi) => (
-      <div key={fi}>
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">{f.field}</p>
-        <BeforeAfterCard from={f.from} to={f.to} />
-      </div>
-    ))}
+const TypeBadge = ({ type }) => {
+  const cfg = CHANGE_TYPE[type] || CHANGE_TYPE.modified;
+  const Icon = cfg.icon;
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-1 rounded-full border ${cfg.chip}`}>
+      <Icon size={8} aria-hidden="true" /> {cfg.label}
+    </span>
+  );
+};
+
+// Flattens the section → stage → checkpoint → field diff tree into one flat
+// list of atomic changes — the unit a table row represents.
+const flattenDiff = (diff) => {
+  const rows = [];
+  let rid = 0;
+  const push = (row) => rows.push({ id: rid++, before: "", after: "", field: "", stage: "", checkpoint: "", ...row });
+
+  diff.sections.added.forEach((s) =>
+    push({ type: "added", section: s.sectionName, field: `${s.stageCount} stages · ${s.checkpointCount} checkpoints` }));
+  diff.sections.removed.forEach((s) =>
+    push({ type: "removed", section: s.sectionName, field: `${s.stageCount} stages · ${s.checkpointCount} checkpoints` }));
+  diff.sections.renamed
+    .filter((s) => !diff.sections.modified.some((m) => m.id === s.id))
+    .forEach((s) => push({ type: "renamed", section: s.to, field: "Section Name", before: s.from, after: s.to }));
+
+  diff.sections.modified.forEach((sec) => {
+    if (sec.renamed) {
+      push({ type: "renamed", section: sec.sectionName, field: "Section Name", before: sec.renamed.from, after: sec.renamed.to });
+    }
+    sec.stages.added.forEach((st) =>
+      push({ type: "added", section: sec.sectionName, stage: st.stageName, field: `${st.checkpointCount} checkpoints` }));
+    sec.stages.removed.forEach((st) =>
+      push({ type: "removed", section: sec.sectionName, stage: st.stageName, field: `${st.checkpointCount} checkpoints` }));
+    sec.stages.modified.forEach((stage) => {
+      if (stage.renamed) {
+        push({ type: "renamed", section: sec.sectionName, stage: stage.stageName, field: "Stage Name", before: stage.renamed.from, after: stage.renamed.to });
+      }
+      stage.checkpoints.added.forEach((cp) =>
+        push({ type: "added", section: sec.sectionName, stage: stage.stageName, checkpoint: cp.checkPoint }));
+      stage.checkpoints.removed.forEach((cp) =>
+        push({ type: "removed", section: sec.sectionName, stage: stage.stageName, checkpoint: cp.checkPoint }));
+      stage.checkpoints.modified.forEach((cp) => {
+        cp.fields.forEach((f) =>
+          push({ type: "modified", section: sec.sectionName, stage: stage.stageName, checkpoint: cp.checkPoint, field: f.field, before: f.from, after: f.to }));
+      });
+    });
+  });
+
+  return rows;
+};
+
+const DiffTable = ({ rows }) => (
+  <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto">
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="bg-slate-50 border-b border-slate-200">
+          {["Type", "Section", "Stage", "Checkpoint", "Field / Details", "Before", "After"].map((h) => (
+            <th key={h} className="px-4 py-2.5 text-left font-bold text-[10px] uppercase tracking-wider text-slate-500 whitespace-nowrap">
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-50">
+        {rows.map((r) => (
+          <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
+            <td className="px-4 py-2.5"><TypeBadge type={r.type} /></td>
+            <td className="px-4 py-2.5 font-semibold text-slate-800 whitespace-nowrap">{r.section || "—"}</td>
+            <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{r.stage || "—"}</td>
+            <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{r.checkpoint || "—"}</td>
+            <td className="px-4 py-2.5 text-slate-500">{r.field || "—"}</td>
+            <td className="px-4 py-2.5">
+              {r.before ? <span className="text-red-700 bg-red-50 border border-red-100 rounded-md px-2 py-1 break-all">{r.before}</span> : <span className="text-slate-300">—</span>}
+            </td>
+            <td className="px-4 py-2.5">
+              {r.after ? <span className="text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1 break-all">{r.after}</span> : <span className="text-slate-300">—</span>}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   </div>
 );
-
-// ── One stage's diff, nested inside a modified section ───────────────────
-const StageDiffRow = ({ stage, expandAll }) => {
-  const hasContent =
-    stage.checkpoints.added.length > 0 || stage.checkpoints.removed.length > 0 || stage.checkpoints.modified.length > 0;
-
-  return (
-    <ChangeRow
-      key={String(expandAll)}
-      type="modified"
-      label={stage.stageName}
-      meta={stage.renamed ? `renamed from "${stage.renamed.from}"` : undefined}
-      level={1}
-      defaultOpen={expandAll}
-    >
-      {stage.renamed && <div className="pl-12 pb-2"><BeforeAfterCard from={stage.renamed.from} to={stage.renamed.to} /></div>}
-      {stage.checkpoints.added.map((cp) => (
-        <ChangeRow key={cp.id} type="added" label={cp.checkPoint} level={2} />
-      ))}
-      {stage.checkpoints.removed.map((cp) => (
-        <ChangeRow key={cp.id} type="removed" label={cp.checkPoint} level={2} />
-      ))}
-      {stage.checkpoints.modified.map((cp) => (
-        <ChangeRow
-          key={`${cp.id}-${expandAll}`}
-          type="modified"
-          label={cp.checkPoint}
-          meta={`${cp.fields.length} field${cp.fields.length !== 1 ? "s" : ""} changed`}
-          level={2}
-          defaultOpen={expandAll}
-        >
-          <FieldDiffList fields={cp.fields} />
-        </ChangeRow>
-      ))}
-      {!hasContent && !stage.renamed && (
-        <p className="pl-12 pb-2 text-xs text-slate-400">No further changes in this stage.</p>
-      )}
-    </ChangeRow>
-  );
-};
-
-// ── One top-level section row (added / removed / renamed-only / modified) ─
-const SectionDiffRow = ({ item, expandKey }) => {
-  if (item.kind === "added") {
-    return (
-      <ChangeRow
-        key={expandKey}
-        type="added"
-        label={item.sectionName}
-        meta={`${item.stageCount} stages · ${item.checkpointCount} checkpoints`}
-        level={0}
-      />
-    );
-  }
-  if (item.kind === "removed") {
-    return (
-      <ChangeRow
-        key={expandKey}
-        type="removed"
-        label={item.sectionName}
-        meta={`${item.stageCount} stages · ${item.checkpointCount} checkpoints`}
-        level={0}
-      />
-    );
-  }
-  if (item.kind === "renamed") {
-    return (
-      <ChangeRow key={expandKey} type="renamed" label={item.to} meta="Section renamed" level={0} defaultOpen={item.defaultOpen}>
-        <div className="pl-6 pb-2"><BeforeAfterCard from={item.from} to={item.to} /></div>
-      </ChangeRow>
-    );
-  }
-  // modified
-  const sec = item.data;
-  return (
-    <ChangeRow
-      key={expandKey}
-      type="modified"
-      label={sec.sectionName}
-      meta={sec.renamed ? `renamed from "${sec.renamed.from}"` : "Modified"}
-      level={0}
-      defaultOpen={item.defaultOpen}
-    >
-      {sec.renamed && <div className="pl-6 pb-2"><BeforeAfterCard from={sec.renamed.from} to={sec.renamed.to} /></div>}
-      {sec.stages.added.map((st) => (
-        <ChangeRow key={st.id} type="added" label={st.stageName} meta={`${st.checkpointCount} checkpoints`} level={1} />
-      ))}
-      {sec.stages.removed.map((st) => (
-        <ChangeRow key={st.id} type="removed" label={st.stageName} meta={`${st.checkpointCount} checkpoints`} level={1} />
-      ))}
-      {sec.stages.modified.map((stage) => (
-        <StageDiffRow key={stage.id} stage={stage} expandAll={item.defaultOpen} />
-      ))}
-    </ChangeRow>
-  );
-};
 
 // ── Main page ──────────────────────────────────────────────────────────────
 const TemplateCompare = () => {
@@ -145,7 +118,6 @@ const TemplateCompare = () => {
   const [result, setResult] = useState(null);
   const [loadingVersions, setLoadingVersions] = useState(true);
   const [loadingDiff, setLoadingDiff] = useState(false);
-  const [expandAll, setExpandAll] = useState(false);
 
   // Load version chain once, default to the latest two when no query params given
   useEffect(() => {
@@ -212,18 +184,7 @@ const TemplateCompare = () => {
   const fromMeta = result?.from;
   const toMeta = result?.to;
 
-  // Build one ordered, flat list of top-level section changes so rendering
-  // is a single .map() instead of four separate blocks.
-  const sectionItems = diff
-    ? [
-        ...diff.sections.added.map((s) => ({ kind: "added", key: `a-${s.id}`, ...s })),
-        ...diff.sections.removed.map((s) => ({ kind: "removed", key: `r-${s.id}`, ...s })),
-        ...diff.sections.renamed
-          .filter((s) => !diff.sections.modified.some((m) => m.id === s.id))
-          .map((s) => ({ kind: "renamed", key: `n-${s.id}`, ...s })),
-        ...diff.sections.modified.map((s) => ({ kind: "modified", key: `m-${s.id}`, data: s })),
-      ]
-    : [];
+  const diffRows = diff ? flattenDiff(diff) : [];
 
   // Four buckets instead of the original nine — added/removed/renamed roll
   // up section+stage+checkpoint counts; "modified" is checkpoint field
@@ -297,7 +258,7 @@ const TemplateCompare = () => {
         </div>
       </div>
 
-      <div className="px-6 py-5 space-y-5 max-w-3xl mx-auto">
+      <div className="w-full px-6 py-5 space-y-5">
         {loadingDiff ? (
           <div className="space-y-3">
             <CardSkeleton rows={1} />
@@ -306,18 +267,18 @@ const TemplateCompare = () => {
         ) : !diff ? null : (
           <>
             {/* Version meta strip */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white rounded-xl border border-slate-200 p-4">
-                <p className="text-[11px] font-bold text-red-400 uppercase tracking-wide mb-1">From — v{fromMeta.version}</p>
-                <p className="text-xs text-slate-500">{fmtDate(fromMeta.createdAt)} · {fromMeta.createdBy || "System"}</p>
-                <p className="text-[11px] text-slate-400 mt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                <p className="text-xs font-bold text-red-400 uppercase tracking-wide mb-1.5">From — v{fromMeta.version}</p>
+                <p className="text-sm text-slate-600 font-medium">{fmtDate(fromMeta.createdAt)} · {fromMeta.createdBy || "System"}</p>
+                <p className="text-xs text-slate-400 mt-2">
                   {fromMeta.stats.sectionCount} sections · {fromMeta.stats.checkpointCount} checkpoints
                 </p>
               </div>
-              <div className="bg-white rounded-xl border border-slate-200 p-4">
-                <p className="text-[11px] font-bold text-emerald-500 uppercase tracking-wide mb-1">To — v{toMeta.version}</p>
-                <p className="text-xs text-slate-500">{fmtDate(toMeta.createdAt)} · {toMeta.createdBy || "System"}</p>
-                <p className="text-[11px] text-slate-400 mt-1">
+              <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                <p className="text-xs font-bold text-emerald-500 uppercase tracking-wide mb-1.5">To — v{toMeta.version}</p>
+                <p className="text-sm text-slate-600 font-medium">{fmtDate(toMeta.createdAt)} · {toMeta.createdBy || "System"}</p>
+                <p className="text-xs text-slate-400 mt-2">
                   {toMeta.stats.sectionCount} sections · {toMeta.stats.checkpointCount} checkpoints
                 </p>
               </div>
@@ -330,27 +291,15 @@ const TemplateCompare = () => {
             ) : (
               <>
                 {/* Overview strip — 4 buckets instead of 9 chips */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap gap-2">
-                    <ChangeCountChip type="added" count={buckets.added} label="added" />
-                    <ChangeCountChip type="removed" count={buckets.removed} label="removed" />
-                    <ChangeCountChip type="renamed" count={buckets.renamed} label="renamed" />
-                    <ChangeCountChip type="modified" count={buckets.modified} label="checkpoint edits" />
-                  </div>
-                  <SecondaryButton
-                    icon={expandAll ? FaCompressAlt : FaExpandAlt}
-                    onClick={() => setExpandAll((v) => !v)}
-                  >
-                    {expandAll ? "Collapse all" : "Expand all"}
-                  </SecondaryButton>
+                <div className="flex flex-wrap gap-2">
+                  <ChangeCountChip type="added" count={buckets.added} label="added" />
+                  <ChangeCountChip type="removed" count={buckets.removed} label="removed" />
+                  <ChangeCountChip type="renamed" count={buckets.renamed} label="renamed" />
+                  <ChangeCountChip type="modified" count={buckets.modified} label="checkpoint edits" />
                 </div>
 
-                {/* Diff tree */}
-                <div className="bg-white rounded-2xl border border-slate-200 px-4 divide-y divide-slate-50">
-                  {sectionItems.map((item) => (
-                    <SectionDiffRow key={item.key} item={{ ...item, defaultOpen: expandAll }} expandKey={`${item.key}-${expandAll}`} />
-                  ))}
-                </div>
+                {/* Diff table — one row per atomic change */}
+                <DiffTable rows={diffRows} />
               </>
             )}
           </>

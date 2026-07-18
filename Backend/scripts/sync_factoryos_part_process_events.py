@@ -212,7 +212,12 @@ def write_with_node(rows: list[tuple]) -> None:
         raise RuntimeError("SQL Server write timed out after 5 minutes") from error
     except subprocess.CalledProcessError as error:
         detail = (error.stderr or error.stdout or "Node SQL writer failed").strip()
-        raise RuntimeError(detail[-1000:]) from error
+        # An uncaught Node exception dumps the actual "Error: message" line and
+        # the immediate stack frames FIRST, then trails off into a long,
+        # low-signal object dump (e.g. mssql's `info`/`precedingErrors`
+        # payload). Keep the head, not the tail — slicing from the end
+        # previously chopped off the one line that says what went wrong.
+        raise RuntimeError(detail[:1000]) from error
     try:
         response = json.loads(result.stdout.strip().splitlines()[-1])
     except (IndexError, json.JSONDecodeError) as error:

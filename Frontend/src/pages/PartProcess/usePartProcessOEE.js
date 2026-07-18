@@ -288,30 +288,21 @@ export const usePartProcessOEE = () => {
         const rStart = new Date(startISO).getTime();
         const rEnd   = new Date(endISO).getTime();
 
-        // Production-day boundary: StartTime before this (in minutes) belongs to the
-        // NEXT calendar date (post-midnight portion of an overnight shift).
-        const _rsDt       = new Date(startISO);
-        const dayStartMins = _rsDt.getHours() * 60 + _rsDt.getMinutes();
-        const bumpDate = (d) => {
-          const [y, mo, dy] = d.split("-").map(Number);
-          const dt = new Date(y, mo - 1, dy + 1);
-          return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-        };
-
+        // EventDate is a plain calendar-date tag (whatever wall-clock date the
+        // event actually happened on), not a shift-adjusted "production day" —
+        // confirmed directly against the DB. So a record's absolute timestamp
+        // is always just EventDate + StartTime, with no date bump needed. An
+        // earlier version bumped the date forward for any StartTime before
+        // 08:00 assuming EventDate lagged an overnight shift's post-midnight
+        // tail — but EventDate was already correct, so that bump pushed the
+        // tail's timestamp a full day late, past rEnd, silently dropping it.
         const filtered = rows.filter(r => {
           if (!r.StartTime) return true; // keep if no time (let downstream handle)
           const eventDate = String(r.EventDate).slice(0, 10);
           const timeStr   = String(r.StartTime);
-          let ts;
-          if (timeStr.includes("T") || timeStr.length > 8) {
-            ts = new Date(timeStr).getTime();
-          } else {
-            // Overnight correction: StartTime before day-start means next calendar date
-            const [hh, mm] = timeStr.split(":").map(Number);
-            const todMins  = (hh || 0) * 60 + (mm || 0);
-            const calDate  = todMins < dayStartMins ? bumpDate(eventDate) : eventDate;
-            ts = new Date(`${calDate}T${timeStr}`).getTime();
-          }
+          const ts = (timeStr.includes("T") || timeStr.length > 8)
+            ? new Date(timeStr).getTime()
+            : new Date(`${eventDate}T${timeStr}`).getTime();
           return ts >= rStart && ts <= rEnd;
         });
         const mapped = (filtered.length > 0 ? filtered : rows)

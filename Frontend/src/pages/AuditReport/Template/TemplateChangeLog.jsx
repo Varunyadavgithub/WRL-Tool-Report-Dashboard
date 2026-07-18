@@ -128,7 +128,7 @@ const TemplateChangeLog = () => {
         </div>
       </div>
 
-      <div className="px-6 py-5 max-w-3xl mx-auto space-y-4">
+      <div className="w-full px-6 py-5 space-y-4">
         {loading ? (
           <div className="space-y-3">
             <CardSkeleton rows={3} />

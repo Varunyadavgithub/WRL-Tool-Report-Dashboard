@@ -19,6 +19,7 @@ const toBit = (v) => (v ? 1 : 0);
 const MATERIAL_SELECT = `
   SELECT
     Id AS id, SapCode AS sapCode, PartName AS partName, Category AS category,
+    SheetSapCode AS sheetSapCode, SheetDescription AS sheetDescription,
     Length AS length, Width AS width, Thickness AS thickness, Weight AS weight,
     ComponentWeight AS componentWeight, ScrapWeight AS scrapWeight,
     NoOfSheet AS noOfSheet, ActualComponentsPerSheet AS actualComponentsPerSheet,
@@ -46,6 +47,8 @@ export const createMaterial = async (req, res) => {
       .input("sapCode",        sql.NVarChar(50),  m.sapCode)
       .input("partName",       sql.NVarChar(300), strOrNull(m.partName))
       .input("category",       sql.NVarChar(100), strOrNull(m.category))
+      .input("sheetSapCode",   sql.NVarChar(50),  strOrNull(m.sheetSapCode))
+      .input("sheetDescription", sql.NVarChar(300), strOrNull(m.sheetDescription))
       .input("length",         sql.Decimal(12, 3), numOrNull(m.length))
       .input("width",          sql.Decimal(12, 3), numOrNull(m.width))
       .input("thickness",      sql.Decimal(12, 3), numOrNull(m.thickness))
@@ -61,19 +64,20 @@ export const createMaterial = async (req, res) => {
       .input("status",         sql.Bit, toBit(m.status ?? true))
       .query(`
         INSERT INTO MaterialConfigs (
-          SapCode, PartName, Category, Length, Width, Thickness, Weight,
+          SapCode, PartName, Category, SheetSapCode, SheetDescription, Length, Width, Thickness, Weight,
           ComponentWeight, ScrapWeight, NoOfSheet, ActualComponentsPerSheet,
           PncLoadingUnloading, DefinedComponentCycleTime, DrawingNumber, DrawingRevision, Status
         )
         OUTPUT
           INSERTED.Id AS id, INSERTED.SapCode AS sapCode, INSERTED.PartName AS partName, INSERTED.Category AS category,
+          INSERTED.SheetSapCode AS sheetSapCode, INSERTED.SheetDescription AS sheetDescription,
           INSERTED.Length AS length, INSERTED.Width AS width, INSERTED.Thickness AS thickness, INSERTED.Weight AS weight,
           INSERTED.ComponentWeight AS componentWeight, INSERTED.ScrapWeight AS scrapWeight,
           INSERTED.NoOfSheet AS noOfSheet, INSERTED.ActualComponentsPerSheet AS actualComponentsPerSheet,
           INSERTED.PncLoadingUnloading AS pncLoadingUnloading, INSERTED.DefinedComponentCycleTime AS definedComponentCycleTime,
           INSERTED.DrawingNumber AS drawingNumber, INSERTED.DrawingRevision AS drawingRevision, INSERTED.Status AS status
         VALUES (
-          @sapCode, @partName, @category, @length, @width, @thickness, @weight,
+          @sapCode, @partName, @category, @sheetSapCode, @sheetDescription, @length, @width, @thickness, @weight,
           @componentWeight, @scrapWeight, @noOfSheet, @actualComponentsPerSheet,
           @pncLoadingUnloading, @definedComponentCycleTime, @drawingNumber, @drawingRevision, @status
         )
@@ -98,6 +102,8 @@ export const updateMaterial = async (req, res) => {
       .input("sapCode",        sql.NVarChar(50),  m.sapCode)
       .input("partName",       sql.NVarChar(300), strOrNull(m.partName))
       .input("category",       sql.NVarChar(100), strOrNull(m.category))
+      .input("sheetSapCode",   sql.NVarChar(50),  strOrNull(m.sheetSapCode))
+      .input("sheetDescription", sql.NVarChar(300), strOrNull(m.sheetDescription))
       .input("length",         sql.Decimal(12, 3), numOrNull(m.length))
       .input("width",          sql.Decimal(12, 3), numOrNull(m.width))
       .input("thickness",      sql.Decimal(12, 3), numOrNull(m.thickness))
@@ -114,6 +120,7 @@ export const updateMaterial = async (req, res) => {
       .query(`
         UPDATE MaterialConfigs SET
           SapCode = @sapCode, PartName = @partName, Category = @category,
+          SheetSapCode = @sheetSapCode, SheetDescription = @sheetDescription,
           Length = @length, Width = @width, Thickness = @thickness, Weight = @weight,
           ComponentWeight = @componentWeight, ScrapWeight = @scrapWeight,
           NoOfSheet = @noOfSheet, ActualComponentsPerSheet = @actualComponentsPerSheet,
@@ -122,6 +129,7 @@ export const updateMaterial = async (req, res) => {
           UpdatedAt = GETDATE()
         OUTPUT
           INSERTED.Id AS id, INSERTED.SapCode AS sapCode, INSERTED.PartName AS partName, INSERTED.Category AS category,
+          INSERTED.SheetSapCode AS sheetSapCode, INSERTED.SheetDescription AS sheetDescription,
           INSERTED.Length AS length, INSERTED.Width AS width, INSERTED.Thickness AS thickness, INSERTED.Weight AS weight,
           INSERTED.ComponentWeight AS componentWeight, INSERTED.ScrapWeight AS scrapWeight,
           INSERTED.NoOfSheet AS noOfSheet, INSERTED.ActualComponentsPerSheet AS actualComponentsPerSheet,
@@ -224,6 +232,8 @@ export const bulkUpsertMaterials = async (req, res) => {
         .input("sapCode",        sql.NVarChar(50),  m.sapCode)
         .input("partName",       sql.NVarChar(300), strOrNull(m.partName))
         .input("category",       sql.NVarChar(100), strOrNull(m.category))
+        .input("sheetSapCode",   sql.NVarChar(50),  strOrNull(m.sheetSapCode))
+        .input("sheetDescription", sql.NVarChar(300), strOrNull(m.sheetDescription))
         .input("length",         sql.Decimal(12, 3), numOrNull(m.length))
         .input("width",          sql.Decimal(12, 3), numOrNull(m.width))
         .input("thickness",      sql.Decimal(12, 3), numOrNull(m.thickness))
@@ -244,6 +254,7 @@ export const bulkUpsertMaterials = async (req, res) => {
         ON target.SapCode = src.SapCode
         WHEN MATCHED THEN UPDATE SET
           PartName = @partName, Category = @category,
+          SheetSapCode = @sheetSapCode, SheetDescription = @sheetDescription,
           Length = @length, Width = @width, Thickness = @thickness, Weight = @weight,
           ComponentWeight = @componentWeight, ScrapWeight = @scrapWeight,
           NoOfSheet = @noOfSheet, ActualComponentsPerSheet = @actualComponentsPerSheet,
@@ -251,11 +262,11 @@ export const bulkUpsertMaterials = async (req, res) => {
           DrawingNumber = @drawingNumber, DrawingRevision = @drawingRevision, Status = @status,
           UpdatedAt = GETDATE()
         WHEN NOT MATCHED THEN INSERT (
-          SapCode, PartName, Category, Length, Width, Thickness, Weight,
+          SapCode, PartName, Category, SheetSapCode, SheetDescription, Length, Width, Thickness, Weight,
           ComponentWeight, ScrapWeight, NoOfSheet, ActualComponentsPerSheet,
           PncLoadingUnloading, DefinedComponentCycleTime, DrawingNumber, DrawingRevision, Status
         ) VALUES (
-          @sapCode, @partName, @category, @length, @width, @thickness, @weight,
+          @sapCode, @partName, @category, @sheetSapCode, @sheetDescription, @length, @width, @thickness, @weight,
           @componentWeight, @scrapWeight, @noOfSheet, @actualComponentsPerSheet,
           @pncLoadingUnloading, @definedComponentCycleTime, @drawingNumber, @drawingRevision, @status
         )

@@ -18,6 +18,7 @@ import apprenticeRoute from "./apprentice.route.js";
 import factoryOsRoute     from "./factoryOs.route.js";
 import partProcessRoute   from "./partProcess.route.js";
 import masterConfigRoute  from "./masterConfig.route.js";
+import energyMeterRoute   from "./energyMeter.route.js";
 
 const routers = Router();
 
@@ -40,5 +41,6 @@ routers.use("/apprentice",  apprenticeRoute);
 routers.use("/factory-os",   factoryOsRoute);
 routers.use("/part-process", partProcessRoute);
 routers.use("/master-config", masterConfigRoute);
+routers.use("/energy-meters", energyMeterRoute);
 
 export default routers;

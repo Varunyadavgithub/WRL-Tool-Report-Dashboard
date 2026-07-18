@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 import {
   Package2, Upload, Download, Eye, Trash2,
   CheckCircle2, AlertTriangle, FileSpreadsheet,
-  Info, Loader2,
+  Info, Loader2, X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -19,10 +19,11 @@ import {
 import { fileBaseURL } from "../../assets/assets";
 
 // ─── Static options ────────────────────────────────────────────────────────────
-const CATEGORIES = ["Compressor","Sheet Metal","Casting","Forging","Plastic","Rubber","Bought Out","Sub Assembly","PC WHITE"];
+const CATEGORIES = ["ALUMINIUM","GP","GPSP","PC RED","PC WHITE","SS304 2B","SS304 HL","SS430 HL","SSS430 2B"];
 
 const INIT = {
   sapCode:"", partName:"", category:"",
+  sheetSapCode:"", sheetDescription:"",
   length:"", width:"", thickness:"", weight:"", componentWeight:"", scrapWeight:"",
   noOfSheet:"", actualComponentsPerSheet:"", pncLoadingUnloading:"",
   definedComponentCycleTime:"",
@@ -48,6 +49,8 @@ const defaultNoOfSheet = (thickness) => {
 const COLUMN_ALIASES = {
   sapCode:        ["sap code","sap","sapcode","material code","mat code","matcode","material no","mat no","part code","item code","part no","part number"],
   partName:       ["part name","partname","description","item description","item name","name","material description","mat desc","part desc","component name"],
+  sheetSapCode:   ["sheet sap code","sheet sapcode","sheet code","sheet material code","raw material code","raw material sap code"],
+  sheetDescription: ["sheet description","sheet desc","sheet name","raw material description","raw material name"],
   drawingNumber:  ["drawing no","drawing number","drg no","drg","drawing","drg number","drawing no."],
   drawingRevision:["drawing revision","drg rev","revision","rev","drg rev.","rev no"],
   noOfSheet:      ["no of sheet","no. of sheet","no of sheets","sheet count","sheets","number of sheets","no_of_sheet"],
@@ -95,6 +98,7 @@ const autoMap = (headers) => {
 // ─── Bulk Upload Modal ─────────────────────────────────────────────────────────
 const FIELD_LABELS = {
   sapCode: "SAP Code *", partName: "Description *", category: "Category",
+  sheetSapCode: "Sheet SAP Code", sheetDescription: "Sheet Description",
   length: "Length", width: "Width", thickness: "THK",
   weight: "Weight", componentWeight: "Component Weight", scrapWeight: "Scrap Weight",
   noOfSheet: "No of Sheet",
@@ -256,7 +260,7 @@ const BulkUploadModal = ({ onClose, onImport }) => {
                   <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wide">Expected Columns</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {["SAP Code","Description","Category","Length","Width","THK","Weight","Component Weight","Scrap Weight","No of Sheet","No of Component per Sheet","Loading/Unloading Time","Defined Component Cycle Time (Secs)","Drawing No.","Rev."].map(c => (
+                  {["SAP Code","Description","Category","Sheet SAP Code","Sheet Description","Length","Width","THK","Weight","Component Weight","Scrap Weight","No of Sheet","No of Component per Sheet","Loading/Unloading Time","Defined Component Cycle Time (Secs)","Drawing No.","Rev."].map(c => (
                     <span key={c} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{c}</span>
                   ))}
                 </div>
@@ -323,7 +327,7 @@ const BulkUploadModal = ({ onClose, onImport }) => {
                 <table className="min-w-full text-xs border-separate border-spacing-0">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-100">
-                      {["#","SAP Code","Description","No of Sheet","Comp/Sheet","Loading/Unloading","Defined Component Cycle Time (Secs)","Drawing No.","Rev."].map(h => (
+                      {["#","SAP Code","Description","Sheet SAP Code","Sheet Description","No of Sheet","Comp/Sheet","Loading/Unloading","Defined Component Cycle Time (Secs)","Drawing No.","Rev."].map(h => (
                         <th key={h} className="px-3 py-2 text-[10px] font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap text-left">{h}</th>
                       ))}
                     </tr>
@@ -334,6 +338,8 @@ const BulkUploadModal = ({ onClose, onImport }) => {
                         <td className="px-3 py-2 border-b border-slate-100 text-slate-400 font-mono">{idx + 1}</td>
                         <td className="px-3 py-2 border-b border-slate-100 font-bold text-blue-600 font-mono">{r.sapCode}</td>
                         <td className="px-3 py-2 border-b border-slate-100 font-medium text-slate-700 whitespace-nowrap">{r.partName}</td>
+                        <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-500">{r.sheetSapCode || "—"}</td>
+                        <td className="px-3 py-2 border-b border-slate-100 text-slate-500 whitespace-nowrap">{r.sheetDescription || "—"}</td>
                         <td className="px-3 py-2 border-b border-slate-100 font-mono font-bold text-slate-700">{r.noOfSheet || "—"}</td>
                         <td className="px-3 py-2 border-b border-slate-100 font-mono font-bold text-slate-700">{r.actualComponentsPerSheet || "—"}</td>
                         <td className="px-3 py-2 border-b border-slate-100 font-mono text-amber-600">{r.pncLoadingUnloading || "—"}</td>
@@ -425,14 +431,15 @@ const ConfirmDeleteAll = ({ count, onCancel, onConfirm }) => (
 
 // ─── Export helpers ──────────────────────────────────────────────────────────────
 const EXPORT_HEADERS = [
-  "SAP Code","Description","Category","Length","Width","THK","Weight","Component Weight","Scrap Weight",
+  "SAP Code","Description","Category","Sheet SAP Code","Sheet Description",
+  "Length","Width","THK","Weight","Component Weight","Scrap Weight",
   "No of Sheet","No of Component per Sheet","Loading/Unloading Time","Defined Component Cycle Time (Secs)",
   "Drawing No.","Rev.",
 ];
 
 const downloadTemplate = () => {
   // No of Sheet left blank below to demonstrate the THK auto-fill / default-1 behaviour.
-  const sample = [["1124700","PC OUTER REAR NWHD70H1-HC WHITE_0108171","PC WHITE","536","460","0.40","0.78","0.826","0.061","","2","15","25.00","",""]];
+  const sample = [["1124700","PC OUTER REAR NWHD70H1-HC WHITE_0108171","PC WHITE","1108171","PC WHITE SHEET 536X460","536","460","0.40","0.78","0.826","0.061","","2","15","25.00","",""]];
   const ws = XLSX.utils.aoa_to_sheet([EXPORT_HEADERS, ...sample]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Materials");
@@ -441,7 +448,8 @@ const downloadTemplate = () => {
 
 const exportData = (data) => {
   const rows = data.map(r => [
-    r.sapCode, r.partName, r.category, r.length || "", r.width || "", r.thickness || "",
+    r.sapCode, r.partName, r.category, r.sheetSapCode || "", r.sheetDescription || "",
+    r.length || "", r.width || "", r.thickness || "",
     r.weight || "", r.componentWeight || "", r.scrapWeight || "",
     r.noOfSheet || "", r.actualComponentsPerSheet || "", r.pncLoadingUnloading || "",
     r.definedComponentCycleTime ? round2(+r.definedComponentCycleTime) : "",
@@ -609,6 +617,8 @@ const MaterialConfig = () => {
                   <TH>SAP Code</TH>
                   <TH>Description</TH>
                   <TH>Category</TH>
+                  <TH>Sheet SAP Code</TH>
+                  <TH>Sheet Description</TH>
                   <TH center>Length</TH>
                   <TH center>Width</TH>
                   <TH center>THK</TH>
@@ -632,6 +642,8 @@ const MaterialConfig = () => {
                     <TD mono cls="text-blue-600 font-bold">{r.sapCode}</TD>
                     <TD cls="font-medium text-slate-700 whitespace-nowrap">{r.partName}</TD>
                     <TD><span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{r.category || "—"}</span></TD>
+                    <TD mono cls="text-slate-500">{r.sheetSapCode || "—"}</TD>
+                    <TD cls="text-slate-500 whitespace-nowrap">{r.sheetDescription || "—"}</TD>
                     <TD center cls="font-mono text-slate-600">{r.length || "—"}</TD>
                     <TD center cls="font-mono text-slate-600">{r.width || "—"}</TD>
                     <TD center cls="font-mono text-slate-600">{r.thickness || "—"}</TD>
@@ -683,7 +695,7 @@ const MaterialConfig = () => {
                       <TableActions onEdit={() => openEdit(r)} onDelete={() => handleDelete(r.id)} />
                     </TD>
                   </tr>
-                )) : <EmptyState colSpan={18} message="No materials found. Add or upload your first material." />}
+                )) : <EmptyState colSpan={20} message="No materials found. Add or upload your first material." />}
               </tbody>
             </table>
           </div>
@@ -700,6 +712,8 @@ const MaterialConfig = () => {
               <select value={form.category} onChange={sf("category")} className={selectCls}><option value="">Select</option>{CATEGORIES.map(c => <option key={c}>{c}</option>)}</select>
             </Field>
             <div /> {/* spacer to keep the grid aligned */}
+            <Field label="Sheet SAP Code"><input value={form.sheetSapCode} onChange={sf("sheetSapCode")} placeholder="e.g. 1108171" className={inputCls} /></Field>
+            <Field label="Sheet Description"><input value={form.sheetDescription} onChange={sf("sheetDescription")} placeholder="e.g. PC WHITE SHEET 536X460" className={inputCls} /></Field>
 
             {/* Sheet dimensions & weights */}
             <div className="col-span-2 grid grid-cols-3 gap-4 p-3 rounded-lg bg-slate-50 border border-slate-200">

@@ -291,6 +291,11 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
       const idealEnergyWh  = Math.round((planQty * row.definedCycleTime * MACHINE_POWER_KW) / 3600);
       const actualEnergyWh = Math.round((row.actualQty * avgCycleSecs * MACHINE_POWER_KW) / 3600);
 
+      // Material weight (kg) — Sheet Wt Used and Scrap scale per sheet
+      // (row.actualQty); weight/scrapWeight are the per-sheet master values.
+      const sheetWeightKg = Math.round((Number(matForRow?.weight) || 0) * row.actualQty * 100) / 100;
+      const scrapWeightKg = Math.round((Number(matForRow?.scrapWeight) || 0) * row.actualQty * 100) / 100;
+
       return {
         srNo: idx + 1,
         dateFrom: row.dateFrom,
@@ -300,6 +305,8 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
         completedAt: fmtAbs(row.completedAtMs, row.completedAt),
         sapCode: row.sapCode,
         itemDescription: row.itemDescription,
+        sheetSapCode: matForRow?.sheetSapCode || "",
+        sheetDescription: matForRow?.sheetDescription || "",
         model: row.model,
         planQty,
         planQtyFromConfig,
@@ -324,6 +331,7 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
         oee: isNaN(oee) ? 0 : oee,
         availability, performance, quality,
         idealEnergyWh, actualEnergyWh,
+        sheetWeightKg, scrapWeightKg,
         // OEE breakdown inputs (component units) — surfaced in the UI
         actualCompCT, availableTimeSecs, actualTimeSecs, netOperatingSecs,
         downtimeSecs: row.downtimeSecs, idleSecs: row.idleSecs,
@@ -426,6 +434,12 @@ const buildColumns = (materials) => [
         )
     ),
     csv: (r) => r.itemDescription },
+  { key: "sheetSapCode", label: "Sheet SAP Code", group: "info", sortable: true, align: "left",
+    cell: (r) => <span className="font-mono text-slate-500 text-xs">{r.sheetSapCode || "—"}</span>,
+    csv: (r) => r.sheetSapCode },
+  { key: "sheetDescription", label: "Sheet Description", group: "info", sortable: true, align: "left", wide: true,
+    cell: (r) => <span className="text-[11px] text-slate-500 leading-snug block max-w-[200px]">{r.sheetDescription || "—"}</span>,
+    csv: (r) => r.sheetDescription },
   { key: "planQty", label: "Plan Qty", group: "qty", sortable: true, align: "center",
     cell: (r) => (
       <div className="text-center">
@@ -456,6 +470,12 @@ const buildColumns = (materials) => [
   { key: "actualQty", label: "Sheet Qty", group: "qty", sortable: true, align: "center",
     cell: (r) => <span className="font-bold font-mono text-sm text-slate-600">{r.actualQty.toLocaleString()}</span>,
     csv: (r) => r.actualQty },
+  { key: "sheetWeightKg", label: "Sheet Wt Used (kg)", group: "weight", sortable: true, align: "center",
+    cell: (r) => <span className="font-mono font-semibold text-slate-600">{r.sheetWeightKg > 0 ? r.sheetWeightKg.toLocaleString() : "-"}</span>,
+    csv: (r) => r.sheetWeightKg },
+  { key: "scrapWeightKg", label: "Scrap Wt (kg)", group: "weight", sortable: true, align: "center",
+    cell: (r) => <span className="font-mono font-semibold text-amber-600">{r.scrapWeightKg > 0 ? r.scrapWeightKg.toLocaleString() : "-"}</span>,
+    csv: (r) => r.scrapWeightKg },
   { key: "reqTimeMins", label: "Required Time", group: "time", sortable: true, align: "center",
     cell: (r) => <span className="font-mono text-violet-600 font-semibold">{r.reqTimeMins}</span>,
     csv: (r) => r.reqTimeMins },
@@ -539,6 +559,7 @@ const buildColumns = (materials) => [
 const GROUP_META = {
   info:    { label: "Part Info",      tone: "text-slate-600  bg-slate-100" },
   qty:     { label: "Production Qty",  tone: "text-blue-700   bg-blue-50" },
+  weight:  { label: "Material Weight (kg)", tone: "text-amber-700  bg-amber-50" },
   time:    { label: "Time (min)",      tone: "text-violet-700 bg-violet-50" },
   ct:      { label: "Cycle Time (s)",  tone: "text-cyan-700   bg-cyan-50" },
   quality: { label: "Quality Log",     tone: "text-emerald-700 bg-emerald-50" },
@@ -560,7 +581,7 @@ const groupSpans = (cols) => {
  * 7. Export helpers
  * ================================================================== */
 // Which summary columns are additive (SUM) vs averaged (AVG) for footer rows.
-const AGG_SUM = new Set(["planQty", "componentQty", "actualQty", "reqTimeMins", "actualTimeMins", "totalDowntimeMins", "accepted", "rejected"]);
+const AGG_SUM = new Set(["planQty", "componentQty", "actualQty", "sheetWeightKg", "scrapWeightKg", "reqTimeMins", "actualTimeMins", "totalDowntimeMins", "accepted", "rejected"]);
 const AGG_AVG = new Set(["availability", "performance", "quality", "oee"]);
 
 const computeTotals = (rows, columns) => {
@@ -603,13 +624,17 @@ const exportCSV = (rows, columns) => {
 const exportExcel = async (rows, columns, meta) => {
   const logo = await getWrlLogoBase64();
   const cols = columns.filter((c) => c.csv);
+  const segs = groupSpans(cols);
   const totals = computeTotals(rows, cols);
   const span = cols.length;
+  // Two header rows, matching the PDF export: coloured group band + column labels.
+  const groupTh = (s) => `<th colspan="${s.count}" style="background:#e2e8f0;color:#1e293b;font-weight:bold;border:1px solid #1e293b;padding:5px;text-align:center">${(GROUP_META[s.group] || GROUP_META.info).label}</th>`;
   const th = (c) => `<th style="background:#1e3a8a;color:#ffffff;font-weight:bold;border:1px solid #1e293b;padding:6px;text-align:${c.align === "center" ? "center" : "left"}">${c.label}</th>`;
   const td = (c, v) => {
     const num = v !== "" && v != null && !isNaN(parseFloat(v)) && isFinite(v);
     return `<td style="border:1px solid #cbd5e1;padding:4px;text-align:${num ? "right" : "left"}">${v ?? ""}</td>`;
   };
+  const groupHead = `<tr>${segs.map(groupTh).join("")}</tr>`;
   const head = `<tr>${cols.map(th).join("")}</tr>`;
   const body = rows.map((r, i) =>
     `<tr style="background:${i % 2 ? "#f1f5f9" : "#ffffff"}">${cols.map((c) => td(c, c.csv(r))).join("")}</tr>`).join("");
@@ -621,7 +646,7 @@ const exportExcel = async (rows, columns, meta) => {
     <body>
       <table><tr>${logoCell}<td colspan="${span}" style="font-size:15px;font-weight:bold;padding:8px;text-align:center">Part Process — Production Report</td></tr>
       <tr><td colspan="${span + (logo ? 1 : 0)}" style="font-size:10px;color:#475569;padding:0 8px 8px;text-align:center">${meta.start} → ${meta.end} · Generated ${meta.generated}</td></tr></table>
-      <table border="1">${head}${body}${foot}</table>
+      <table border="1">${groupHead}${head}${body}${foot}</table>
     </body></html>`;
   downloadBlob(html, "application/vnd.ms-excel", "production_report.xls");
 };
@@ -729,7 +754,10 @@ const PartProcessProductionReport = () => {
   const [page, setPage]       = useState(1);
   const [pageSize, setPageSize] = useState(25);
   // Sheet Qty + Sheet CT hidden by default; toggle on from the Columns menu.
-  const [hiddenCols, setHiddenCols] = useState({ actualQty: true, sheetCycleTime: true });
+  const [hiddenCols, setHiddenCols] = useState({
+    actualQty: true, sheetCycleTime: true,
+    sheetSapCode: true, sheetDescription: true, sheetWeightKg: true, scrapWeightKg: true,
+  });
   const [colMenuOpen, setColMenuOpen] = useState(false);
 
   // Advanced filters
@@ -776,17 +804,15 @@ const PartProcessProductionReport = () => {
         ? Math.min(...configShifts.map((s) => toMins(s.startTime))) * 60
         : 0;
 
-      const prodDayOf = (ms) => {
-        const d = new Date(ms);
-        const tod = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
-        const base = new Date(d); base.setHours(0, 0, 0, 0);
-        if (tod < dayStartSec) base.setDate(base.getDate() - 1);
-        return base;
-      };
-
+      // EventDate in the DB is a plain calendar-date tag (whatever wall-clock
+      // date the event actually happened on) — NOT shift-adjusted. An
+      // overnight Shift 2's post-midnight tail is stored under the NEXT
+      // calendar date. So the set of dates to query must be the raw calendar
+      // span of [startMs, endMs), not a production-day-shifted range —
+      // otherwise that tail's EventDate is never queried and silently drops.
       const dates = [];
-      const cur  = prodDayOf(startMs);
-      const last = prodDayOf(endMs - 1000);
+      const cur  = new Date(startMs);   cur.setHours(0, 0, 0, 0);
+      const last = new Date(endMs - 1000); last.setHours(0, 0, 0, 0);
       while (cur <= last) { dates.push(fmtYMD(cur)); cur.setDate(cur.getDate() + 1); }
 
       const res = await axios.get(`${PART_PROCESS_API}/records-range`, {
@@ -940,6 +966,8 @@ const PartProcessProductionReport = () => {
       planQty: sum((r) => r.planQty),
       componentQty: sum((r) => r.componentQty),
       actualQty: sum((r) => r.actualQty),
+      sheetWeightKg: Math.round(sum((r) => r.sheetWeightKg) * 100) / 100,
+      scrapWeightKg: Math.round(sum((r) => r.scrapWeightKg) * 100) / 100,
       rejects: sum((r) => r.rejects),
       accepted: sum((r) => r.accepted),
       lossMins: sum((r) => r.lossMins),
@@ -994,6 +1022,8 @@ const PartProcessProductionReport = () => {
           <div className="flex items-center gap-2 flex-wrap">
             <StatCard icon={FiGrid} label="Components" value={totals.componentQty.toLocaleString()} tone="violet" />
             <StatCard icon={FiPackage} label="Sheets" value={totals.actualQty.toLocaleString()} tone="blue" />
+            <StatCard icon={FiPackage} label="Sheet Wt Used" value={`${totals.sheetWeightKg.toLocaleString()} kg`} tone="amber" />
+            <StatCard icon={FiAlertTriangle} label="Total Scrap" value={`${totals.scrapWeightKg.toLocaleString()} kg`} tone="rose" />
             <StatCard icon={FiAlertTriangle} label="Rejects" value={totals.rejects.toLocaleString()} tone="rose" />
             <StatCard icon={FiClock} label="Downtime" value={`${totals.totalDowntimeMins} min`} tone="amber" />
             <StatCard icon={FiActivity} label="Avg OEE" value={`${totals.oee}%`} tone="emerald" />

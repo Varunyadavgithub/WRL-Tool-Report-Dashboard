@@ -121,6 +121,9 @@ const TemplateApproval = lazy(
 const TemplateCompare = lazy(
   () => import("../pages/AuditReport/Template/TemplateCompare"),
 );
+const TemplateChangeLog = lazy(
+  () => import("../pages/AuditReport/Template/TemplateChangeLog"),
+);
 const SerialScan = lazy(
   () => import("../pages/AuditReport/Template/SerialScan"),
 );
@@ -132,6 +135,9 @@ const AuditDashboard = lazy(() => import("../pages/AuditReport/Auditdashboard"))
 
 const DehumidifierDashboard = lazy(
   () => import("../pages/Readings/DehumidifierDashboard"),
+);
+const EnergyMeterDashboard = lazy(
+  () => import("../pages/Readings/EnergyMeterDashboard"),
 );
 
 const ManpowerForm = lazy(() => import("../pages/Forms/ManpowerForm"));
@@ -417,7 +423,7 @@ export const ROUTE_CONFIG = [
       },
       {
         path: "/dispatch/dispatch-unloading",
-        label: "Dispatch Unloading",
+        label: "FG Unloading",
         component: DispatchUnloading,
       },
       {
@@ -427,7 +433,7 @@ export const ROUTE_CONFIG = [
       },
       {
         path: "/dispatch/fg-dispatchReport",
-        label: "FG Dispatch Report",
+        label: "Unloading Status",
         component: FGDispatchReport,
       },
       {
@@ -541,6 +547,10 @@ export const ROUTE_CONFIG = [
         component: TemplateCompare,
       },
       {
+        path: "/auditreport/templates/:id/history",
+        component: TemplateChangeLog,
+      },
+      {
         path: "/auditreport/templates/:id",
         component: TemplateBuilder,
       },
@@ -571,6 +581,11 @@ export const ROUTE_CONFIG = [
         path: "/reading/dehumidifier",
         label: "Utility Reading",
         component: DehumidifierDashboard,
+      },
+      {
+        path: "/reading/energy-meters",
+        label: "Energy Meters",
+        component: EnergyMeterDashboard,
       },
     ],
   },

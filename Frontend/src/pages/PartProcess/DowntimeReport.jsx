@@ -278,15 +278,14 @@ const PartProcessDowntimeReport = () => {
     setLoadFn(true); setRecords([]);
     try {
       const dayStartSec = shifts.length ? Math.min(...shifts.map((s)=>toMins(s.startTime)))*60 : 0;
-      const prodDayOf = (ms) => {
-        const d = new Date(ms);
-        const tod = d.getHours()*3600+d.getMinutes()*60+d.getSeconds();
-        const base = new Date(d); base.setHours(0,0,0,0);
-        if (tod<dayStartSec) base.setDate(base.getDate()-1);
-        return base;
-      };
+      // EventDate in the DB is a plain calendar-date tag, not shift-adjusted
+      // — an overnight shift's post-midnight tail is stored under the NEXT
+      // calendar date. Query the raw calendar span of [startMs, endMs), not
+      // a production-day-shifted range, or that tail's EventDate never gets
+      // queried and silently drops.
       const dates = [];
-      const cur = prodDayOf(startMs); const last = prodDayOf(endMs-1000);
+      const cur = new Date(startMs); cur.setHours(0,0,0,0);
+      const last = new Date(endMs-1000); last.setHours(0,0,0,0);
       while (cur<=last) { dates.push(fmtYMD(cur)); cur.setDate(cur.getDate()+1); }
 
       const res = await axios.get(`${PART_PROCESS_API}/records-range`, {
