@@ -433,6 +433,31 @@ const DateFilter = ({ value, onChange }) => (
 
 const clampPct = (v, max) => (v == null || !max ? 0 : Math.min(1, Math.max(0, v / max)));
 
+const MiniGauge = ({ label, value, unit, color, pct }) => {
+  const r = 26, strokeWidth = 6;
+  const circumference = 2 * Math.PI * r;
+  const dash = circumference * pct;
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative w-16 h-16 shrink-0">
+        <svg width="64" height="64" viewBox="0 0 64 64" className="-rotate-90 absolute inset-0">
+          <circle cx="32" cy="32" r={r} fill="none" stroke="#e2e8f0" strokeWidth={strokeWidth} />
+          <circle
+            cx="32" cy="32" r={r} fill="none" stroke={color} strokeWidth={strokeWidth}
+            strokeDasharray={`${dash} ${circumference}`} strokeLinecap="round"
+            style={{ transition: "stroke-dasharray .3s ease" }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-[11px] font-bold text-slate-800 font-mono leading-none">{value}</span>
+        </div>
+      </div>
+      <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color }}>{label}</span>
+      <span className="text-[9px] text-slate-400 font-mono -mt-1">{unit}</span>
+    </div>
+  );
+};
+
 const MeterOverviewCard = ({ m, todayKwh, selected, onSelect }) => {
   const stats = [
     { label: "Voltage", value: fmt(m.voltageLlAvg), unit: "V",  color: "#2563eb", pct: clampPct(m.voltageLlAvg, 450) },
@@ -461,18 +486,8 @@ const MeterOverviewCard = ({ m, todayKwh, selected, onSelect }) => {
         <span className={`w-1.5 h-1.5 rounded-full ${m.commStatus === "Online" ? "bg-emerald-500" : "bg-slate-400"}`} /> {m.commStatus}
       </span>
 
-      <div className="mt-4 space-y-2.5">
-        {stats.map((s) => (
-          <div key={s.label}>
-            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider" style={{ color: s.color }}>
-              <span>{s.label}</span>
-              <span className="text-slate-700 font-mono text-xs">{s.value}{s.unit}</span>
-            </div>
-            <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden mt-1">
-              <div className="h-full rounded-full transition-all" style={{ width: `${s.pct * 100}%`, background: s.color }} />
-            </div>
-          </div>
-        ))}
+      <div className="grid grid-cols-4 gap-1 mt-4">
+        {stats.map((s) => <MiniGauge key={s.label} {...s} />)}
       </div>
 
       <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">

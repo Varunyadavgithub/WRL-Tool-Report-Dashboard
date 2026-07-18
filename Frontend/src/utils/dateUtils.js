@@ -51,7 +51,14 @@ export const formatDateForApi = (date) => {
 };
 
 /**
- * Get today's shift date range (8:00 AM today → now)
+ * Get today's shift date range (most recent 8:00 AM → now)
+ * The production day boundary is 8 AM (Shift 1 start), so between midnight
+ * and 8 AM "today" still means the production day that started at 8 AM
+ * *yesterday* — that's when the overnight Shift 2 (20:00→08:00) is still
+ * running. Anchoring to the current calendar date's 8 AM regardless of the
+ * time of day would put the anchor in the future before 8 AM, producing an
+ * inverted (start > end) range that silently returns no data — which is
+ * exactly when Shift 2's post-midnight portion needs to show up.
  * Returns ISO UTC strings for API and local strings for input binding
  * Backend converts ISO to IST using convertToIST()
  * @returns {{ startDate: string, endDate: string, startLocal: string, endLocal: string }}
@@ -61,7 +68,7 @@ export const formatDateForApi = (date) => {
  */
 export const getTodayRange = () => {
   const now = new Date();
-  const today8AM = new Date(
+  const anchor8AM = new Date(
     now.getFullYear(),
     now.getMonth(),
     now.getDate(),
@@ -69,11 +76,12 @@ export const getTodayRange = () => {
     0,
     0,
   );
+  if (now < anchor8AM) anchor8AM.setDate(anchor8AM.getDate() - 1);
 
   return {
-    startDate: today8AM.toISOString(),
+    startDate: anchor8AM.toISOString(),
     endDate: now.toISOString(),
-    startLocal: toDateTimeLocal(today8AM),
+    startLocal: toDateTimeLocal(anchor8AM),
     endLocal: toDateTimeLocal(now),
   };
 };
@@ -144,6 +152,24 @@ export const getLastNDaysRange = (n) => {
     startLocal: toDateTimeLocal(start),
     endLocal: toDateTimeLocal(now),
   };
+};
+
+/**
+ * Convert an IST wall-clock date/time to a UTC epoch timestamp (ms).
+ * Centralises the 5:30 IST offset math so callers building an absolute
+ * timestamp from "selectedDate HH:MM IST" (e.g. a shift window) don't each
+ * duplicate `Date.UTC(...) - 5.5 * 3600_000` inline.
+ * @param {number} year
+ * @param {number} month - 1-indexed (1 = January), matching a "YYYY-MM-DD".split("-") result
+ * @param {number} day
+ * @param {number} hour
+ * @param {number} minute
+ * @returns {number} epoch ms
+ * @example istToUtcMs(2026, 7, 18, 8, 0) → epoch ms for 2026-07-18 08:00 IST
+ */
+export const istToUtcMs = (year, month, day, hour, minute) => {
+  const istOffsetMs = 5.5 * 60 * 60 * 1000;
+  return Date.UTC(year, month - 1, day, hour, minute) - istOffsetMs;
 };
 
 /**

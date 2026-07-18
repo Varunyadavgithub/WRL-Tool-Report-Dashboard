@@ -37,6 +37,7 @@ import {
   FaHourglassHalf,
   FaSync,
   FaTools,
+  FaPlus,
 } from "react-icons/fa";
 import {
   MdFormatListNumbered,
@@ -625,7 +626,14 @@ const AuditEntry = () => {
                       ...stage,
                       checkPoints: stage.checkPoints.map((cp) =>
                         cp.id === checkpointId
-                          ? { ...cp, [columnId]: imageData }
+                          ? {
+                              ...cp,
+                              [columnId]: imageData,
+                              // Image Capture items have no pass/fail concept
+                              // of their own — the photo being present *is*
+                              // the completion signal, so drive status from it.
+                              ...(section.sectionType === "imageCapture" ? { status: "pass" } : {}),
+                            }
                           : cp,
                       ),
                     }
@@ -672,7 +680,11 @@ const AuditEntry = () => {
                     ...stage,
                     checkPoints: stage.checkPoints.map((cp) =>
                       cp.id === checkpointId
-                        ? { ...cp, [columnId]: null }
+                        ? {
+                            ...cp,
+                            [columnId]: null,
+                            ...(section.sectionType === "imageCapture" ? { status: "pending" } : {}),
+                          }
                         : cp,
                     ),
                   }
@@ -1068,6 +1080,68 @@ const AuditEntry = () => {
     toast.success(`All checkpoints set to "${STATUS_CONFIG[status]?.label}"`);
   };
 
+  // Lets the auditor insert a checkpoint the template didn't anticipate,
+  // right there during entry — flagged `custom: true` so only these (not
+  // template-defined checkpoints) can be removed again from the entry screen.
+  const handleAddCheckpoint = (sectionId, stageId) => {
+    const section = sections.find((s) => s.id === sectionId);
+    const isImageCapture = section?.sectionType === "imageCapture";
+    const name = window.prompt(
+      isImageCapture ? "Item name (e.g. FG Sticker):" : "Checkpoint text:",
+    );
+    if (!name || !name.trim()) return;
+
+    const newCheckpoint = {
+      id: generateId(),
+      checkPoint: name.trim(),
+      method: "",
+      specification: "",
+      observation: "",
+      remark: "",
+      status: "pending",
+      required: isImageCapture,
+      custom: true,
+    };
+
+    setSections((prev) =>
+      prev.map((s) =>
+        s.id === sectionId
+          ? {
+              ...s,
+              stages: s.stages.map((st) =>
+                st.id === stageId
+                  ? { ...st, checkPoints: [...st.checkPoints, newCheckpoint] }
+                  : st,
+              ),
+            }
+          : s,
+      ),
+    );
+    toast.success(isImageCapture ? "Item added" : "Checkpoint added");
+  };
+
+  const handleRemoveCustomCheckpoint = (sectionId, stageId, checkpointId) => {
+    setSections((prev) =>
+      prev.map((s) =>
+        s.id === sectionId
+          ? {
+              ...s,
+              stages: s.stages.map((st) =>
+                st.id === stageId
+                  ? {
+                      ...st,
+                      checkPoints: st.checkPoints.filter(
+                        (cp) => cp.id !== checkpointId || !cp.custom,
+                      ),
+                    }
+                  : st,
+              ),
+            }
+          : s,
+      ),
+    );
+  };
+
   const toggleSection = (sectionId) => {
     setCollapsedSections((prev) => ({
       ...prev,
@@ -1079,6 +1153,14 @@ const AuditEntry = () => {
   // Including it in visibleColumns creates a <th> with no matching <td> (body returns null),
   // which shifts every body column one position right — making specification appear blank.
   const visibleColumns = template?.columns?.filter((col) => col.visible && col.id !== "section") || [];
+
+  // Image Capture is a fixed area pinned to the end of the audit — not one
+  // of the ordinary reorderable sections — so it always renders last
+  // regardless of where it happens to sit in the underlying `sections`
+  // array (e.g. templates saved before this feature existed).
+  const orderedSections = [...sections].sort(
+    (a, b) => (a.sectionType === "imageCapture" ? 1 : 0) - (b.sectionType === "imageCapture" ? 1 : 0),
+  );
 
   const getSummary = useCallback(() => {
     let pass = 0,
@@ -2009,7 +2091,7 @@ const AuditEntry = () => {
               Sections
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2 max-h-28 overflow-y-auto pr-1">
-              {sections.map((section) => {
+              {orderedSections.map((section) => {
                 const stats = getSectionStats(section);
                 const pct =
                   stats.total > 0
@@ -2308,7 +2390,7 @@ const AuditEntry = () => {
             )}
 
             {/* ==================== SECTIONS & TABLE ==================== */}
-            {sections.map((section) => {
+            {orderedSections.map((section) => {
               const isCollapsed = collapsedSections[section.id];
               const sectionStats = getSectionStats(section);
               const sectionPct =
@@ -2371,8 +2453,9 @@ const AuditEntry = () => {
                       </div>
                     </div>
 
-                    {/* Bulk Actions */}
-                    {!showPreview && (
+                    {/* Bulk Actions — status is driven by photo presence in
+                        Image Capture sections, so a manual bulk-set doesn't apply */}
+                    {!showPreview && section.sectionType !== "imageCapture" && (
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <span className="text-xs text-indigo-300 mr-1 hidden sm:inline">
                           Bulk:
@@ -2424,8 +2507,100 @@ const AuditEntry = () => {
                     </div>
                   )}
 
-                  {/* Table */}
-                  {!isCollapsed && (
+                  {/* Image Capture grid — photo-only items, no checkpoint table */}
+                  {!isCollapsed && section.sectionType === "imageCapture" && (
+                    <div className="p-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {(section.stages?.[0]?.checkPoints || [])
+                          .filter(filterCheckpoint)
+                          .map((cp) => {
+                            const stage = section.stages[0];
+                            const imageData = cp.image;
+                            const isFilename = typeof imageData === "string" && imageData.length > 0;
+                            const isBase64 = !!(imageData && typeof imageData === "object" && imageData.data);
+                            const imgSrc = isFilename
+                              ? `${baseURL}audit-report/images/${imageData}`
+                              : isBase64
+                                ? imageData.data
+                                : null;
+                            const imgName = isFilename ? imageData : imageData?.name || "img";
+                            const previewPayload = isFilename
+                              ? { fileName: imageData, data: imgSrc, name: imageData, size: null }
+                              : imageData;
+                            const refKey = `${section.id}-${stage.id}-${cp.id}-image`;
+
+                            return (
+                              <div key={cp.id} className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col items-center gap-2 relative">
+                                {!showPreview && canEdit && cp.custom && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveCustomCheckpoint(section.id, stage.id, cp.id)}
+                                    className="absolute top-2 right-2 text-red-300 hover:text-red-600 transition"
+                                    title="Remove item"
+                                  >
+                                    <FaTrash size={10} />
+                                  </button>
+                                )}
+                                <span className="text-xs font-semibold text-gray-700 text-center">
+                                  {cp.checkPoint || "Untitled"}
+                                </span>
+                                {imgSrc ? (
+                                  <div className="relative group">
+                                    <img
+                                      src={imgSrc}
+                                      alt={imgName}
+                                      className="w-28 h-28 object-cover rounded-xl border-2 border-gray-200 cursor-pointer group-hover:border-indigo-400 transition-all"
+                                      onClick={() => setImagePreview(previewPayload)}
+                                      onError={(e) => {
+                                        e.target.src =
+                                          "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzljYTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkVycm9yPC90ZXh0Pjwvc3ZnPg==";
+                                      }}
+                                    />
+                                    {!showPreview && canEdit && (
+                                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 rounded-xl transition-all flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100">
+                                        <button onClick={() => setImagePreview(previewPayload)} className="p-1.5 bg-white rounded-full text-indigo-600 shadow" title="View">
+                                          <FaSearchPlus size={11} />
+                                        </button>
+                                        <button onClick={() => handleImageRemove(section.id, stage.id, cp.id, "image")} className="p-1.5 bg-white rounded-full text-red-600 shadow" title="Remove photo">
+                                          <FaTrash size={11} />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : !showPreview && canEdit ? (
+                                  <ImageZone
+                                    uploadRef={(el) => (fileInputRefs.current[refKey] = el)}
+                                    onFile={(e) => handleImageUpload(section.id, stage.id, cp.id, "image", e)}
+                                  />
+                                ) : (
+                                  <span className="text-xs text-gray-300 italic">No photo</span>
+                                )}
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cp.status === "pass" ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                                  {cp.status === "pass" ? "Captured" : "Pending"}
+                                </span>
+                              </div>
+                            );
+                          })}
+                      </div>
+                      {(section.stages?.[0]?.checkPoints || []).length === 0 && (
+                        <p className="text-xs text-gray-400 italic text-center py-6">
+                          No image capture items defined for this section.
+                        </p>
+                      )}
+                      {!showPreview && canEdit && section.stages?.[0] && (
+                        <button
+                          type="button"
+                          onClick={() => handleAddCheckpoint(section.id, section.stages[0].id)}
+                          className="mt-4 w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 text-xs font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2"
+                        >
+                          <FaPlus size={10} /> Add Item
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Table (checklist sections) */}
+                  {!isCollapsed && section.sectionType !== "imageCapture" && (
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
@@ -2472,7 +2647,7 @@ const AuditEntry = () => {
                             let stageRendered = false;
                             const stageRowSpan = filteredCPs.length;
 
-                            return filteredCPs.map((checkpoint, cpIdx) => {
+                            const rows = filteredCPs.map((checkpoint, cpIdx) => {
                               const showStage = !stageRendered && cpIdx === 0;
                               if (showStage) stageRendered = true;
 
@@ -2609,15 +2784,49 @@ const AuditEntry = () => {
                                         key={column.id}
                                         className="px-3 py-2 border-r border-gray-100 last:border-r-0"
                                       >
-                                        <span className="text-gray-700 text-xs">
+                                        <span className="text-gray-700 text-xs inline-flex items-center gap-1.5">
                                           {checkpoint[column.id] || "—"}
+                                          {column.id === "checkPoint" && checkpoint.custom && (
+                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-600">
+                                              Custom
+                                            </span>
+                                          )}
                                         </span>
+                                        {column.id === "checkPoint" && checkpoint.custom && !showPreview && canEdit && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleRemoveCustomCheckpoint(section.id, stage.id, checkpoint.id)
+                                            }
+                                            className="ml-2 text-red-300 hover:text-red-600 transition"
+                                            title="Remove this checkpoint"
+                                          >
+                                            <FaTrash size={10} />
+                                          </button>
+                                        )}
                                       </td>
                                     );
                                   })}
                                 </tr>
                               );
                             });
+
+                            if (!showPreview && canEdit) {
+                              rows.push(
+                                <tr key={`${stage.id}-add-checkpoint`} className="border-b border-gray-100 bg-gray-50/40">
+                                  <td colSpan={visibleColumns.length} className="px-4 py-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAddCheckpoint(section.id, stage.id)}
+                                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5"
+                                    >
+                                      <FaPlus size={10} /> Add Checkpoint{stage.stageName ? ` to "${stage.stageName}"` : ""}
+                                    </button>
+                                  </td>
+                                </tr>,
+                              );
+                            }
+                            return rows;
                           })}
                         </tbody>
                       </table>

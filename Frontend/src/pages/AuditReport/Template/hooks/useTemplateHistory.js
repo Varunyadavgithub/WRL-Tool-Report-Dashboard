@@ -6,7 +6,7 @@
 // ──────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
-import useAuditData from "../../../hooks/useAuditData";
+import useAuditData from "../../../../hooks/useAuditData";
 
 export default function useTemplateHistory(templateId) {
   const { getTemplateHistory } = useAuditData();

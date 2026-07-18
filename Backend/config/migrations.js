@@ -717,6 +717,28 @@ export const runMigrations = async (pool3) => {
     END
   `);
 
+  // ── SheetSapCode / SheetDescription columns on MaterialConfigs ───────────
+  // Identify the raw sheet the component is punched from, distinct from the
+  // component's own SapCode/PartName.
+  await pool3.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'MaterialConfigs' AND COLUMN_NAME = 'SheetSapCode'
+    )
+    BEGIN
+      ALTER TABLE MaterialConfigs ADD SheetSapCode NVARCHAR(50) NULL;
+      PRINT 'Migration: Added SheetSapCode column to MaterialConfigs';
+    END
+    IF NOT EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'MaterialConfigs' AND COLUMN_NAME = 'SheetDescription'
+    )
+    BEGIN
+      ALTER TABLE MaterialConfigs ADD SheetDescription NVARCHAR(300) NULL;
+      PRINT 'Migration: Added SheetDescription column to MaterialConfigs';
+    END
+  `);
+
   // ── LPTReport: add LPTType column ────────────────────────────────────────
   await pool3.request().query(`
     IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'LPTReport')

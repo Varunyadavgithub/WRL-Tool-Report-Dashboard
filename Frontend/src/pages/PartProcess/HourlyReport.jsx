@@ -112,27 +112,17 @@ const PartProcessHourlyReport = () => {
       const fin   = new Date(endDate   + "T00:00:00");
       while (cur <= fin) { dates.push(`${cur.getFullYear()}-${pad(cur.getMonth()+1)}-${pad(cur.getDate())}`); cur.setDate(cur.getDate() + 1); }
 
-      // Overnight correction: records with StartTime before the production-day start
-      // belong to the next calendar date (post-midnight portion of overnight shifts).
-      const [sHH, sMM] = startH.split(":").map(Number);
-      const dayStartMins = sHH * 60 + sMM;
-      const bumpDate = (d) => {
-        const [y, mo, dy] = d.split("-").map(Number);
-        const dt = new Date(y, mo - 1, dy + 1);
-        return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
-      };
-      const calDateOf = (r) => {
-        const evDate = String(r.EventDate).slice(0, 10);
-        const hhmm = extractHHMM(r.StartTime);
-        if (!hhmm || dayStartMins === 0) return evDate;
-        const [h, m] = hhmm.split(":").map(Number);
-        return (h * 60 + m) < dayStartMins ? bumpDate(evDate) : evDate;
-      };
-
+      // EventDate is a plain calendar-date tag (whatever wall-clock date the
+      // event actually happened on), not a shift-adjusted "production day" —
+      // confirmed directly against the DB. So rows bucket by EventDate as-is;
+      // no date bump needed. A previous version bumped the date forward for
+      // any StartTime before the query's start-of-day, which pushed an
+      // already-correctly-dated overnight shift's post-midnight tail out of
+      // `dates` entirely, silently dropping it from every bucket.
       const allMapped = [];
       const allRaw    = [];
       for (const date of dates) {
-        const raw = allRows.filter(r => calDateOf(r) === date);
+        const raw = allRows.filter(r => String(r.EventDate).slice(0, 10) === date);
         raw.forEach(r => allRaw.push({ _fetchDate: date, ...r }));
         const mapped = raw.map((r, i) => ({ ...mapDbRecord(r, i), eventDate: date }));
         const filtered = mapped.filter(r => {

@@ -34,6 +34,7 @@ import axios from "axios";
 import { fileBaseURL } from "../../assets/assets.js";
 import toast from "react-hot-toast";
 import { PART_PROCESS_API } from "../../utils/factoryOsClient";
+import { istToUtcMs } from "../../utils/dateUtils.js";
 import {
   selectDowntimeReasons,
   selectQualityDefects,
@@ -220,12 +221,6 @@ const TimeMap = ({
   // Shift 2:     today 20:00 → tomorrow 08:00
   windowStartMs = null, // epoch ms of axis left edge
   windowEndMs = null, // epoch ms of axis right edge
-  // Minute-of-day below which a time string belongs to the NEXT calendar date
-  // relative to its record's eventDate. PartProcessEvents.EventDate stores the
-  // production day, so the post-midnight portion of an overnight shift (e.g.
-  // Shift 2: 20:00 D → 08:00 D+1) is saved under EventDate=D even though its
-  // wall-clock time is technically D+1. Defaults to 08:00 (typical day start).
-  dayStartMins = 480,
 }) => {
   const scrollRef = useRef(null);
   const canvasRef = useRef(null);
@@ -272,28 +267,32 @@ const TimeMap = ({
   const MS_PER_DAY = 86_400_000;
 
   // Convert "HH:MM" or "HH:MM:SS" from an API record + its eventDate to epoch ms.
-  // eventDate is the PRODUCTION DAY (DB EventDate), not necessarily the calendar
-  // date of the timestamp — bump it forward a day for the post-midnight portion
-  // of an overnight shift (time-of-day before dayStartMins).
+  // eventDate (PartProcessEvents.EventDate) is a plain calendar-date tag —
+  // whatever wall-clock date the event actually happened on — confirmed
+  // directly against the DB. It is NOT a "production day" that lags behind
+  // for the post-midnight portion of an overnight shift, so no date bump is
+  // needed: EventDate + StartTime is already the correct absolute timestamp.
+  // (A previous version bumped the date forward for any StartTime before
+  // 08:00, which pushed already-correctly-dated post-midnight records a full
+  // day late — past the window end — silently dropping them from the axis.)
+  // Returns epoch ms, or null if the record's time can't be parsed — NEVER a
+  // leaking NaN. Callers guard on `=== null`; a NaN previously slipped past
+  // every one of those checks (NaN <= x and NaN >= x are both false), so a
+  // single unparsable record could corrupt the whole timeline's aggregate
+  // stats (e.g. "NaNm running" in the legend) instead of just being dropped.
   const recordToMs = useCallback((r, field) => {
     const tStr = r[field];
     if (!tStr) return null;
     // If already a full datetime string, parse directly
-    if (tStr.length > 8 || tStr.includes("T")) return new Date(tStr).getTime();
-    let dateStr = r.eventDate || null;
-    if (dateStr) {
-      const [hh, mm] = tStr.split(":").map(Number);
-      const todMins = (hh || 0) * 60 + (mm || 0);
-      if (todMins < dayStartMins) {
-        const [y, mo, dy] = dateStr.split("-").map(Number);
-        const dt = new Date(y, mo - 1, dy + 1);
-        dateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-      }
+    if (tStr.length > 8 || tStr.includes("T")) {
+      const ms = new Date(tStr).getTime();
+      return Number.isNaN(ms) ? null : ms;
     }
-    // "HH:MM:SS" + (corrected) eventDate → combine
+    const dateStr = r.eventDate || null;
     const base = dateStr ? `${dateStr}T${tStr}` : tStr;
-    return new Date(base).getTime();
-  }, [dayStartMins]);
+    const ms = new Date(base).getTime();
+    return Number.isNaN(ms) ? null : ms;
+  }, []);
 
   // Current time as epoch ms (updated every minute via nowMins)
   const nowMs = useMemo(() => {
@@ -302,8 +301,11 @@ const TimeMap = ({
     return d.getTime();
   }, [nowMins]); // eslint-disable-line
 
-  // Window boundaries: use props when provided, else derive from data
-  const hasWindow = windowStartMs !== null && windowEndMs !== null;
+  // Window boundaries: use props when provided, else derive from data.
+  // Number.isFinite (not `!== null`) so a NaN prop — e.g. new Date(badRangeStart)
+  // upstream — falls back to data-derived bounds instead of silently
+  // corrupting the entire axis (minMs/maxMs/nowPct/elapsedMs all NaN).
+  const hasWindow = Number.isFinite(windowStartMs) && Number.isFinite(windowEndMs);
   const windowSpan = hasWindow ? windowEndMs - windowStartMs : 0;
 
   // Build event array in absolute ms — clamp to window when known
@@ -2132,12 +2134,18 @@ const PartProcessDashboard = () => {
 
   // FIX #4 #5 #6 — uses buildOeeTimeSeries with normalisation
   const oeeTimeSeries = useMemo(() => {
-    // For "All Shifts": use only selectedDate records (not D+1 overnight pull)
-    // so the graph x-axis represents one day, midnight-crossing normalised.
+    // For "All Shifts": use `records` directly. It's already bounded to the
+    // exact [rangeStart, rangeEnd] window by usePartProcessOEE's loadForRange,
+    // which for a 24h window (e.g. 08:00 D -> 08:00 D+1) legitimately spans
+    // two calendar EventDates. A previous version filtered down to only
+    // `r.eventDate === selectedDate`, which dropped every record tagged with
+    // the next day's EventDate — including the real post-midnight portion of
+    // this same production window (e.g. an overnight Shift 2's 00:00-08:00
+    // tail) — making the "All Shifts" OEE trend chart flatline after
+    // midnight even though the data existed (confirmed via Shift 2's own
+    // graph and the Shift Timeline widget both showing it correctly).
     // For a specific shift: use shiftRecords (already time-filtered to that shift).
-    const src = selectedShift
-      ? shiftRecords
-      : records.filter((r) => r.eventDate === selectedDate);
+    const src = selectedShift ? shiftRecords : records;
 
     // Find ideal cycle time for the graph's P curve
     const domModel = src
@@ -2195,7 +2203,6 @@ const PartProcessDashboard = () => {
     shiftRecords,
     records,
     selectedShift,
-    selectedDate,
     materials,
     shifts,
     isToday,
@@ -3415,6 +3422,9 @@ const PartProcessDashboard = () => {
                             <td className="px-3 py-2.5 border-b border-slate-100 font-bold font-mono text-blue-600">
                               {produced}
                             </td>
+                            <td className="px-3 py-2.5 border-b border-slate-100 font-bold font-mono text-emerald-600">
+                              {accepted}
+                            </td>
                             <td
                               className="px-3 py-2.5 border-b border-slate-100 font-bold font-mono"
                               style={{
@@ -3422,9 +3432,6 @@ const PartProcessDashboard = () => {
                               }}
                             >
                               {qLog.rejected}
-                            </td>
-                            <td className="px-3 py-2.5 border-b border-slate-100 font-bold font-mono text-emerald-600">
-                              {accepted}
                             </td>
                           </tr>
                         );
@@ -3647,8 +3654,6 @@ const PartProcessDashboard = () => {
               //   All Shifts:  rangeStart → rangeEnd  (from date-range picker)
               //   Shift 1:     selectedDate 08:00 IST → selectedDate 20:00 IST
               //   Shift 2:     selectedDate 20:00 IST → (selectedDate+1) 08:00 IST
-              // IST = UTC+5:30 → subtract 5h30m to get UTC, then Date.UTC
-              const istOffsetMs = 5.5 * 3600_000;
               let tlWindowStart, tlWindowEnd;
               if (!selectedShift) {
                 // All Shifts: use the loaded range directly
@@ -3659,22 +3664,12 @@ const PartProcessDashboard = () => {
                 const [sH, sM] = selectedShift.startTime.split(":").map(Number);
                 const [eH, eM] = selectedShift.endTime.split(":").map(Number);
                 const [yr, mo, dy] = selectedDate.split("-").map(Number);
-                // Start: selectedDate HH:MM IST → UTC ms
-                tlWindowStart = Date.UTC(yr, mo - 1, dy, sH, sM) - istOffsetMs;
+                tlWindowStart = istToUtcMs(yr, mo, dy, sH, sM);
                 // End: same date if day shift, next date if overnight
                 const isON = eH * 60 + eM <= sH * 60 + sM;
                 const endDy = isON ? dy + 1 : dy;
-                tlWindowEnd = Date.UTC(yr, mo - 1, endDy, eH, eM) - istOffsetMs;
+                tlWindowEnd = istToUtcMs(yr, mo, endDy, eH, eM);
               }
-              // Earliest configured shift start = the production-day boundary.
-              // Any record time-of-day before this belongs to the next
-              // calendar date relative to its (production-day) eventDate.
-              const dayStartMins = shifts.length > 0
-                ? Math.min(...shifts.map((s) => {
-                    const [h, m] = s.startTime.split(":").map(Number);
-                    return h * 60 + m;
-                  }))
-                : 480;
               return (
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
                   <TimeMap
@@ -3683,7 +3678,6 @@ const PartProcessDashboard = () => {
                     isToday={isToday}
                     shiftName={selectedShift?.shiftName}
                     shiftColor={selectedShift?.color}
-                    dayStartMins={dayStartMins}
                     windowStartMs={tlWindowStart}
                     windowEndMs={tlWindowEnd}
                   />

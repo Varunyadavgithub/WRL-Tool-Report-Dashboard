@@ -24,31 +24,48 @@ const input = await new Promise((resolve, reject) => {
 });
 if (!Array.isArray(input)) throw new Error("Expected a JSON array of event rows on standard input");
 
+// SQL Server error 1205 = deadlock victim. Expected under concurrent writers
+// (e.g. a manual sync run overlapping the 5-minute cron tick) — SQL Server's
+// own guidance is to just rerun the transaction, which almost always
+// succeeds on the next attempt since the winning transaction has released
+// its locks by then. Retry a few times with a short backoff before giving up.
+const MAX_DEADLOCK_RETRIES = 3;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 let pool;
 try {
   pool = await connectToDB(dbConfig3);
-  const transaction = new sql.Transaction(pool);
-  await transaction.begin();
-  try {
-    for (const row of input) {
-      const request = new sql.Request(transaction);
-      request.input("EventId", sql.NVarChar(50), row[0]); request.input("EventDate", sql.Date, row[1]);
-      request.input("ShiftName", sql.NVarChar(100), row[2]); request.input("EventType", sql.NVarChar(20), row[3]);
-      request.input("Barcode", sql.NVarChar(500), row[4]); request.input("StartTime", sql.NVarChar(10), row[5]);
-      request.input("EndTime", sql.NVarChar(10), row[6]); request.input("Duration", sql.NVarChar(15), row[7]);
-      request.input("PartsQty", sql.Int, row[8]); request.input("PartsQuality", sql.NVarChar(20), row[9]);
-      request.input("OperatorName", sql.NVarChar(200), row[10]); request.input("DowntimeReason", sql.NVarChar(500), row[11]);
-      request.input("DowntimeComment", sql.NVarChar(sql.MAX), row[12]); request.input("AssetName", sql.NVarChar(200), row[13]);
-      request.input("LineName", sql.NVarChar(200), row[14]); request.input("Energy", sql.Float, row[15]);
-      await request.query(UPSERT_SQL);
+  for (let attempt = 1; ; attempt++) {
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+    try {
+      for (const row of input) {
+        const request = new sql.Request(transaction);
+        request.input("EventId", sql.NVarChar(50), row[0]); request.input("EventDate", sql.Date, row[1]);
+        request.input("ShiftName", sql.NVarChar(100), row[2]); request.input("EventType", sql.NVarChar(20), row[3]);
+        request.input("Barcode", sql.NVarChar(500), row[4]); request.input("StartTime", sql.NVarChar(10), row[5]);
+        request.input("EndTime", sql.NVarChar(10), row[6]); request.input("Duration", sql.NVarChar(15), row[7]);
+        request.input("PartsQty", sql.Int, row[8]); request.input("PartsQuality", sql.NVarChar(20), row[9]);
+        request.input("OperatorName", sql.NVarChar(200), row[10]); request.input("DowntimeReason", sql.NVarChar(500), row[11]);
+        request.input("DowntimeComment", sql.NVarChar(sql.MAX), row[12]); request.input("AssetName", sql.NVarChar(200), row[13]);
+        request.input("LineName", sql.NVarChar(200), row[14]); request.input("Energy", sql.Float, row[15]);
+        await request.query(UPSERT_SQL);
+      }
+      await transaction.commit();
+      break;
+    } catch (error) {
+      // If SQL Server already aborted the transaction server-side (e.g. after a
+      // batch-aborting error), rollback() itself throws EABORT — that would
+      // otherwise mask the real error below with an unrelated stack trace.
+      try { await transaction.rollback(); } catch { /* already aborted, ignore */ }
+      const isDeadlock = error?.number === 1205 ||
+        (error?.code === "EREQUEST" && /deadlock/i.test(error?.message || ""));
+      if (isDeadlock && attempt < MAX_DEADLOCK_RETRIES) {
+        await sleep(300 * attempt);
+        continue;
+      }
+      throw error;
     }
-    await transaction.commit();
-  } catch (error) {
-    // If SQL Server already aborted the transaction server-side (e.g. after a
-    // batch-aborting error), rollback() itself throws EABORT — that would
-    // otherwise mask the real error below with an unrelated stack trace.
-    try { await transaction.rollback(); } catch { /* already aborted, ignore */ }
-    throw error;
   }
   process.stdout.write(JSON.stringify({ synced: input.length }) + "\n");
 } finally {

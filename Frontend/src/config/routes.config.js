@@ -121,6 +121,9 @@ const TemplateApproval = lazy(
 const TemplateCompare = lazy(
   () => import("../pages/AuditReport/Template/TemplateCompare"),
 );
+const TemplateChangeLog = lazy(
+  () => import("../pages/AuditReport/Template/TemplateChangeLog"),
+);
 const SerialScan = lazy(
   () => import("../pages/AuditReport/Template/SerialScan"),
 );
@@ -420,7 +423,7 @@ export const ROUTE_CONFIG = [
       },
       {
         path: "/dispatch/dispatch-unloading",
-        label: "Dispatch Unloading",
+        label: "FG Unloading",
         component: DispatchUnloading,
       },
       {
@@ -430,7 +433,7 @@ export const ROUTE_CONFIG = [
       },
       {
         path: "/dispatch/fg-dispatchReport",
-        label: "FG Dispatch Report",
+        label: "Unloading Status",
         component: FGDispatchReport,
       },
       {
@@ -542,6 +545,10 @@ export const ROUTE_CONFIG = [
       {
         path: "/auditreport/templates/:id/compare",
         component: TemplateCompare,
+      },
+      {
+        path: "/auditreport/templates/:id/history",
+        component: TemplateChangeLog,
       },
       {
         path: "/auditreport/templates/:id",
