@@ -217,6 +217,7 @@ export const ROLES = {
   CHEM_DATA_USER: "chem data user", // 225007
   VISI2_POST_QA: "visi-2 post qa", // 226002
   VISI_COMP_SCAN: "visi comp scan", // 226003
+  PART_PROCESS_PLANING:"part process planing"
 };
 
 // ─── Route Configuration ──────────────────────────────────────────────────────
