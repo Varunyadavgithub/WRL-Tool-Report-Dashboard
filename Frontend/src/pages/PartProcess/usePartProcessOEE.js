@@ -84,11 +84,15 @@ export const componentQtyFromMaster = (machineQty, mat) => {
     : q;
 };
 
+// Actual component CT = (machine cycle time + load/unload allowance) spread
+// across every component produced per machine cycle (comps/sheet × sheets/cycle)
+// — same formula as ProductionReport.jsx / productionLogic.js's Actual CT.
 const componentCTFromMaster = (sheetCT, mat) => {
+  const noOfSheet    = Number(mat?.noOfSheet) || 0;
   const compPerSheet = Number(mat?.actualComponentsPerSheet) || 0;
   const loadUnload   = Number(mat?.pncLoadingUnloading) || 0;
-  if (!isPunchingPart(mat) || compPerSheet <= 0) return null;
-  return Math.round((((Number(sheetCT) || 0) + loadUnload) / compPerSheet) * 100) / 100;
+  if (!isPunchingPart(mat) || compPerSheet <= 0 || noOfSheet <= 0) return null;
+  return Math.round((((Number(sheetCT) || 0) + loadUnload) / (noOfSheet * compPerSheet)) * 100) / 100;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -147,22 +151,52 @@ export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials })
   const planned  = Math.max(plannedMins, runTimeMins, 1);
   const A        = Math.min(100, Math.max(0, Math.round(((planned - downMins) / planned) * 100)));
 
+  // ── Component-unit quantities ───────────────────────────────────────────
+  // Convert every record's machine/sheet qty into component units (punching
+  // parts: sheets × comps/sheet). Computed up front so Performance can use
+  // component qty instead of raw sheet qty — DefinedComponentCycleTime is a
+  // per-COMPONENT cycle time, so multiplying it by raw sheet qty understated
+  // P for any punching part with >1 component per sheet.
+  const hasQualityData = prodRecords.some(r => r.quality != null && r.quality !== "");
+  let componentQty = 0;
+  let componentGood = 0;
+  const modelComponentTally = {};
+  prodRecords.forEach((r) => {
+    const mat = getMaterialByModel(materials, r.model);
+    const comp = componentQtyFromMaster(r.qty ?? 0, mat);
+    componentQty += comp;
+    if (!hasQualityData || r.quality === "GOOD") componentGood += comp;
+    if (r.model) modelComponentTally[r.model] = (modelComponentTally[r.model] || 0) + comp;
+  });
+  componentQty  = Math.round(componentQty);
+  componentGood = Math.round(componentGood);
+  const componentBad = Math.max(0, componentQty - componentGood);
+
   // ── P: Performance ────────────────────────────────────────────────────────
-  // Find the dominant model (highest qty) and look up its ideal cycle time
-  const modelTally = {};
-  prodRecords.forEach(r => { if (r.model) modelTally[r.model] = (modelTally[r.model] || 0) + (r.qty ?? 0); });
-  const topModel     = Object.entries(modelTally).sort((a, b) => b[1] - a[1])[0]?.[0];
-  const masterEntry  = topModel ? getMaterialByModel(materials, topModel) : null;
-  const idealCycleSecs = (masterEntry?.definedComponentCycleTime > 0) ? masterEntry.definedComponentCycleTime : null;
+  // Ideal production time = sum, across every model actually run, of that
+  // model's OWN component qty × its OWN DefinedComponentCycleTime — not one
+  // "dominant" model's cycle time applied against the whole shift's qty.
+  // Models with no configured cycle time simply don't contribute to either
+  // side (same "don't penalise unknown config" rule as before, now applied
+  // per model instead of picking one model for the entire shift).
+  let idealProdSecs = 0;
+  let anyIdealCycle = false;
+  Object.entries(modelComponentTally).forEach(([model, compQty]) => {
+    const mat = getMaterialByModel(materials, model);
+    const cycleSecs = mat?.definedComponentCycleTime > 0 ? mat.definedComponentCycleTime : null;
+    if (cycleSecs) {
+      idealProdSecs += compQty * cycleSecs;
+      anyIdealCycle = true;
+    }
+  });
   const plannedSecs  = planned * 60;
   const netSecs      = Math.max(1, plannedSecs - downSecs);
-  const pUnverified  = !idealCycleSecs;
-  const P            = idealCycleSecs
-    ? Math.min(100, Math.max(0, Math.round(((qty * idealCycleSecs) / netSecs) * 100)))
-    : 100;  // unknown std cycle → don't penalise, flag instead
+  const pUnverified  = !anyIdealCycle;
+  const P            = anyIdealCycle
+    ? Math.min(100, Math.max(0, Math.round((idealProdSecs / netSecs) * 100)))
+    : 100;  // no model in this window has a configured std cycle → don't penalise, flag instead
 
   // ── Q: Quality ────────────────────────────────────────────────────────────
-  const hasQualityData = prodRecords.some(r => r.quality != null && r.quality !== "");
   const good           = hasQualityData
     ? prodRecords.filter(r => r.quality === "GOOD").reduce((s, r) => s + (r.qty ?? 0), 0)
     : qty; // treat all as good when quality sensor not connected
@@ -172,22 +206,6 @@ export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials })
   // A, P and Q are percentages, so convert their product back to a
   // percentage with the standard OEE formula: A × P × Q ÷ 10,000.
   const OEE = Math.round((A * P * Q) / 10000);
-
-  // componentGood/componentBad mirror good/bad but in component units (same
-  // sheet→component multiplier as componentQty), so "Accepted"/"Rejected"
-  // tiles agree with "Produced Part Count" instead of mixing machine-qty and
-  // component-qty numbers in the same panel.
-  let componentQty = 0;
-  let componentGood = 0;
-  prodRecords.forEach((r) => {
-    const mat = getMaterialByModel(materials, r.model);
-    const comp = componentQtyFromMaster(r.qty ?? 0, mat);
-    componentQty += comp;
-    if (!hasQualityData || r.quality === "GOOD") componentGood += comp;
-  });
-  componentQty  = Math.round(componentQty);
-  componentGood = Math.round(componentGood);
-  const componentBad = Math.max(0, componentQty - componentGood);
 
   const avgCycleSecs = prodRecords.length > 0 ? Math.round(runSecs / prodRecords.length) : 0;
 
@@ -332,11 +350,14 @@ export const usePartProcessOEE = () => {
     if (rangeStart && rangeEnd) loadForRange(rangeStart, rangeEnd);
   }, [rangeStart, rangeEnd, loadForRange]);
 
-  // The FactoryOS importer updates PartProcessEvents in the background. Refresh
-  // the active dashboard range so newly synced cycles appear without a reload.
+  // The FactoryOS importer updates PartProcessEvents in the background, on its
+  // own 5-minute cron (Backend/cron/factoryOsSync.cron.js). Polling faster than
+  // that just re-fetches data that hasn't changed yet, so this matches the
+  // sync cadence instead of guessing a shorter interval — same freshness, far
+  // fewer redundant /records-range calls hitting the API and DB.
   useEffect(() => {
     if (!rangeStart || !rangeEnd) return undefined;
-    const timer = setInterval(() => loadForRange(rangeStart, rangeEnd), 60_000);
+    const timer = setInterval(() => loadForRange(rangeStart, rangeEnd), 300_000);
     return () => clearInterval(timer);
   }, [rangeStart, rangeEnd, loadForRange]);
 
@@ -443,17 +464,11 @@ export const usePartProcessOEE = () => {
   const activeAvgCycleSecs  = activeOEEData.avgCycleSecs;
 
   // ── Current model / material lookup ────────────────────────────────────
-  const latestProdRecord = (selectedShift ? shiftRecords : records).find(r => r.state === "Production");
-  const curModel = latestProdRecord?.model ?? null;
-  const curMat   = curModel ? getMaterialByModel(materials, curModel) : null;
-  const curComponentCT = componentCTFromMaster(activeAvgCycleSecs, curMat);
-
-  // Determine running status based on the most recent Production record's timestamp.
-  // Rationale: raw DB updates can interleave Downtime/Production rows — using the
-  // first array entry made the UI flip to OFFLINE incorrectly. Instead we look
-  // for the latest Production record (or fallback to the newest record) and
-  // consider the machine running only if that record is Production and
-  // occurred within a short recency window.
+  // /records-range returns rows ORDER BY EventDate ASC, StartTime ASC (oldest
+  // first), so records[]/shiftRecords[] are in ascending order — picking the
+  // FIRST array entry (as a naive .find() would) actually returns the OLDEST
+  // record of the range, not the latest. Every "most recent" lookup here must
+  // instead reduce by parsed timestamp, same as latestRecord below.
   const srcRecords = selectedShift ? shiftRecords : records;
   const parseRecordTs = (r) => {
     if (!r) return null;
@@ -476,6 +491,20 @@ export const usePartProcessOEE = () => {
     return null;
   };
 
+  const prodRecords = srcRecords.filter(r => r.state === "Production");
+  const latestProdRecord = prodRecords.length > 0
+    ? prodRecords.reduce((a, b) => (parseRecordTs(a) || 0) > (parseRecordTs(b) || 0) ? a : b)
+    : null;
+  const curModel = latestProdRecord?.model ?? null;
+  const curMat   = curModel ? getMaterialByModel(materials, curModel) : null;
+  const curComponentCT = componentCTFromMaster(activeAvgCycleSecs, curMat);
+
+  // Determine running status based on the most recent Production record's timestamp.
+  // Rationale: raw DB updates can interleave Downtime/Production rows — using the
+  // first array entry made the UI flip to OFFLINE incorrectly. Instead we look
+  // for the latest Production record (or fallback to the newest record) and
+  // consider the machine running only if that record is Production and
+  // occurred within a short recency window.
   let isRunning = false;
   if (srcRecords && srcRecords.length > 0) {
     const nowMs = time.getTime();
@@ -484,18 +513,14 @@ export const usePartProcessOEE = () => {
     // Latest record of any state
     const latestRecord = srcRecords.reduce((a, b) => (parseRecordTs(a) || 0) > (parseRecordTs(b) || 0) ? a : b);
     const latestRecordTs = parseRecordTs(latestRecord);
-
-    // Latest Production record (if any)
-    const prodRecords = srcRecords.filter(r => r.state === "Production");
-    const latestProd = prodRecords.length > 0 ? prodRecords.reduce((a, b) => (parseRecordTs(a) || 0) > (parseRecordTs(b) || 0) ? a : b) : null;
-    const latestProdTs = parseRecordTs(latestProd);
+    const latestProdTs = parseRecordTs(latestProdRecord);
 
     // Prefer explicit DB event type: if the latest record is a recent Downtime,
     // the machine is stopped. Otherwise if a recent Production exists treat
     // the machine as running. Fall back to latest-record Production as last resort.
     if (latestRecord && latestRecord.state === "Downtime" && latestRecordTs && (nowMs - latestRecordTs) < THRESHOLD_MS) {
       isRunning = false;
-    } else if (latestProd && latestProdTs && (nowMs - latestProdTs) < THRESHOLD_MS) {
+    } else if (latestProdRecord && latestProdTs && (nowMs - latestProdTs) < THRESHOLD_MS) {
       isRunning = true;
     } else if (latestRecord && latestRecord.state === "Production" && latestRecordTs && (nowMs - latestRecordTs) < THRESHOLD_MS) {
       isRunning = true;
@@ -535,7 +560,7 @@ export const usePartProcessOEE = () => {
     displayQty, displayComponentQty, displayGood, displayBad,
     displayComponentGood, displayComponentBad, passR, dMins, activeAvgCycleSecs,
     curModel, curMat, curComponentCT, isRunning,
-    latestRecord,
+    latestRecord, latestProdRecord,
     shiftProgress,
   };
 };

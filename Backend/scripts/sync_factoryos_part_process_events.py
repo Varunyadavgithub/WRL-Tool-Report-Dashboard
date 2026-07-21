@@ -25,7 +25,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -37,6 +37,18 @@ import pyodbc
 
 DEFAULT_API_BASE = "https://factoryos.smartudyog.in/api"
 DEFAULT_MACHINE_ID = "b3b8627a-3b55-4af3-96ee-c3fc7f712ecd"
+
+# FactoryOS event ids that must never be written locally, regardless of what
+# FactoryOS itself reports for them. Add an entry here (with a short reason)
+# when a record needs to be permanently suppressed instead of getting
+# silently re-synced back a few minutes after a manual edit or delete.
+EXCLUDED_EVENT_IDS = {
+    # 2026-07-21 Shift 1 downtime — stuck open 12:30-16:18:43 on FactoryOS's
+    # side, overlapping manually-inserted test production data for that
+    # window. Editing/deleting it locally kept getting overwritten by the
+    # next sync since FactoryOS's own record is unchanged.
+    "86b47dfe-691f-4769-9e46-fe06a7b41276",
+}
 INSERT_SQL = """
 MERGE PartProcessEvents AS target
 USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)) AS source (
@@ -137,7 +149,24 @@ def to_row(record: dict, requested_date: str) -> tuple:
     event_id = get_value(record, "id", "event_id")
     if event_id is None:
         raise ValueError("FactoryOS event has no id")
-    event_date = text(get_value(record, "event_date", "date", default=requested_date), 10) or requested_date
+
+    # FactoryOS's daily-summary buckets by PRODUCTION day, not calendar date:
+    # an overnight shift (e.g. 20:00-08:00) is returned in full under the date
+    # its evening portion falls on, including the post-midnight tail that
+    # actually happens the NEXT calendar day. FactoryOS never sends its own
+    # per-event date field (observed: always null), so without this
+    # correction every event gets written with EventDate=requested_date,
+    # silently mis-tagging the overnight tail a day early (caught via a
+    # manual backfill on 2026-07-20 whose "00:00-08:00" rows turned out to
+    # be 2026-07-21's actual events per their FactoryOS modified_at stamps).
+    event_date = text(get_value(record, "event_date", "date"), 10) or requested_date
+    shift_start = get_value(record, "shift.start_time")
+    shift_end   = get_value(record, "shift.end_time")
+    own_start   = get_value(record, "start_time")
+    if (event_date == requested_date and shift_start and shift_end and own_start
+            and shift_end <= shift_start and own_start < shift_end):
+        event_date = (date.fromisoformat(requested_date) + timedelta(days=1)).isoformat()
+
     shift = get_value(record, "shift.shift_name", "shift_name")
     return (
         text(event_id, 50), event_date, text(shift, 100),
@@ -248,12 +277,20 @@ def main() -> int:
         events = fetch_events(api_base, args.machine_id, args.date, args.page_size, username, password)
         # FactoryOS can occasionally return the same event_id more than once.
         # EventId is the local primary key, so keep the last version of each event.
-        rows_by_id = {row[0]: row for row in (to_row(event, args.date) for event in events)}
+        rows_by_id: dict[str, tuple] = {}
+        excluded_count = 0
+        for event in events:
+            row = to_row(event, args.date)
+            if row[0] in EXCLUDED_EVENT_IDS:
+                excluded_count += 1
+                continue
+            rows_by_id[row[0]] = row
         rows = list(rows_by_id.values())
-        duplicate_count = len(events) - len(rows)
+        duplicate_count = len(events) - len(rows) - excluded_count
+        excluded_note = f", {excluded_count} excluded event IDs skipped" if excluded_count else ""
         if args.dry_run:
             print(f"Validated {len(rows)} unique FactoryOS events for {args.date}"
-                  f" ({duplicate_count} duplicate event IDs ignored); no database changes made.")
+                  f" ({duplicate_count} duplicate event IDs ignored{excluded_note}); no database changes made.")
             return 0
         if not rows:
             print(f"No FactoryOS events found for {args.date}; no database changes made.")
@@ -267,7 +304,7 @@ def main() -> int:
                 cursor.executemany(INSERT_SQL, rows)
                 connection.commit()
         print(f"Synced {len(rows)} unique FactoryOS events for {args.date} into PartProcessEvents"
-              f" ({duplicate_count} duplicate event IDs ignored).")
+              f" ({duplicate_count} duplicate event IDs ignored{excluded_note}).")
         return 0
     except (RuntimeError, ValueError, pyodbc.Error) as error:
         print(f"Sync failed: {error}", file=sys.stderr)

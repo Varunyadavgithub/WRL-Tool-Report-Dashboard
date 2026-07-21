@@ -4,16 +4,28 @@ import { uploadMachineImage, uploadMaterialDrawing, handleMulterError } from "..
 import {
   getMaterials, createMaterial, updateMaterial, deleteMaterial, bulkUpsertMaterials,
   uploadMaterialDrawing as uploadMaterialDrawingHandler, deleteMaterialDrawing,
-  getShifts, createShift, updateShift, deleteShift,
+} from "../controllers/masterConfig/materials.controller.js";
+import { getShifts, createShift, updateShift, deleteShift } from "../controllers/masterConfig/shifts.controller.js";
+import {
   getDowntimeReasons, createDowntimeReason, updateDowntimeReason, deleteDowntimeReason,
+} from "../controllers/masterConfig/downtimeReasons.controller.js";
+import {
   getDepartments, createDepartment, updateDepartment, deleteDepartment,
+} from "../controllers/masterConfig/departments.controller.js";
+import {
   getQualityDefects, createQualityDefect, updateQualityDefect, deleteQualityDefect,
+} from "../controllers/masterConfig/qualityDefects.controller.js";
+import {
   getMailSubscribers, createMailSubscriber, updateMailSubscriber, deleteMailSubscriber, testMailSubscriber,
+} from "../controllers/masterConfig/mailSubscribers.controller.js";
+import {
   getMachines, createMachine, updateMachine, deleteMachine, uploadMachineImage as uploadMachineImageHandler,
-  getPlans, createPlan, updatePlan, deletePlan, bulkUpsertPlans,
+} from "../controllers/masterConfig/machines.controller.js";
+import { getPlans, createPlan, updatePlan, deletePlan, bulkUpsertPlans } from "../controllers/masterConfig/plans.controller.js";
+import {
   getCheckpointLibrary, createCheckpointLibraryEntry, updateCheckpointLibraryEntry,
   deleteCheckpointLibraryEntry, incrementCheckpointUsage,
-} from "../controllers/masterConfig.controller.js";
+} from "../controllers/masterConfig/checkpointLibrary.controller.js";
 
 const router = Router();
 

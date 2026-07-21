@@ -13,6 +13,17 @@ const TYPES = ["Rework","Rejection","Hold","Observation"];
 
 const INIT = { qCode:"", defectName:"", category:"Dimensional", type:"Rework", severity:"Minor", stage:"In-Process", rootCause:"", capaRequired:false, status:true };
 
+// Auto-generate the next sequential "QD001", "QD002"... code from whatever's
+// already configured, so admins never have to invent/type one by hand.
+const nextQCode = (data) => {
+  const nums = data
+    .map((r) => /^QD(\d+)$/i.exec((r.qCode || "").trim()))
+    .filter(Boolean)
+    .map((m) => parseInt(m[1], 10));
+  const next = (nums.length ? Math.max(...nums) : 0) + 1;
+  return `QD${String(next).padStart(3, "0")}`;
+};
+
 const SeverityBadge = ({ s }) => {
   const c = { Critical:"bg-rose-100 text-rose-700 border-rose-300", Major:"bg-orange-50 text-orange-700 border-orange-200", Minor:"bg-amber-50 text-amber-700 border-amber-200", Observation:"bg-slate-100 text-slate-600 border-slate-200" };
   return <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${c[s] || c.Observation}`}>{s}</span>;
@@ -43,12 +54,12 @@ const QualityConfig = () => {
 
   const filtered = useMemo(() => data.filter((r) => r.qCode.toLowerCase().includes(search.toLowerCase()) || r.defectName.toLowerCase().includes(search.toLowerCase())), [data, search]);
 
-  const openAdd  = () => { setForm(INIT); setModal({ open:true, mode:"add" }); };
+  const openAdd  = () => { setForm({ ...INIT, qCode: nextQCode(data) }); setModal({ open:true, mode:"add" }); };
   const openEdit = (row) => { setForm({ ...row }); setModal({ open:true, mode:"edit", row }); };
   const closeModal = () => setModal({ open:false });
 
   const handleSave = async () => {
-    if (!form.qCode || !form.defectName) { toast.error("Code and Defect Name are required."); return; }
+    if (!form.defectName) { toast.error("Defect Name is required."); return; }
     try {
       if (modal.mode === "add") {
         if (data.find((r) => r.qCode === form.qCode)) { toast.error("Quality Code already exists."); return; }
@@ -148,7 +159,7 @@ const QualityConfig = () => {
       {modal.open && (
         <Modal title={modal.mode === "add" ? "Add Defect Code" : "Edit Defect Code"} onClose={closeModal} onSave={handleSave}>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Quality Code" required><input value={form.qCode} onChange={sf("qCode")} placeholder="e.g. QD001" className={inputCls} /></Field>
+            <Field label="Quality Code" required><input value={form.qCode} readOnly disabled title="Auto-generated" className={`${inputCls} bg-slate-50 text-slate-500 cursor-not-allowed`} /></Field>
             <Field label="Defect Name" required><input value={form.defectName} onChange={sf("defectName")} placeholder="e.g. Dimensional Variation" className={inputCls} /></Field>
             <Field label="Defect Category">
               <select value={form.category} onChange={sf("category")} className={selectCls}>

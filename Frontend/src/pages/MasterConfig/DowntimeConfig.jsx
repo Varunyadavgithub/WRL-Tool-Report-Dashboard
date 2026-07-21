@@ -12,6 +12,17 @@ import {
 const INIT = { dtCode:"", reason:"", department:"", status:true };
 const DEPT_INIT = { name:"" };
 
+// Auto-generate the next sequential "DT001", "DT002"... code from whatever's
+// already configured, so admins never have to invent/type one by hand.
+const nextDtCode = (data) => {
+  const nums = data
+    .map((r) => /^DT(\d+)$/i.exec((r.dtCode || "").trim()))
+    .filter(Boolean)
+    .map((m) => parseInt(m[1], 10));
+  const next = (nums.length ? Math.max(...nums) : 0) + 1;
+  return `DT${String(next).padStart(3, "0")}`;
+};
+
 const DepartmentBadge = ({ name }) =>
   name ? (
     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200">{name}</span>
@@ -124,12 +135,12 @@ const DowntimeConfig = () => {
 
   const filtered = useMemo(() => data.filter((r) => r.dtCode.toLowerCase().includes(search.toLowerCase()) || r.reason.toLowerCase().includes(search.toLowerCase())), [data, search]);
 
-  const openAdd  = () => { setForm(INIT); setModal({ open:true, mode:"add" }); };
+  const openAdd  = () => { setForm({ ...INIT, dtCode: nextDtCode(data) }); setModal({ open:true, mode:"add" }); };
   const openEdit = (row) => { setForm({ ...row }); setModal({ open:true, mode:"edit", row }); };
   const closeModal = () => setModal({ open:false });
 
   const handleSave = async () => {
-    if (!form.dtCode || !form.reason) { toast.error("Code and Reason are required."); return; }
+    if (!form.reason) { toast.error("Reason is required."); return; }
     try {
       if (modal.mode === "add") {
         if (data.find((r) => r.dtCode === form.dtCode)) { toast.error("Downtime Code already exists."); return; }
@@ -196,7 +207,7 @@ const DowntimeConfig = () => {
       {modal.open && (
         <Modal title={modal.mode === "add" ? "Add Downtime Reason" : "Edit Downtime Reason"} onClose={closeModal} onSave={handleSave}>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Downtime Code" required><input value={form.dtCode} onChange={sf("dtCode")} placeholder="e.g. DT001" className={inputCls} /></Field>
+            <Field label="Downtime Code" required><input value={form.dtCode} readOnly disabled title="Auto-generated" className={`${inputCls} bg-slate-50 text-slate-500 cursor-not-allowed`} /></Field>
             <Field label="Downtime Reason" required><input value={form.reason} onChange={sf("reason")} placeholder="e.g. Machine Breakdown" className={inputCls} /></Field>
             <Field label="Department">
               <select value={form.department} onChange={sf("department")} className={selectCls}>

@@ -879,22 +879,28 @@ const QuickDowntimeForm = ({
     [downtimeEntries],
   );
 
-  // Merge downtime events + changeover events into one unified list
+  // Merge downtime events + changeover events into one unified list.
+  // A changeover completed within the standard allowance (STD_CHANGEOVER_MINS)
+  // isn't "extra" downtime — nothing to explain, so it doesn't need a downtime
+  // log entry at all and is left out of this list. Only overrun changeovers
+  // (the excess beyond standard time) show up here.
   const allEvents = useMemo(() => {
     const dtEvents = downtimeList.map((r) => ({ ...r, _type: "Downtime" }));
-    const coEvents = changeovers.map((co, i) => ({
-      _type: "Changeover",
-      srNo: `CO-${i + 1}`,
-      shift: co.shift,
-      startTime: co.startTime,
-      endTime: co.endTime,
-      duration: coMinsToHMS(co.durationMins),
-      durationMins: co.durationMins,
-      model: co.toModel,
-      fromModel: co.fromModel,
-      isOverrun: co.isOverrun,
-      downtimeReason: null,
-    }));
+    const coEvents = changeovers
+      .filter((co) => co.isOverrun)
+      .map((co, i) => ({
+        _type: "Changeover",
+        srNo: `CO-${i + 1}`,
+        shift: co.shift,
+        startTime: co.startTime,
+        endTime: co.endTime,
+        duration: coMinsToHMS(co.durationMins),
+        durationMins: co.durationMins,
+        model: co.toModel,
+        fromModel: co.fromModel,
+        isOverrun: co.isOverrun,
+        downtimeReason: null,
+      }));
     return [...dtEvents, ...coEvents];
   }, [downtimeList, changeovers]); // eslint-disable-line
 
@@ -1012,9 +1018,9 @@ const QuickDowntimeForm = ({
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-600">
                 {downtimeList.length} DT
               </span>
-              {changeovers.length > 0 && (
+              {changeovers.some((co) => co.isOverrun) && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                  {changeovers.length} CO
+                  {changeovers.filter((co) => co.isOverrun).length} CO
                 </span>
               )}
             </div>
@@ -1520,7 +1526,7 @@ const QuickQualityForm = ({
             </div>
 
             {/* Form */}
-            <div className="w-64 shrink-0 p-4 flex flex-col gap-3 overflow-auto">
+            <div className="w-72 shrink-0 p-4 flex flex-col gap-3 overflow-auto">
               {selected ? (
                 <>
                   <div className="bg-violet-50 rounded-xl border border-violet-200 p-3 shrink-0">
@@ -1565,7 +1571,7 @@ const QuickQualityForm = ({
                       <option value="">Select Defect</option>
                       {activeDefects.map((q) => (
                         <option key={q.id} value={q.id}>
-                          [{q.qCode}] {q.defectName}
+                          {q.defectName}
                         </option>
                       ))}
                     </select>
@@ -1577,17 +1583,17 @@ const QuickQualityForm = ({
                       onChange={sf("disposition")}
                       className={iC}
                     >
-                      {["Rework", "Rejection", "Hold", "Accept"].map((d) => (
+                      {["Rework", "Rejection"].map((d) => (
                         <option key={d}>{d}</option>
                       ))}
                     </select>
                   </div>
-                  <div>
+                  <div className="w-60">
                     <Lbl>Remarks</Lbl>
                     <textarea
                       value={form.remarks}
                       onChange={sf("remarks")}
-                      className={`${iC} resize-none h-20`}
+                      className={`${iC} resize-none h-40`}
                     />
                   </div>
                 </>
@@ -2127,6 +2133,16 @@ const PartProcessDashboard = () => {
   const scopedDTEntries = scopedLogEntries.downtime;
   const scopedQEntries = scopedLogEntries.quality;
 
+  // Downtime events with no matching logged entry yet — same srNo matching
+  // QuickDowntimeForm uses internally, so this count always agrees with what
+  // the modal itself would show as "not yet logged".
+  const unassignedDowntimeCount = useMemo(() => {
+    const loggedSrNos = new Set(scopedDTEntries.map((e) => String(e.srNo)));
+    return records.filter(
+      (r) => r.state === "Downtime" && !loggedSrNos.has(String(r.srNo)),
+    ).length;
+  }, [records, scopedDTEntries]);
+
   // ── OEE time-series graph ───────────────────────────────────────────────
   // Minute-resolution "now" — recomputing the chart on every second tick of
   // useClock() would be wasteful since the graph buckets are 30 minutes wide.
@@ -2307,7 +2323,6 @@ const PartProcessDashboard = () => {
   }, [shiftRecords, records, selectedShift, selectedDate, materials]);
 
   const modelLabels = Object.keys(activeModelMap);
-  const modelValues = Object.values(activeModelMap);
 
   // Planning Config target qty per model for selectedDate — keyed the same way
   // activeModelMap keys its rows (Material's partName when matched via SAP code,
@@ -2343,19 +2358,22 @@ const PartProcessDashboard = () => {
     return lines;
   };
 
+  // Same model set as the "Model Breakdown" table (produced models + planned-
+  // but-not-yet-produced ones), so the chart and table never disagree on
+  // which models are shown for the selected date/shift.
   const modelChartData = useMemo(
     () => ({
-      labels: modelLabels.map(wrapLabel),
+      labels: modelBreakdownLabels.map(wrapLabel),
       datasets: [
         {
-          data: modelValues,
-          backgroundColor: CHART_COLORS.slice(0, modelLabels.length),
+          data: modelBreakdownLabels.map((m) => activeModelMap[m] || 0),
+          backgroundColor: CHART_COLORS.slice(0, modelBreakdownLabels.length),
           borderWidth: 0,
           borderRadius: 5,
         },
       ],
     }),
-    [modelLabels.join(), modelValues.join()],
+    [modelBreakdownLabels.join(), activeModelMap],
   ); // eslint-disable-line
 
   const modelChartOptions = useMemo(
@@ -2371,7 +2389,7 @@ const PartProcessDashboard = () => {
           borderColor: "#e2e8f0",
           borderWidth: 1,
           callbacks: {
-            title: (items) => modelLabels[items[0]?.dataIndex] ?? "",
+            title: (items) => modelBreakdownLabels[items[0]?.dataIndex] ?? "",
             label: (ctx) => `  Components: ${ctx.parsed.y}`,
           },
         },
@@ -2627,46 +2645,6 @@ const PartProcessDashboard = () => {
                 </div>
               </>
             )}
-
-            <div className="flex gap-2 ml-2 flex-wrap">
-              <button
-                onClick={() => navigate("/part-process/hourly-report")}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-              >
-                Hourly Report
-              </button>
-              <button
-                onClick={() => navigate("/part-process/production-report")}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-700 text-white hover:bg-slate-800"
-              >
-                Production Report
-              </button>
-              <button
-                onClick={() => setDowntimeModal(true)}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 hover:bg-rose-700 text-white"
-              >
-                <TimerOff className="w-3.5 h-3.5" /> Log Downtime
-              </button>
-              <button
-                onClick={() => {
-                  if (qualityPassword) {
-                    setPwdInput("");
-                    setPwdError(false);
-                    setPwdGate(true);
-                  } else {
-                    setQualityModal(true);
-                  }
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 hover:bg-violet-700 text-white"
-              >
-                {qualityPassword ? (
-                  <Lock className="w-3.5 h-3.5" />
-                ) : (
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                )}{" "}
-                Log Quality
-              </button>
-            </div>
 
             <div className="ml-auto flex items-center gap-2 flex-wrap">
               {/* ── Quick range buttons ── */}
@@ -3694,7 +3672,7 @@ const PartProcessDashboard = () => {
               </span>
             </div>
             <div className="h-56">
-              {modelLabels.length > 0 ? (
+              {modelBreakdownLabels.length > 0 ? (
                 <Bar data={modelChartData} options={modelChartOptions} />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-300">
@@ -3813,7 +3791,6 @@ const PartProcessDashboard = () => {
                           {[
                             "Shift",
                             "Model",
-                            "Inspected",
                             "Rejected",
                             "Defect",
                             "Disposition",
@@ -3844,9 +3821,6 @@ const PartProcessDashboard = () => {
                                   e.model ||
                                   e.Model ||
                                   "—"}
-                              </td>
-                              <td className="px-3 py-2 border-b border-slate-100 font-mono font-bold text-blue-600 text-center">
-                                {e.inspectedQty ?? e.InspectedQty ?? "—"}
                               </td>
                               <td
                                 className="px-3 py-2 border-b border-slate-100 font-mono font-bold text-center"
@@ -3960,6 +3934,57 @@ const PartProcessDashboard = () => {
           )}
         </div>
       </div>
+
+      {/* ── Quick actions rail — fixed to the right edge of the screen ── */}
+      {!isFullscreen && (
+        <div className="fixed right-4 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-2">
+          <button
+            onClick={() => navigate("/part-process/hourly-report")}
+            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-600/20 whitespace-nowrap"
+          >
+            Hourly Report
+          </button>
+          <button
+            onClick={() => navigate("/part-process/production-report")}
+            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-700 text-white hover:bg-slate-800 shadow-lg shadow-slate-700/20 whitespace-nowrap"
+          >
+            Production Report
+          </button>
+          <button
+            onClick={() => setDowntimeModal(true)}
+            className="relative flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/20 whitespace-nowrap"
+          >
+            <TimerOff className="w-3.5 h-3.5" /> Log Downtime
+            {unassignedDowntimeCount > 0 && (
+              <span
+                className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-400 text-amber-950 text-[10px] font-bold border-2 border-white animate-pulse"
+                title={`${unassignedDowntimeCount} downtime event${unassignedDowntimeCount === 1 ? "" : "s"} not yet assigned a reason`}
+              >
+                {unassignedDowntimeCount > 99 ? "99+" : unassignedDowntimeCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              if (qualityPassword) {
+                setPwdInput("");
+                setPwdError(false);
+                setPwdGate(true);
+              } else {
+                setQualityModal(true);
+              }
+            }}
+            className="flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-600/20 whitespace-nowrap"
+          >
+            {qualityPassword ? (
+              <Lock className="w-3.5 h-3.5" />
+            ) : (
+              <ShieldCheck className="w-3.5 h-3.5" />
+            )}{" "}
+            Log Quality
+          </button>
+        </div>
+      )}
 
       {/* ── Log Downtime Modal ── */}
       {downtimeModal && (

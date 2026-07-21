@@ -11,6 +11,8 @@ const MATERIAL_SELECT = `
     Id AS id, SapCode AS sapCode, PartName AS partName,
     NoOfSheet AS noOfSheet, ActualComponentsPerSheet AS actualComponentsPerSheet,
     PncLoadingUnloading AS pncLoadingUnloading, DefinedComponentCycleTime AS definedComponentCycleTime,
+    SheetSapCode AS sheetSapCode, SheetDescription AS sheetDescription,
+    Weight AS weight, ScrapWeight AS scrapWeight,
     Status AS status
   FROM MaterialConfigs WHERE Status = 1`;
 
@@ -76,7 +78,20 @@ export const buildShiftReport = async (pool, shift, dateStr) => {
     const qLog = qualityByPartName[r.itemDescription];
     const rejected = qLog?.rejected ?? 0;
     const accepted  = Math.max(0, r.componentQty - rejected);
-    return { ...r, accepted, rejected };
+    const material = materials.find((m) => m.sapCode === r.sapCode);
+    const totalDowntimeMins = Math.max(0, (r.lossMins || 0) - (r.coOverrunMins || 0));
+    return {
+      ...r,
+      startedAt: r.startedAt || "",
+      completedAt: r.completedAt || "",
+      sheetSapCode: material?.sheetSapCode || "",
+      sheetDescription: material?.sheetDescription || "",
+      sheetWeightKg: Math.round((Number(material?.weight) || 0) * (r.actualQty || 0) * 100) / 100,
+      scrapWeightKg: Math.round((Number(material?.scrapWeight) || 0) * (r.actualQty || 0) * 100) / 100,
+      totalDowntimeMins,
+      accepted,
+      rejected,
+    };
   });
 
   const totals = enrichedRows.reduce((acc, r) => {

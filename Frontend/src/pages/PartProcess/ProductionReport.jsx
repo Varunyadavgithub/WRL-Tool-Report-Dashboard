@@ -16,7 +16,7 @@ import autoTable from "jspdf-autotable";
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import toast from "react-hot-toast";
 import {
-  selectMaterials, getMaterialByModel, selectShifts, toMins, selectPlans,
+  selectMaterials, getMaterialByModel, selectPlans,
 } from "../../redux/slices/masterConfigSlice";
 import {
   enrichRecords, detectChangeovers, changeoverStats, parseDurSecs,
@@ -220,8 +220,10 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
       const sheetCT = punching && noOfSheet > 0
         ? Math.round((avgCycleSecs / noOfSheet) * 100) / 100
         : avgCycleSecs;
-      const compCT = punching && compPerSheet > 0
-        ? Math.round(((sheetCT + loadUnload) / compPerSheet) * 100) / 100
+      // Actual CT = (machine cycle time + load/unload allowance) spread across
+      // every component produced per machine cycle (comps/sheet × sheets/cycle).
+      const compCT = punching && compPerSheet > 0 && noOfSheet > 0
+        ? Math.round(((avgCycleSecs + loadUnload) / (compPerSheet * noOfSheet)) * 100) / 100
         : null;
 
       // Total Components Produced = (sheets × comps/sheet) × machine sheet count
@@ -506,7 +508,7 @@ const buildColumns = (materials) => [
         ? (
           <div className="text-center">
             <span className="font-mono font-semibold text-indigo-600">{r.componentCycleTime}</span>
-            <div className="text-[9px] font-mono text-slate-400">({r.sheetCycleTime}+{r.loadUnload}) ÷ {r.compPerSheet}</div>
+            <div className="text-[9px] font-mono text-slate-400">({r.machineCycleSecs}+{r.loadUnload}) ÷ ({r.compPerSheet}×{r.noOfSheet})</div>
           </div>
         )
         : <span className="text-slate-300 text-xs">—</span>
@@ -730,11 +732,6 @@ const PAGE_SIZES = [10, 25, 50, 100];
 const PartProcessProductionReport = () => {
   const materials = useSelector(selectMaterials);
   const plans = useSelector(selectPlans);
-  // CHANGE: memoise the filtered shift list. `.filter()` produced a NEW array
-  // every render, which re-created `fetchData` on every render and defeated
-  // useCallback/useMemo downstream.
-  const allShifts = useSelector(selectShifts);
-  const configShifts = useMemo(() => allShifts.filter((s) => s.status), [allShifts]);
 
   const [startTime, setStartTime] = useState(`${todayStr()} 08:00`);
   const [endTime, setEndTime]     = useState(`${todayStr()} 20:00`);
@@ -800,16 +797,22 @@ const PartProcessProductionReport = () => {
 
     setLoadFn(true); setRecords([]); setRawRecords([]); setPage(1);
     try {
-      const dayStartSec = configShifts.length
-        ? Math.min(...configShifts.map((s) => toMins(s.startTime))) * 60
-        : 0;
-
       // EventDate in the DB is a plain calendar-date tag (whatever wall-clock
       // date the event actually happened on) — NOT shift-adjusted. An
       // overnight Shift 2's post-midnight tail is stored under the NEXT
-      // calendar date. So the set of dates to query must be the raw calendar
-      // span of [startMs, endMs), not a production-day-shifted range —
-      // otherwise that tail's EventDate is never queried and silently drops.
+      // calendar date already (sync_factoryos_part_process_events.py derives
+      // it from the shift's own start/end window at write time), so no
+      // "StartTime before the earliest shift start → bump the display date
+      // +1 day" compensation is needed here anymore — EventDate + StartTime
+      // is already the correct absolute timestamp. An earlier version of this
+      // function DID apply that bump (to compensate for an older sync bug
+      // that mistagged the tail under the previous day), which is exactly
+      // what caused Started/Completed to show a day ahead of the Date column
+      // once the sync-side bug was fixed — the bump was then double-applying.
+      //
+      // The set of dates to query must still be the raw calendar span of
+      // [startMs, endMs), not a production-day-shifted range — otherwise the
+      // tail's (correct) EventDate is never queried and silently drops.
       const dates = [];
       const cur  = new Date(startMs);   cur.setHours(0, 0, 0, 0);
       const last = new Date(endMs - 1000); last.setHours(0, 0, 0, 0);
@@ -827,20 +830,14 @@ const PartProcessProductionReport = () => {
       for (const date of dates) {
         const raw = allRows.filter((r) => String(r.EventDate).slice(0, 10) === date);
         raw.forEach((r) => {
-          const tod = todSecs(r.StartTime);
-          let calDate = date;
-          if (tod !== null && tod < dayStartSec) {
-            const d = new Date(date + "T00:00:00"); d.setDate(d.getDate() + 1);
-            calDate = fmtYMD(d);
-          }
-          allRaw.push({ _fetchDate: date, _calDate: calDate, ...r });
+          allRaw.push({ _fetchDate: date, _calDate: date, ...r });
         });
 
         const midnight = new Date(date + "T00:00:00").getTime();
         const mapped = raw.map((r, i) => ({ ...mapDbRecord(r, i), eventDate: date })).map((r) => {
           const tod    = todSecs(r.startTime);
           const todEnd = todSecs(r.endTime);
-          const absMs  = tod === null ? null : midnight + (tod < dayStartSec ? 86400000 : 0) + tod * 1000;
+          const absMs  = tod === null ? null : midnight + tod * 1000;
           let absMsEnd = null;
           if (absMs !== null && todEnd !== null) {
             const sm = new Date(absMs); sm.setHours(0, 0, 0, 0);
@@ -874,7 +871,7 @@ const PartProcessProductionReport = () => {
       setDbQLogs([]);
       toast("Demo data loaded - connect to DB for live data", { icon: "⚡" });
     } finally { setLoadFn(false); }
-  }, [configShifts, DEMO_RECORDS]);
+  }, [DEMO_RECORDS]);
 
   const handleQuery = () => {
     if (!startTime || !endTime) { toast.error("Select a time range."); return; }
