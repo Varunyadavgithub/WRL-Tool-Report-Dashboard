@@ -175,6 +175,10 @@ const LPT = () => {
   const [lptDefectReport, setLptDefectReport] = useState([]);
   const [lptDefectCount, setLptDefectCount] = useState([]);
   const [performanceRes, setPerformanceRes] = useState("");
+  // LPT Recipe's manual "BIS Type" override (Quality > LPT Recipe) takes
+  // priority over the naming-convention guess in deriveBIS() below — a model
+  // set to "BIS" there must show as BIS here too, not just on that page.
+  const [recipes, setRecipes] = useState([]);
 
   // ── API Calls ──────────────────────────────────────────────────────────────
 
@@ -201,6 +205,15 @@ const LPT = () => {
       toast.error("Failed to fetch Lpt Defect data.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getRecipes = async () => {
+    try {
+      const res = await axios.get(`${baseURL}quality/lpt-recipe`);
+      if (res?.data?.success) setRecipes(res.data.data || []);
+    } catch (error) {
+      console.error("Failed to fetch LPT recipes:", error);
     }
   };
 
@@ -345,9 +358,18 @@ const LPT = () => {
     getLptDefectCount();
     getLptDefectReport();
     getLptDefectCategory();
+    getRecipes();
   }, []);
 
   // ── Derived ────────────────────────────────────────────────────────────────
+
+  // ModelName -> manually-set "BIS"/"Non BIS" from LPT Recipe, where set.
+  const bisOverrideByModel = recipes.reduce((map, r) => {
+    if (r.BIS && r.ModelName) map[r.ModelName.trim()] = r.BIS;
+    return map;
+  }, {});
+  const resolveBIS = (modelName) =>
+    bisOverrideByModel[(modelName || "").trim()] || deriveBIS(modelName);
 
   const totalTested = lptDefectCount.reduce(
     (s, r) => s + (r.SampleInspected || 0),
@@ -765,8 +787,8 @@ const LPT = () => {
                 {lptDefectCount.length === 0 ? (
                   <table className="min-w-full"><tbody><EmptyRow colSpan={6} /></tbody></table>
                 ) : (() => {
-                  const bisRows = lptDefectCount.filter((r) => deriveBIS(r.ModelName) === "BIS");
-                  const nonBisRows = lptDefectCount.filter((r) => deriveBIS(r.ModelName) === "Non BIS");
+                  const bisRows = lptDefectCount.filter((r) => resolveBIS(r.ModelName) === "BIS");
+                  const nonBisRows = lptDefectCount.filter((r) => resolveBIS(r.ModelName) === "Non BIS");
 
                   const subTotal = (rows) => ({
                     prod: rows.reduce((s, r) => s + (r.ModelCount || 0), 0),
