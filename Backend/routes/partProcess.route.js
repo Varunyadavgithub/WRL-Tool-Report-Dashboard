@@ -1,10 +1,8 @@
 import { Router } from "express";
 import { authenticate } from "../middlewares/auth.js";
-import {
-  getRecords, getRecordsRange, getSyncLog,
-  createDowntimeLog, getDowntimeLogs, deleteDowntimeLog,
-  createQualityLog, getQualityLogs, deleteQualityLog,
-} from "../controllers/partProcess.controller.js";
+import { getRecords, getRecordsRange, getSyncLog } from "../controllers/partProcess/records.controller.js";
+import { createDowntimeLog, getDowntimeLogs, deleteDowntimeLog } from "../controllers/partProcess/downtimeLog.controller.js";
+import { createQualityLog, getQualityLogs, deleteQualityLog } from "../controllers/partProcess/qualityLog.controller.js";
 
 const router = Router();
 

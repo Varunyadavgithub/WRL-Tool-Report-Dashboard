@@ -17,6 +17,10 @@ const SHIFTS = ["Shift A","Shift B","Shift C","All Shifts"];
 
 const today = new Date();
 const fmtDate = (d) => d.toISOString().split("T")[0];
+const yesterday = new Date(today);
+yesterday.setDate(yesterday.getDate() - 1);
+const TODAY_STR = fmtDate(today);
+const YESTERDAY_STR = fmtDate(yesterday);
 
 const INIT = { machineName:"", sapCode:"", partName:"", modelCode:"", targetQty:"", shift:"All Shifts", planDate: fmtDate(today), priority:"Medium", customer:"", plannedCycleTime:"" };
 
@@ -387,7 +391,9 @@ const PlanningConfig = () => {
   const [modal, setModal] = useState({ open:false, mode:"add", row:null });
   const [form, setForm]   = useState(INIT);
   const [search, setSearch] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
+  // Defaults to today's plans, matching the Today/Yesterday quick-filter
+  // pattern used on the Part Process report pages.
+  const [dateFilter, setDateFilter] = useState(TODAY_STR);
   const [showBulk, setShowBulk] = useState(false);
 
   const filtered = useMemo(() =>
@@ -441,12 +447,27 @@ const PlanningConfig = () => {
       <div className="flex-1 overflow-auto p-4">
         {/* Action bar */}
         <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <label className="text-[11px] font-semibold text-slate-500">Plan Date:</label>
+            <button
+              onClick={() => setDateFilter(TODAY_STR)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${dateFilter === TODAY_STR ? "bg-blue-600 border-blue-600 text-white" : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"}`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setDateFilter(YESTERDAY_STR)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${dateFilter === YESTERDAY_STR ? "bg-blue-600 border-blue-600 text-white" : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"}`}
+            >
+              Yesterday
+            </button>
+            <button
+              onClick={() => setDateFilter("")}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${dateFilter === "" ? "bg-blue-600 border-blue-600 text-white" : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"}`}
+            >
+              All Dates
+            </button>
             <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="text-xs px-2 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
-            {dateFilter && (
-              <button onClick={() => setDateFilter("")} className="text-[10px] text-slate-400 hover:text-slate-600 underline">Clear</button>
-            )}
           </div>
           <button
             onClick={() => setShowBulk(true)}

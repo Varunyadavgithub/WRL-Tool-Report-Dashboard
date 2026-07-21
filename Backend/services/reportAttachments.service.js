@@ -1,26 +1,20 @@
 /**
- * Builds nodemailer-ready PDF attachments for the Mail Config "Report Matrix"
- * report types, for one shift occurrence. Used by the shift-end cron and the
- * "Send Test Mail" action so subscribers get the same Production/Quality/
- * Downtime/Hourly reports as PDFs that the report pages export.
+ * Builds nodemailer-ready Excel (.xlsx) attachments for the Mail Config
+ * "Report Matrix" report types, for one shift occurrence. Used by the
+ * shift-end cron and the "Send Test Mail" action so subscribers get the
+ * exact same workbook each report page's own "Export Excel" button produces:
+ * Production Report uses its bespoke two-tier-header layout, Downtime Report
+ * shares the single-sheet "sections" layout its page uses.
  */
 import { buildShiftReport } from "./shiftReport.service.js";
-import { buildSectionsPDF } from "./reportPdf.service.js";
-import {
-  fetchShiftRawData, buildProductionReportBlocks, buildQualityReportBlocks,
-  buildDowntimeReportBlocks, buildHourlyReportBlocks,
-} from "./reportData.service.js";
+import { buildSectionsExcel } from "./reportExcel.service.js";
+import { buildProductionReportExcel } from "./productionExcel.service.js";
+import { fetchShiftRawData, buildDowntimeReportBlocks } from "./reportData.service.js";
 
-export const REPORT_NAMES = ["Production Report", "Quality Report", "Downtime Report", "Hourly Report"];
+export const REPORT_NAMES = ["Production Report", "Downtime Report"];
 
 const BLOCK_BUILDERS = {
-  "Production Report": async (pool, shift, dateStr) => {
-    const shiftReport = await buildShiftReport(pool, shift, dateStr);
-    return shiftReport ? buildProductionReportBlocks(shiftReport) : null;
-  },
-  "Quality Report":  async (_pool, _shift, _dateStr, raw) => buildQualityReportBlocks(raw),
   "Downtime Report": async (_pool, _shift, _dateStr, raw) => buildDowntimeReportBlocks(raw),
-  "Hourly Report":   async (_pool, _shift, _dateStr, raw) => buildHourlyReportBlocks(raw),
 };
 
 /**
@@ -28,24 +22,43 @@ const BLOCK_BUILDERS = {
  * names that actually had data are included.
  */
 export const buildReportAttachments = async (pool, shift, dateStr, reportNames) => {
-  const raw = await fetchShiftRawData(pool, shift, dateStr);
   const attachments = {};
+  const title = (name) => `${shift.shiftName} — ${name}`;
+  const subtitle = `${dateStr}  |  Generated ${new Date().toLocaleString()}`;
+  const attach = (name, ext, content) => {
+    attachments[name] = {
+      filename: `${name.replace(/\s+/g, "_")}_${dateStr}.${ext}`,
+      content,
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    };
+  };
 
-  for (const name of reportNames) {
-    const builder = BLOCK_BUILDERS[name];
-    if (!builder) continue;
+  if (reportNames.includes("Production Report")) {
     try {
-      const blocks = await builder(pool, shift, dateStr, raw);
-      if (!blocks || !blocks.length) continue;
-
-      const content = await buildSectionsPDF({
-        title: `${shift.shiftName} — ${name}`,
-        subtitle: `${dateStr}  |  Generated ${new Date().toLocaleString()}`,
-        blocks,
-      });
-      attachments[name] = { filename: `${name.replace(/\s+/g, "_")}_${dateStr}.pdf`, content };
+      const shiftReport = await buildShiftReport(pool, shift, dateStr);
+      if (shiftReport?.rows?.length) {
+        const content = await buildProductionReportExcel({
+          title: title("Production Report"), subtitle, rows: shiftReport.rows,
+        });
+        attach("Production Report", "xlsx", content);
+      }
     } catch (err) {
-      console.error(`[ReportAttachments] Failed building "${name}" PDF:`, err.message);
+      console.error(`[ReportAttachments] Failed building "Production Report" Excel:`, err.message);
+    }
+  }
+
+  const otherNames = reportNames.filter((n) => n !== "Production Report" && BLOCK_BUILDERS[n]);
+  if (otherNames.length) {
+    const raw = await fetchShiftRawData(pool, shift, dateStr);
+    for (const name of otherNames) {
+      try {
+        const blocks = await BLOCK_BUILDERS[name](pool, shift, dateStr, raw);
+        if (!blocks || !blocks.length) continue;
+        const content = await buildSectionsExcel({ title: title(name), subtitle, blocks });
+        attach(name, "xlsx", content);
+      } catch (err) {
+        console.error(`[ReportAttachments] Failed building "${name}" Excel:`, err.message);
+      }
     }
   }
 

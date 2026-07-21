@@ -3,7 +3,7 @@
  * shift to every active Mail Config subscriber, the moment that shift's
  * configured end time (ShiftConfigs.EndTime) is reached. The email body
  * always shows the live Production Report numbers; subscribers additionally
- * get a PDF attachment for each of the Report Matrix reports they picked
+ * get an Excel attachment for each of the Report Matrix reports they picked
  * (Production/Quality/Downtime/Hourly), built from the same data the report
  * pages export.
  *
@@ -99,7 +99,7 @@ const checkShiftEnds = async () => {
           continue;
         }
 
-        // Build each subscribed report's PDF once (shared across subscribers),
+        // Build each subscribed report's Excel workbook once (shared across subscribers),
         // then attach only what each individual subscriber asked for.
         const unionReports = [...new Set(subscribers.flatMap((s) => s.reports))];
         const attachmentsByReport = await buildReportAttachments(pool, { id: shift.Id, shiftName: shift.ShiftName }, dateStr, unionReports);

@@ -9,8 +9,6 @@
 export const IDLE_THRESHOLD_MINS = 10;  // Downtime ≥ 10 min → Idle
 export const STD_CHANGEOVER_MINS = 5;   // Standard changeover allowance
 
-const MIN_REAL_CO_MINS = 1;
-
 export const parseDurSecs = (dur = "00:00:00") => {
   const [h, m, s] = (dur || "00:00:00").split(":").map(Number);
   return (h || 0) * 3600 + (m || 0) * 60 + (s || 0);
@@ -77,13 +75,6 @@ export const detectChangeovers = (records, stdMins = STD_CHANGEOVER_MINS, shiftS
 
     if (prevModel !== null && prevModel !== r.model) {
       const gapMins = startMins - (prevEndMins ?? startMins);
-
-      if (gapMins < MIN_REAL_CO_MINS) {
-        prevModel   = r.model;
-        prevEndMins = endMins;
-        prevShift   = r.shift || prevShift;
-        continue;
-      }
 
       const overrunMins = Math.max(0, gapMins - stdMins);
       const coStartMins = prevEndMins ?? startMins;
@@ -237,6 +228,7 @@ export const aggregateRecords = (records, materials, dateStr) => {
         definedCycleTime: mat?.definedComponentCycleTime || 0,
         stdChangeoverTime: STD_CHANGEOVER_MINS,
         date: dateStr,
+        startedAt: "", completedAt: "",
         planQty: 0, actualQty: 0, goodQty: 0,
         downtimeSecs: 0, downtimeCount: 0,
         idleSecs: 0,    idleCount: 0,
@@ -247,6 +239,13 @@ export const aggregateRecords = (records, materials, dateStr) => {
 
     const g = map[key];
     g.rawRecords.push(r);
+    // Records arrive pre-sorted by StartTime ASC (fetchShiftRawData's query),
+    // so first-seen/last-seen tracks the model's production window within
+    // this single-date, single-shift fetch. (Doesn't attempt to re-order an
+    // overnight shift's wrapped 00:00-08:00 tail — that's a display-only
+    // approximation, not used in any OEE math below.)
+    if (!g.startedAt && r.startTime) g.startedAt = r.startTime;
+    if (r.endTime || r.startTime) g.completedAt = r.endTime || r.startTime;
 
     if (r.state === "Production") {
       g.actualQty += r.qty ?? 0;
@@ -307,9 +306,13 @@ export const aggregateRecords = (records, materials, dateStr) => {
       const compPerSheet  = Number(matForRow?.actualComponentsPerSheet) || 0;
       const loadUnload    = Number(matForRow?.pncLoadingUnloading) || 0;
 
-      const sheetCT = avgCycleSecs;
-      const compCT = punching && compPerSheet > 0
-        ? Math.round(((sheetCT + loadUnload) / compPerSheet) * 100) / 100
+      const sheetCT = punching && noOfSheet > 0
+        ? Math.round((avgCycleSecs / noOfSheet) * 100) / 100
+        : avgCycleSecs;
+      // Actual CT = (machine cycle time + load/unload allowance) spread across
+      // every component produced per machine cycle (comps/sheet × sheets/cycle).
+      const compCT = punching && compPerSheet > 0 && noOfSheet > 0
+        ? Math.round(((avgCycleSecs + loadUnload) / (compPerSheet * noOfSheet)) * 100) / 100
         : null;
       const compQty = punching && noOfSheet > 0 && compPerSheet > 0
         ? Math.round(noOfSheet * compPerSheet * row.actualQty)
@@ -318,6 +321,8 @@ export const aggregateRecords = (records, materials, dateStr) => {
       return {
         srNo: idx + 1,
         date: row.date,
+        startedAt: row.startedAt,
+        completedAt: row.completedAt,
         sapCode: row.sapCode,
         itemDescription: row.itemDescription,
         planQty,
@@ -328,7 +333,7 @@ export const aggregateRecords = (records, materials, dateStr) => {
         reqTimeMins,
         actualTimeMins,
         definedCycleTime: row.definedCycleTime,
-        sheetCycleTime: avgCycleSecs,
+        sheetCycleTime: sheetCT,
         stdChangeoverTime:    row.stdChangeoverTime,
         actualChangeoverTime: Math.round(coSt.totalMins * 10) / 10,
         plannedChangeovers:   coSt.count,

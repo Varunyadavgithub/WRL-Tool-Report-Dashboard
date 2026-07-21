@@ -14,17 +14,19 @@
  *   Known data issues handled here:
  *   a) Midnight bug: 23:36→00:07 naively sorts 00:07 first, giving a ~1408 min gap.
  *      Fix: normalise using shiftStartMins so overnight records sort correctly.
- *   b) Two-machine interleaving: alternating parts at sub-second intervals create
- *      hundreds of 0.0 m "changeovers". Fix: only record gaps ≥ MIN_REAL_CO_MINS.
- *   c) Negative gaps (setup hidden as production): handled — not clamped to 0.
+ *   b) Negative gaps (setup hidden as production): handled — not clamped to 0.
+ *
+ *   Every model switch is recorded as a changeover regardless of gap length —
+ *   including near-instant ones (same die/tool, only a program change), which
+ *   are real changeovers that just happen to run well inside STD_CHANGEOVER_MINS.
+ *   This plant currently has a single machine feeding PartProcessEvents, so
+ *   there's no interleaved-multi-machine data to produce false positives; if a
+ *   second machine is ever added, group records by assetName before calling
+ *   this so a "changeover" is never inferred across two different machines.
  */
 
 export const IDLE_THRESHOLD_MINS = 10;  // Downtime ≥ 10 min → Idle
 export const STD_CHANGEOVER_MINS = 5;   // Standard changeover allowance
-
-// Minimum gap to count as a REAL changeover.
-// Gaps below this are artefacts of two-machine interleaved data.
-const MIN_REAL_CO_MINS = 1;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 export const parseDurSecs = (dur = "00:00:00") => {
@@ -117,15 +119,6 @@ export const detectChangeovers = (records, stdMins = STD_CHANGEOVER_MINS, shiftS
 
     if (prevModel !== null && prevModel !== r.model) {
       const gapMins = startMins - (prevEndMins ?? startMins);
-
-      // Skip sub-minute gaps — these are artefacts of two-machine interleaved data,
-      // not real changeovers (two different dies can stroke in the same second).
-      if (gapMins < MIN_REAL_CO_MINS) {
-        prevModel   = r.model;
-        prevEndMins = endMins;
-        prevShift   = r.shift || prevShift;
-        continue;
-      }
 
       const overrunMins = Math.max(0, gapMins - stdMins);
       const coStartMins = prevEndMins ?? startMins;
