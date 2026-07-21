@@ -465,11 +465,11 @@ const SummaryRow = ({ label, rows, isBisGroup = false }) => {
   );
 };
 
-const ModelSummaryPanel = ({ data }) => {
+const ModelSummaryPanel = ({ data, resolveBIS = deriveBIS }) => {
   if (!data || data.length === 0) return null;
 
-  const bisGroup = data.filter((r) => deriveBIS(r.ModelName) === "BIS");
-  const nonBisGroup = data.filter((r) => deriveBIS(r.ModelName) === "Non BIS");
+  const bisGroup = data.filter((r) => resolveBIS(r.ModelName) === "BIS");
+  const nonBisGroup = data.filter((r) => resolveBIS(r.ModelName) === "Non BIS");
 
   const renderRows = (rows) =>
     rows.map((row, i) => {
@@ -619,7 +619,7 @@ const TableEmpty = () => (
 
 // ─── LPT Report Table ─────────────────────────────────────────────────────────
 
-const LptReportTable = ({ data }) => {
+const LptReportTable = ({ data, resolveBIS = deriveBIS }) => {
   const [sort, setSort] = useState({ key: null, dir: "asc" });
   const [perfFilter, setPerfFilter] = useState("All");
 
@@ -781,7 +781,7 @@ const LptReportTable = ({ data }) => {
                 </td>
                 <td className="px-3 py-2 border-b border-slate-100 text-center">
                   {(() => {
-                    const bis = deriveBIS(row.ModelName);
+                    const bis = resolveBIS(row.ModelName);
                     return (
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
                         bis === "BIS"
@@ -847,6 +847,10 @@ const LPTReport = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [details, setDetails] = useState("");
   const [lastFetched, setLastFetched] = useState(null);
+  // LPT Recipe's manual "BIS Type" override (Quality > LPT Recipe) takes
+  // priority over the naming-convention guess in deriveBIS() below — a model
+  // set to "BIS" there must show as BIS here too, not just on that page.
+  const [recipes, setRecipes] = useState([]);
 
   const {
     data: variants = [],
@@ -862,6 +866,22 @@ const LPTReport = () => {
     const t = setTimeout(() => setDetails(searchTerm), 300);
     return () => clearTimeout(t);
   }, [searchTerm]);
+
+  useEffect(() => {
+    axios.get(`${baseURL}quality/lpt-recipe`)
+      .then((res) => { if (res?.data?.success) setRecipes(res.data.data || []); })
+      .catch((err) => console.error("Failed to fetch LPT recipes:", err));
+  }, []);
+
+  // ModelName -> manually-set "BIS"/"Non BIS" from LPT Recipe, where set.
+  const bisOverrideByModel = useMemo(() => recipes.reduce((map, r) => {
+    if (r.BIS && r.ModelName) map[r.ModelName.trim()] = r.BIS;
+    return map;
+  }, {}), [recipes]);
+  const resolveBIS = useCallback(
+    (modelName) => bisOverrideByModel[(modelName || "").trim()] || deriveBIS(modelName),
+    [bisOverrideByModel],
+  );
 
   const fetchReport = useCallback(async (params) => {
     const res = await axios.get(`${baseURL}quality/lpt-report`, { params });
@@ -941,7 +961,7 @@ const LPTReport = () => {
     if (!Array.isArray(reportData)) return reportData;
     let data = reportData;
     if (selectedBisType !== "All") {
-      data = data.filter((item) => deriveBIS(item.ModelName) === selectedBisType);
+      data = data.filter((item) => resolveBIS(item.ModelName) === selectedBisType);
     }
     if (!details) return data;
     const q = details.toLowerCase();
@@ -952,12 +972,12 @@ const LPTReport = () => {
         item.Shift?.toLowerCase().includes(q) ||
         item.Performance?.toLowerCase().includes(q),
     );
-  }, [reportData, details, selectedBisType]);
+  }, [reportData, details, selectedBisType, resolveBIS]);
 
   const filteredModelSummary = useMemo(() => {
     if (selectedBisType === "All") return modelSummary;
-    return modelSummary.filter((r) => deriveBIS(r.ModelName) === selectedBisType);
-  }, [modelSummary, selectedBisType]);
+    return modelSummary.filter((r) => resolveBIS(r.ModelName) === selectedBisType);
+  }, [modelSummary, selectedBisType, resolveBIS]);
 
   if (variantsLoading) return <Loader />;
 
@@ -1180,7 +1200,7 @@ const LPTReport = () => {
 
             {/* Model Summary */}
             {filteredModelSummary.length > 0 && (
-              <ModelSummaryPanel data={filteredModelSummary} />
+              <ModelSummaryPanel data={filteredModelSummary} resolveBIS={resolveBIS} />
             )}
 
             {/* Analysis Panels */}
@@ -1201,7 +1221,7 @@ const LPTReport = () => {
                 </span>
               </div>
               <div className="p-4">
-                <LptReportTable data={filteredData} />
+                <LptReportTable data={filteredData} resolveBIS={resolveBIS} />
               </div>
             </div>
           </>
