@@ -6,10 +6,8 @@ import Loader from "./ui/Loader";
 import { IoCloseOutline } from "react-icons/io5";
 import { HiOutlineSearch } from "react-icons/hi";
 import { FiDownload, FiMaximize2, FiX, FiImage, FiAlertCircle } from "react-icons/fi";
-import { baseURL } from "../assets/assets.js";
+import { fileBaseURL } from "../assets/assets.js";
 import toast from "react-hot-toast";
-
-const SERVER_URL = new URL(baseURL).origin;
 
 /* ── Category config ── */
 const CAT_CONFIG = {
@@ -35,7 +33,7 @@ const CAT_CONFIG = {
 
 const getImageUrl = (imageName) => {
   if (!imageName) return null;
-  return `${SERVER_URL}/uploads/FpaDefectImages/${imageName}`;
+  return `${fileBaseURL}/uploads/FpaDefectImages/${imageName}`;
 };
 
 /* ── Lightbox ── */
