@@ -277,11 +277,19 @@ const PartProcessDowntimeReport = () => {
 
     setLoadFn(true); setRecords([]);
     try {
-      const dayStartSec = shifts.length ? Math.min(...shifts.map((s)=>toMins(s.startTime)))*60 : 0;
       // EventDate in the DB is a plain calendar-date tag, not shift-adjusted
       // — an overnight shift's post-midnight tail is stored under the NEXT
-      // calendar date. Query the raw calendar span of [startMs, endMs), not
-      // a production-day-shifted range, or that tail's EventDate never gets
+      // calendar date already (the sync script derives it from the shift's
+      // own start/end window at write time), so EventDate + StartTime is
+      // already the correct absolute timestamp — no "before the earliest
+      // shift start → bump +1 day" compensation needed below. An earlier
+      // version DID apply that bump (for an older sync bug that mistagged
+      // the tail under the previous day), which is exactly what caused an
+      // early-morning event to display a full day late once the sync-side
+      // bug was fixed — the bump was then double-applying.
+      //
+      // Query the raw calendar span of [startMs, endMs), not a production-
+      // day-shifted range, or an overnight tail's EventDate never gets
       // queried and silently drops.
       const dates = [];
       const cur = new Date(startMs); cur.setHours(0,0,0,0);
@@ -304,7 +312,7 @@ const PartProcessDowntimeReport = () => {
           const matched = resolveShift(r.startTime, shifts);
           const tod     = todSecs(r.startTime);
           const todEnd  = todSecs(r.endTime);
-          const absMs   = tod===null ? null : midnight+(tod<dayStartSec?86400000:0)+tod*1000;
+          const absMs   = tod===null ? null : midnight+tod*1000;
           let absMsEnd  = null;
           if (absMs!==null&&todEnd!==null) {
             const sm = new Date(absMs); sm.setHours(0,0,0,0);

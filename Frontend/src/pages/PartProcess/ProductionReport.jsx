@@ -186,7 +186,11 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
       g.actualQty += r.qty ?? 0;
       if (r.quality === "GOOD") g.goodQty += r.qty ?? 0;
       const dur = parseDurSecs(r.duration);
-      if (dur > 0) g.cycleSecs.push(dur);
+      // Only count this as a real cycle sample if it actually produced
+      // something — a Production-state event with 0 parts (e.g. a sync-gap
+      // placeholder covering an outage window) has no completed cycle to
+      // measure, so its duration must not drag the cycle-time average.
+      if (dur > 0 && (r.qty ?? 0) > 0) g.cycleSecs.push(dur);
       g.productionEvents++;
     } else if (r.effectiveState === "Idle") {
       g.idleSecs  += parseDurSecs(r.duration);

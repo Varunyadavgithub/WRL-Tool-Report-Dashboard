@@ -85,7 +85,22 @@ app.listen(PORT, () => {
 });
 
 // START CRON AFTER SERVER START
-startCalibrationCron();
-startManpowerCron();
-startShiftEndReportCron();
-startFactoryOsSyncCron();
+// Cron jobs poll FactoryOS and email real subscribers — they must only run
+// on the one deployed instance, never from a local dev/test copy pointed at
+// the same live DB. Running them from two processes at once double-writes
+// the sync log and, worse, double-sends shift-end report emails to every
+// subscriber (each process's dedup guard is in-memory, so it can't see the
+// other process's send). Gate behind an explicit opt-in so a fresh checkout
+// — e.g. `npm run dev` on a laptop — defaults to OFF; only the deployed
+// server's .env should set ENABLE_CRON=true.
+if (process.env.ENABLE_CRON === "true") {
+  startCalibrationCron();
+  startManpowerCron();
+  startShiftEndReportCron();
+  startFactoryOsSyncCron();
+  console.log("[Cron] Enabled (ENABLE_CRON=true).");
+} else {
+  console.log(
+    "[Cron] Disabled — set ENABLE_CRON=true in .env to enable (production server only).",
+  );
+}
