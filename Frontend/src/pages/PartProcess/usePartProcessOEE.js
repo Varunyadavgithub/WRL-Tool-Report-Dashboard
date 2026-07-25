@@ -207,7 +207,17 @@ export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials })
   // percentage with the standard OEE formula: A × P × Q ÷ 10,000.
   const OEE = Math.round((A * P * Q) / 10000);
 
-  const avgCycleSecs = prodRecords.length > 0 ? Math.round(runSecs / prodRecords.length) : 0;
+  // Only records that actually produced something count as a real cycle
+  // sample — a Production-state event with 0 parts (e.g. a sync-gap
+  // placeholder covering an outage window) has no completed cycle to
+  // measure, so it must not drag this average. runTimeMins above is
+  // unaffected by this filter — it deliberately still counts that time
+  // toward Availability, since the machine genuinely was in Production
+  // state for that long.
+  const cycleRecords = prodRecords.filter((r) => (r.qty ?? 0) > 0);
+  const avgCycleSecs = cycleRecords.length > 0
+    ? Math.round(cycleRecords.reduce((s, r) => s + parseDurSecs(r.duration), 0) / cycleRecords.length)
+    : 0;
 
   return {
     qty, good, bad: Math.max(0, qty - good), componentQty, componentGood, componentBad,

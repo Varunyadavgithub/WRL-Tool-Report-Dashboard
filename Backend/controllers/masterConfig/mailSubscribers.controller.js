@@ -179,7 +179,7 @@ export const testMailSubscriber = async (req, res) => {
       const latest = await global.pool3.request().query(`
         SELECT TOP 1 EventDate, ShiftName
         FROM PartProcessEvents
-        WHERE ShiftName IS NOT NULL
+        WHERE ShiftName IS NOT NULL AND Status = 1
         ORDER BY EventDate DESC, StartTime DESC
       `);
       if (!latest.recordset.length) {

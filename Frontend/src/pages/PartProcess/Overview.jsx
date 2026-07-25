@@ -240,11 +240,21 @@ const PartProcessOverview = () => {
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   {(() => {
-                    const statusLabel = isRunning ? "ONLINE" : (latestRecord?.state === "Downtime" ? "STOPPED" : "OFFLINE");
-                    const statusClass = isRunning ? "border-emerald-600 bg-emerald-50 text-emerald-700" : "border-rose-500 bg-rose-50 text-rose-600";
+                    const isBreak = !isRunning && latestRecord?.state === "Shift Break";
+                    const statusLabel = isRunning
+                      ? "ONLINE"
+                      : isBreak
+                        ? (latestRecord.shift ? `${latestRecord.shift.toUpperCase()} BREAK` : "ON BREAK")
+                        : (latestRecord?.state === "Downtime" ? "STOPPED" : "OFFLINE");
+                    const statusClass = isRunning
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                      : isBreak
+                        ? "border-amber-500 bg-amber-50 text-amber-700"
+                        : "border-rose-500 bg-rose-50 text-rose-600";
+                    const dotClass = isRunning ? "bg-emerald-500 animate-pulse" : isBreak ? "bg-amber-500" : "bg-rose-500";
                     return (
                       <span className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] font-extrabold tracking-wider ${statusClass}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${isRunning ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
+                        <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
                         {statusLabel}
                       </span>
                     );
