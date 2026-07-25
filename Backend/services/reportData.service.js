@@ -25,7 +25,7 @@ export const fetchShiftRawData = async (pool, shift, dateStr) => {
   const [eventsRes, materialsRes, dtLogRes] = await Promise.all([
     pool.request().input("date", dateStr).input("shiftName", shift.shiftName).query(`
       SELECT EventId, EventDate, ShiftName, EventType, Barcode, StartTime, EndTime, Duration, PartsQty, PartsQuality
-      FROM PartProcessEvents WHERE EventDate = @date AND ShiftName = @shiftName ORDER BY StartTime ASC`),
+      FROM PartProcessEvents WHERE EventDate = @date AND ShiftName = @shiftName AND Status = 1 ORDER BY StartTime ASC`),
     pool.request().query(MATERIAL_SELECT),
     pool.request().input("date", dateStr).input("shiftName", shift.shiftName).query(`
       SELECT Id, SrNo, EventId, ShiftName, EventDate, StartTime, EndTime, Duration, Model, FromModel,

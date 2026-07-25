@@ -49,6 +49,7 @@ export const getRecords = async (req, res) => {
           AssetName, LineName, Energy, SyncedAt
         FROM PartProcessEvents
         WHERE EventDate = @date
+          AND Status = 1
           AND (
             (@startH = '00:00' AND @endH = '23:59')
             OR (
@@ -88,6 +89,7 @@ export const getRecordsRange = async (req, res) => {
           AssetName, LineName, Energy, SyncedAt
         FROM PartProcessEvents
         WHERE EventDate BETWEEN @startDate AND @endDate
+          AND Status = 1
           AND (@shift IS NULL OR ShiftName = @shift)
         ORDER BY EventDate ASC, StartTime ASC
       `));

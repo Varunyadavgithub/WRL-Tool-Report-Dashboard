@@ -808,5 +808,26 @@ export const runMigrations = async (pool3) => {
   //    owned and populated by an external Modbus-polling service — not managed
   //    here. See Backend/controllers/reading/energyMeter*.controller.js.
 
+  // ── PartProcessEvents: add Status column (soft-exclude flag) ────────────
+  // 1 = included in reports/calculations (default), 0 = excluded — for rows
+  // known to be bad (e.g. a sync-gap placeholder covering a FactoryOS outage)
+  // that should stay in the raw table for audit trail but never feed OEE/
+  // cycle-time/report numbers. Every read of PartProcessEvents filters on
+  // this. The FactoryOS sync's MERGE (write_part_process_events.mjs,
+  // sync_factoryos_part_process_events.py) deliberately never references
+  // Status in its UPDATE SET clause, so once a row is set to 0 it stays
+  // excluded permanently — re-syncing can't silently flip it back.
+  await pool3.request().query(`
+    IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'PartProcessEvents')
+    AND NOT EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'PartProcessEvents' AND COLUMN_NAME = 'Status'
+    )
+    BEGIN
+      ALTER TABLE PartProcessEvents ADD Status BIT NOT NULL DEFAULT 1;
+      PRINT 'Migration: Added Status column to PartProcessEvents';
+    END
+  `);
+
   console.log("Migrations completed.");
 };

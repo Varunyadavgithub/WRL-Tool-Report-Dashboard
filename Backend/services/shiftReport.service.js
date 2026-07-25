@@ -43,7 +43,7 @@ export const buildShiftReport = async (pool, shift, dateStr) => {
       .query(`
         SELECT EventId, EventDate, ShiftName, EventType, Barcode, StartTime, EndTime, Duration, PartsQty, PartsQuality
         FROM PartProcessEvents
-        WHERE EventDate = @date AND ShiftName = @shiftName
+        WHERE EventDate = @date AND ShiftName = @shiftName AND Status = 1
         ORDER BY StartTime ASC
       `),
     pool.request().query(MATERIAL_SELECT),
