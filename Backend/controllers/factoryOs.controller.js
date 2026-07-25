@@ -14,8 +14,8 @@
 const FOS_BASE = "https://factoryos.smartudyog.in/api";
 
 const CREDS = {
-  username: process.env.FOS_USER || "western_user",
-  password: process.env.FOS_PASS || "test",
+  username: process.env.FOS_USER,
+  password: process.env.FOS_PASS,
 };
 
 // ── In-process token cache (lives for the lifetime of the Node process) ───────
