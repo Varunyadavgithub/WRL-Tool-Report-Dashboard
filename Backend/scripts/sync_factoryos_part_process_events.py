@@ -38,10 +38,16 @@ import pyodbc
 DEFAULT_API_BASE = "https://factoryos.smartudyog.in/api"
 DEFAULT_MACHINE_ID = "b3b8627a-3b55-4af3-96ee-c3fc7f712ecd"
 
-# FactoryOS event ids that must never be written locally, regardless of what
-# FactoryOS itself reports for them. Add an entry here (with a short reason)
-# when a record needs to be permanently suppressed instead of getting
-# silently re-synced back a few minutes after a manual edit or delete.
+# FactoryOS event ids that must never be written locally at all, regardless
+# of what FactoryOS itself reports for them — the row won't exist here, not
+# even in the raw table. Add an entry here (with a short reason) only for
+# that "should never have been synced" case.
+#
+# For a row that WAS legitimately synced but should be excluded from reports/
+# calculations (e.g. a sync-gap placeholder), prefer the PartProcessEvents.
+# Status column instead (0 = excluded) — it keeps the row for audit trail and
+# doesn't require a code change per record. See INSERT_SQL below: it
+# deliberately never references Status, so a manually-set 0 survives re-sync.
 EXCLUDED_EVENT_IDS = {
     # 2026-07-21 Shift 1 downtime — stuck open 12:30-16:18:43 on FactoryOS's
     # side, overlapping manually-inserted test production data for that
@@ -49,6 +55,8 @@ EXCLUDED_EVENT_IDS = {
     # next sync since FactoryOS's own record is unchanged.
     "86b47dfe-691f-4769-9e46-fe06a7b41276",
 }
+# NOTE: intentionally has no Status column in its INSERT column list — see
+# EXCLUDED_EVENT_IDS comment above. Don't add it here.
 INSERT_SQL = """
 MERGE PartProcessEvents AS target
 USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)) AS source (

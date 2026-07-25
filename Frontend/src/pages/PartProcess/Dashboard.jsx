@@ -51,7 +51,17 @@ import {
   selectMachines,
   selectPlans,
 } from "../../redux/slices/masterConfigSlice";
-import { TimerOff, ShieldCheck, X, Plus, FileImage, Lock } from "lucide-react";
+import {
+  TimerOff,
+  ShieldCheck,
+  X,
+  Plus,
+  FileImage,
+  Lock,
+  Coffee,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 import {
   IDLE_THRESHOLD_MINS,
   STD_CHANGEOVER_MINS,
@@ -227,6 +237,7 @@ const TimeMap = ({
   const [zoom, setZoom] = useState(1);
   const [canvasW, setCanvasW] = useState(0);
   const [tooltip, setTooltip] = useState(null);
+  const [hoverRect, setHoverRect] = useState(null);
 
   const dragRef = useRef({ dragging: false, startX: 0, scrollLeft: 0 });
   const onMouseDown = useCallback((e) => {
@@ -312,11 +323,34 @@ const TimeMap = ({
   const rawEvents = useMemo(() => {
     return records
       .filter((r) => r.startTime && r.endTime)
+      // 0-qty "Production" rows are in-progress placeholders the sync writes
+      // while a cycle is still open — their EndTime is hard-set to the
+      // shift's closing boundary (e.g. 18:00 on a 10h shift), not the real
+      // moment the machine actually stopped, and several stale duplicates
+      // for the same barcode/StartTime can pile up before a real cycle
+      // supersedes them. Rendered as-is these paint a single solid green
+      // bar running all the way to shift end regardless of when production
+      // genuinely paused. Cycle-time averaging elsewhere already excludes
+      // qty=0 rows for the same reason — do the same here.
+      .filter((r) => r.state !== "Production" || (r.qty ?? 0) > 0)
       .map((r) => {
         const s = recordToMs(r, "startTime");
         const e = recordToMs(r, "endTime");
         if (s === null || e === null) return null;
-        const es = e <= s ? e + MS_PER_DAY : e; // guard for sub-ms glitches
+        // e <= s means one of two very different things: (a) a genuine short
+        // cycle that ticked over midnight — only possible when StartTime is
+        // late evening (Shift 2 territory) — or (b) a malformed row where
+        // EndTime is a few seconds/minutes earlier than StartTime for no
+        // midnight-related reason at all (seen live: StartTime 12:30:00,
+        // EndTime 12:29:04). Blindly adding a day to (b) turns a ~1-minute
+        // sync glitch into a ~24-hour fake Production block that swallows
+        // the rest of the day. Only wrap when a midnight crossing is
+        // actually plausible; otherwise the row is just malformed — drop it
+        // via the es <= s check below instead of rendering a bogus span.
+        const startIst = new Date(s + 5.5 * 3600_000);
+        const startTodMins = startIst.getUTCHours() * 60 + startIst.getUTCMinutes();
+        const plausibleMidnightCross = startTodMins >= 20 * 60; // 20:00 IST+
+        const es = e <= s && plausibleMidnightCross ? e + MS_PER_DAY : e;
         if (es <= s) return null;
         // Drop events entirely outside the window
         if (hasWindow && es <= windowStartMs) return null;
@@ -324,7 +358,21 @@ const TimeMap = ({
         const cs = hasWindow ? Math.max(s, windowStartMs) : s;
         const ce = hasWindow ? Math.min(es, windowEndMs) : es;
         if (ce <= cs) return null;
-        return { startMs: cs, endMs: ce, state: r.state };
+        // ShiftName can be "Lunch"/"Dinner" (its own scheduled mini-shift
+        // block) independent of EventType — a machine that kept running
+        // through the break still logs EventType="Production" records, but
+        // they belong to the Lunch/Dinner window, not the surrounding
+        // shift's production time. Without this override those records
+        // rendered green (Production) with no break indication at all,
+        // even on a shift whose full length only makes sense once the
+        // break is subtracted out (e.g. a 10h shift = ~9.5h run + break).
+        const isBreakShift = r.shift === "Lunch" || r.shift === "Dinner";
+        return {
+          startMs: cs,
+          endMs: ce,
+          state: isBreakShift ? "Shift Break" : r.state,
+          shift: r.shift,
+        };
       })
       .filter(Boolean);
   }, [records, recordToMs, hasWindow, windowStartMs, windowEndMs]);
@@ -341,17 +389,27 @@ const TimeMap = ({
       .filter((e) => e.endMs > e.startMs);
   }, [rawEvents, isToday, nowMs, nowInWindow]);
 
-  // Axis min/max in epoch ms
+  // Axis min/max in epoch ms.
+  // Math.min()/Math.max() with an empty array return +Infinity/-Infinity —
+  // guard explicitly rather than relying on the "no events" early render
+  // bail below, since these are computed on every render regardless (hooks
+  // can't be conditional), and an Infinity leaking into minMs/maxMs would
+  // corrupt nowPct/rangeMs for any future code path that runs before that
+  // bail.
   const AXIS_PAD_MS = 10 * MS_PER_MIN; // 10 min breathing room when no window set
   const minMs = hasWindow
     ? windowStartMs
-    : Math.min(...rawEvents.map((e) => e.startMs)) - AXIS_PAD_MS;
+    : rawEvents.length
+      ? Math.min(...rawEvents.map((e) => e.startMs)) - AXIS_PAD_MS
+      : (isToday ? nowMs : Date.now()) - AXIS_PAD_MS;
   const maxMs = hasWindow
     ? windowEndMs
-    : Math.max(
-        ...rawEvents.map((e) => e.endMs),
-        ...(isToday && nowInWindow ? [nowMs] : []),
-      ) + AXIS_PAD_MS;
+    : rawEvents.length || (isToday && nowInWindow)
+      ? Math.max(
+          ...rawEvents.map((e) => e.endMs),
+          ...(isToday && nowInWindow ? [nowMs] : []),
+        ) + AXIS_PAD_MS
+      : (isToday ? nowMs : Date.now()) + AXIS_PAD_MS;
   const rangeMs = Math.max(maxMs - minMs, 1);
 
   // "now" cursor position
@@ -375,6 +433,15 @@ const TimeMap = ({
   const idleMinsMs =
     events
       .filter((e) => e.state === "Idle")
+      .reduce((s, e) => s + (e.endMs - e.startMs), 0) / MS_PER_MIN;
+  // Shift Break (Lunch/Dinner) is scheduled, non-productive time — it's
+  // neither "running" nor "down" in the fault sense, so it was previously
+  // just silently absorbed into the Idle/amber bucket with no way to tell
+  // a lunch break apart from an unplanned stop. Tracked separately here so
+  // it gets its own legend colour and stat line instead.
+  const breakMinsMs =
+    events
+      .filter((e) => e.state === "Shift Break")
       .reduce((s, e) => s + (e.endMs - e.startMs), 0) / MS_PER_MIN;
   const runPct = Math.round((runMinsMs / (elapsedMs / MS_PER_MIN)) * 100);
 
@@ -400,38 +467,71 @@ const TimeMap = ({
     return `${hh}:${mm}`;
   };
 
-  // Legacy fmt still used for tooltip display
-  const fmt = (ms) => fmtMs(ms);
 
   // Stats exposed to JSX (rounded minutes for display)
   const runMins = Math.round(runMinsMs);
   const downMins = Math.round(downMinsMs);
   const idleMins = Math.round(idleMinsMs);
+  const breakMins = Math.round(breakMinsMs);
+
+  // At-a-glance status badge next to the title — the most recent event as of
+  // "now", mirroring the ONLINE/STOPPED/BREAK labels used on the Overview
+  // machine cards so the same event maps to the same wording everywhere.
+  const currentStatus = useMemo(() => {
+    if (!isToday || !events.length) return null;
+    const last = events.reduce(
+      (a, e) => (!a || e.endMs > a.endMs ? e : a),
+      null,
+    );
+    if (!last) return null;
+    if (last.state === "Production")
+      return { label: "ONLINE", cls: "bg-emerald-50 text-emerald-700" };
+    if (last.state === "Shift Break")
+      return {
+        label: last.shift ? `${last.shift.toUpperCase()} BREAK` : "ON BREAK",
+        cls: "bg-blue-50 text-blue-700",
+      };
+    if (last.state === "Downtime")
+      return { label: "STOPPED", cls: "bg-rose-50 text-rose-600" };
+    return { label: "IDLE", cls: "bg-amber-50 text-amber-700" };
+  }, [isToday, events]);
+
+  const STATE_DOT = {
+    Production: "#22c55e",
+    Downtime: "#ef4444",
+    Idle: "#f59e0b",
+    "Shift Break": "#3b82f6",
+  };
 
   // Convert changeover positions (normalised mins) → absolute ms for canvas.
-  // co.endMins is the normalised minute of the new model's first record.
-  // We reconstruct ms by adding the shift start date + minutes offset.
+  // co.endMins (from detectChangeovers) is always "minutes since midnight of
+  // day 0", where day 0 is whatever reference day the +1440 overnight bump
+  // was applied against — it is NOT an offset from the shift/window start.
+  // The previous version anchored to windowStartMs's own clock-time-of-day,
+  // which only happened to line up when a specific shift was selected
+  // (shiftStartMins was explicitly passed into detectChangeovers, so
+  // windowStartMs's time-of-day matched its normalisation threshold by
+  // construction). In "All Shifts" view detectChangeovers is called with
+  // shiftStartMins=null and auto-detects its own threshold instead — unrelated
+  // to windowStartMs's clock time — so the old math silently mispositioned
+  // (or dropped, via the range filter below) every changeover marker that
+  // fell on the post-midnight half of an overnight Shift 2. Anchoring to
+  // midnight of windowStartMs's own calendar date is correct in both cases,
+  // since co.endMins's zero point is always that day's midnight regardless
+  // of which threshold produced the +1440 bump.
   const coMarkers = useMemo(() => {
     if (!windowStartMs) return [];
+    const ist = new Date(windowStartMs + 5.5 * 3600_000);
+    const dayFloorMs =
+      Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()) -
+      5.5 * 3600_000;
     return changeovers
-      .map((co) => {
-        // co.endMins: normalised minute from shift start (e.g. 1320 for 22:00 on Shift 2)
-        // shiftStartMins: minute of day of shift start (e.g. 1200 for 20:00)
-        const shiftStartMin = windowStartMs
-          ? (() => {
-              const ist = new Date(windowStartMs + 5.5 * 3600_000);
-              return ist.getUTCHours() * 60 + ist.getUTCMinutes();
-            })()
-          : 0;
-        const offsetMins = co.endMins - shiftStartMin;
-        const xMs = windowStartMs + offsetMins * MS_PER_MIN;
-        return {
-          xMs,
-          from: co.fromModel,
-          to: co.toModel,
-          gapMins: co.durationMins,
-        };
-      })
+      .map((co) => ({
+        xMs: dayFloorMs + co.endMins * MS_PER_MIN,
+        from: co.fromModel,
+        to: co.toModel,
+        gapMins: co.durationMins,
+      }))
       .filter((co) => co.xMs >= minMs && co.xMs <= maxMs);
   }, [changeovers, windowStartMs, minMs, maxMs]);
 
@@ -449,11 +549,11 @@ const TimeMap = ({
   // Canvas draw — all positions in epoch ms
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !canvasW || !events.length) return;
+    if (!canvas || !canvasW) return;
 
     const dpr = window.devicePixelRatio || 1;
     const W = canvasW * zoom;
-    const H = 64;
+    const H = 72;
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     canvas.style.width = `${W}px`;
@@ -462,8 +562,14 @@ const TimeMap = ({
     const ctx = canvas.getContext("2d");
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = "#f1f5f9";
+    ctx.fillStyle = "#f8fafc";
     ctx.fillRect(0, 0, W, H);
+
+    // Bail after clearing — otherwise switching to a window with zero
+    // events (e.g. all events trimmed by the "now" clamp) left the
+    // previous render's bars/markers stuck on screen instead of an
+    // empty grey canvas.
+    if (!events.length) return;
 
     const sp = document.createElement("canvas");
     sp.width = 16;
@@ -486,26 +592,41 @@ const TimeMap = ({
     const stripe = ctx.createPattern(sp, "repeat");
 
     const msToX = (ms) => ((ms - minMs) / rangeMs) * W;
-    const PAD = 5;
+    const PAD = 6;
+    const RADIUS = 3;
+    const drawBar = (x, y, w, h, r) => {
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+      else ctx.rect(x, y, w, h);
+    };
 
     events.forEach((e) => {
       const x = msToX(e.startMs);
       const w = Math.max(1, msToX(e.endMs) - x);
+      // Shift Break (Lunch/Dinner) gets its own colour — previously it fell
+      // through to the same amber fill as Idle, making a scheduled break
+      // indistinguishable from an unplanned stop on the timeline.
       ctx.fillStyle =
         e.state === "Production"
           ? "#22c55e"
           : e.state === "Downtime"
             ? stripe
-            : "#fef3c7";
-      ctx.fillRect(x, PAD, w, H - PAD * 2);
+            : e.state === "Shift Break"
+              ? "#93c5fd"
+              : "#fef3c7";
+      drawBar(x, PAD, w, H - PAD * 2, RADIUS);
+      ctx.fill();
       ctx.strokeStyle =
         e.state === "Production"
           ? "#16a34a"
           : e.state === "Downtime"
             ? "#dc2626"
-            : "#f59e0b";
+            : e.state === "Shift Break"
+              ? "#2563eb"
+              : "#f59e0b";
       ctx.lineWidth = 1;
-      ctx.strokeRect(x + 0.5, PAD + 0.5, Math.max(1, w - 1), H - PAD * 2 - 1);
+      drawBar(x + 0.5, PAD + 0.5, Math.max(1, w - 1), H - PAD * 2 - 1, RADIUS);
+      ctx.stroke();
     });
 
     // Tick grid — interval in ms based on zoom and total span (hours)
@@ -525,7 +646,7 @@ const TimeMap = ({
     for (let t = tStart; t <= maxMs + tickMs; t += tickMs) {
       const x = msToX(t);
       if (x < 0 || x > W) continue;
-      ctx.strokeStyle = "rgba(148,163,184,0.35)";
+      ctx.strokeStyle = "rgba(148,163,184,0.25)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(x, 0);
@@ -616,21 +737,35 @@ const TimeMap = ({
         setTooltip({
           x: e.clientX,
           y: e.clientY,
-          text: `CO: ${nearCo.from?.split("-")[0] || "?"} → ${nearCo.to?.split("-")[0] || "?"}  gap ${nearCo.gapMins.toFixed(1)}m`,
           co: true,
+          from: nearCo.from,
+          to: nearCo.to,
+          gapMins: nearCo.gapMins,
         });
+        setHoverRect(null);
         return;
       }
       const hit = events.find((ev) => tMs >= ev.startMs && tMs <= ev.endMs);
-      setTooltip(
-        hit
-          ? {
-              x: e.clientX,
-              y: e.clientY,
-              text: `${hit.state}: ${fmt(hit.startMs)} – ${fmt(hit.endMs)} (${Math.round((hit.endMs - hit.startMs) / MS_PER_MIN)}m)`,
-            }
-          : null,
-      );
+      if (!hit) {
+        setTooltip(null);
+        setHoverRect(null);
+        return;
+      }
+      const label =
+        hit.state === "Shift Break" && hit.shift ? hit.shift : hit.state;
+      setTooltip({
+        x: e.clientX,
+        y: e.clientY,
+        state: hit.state,
+        label,
+        startMs: hit.startMs,
+        endMs: hit.endMs,
+        durMins: Math.round((hit.endMs - hit.startMs) / MS_PER_MIN),
+      });
+      setHoverRect({
+        leftPct: ((hit.startMs - minMs) / rangeMs) * 100,
+        widthPct: ((hit.endMs - hit.startMs) / rangeMs) * 100,
+      });
     },
     [events, coMarkers, minMs, rangeMs],
   );
@@ -668,8 +803,12 @@ const TimeMap = ({
         </div>
       ) : (
         <>
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <div className="flex items-center gap-2 shrink-0">
+          {/* Title row: icon + label + shift/status badges  |  live-jump + zoom */}
+          <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-slate-100">
+                <Clock className="w-3.5 h-3.5 text-slate-500" />
+              </span>
               <span className="text-[11px] font-bold text-slate-600 uppercase tracking-widest">
                 Shift Timeline
               </span>
@@ -681,65 +820,89 @@ const TimeMap = ({
                   {shiftName}
                 </span>
               )}
-            </div>
-            <div className="flex items-center gap-1">
-              {[
-                { l: "+", fn: handleZoomIn },
-                { l: "Fit", fn: handleFit },
-                { l: "−", fn: handleZoomOut },
-              ].map(({ l, fn }) => (
-                <button
-                  key={l}
-                  onClick={fn}
-                  className="px-2 py-0.5 text-[10px] font-bold rounded border border-slate-300 bg-white hover:bg-slate-100 text-slate-600 transition-colors"
+              {currentStatus && (
+                <span
+                  className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${currentStatus.cls}`}
                 >
-                  {l}
-                </button>
-              ))}
+                  <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+                  {currentStatus.label}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
               {isToday && nowPct !== null && (
                 <button
                   onClick={scrollToNow}
-                  className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded border border-blue-400 bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors"
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-lg border border-blue-400 bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse shrink-0" />{" "}
                   NOW {fmtMs(nowMs)}
                 </button>
               )}
+              <div className="flex items-center rounded-lg border border-slate-200 bg-white overflow-hidden">
+                <button
+                  onClick={handleZoomOut}
+                  title="Zoom out"
+                  className="p-1.5 hover:bg-slate-100 text-slate-500 transition-colors"
+                >
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={handleFit}
+                  title="Fit to view"
+                  className="px-2 py-1 text-[10px] font-bold border-x border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors"
+                >
+                  Fit
+                </button>
+                <button
+                  onClick={handleZoomIn}
+                  title="Zoom in"
+                  className="p-1.5 hover:bg-slate-100 text-slate-500 transition-colors"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
-            <div className="ml-auto flex items-center gap-3 text-[10px] text-slate-500 flex-wrap">
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm bg-emerald-500" />{" "}
-                Production
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span
-                  className="w-3 h-3 rounded-sm"
-                  style={{
-                    background:
-                      "repeating-linear-gradient(-45deg,#f97316 0,#f97316 4px,#ef4444 4px,#ef4444 8px)",
-                  }}
-                />{" "}
-                Downtime
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm bg-amber-100 border border-amber-300" />{" "}
-                Idle
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-0 h-0 border-l-[4px] border-r-[4px] border-b-[7px] border-l-transparent border-r-transparent border-b-amber-500 shrink-0" />
-                Changeover
-              </span>
+          </div>
+
+          {/* Legend row */}
+          <div className="flex items-center gap-1.5 mb-2 flex-wrap text-[10px]">
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+              Production
+            </span>
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600">
               <span
-                className={`font-bold ${runPct >= 80 ? "text-emerald-600" : runPct >= 60 ? "text-amber-600" : "text-rose-500"}`}
-              >
-                {runPct}% Running
-              </span>
-            </div>
+                className="w-2.5 h-2.5 rounded-full"
+                style={{
+                  background:
+                    "repeating-linear-gradient(-45deg,#f97316 0,#f97316 3px,#ef4444 3px,#ef4444 6px)",
+                }}
+              />
+              Downtime
+            </span>
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-100 border border-amber-300" />
+              Idle
+            </span>
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600">
+              <Coffee className="w-3 h-3 text-blue-600" />
+              Break
+            </span>
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600">
+              <span className="w-0 h-0 border-l-[4px] border-r-[4px] border-b-[7px] border-l-transparent border-r-transparent border-b-amber-500 shrink-0" />
+              Changeover
+            </span>
+            <span
+              className={`ml-auto font-bold px-2 py-1 rounded-full ${runPct >= 80 ? "text-emerald-700 bg-emerald-50" : runPct >= 60 ? "text-amber-700 bg-amber-50" : "text-rose-600 bg-rose-50"}`}
+            >
+              {runPct}% Running
+            </span>
           </div>
 
           <div
             ref={scrollRef}
-            className="overflow-x-auto rounded-lg border border-slate-200 select-none bg-white"
+            className="overflow-x-auto rounded-xl border border-slate-200 select-none bg-white shadow-sm"
             style={{
               cursor: dragRef.current?.dragging
                 ? "grabbing"
@@ -784,14 +947,26 @@ const TimeMap = ({
                   />
                 ))}
               </div>
-              <div className="relative" style={{ height: "64px" }}>
+              <div className="relative" style={{ height: "72px" }}>
                 <canvas
                   ref={canvasRef}
                   className="block"
                   style={{ display: "block" }}
                   onMouseMove={handleCanvasMouseMove}
-                  onMouseLeave={() => setTooltip(null)}
+                  onMouseLeave={() => {
+                    setTooltip(null);
+                    setHoverRect(null);
+                  }}
                 />
+                {hoverRect && (
+                  <div
+                    className="absolute top-[6px] bottom-[6px] pointer-events-none rounded-[3px] ring-2 ring-white shadow-[0_0_0_1px_rgba(15,23,42,0.35)] transition-[left,width] duration-75"
+                    style={{
+                      left: `${hoverRect.leftPct}%`,
+                      width: `${hoverRect.widthPct}%`,
+                    }}
+                  />
+                )}
                 {nowPct !== null && (
                   <div
                     className="absolute top-0 bottom-0 pointer-events-none z-10"
@@ -809,38 +984,77 @@ const TimeMap = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-4 mt-1.5 text-[10px] flex-wrap">
-            <span className="text-emerald-600 font-mono">
-              ● {runMins}m running
+          {/* Stat chips */}
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap text-[10px]">
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 font-mono font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              {runMins}m running
             </span>
-            <span className="text-slate-500 font-mono">
-              ● {downMins}m downtime
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-100 text-slate-600 font-mono font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+              {downMins}m downtime
               {idleMins > 0 && (
-                <span className="text-amber-500 ml-1">
-                  (incl. {idleMins}m idle)
-                </span>
+                <span className="text-amber-600">({idleMins}m idle)</span>
               )}
             </span>
+            {breakMins > 0 && (
+              <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-50 text-blue-700 font-mono font-semibold">
+                <Coffee className="w-3 h-3" />
+                {breakMins}m break
+              </span>
+            )}
             {coMarkers.length > 0 && (
-              <span className="flex items-center gap-1 text-amber-600 font-semibold">
+              <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-50 text-amber-700 font-semibold">
                 ◆ {coMarkers.length} changeover{coMarkers.length > 1 ? "s" : ""}
               </span>
             )}
             {isToday && nowPct !== null && (
-              <span className="flex items-center gap-1 text-blue-600 font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />{" "}
+              <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-600 text-white font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                 Live · {fmtMs(nowMs)}
               </span>
             )}
-            <span className="text-slate-400">{rawEvents.length} events</span>
+            <span className="ml-auto text-slate-400">
+              {rawEvents.length} events
+            </span>
           </div>
 
           {tooltip && (
             <div
-              className="fixed z-50 bg-slate-800 text-white text-[11px] px-2.5 py-1.5 rounded-lg shadow-lg pointer-events-none whitespace-nowrap"
-              style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
+              className="fixed z-50 bg-slate-900 text-white text-[11px] px-3 py-2 rounded-lg shadow-xl pointer-events-none whitespace-nowrap border border-slate-700/60"
+              style={{ left: tooltip.x + 14, top: tooltip.y - 12 }}
             >
-              {tooltip.text}
+              {tooltip.co ? (
+                <>
+                  <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                    <span className="w-0 h-0 border-l-[3px] border-r-[3px] border-b-[5px] border-l-transparent border-r-transparent border-b-amber-400" />
+                    Changeover
+                  </div>
+                  <div className="text-slate-200 mt-0.5">
+                    {tooltip.from?.split("-")[0] || "?"} →{" "}
+                    {tooltip.to?.split("-")[0] || "?"}
+                  </div>
+                  <div className="text-slate-400">
+                    {tooltip.gapMins.toFixed(1)}m gap
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{
+                        background: STATE_DOT[tooltip.state] || "#f59e0b",
+                      }}
+                    />
+                    {tooltip.label}
+                  </div>
+                  <div className="text-slate-300 mt-0.5 font-mono">
+                    {fmtMs(tooltip.startMs)} – {fmtMs(tooltip.endMs)}
+                  </div>
+                  <div className="text-slate-400">{tooltip.durMins}m</div>
+                </>
+              )}
             </div>
           )}
         </>

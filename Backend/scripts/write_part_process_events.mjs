@@ -1,5 +1,14 @@
 #!/usr/bin/env node
-/** SQL Server writer used by sync_factoryos_part_process_events.py. */
+/**
+ * SQL Server writer used by sync_factoryos_part_process_events.py.
+ *
+ * UPSERT_SQL's UPDATE SET list deliberately never includes Status — that
+ * column is a manual soft-exclude flag (1 = included in reports, 0 =
+ * excluded), and this MERGE must never overwrite it on an existing row.
+ * Leaving it out of both the UPDATE and the explicit INSERT column list
+ * means new rows correctly get the column's SQL DEFAULT (1) and existing
+ * rows keep whatever a human last set. Do not "helpfully" add it back.
+ */
 import sql, { dbConfig3, connectToDB } from "../config/db.config.js";
 
 const UPSERT_SQL = `
