@@ -7,13 +7,12 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { inputCls, selectCls, Field, Modal, TableActions, PageHeader, EmptyState, TH, TD } from "./_shared";
-import { selectPlans } from "../../redux/slices/masterConfigSlice";
+import { selectPlans, selectShifts } from "../../redux/slices/masterConfigSlice";
 import {
   useAddPlanMutation, useUpdatePlanMutation, useDeletePlanMutation, useBulkAddPlansMutation,
 } from "../../redux/api/masterConfigApi";
 
 const PRIORITIES = ["High","Medium","Low"];
-const SHIFTS = ["Shift A","Shift B","Shift C","All Shifts"];
 
 const today = new Date();
 const fmtDate = (d) => d.toISOString().split("T")[0];
@@ -383,6 +382,16 @@ const exportData = (data) => {
 /* ── Main page ────────────────────────────────────────────────────────────── */
 const PlanningConfig = () => {
   const data = useSelector(selectPlans);
+  // Real configured shift names ("Shift 1"/"Shift 2", from Shift
+  // Configuration) plus an "All Shifts" wildcard — previously this was a
+  // hardcoded "Shift A/B/C" list that never matched any real shift name
+  // used elsewhere in the app (PartProcessEvents.ShiftName, ShiftConfigs),
+  // so every plan saved a shift value nothing could ever match against.
+  const shifts = useSelector(selectShifts);
+  const shiftOptions = useMemo(
+    () => ["All Shifts", ...shifts.filter((s) => s.status).map((s) => s.shiftName)],
+    [shifts],
+  );
   const [addPlan]      = useAddPlanMutation();
   const [updatePlan]   = useUpdatePlanMutation();
   const [deletePlan]   = useDeletePlanMutation();
@@ -528,7 +537,7 @@ const PlanningConfig = () => {
             <Field label="Target Quantity" required><input type="number" value={form.targetQty} onChange={sf("targetQty")} placeholder="e.g. 480" className={inputCls} min={1} /></Field>
             <Field label="Planned Cycle Time (s)"><input type="number" value={form.plannedCycleTime} onChange={sf("plannedCycleTime")} placeholder="e.g. 45" className={inputCls} min={1} /></Field>
             <Field label="Shift">
-              <select value={form.shift} onChange={sf("shift")} className={selectCls}>{SHIFTS.map((s) => <option key={s}>{s}</option>)}</select>
+              <select value={form.shift} onChange={sf("shift")} className={selectCls}>{shiftOptions.map((s) => <option key={s}>{s}</option>)}</select>
             </Field>
             <Field label="Plan Date" required><input type="date" value={form.planDate} onChange={sf("planDate")} className={inputCls} /></Field>
             <Field label="Priority">

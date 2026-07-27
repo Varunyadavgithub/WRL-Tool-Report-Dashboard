@@ -62,6 +62,71 @@ export const classifyState = (record, idleThreshold = IDLE_THRESHOLD_MINS) => {
 export const enrichRecords = (records, idleThreshold = IDLE_THRESHOLD_MINS) =>
   records.map(r => ({ ...r, effectiveState: classifyState(r, idleThreshold) }));
 
+// ── Shift history resolution ────────────────────────────────────────────────
+/**
+ * ShiftConfigs (the Shift Master table) is a flat "current state" table —
+ * editing a shift's timing overwrites in place, so rendering a HISTORICAL
+ * production date with the live shift config silently uses today's timing
+ * instead of whatever was actually in effect back then. ShiftConfigHistory
+ * (append-only, one row per create/update — see
+ * Backend/controllers/masterConfig/shifts.controller.js) fixes that: this
+ * resolves which snapshot applied on a given production date.
+ *
+ * Anchored at 08:00 IST — the existing production-day boundary used
+ * throughout this codebase (see getTodayRange/getYesterdayRange in
+ * utils/dateUtils.js) — since shift timing isn't expected to change
+ * mid-shift, whatever was true at the start of the production day governs
+ * the whole day.
+ *
+ * @param historyRows  Full ShiftConfigHistory array (selectShiftHistory)
+ * @param shiftId      The shift's id (ShiftConfigs.Id)
+ * @param dateStr      "YYYY-MM-DD" production date to resolve as of
+ * @param fallback     Returned when no history row qualifies (e.g. a
+ *                     brand-new shift created after the last history fetch)
+ */
+export const resolveShiftAsOf = (historyRows, shiftId, dateStr, fallback = null) => {
+  if (!Array.isArray(historyRows) || !shiftId || !dateStr) return fallback;
+  const anchor = new Date(`${dateStr}T08:00:00+05:30`).getTime();
+  if (Number.isNaN(anchor)) return fallback;
+  let best = null;
+  for (const h of historyRows) {
+    if (h.shiftId !== shiftId) continue;
+    const t = new Date(h.effectiveFrom).getTime();
+    if (Number.isNaN(t) || t > anchor) continue;
+    if (!best || t > new Date(best.effectiveFrom).getTime()) best = h;
+  }
+  return best || fallback;
+};
+
+/**
+ * Which shift(s) a machine was assigned to, replayed from an append-only
+ * assign/unassign log (MachineShiftAllocationHistory) rather than the
+ * current-state MachineShiftAllocations table — so a historical date
+ * reflects what was actually assigned back then, not today's assignment.
+ * Same 08:00 IST anchor convention as resolveShiftAsOf.
+ *
+ * @param historyRows  Full MachineShiftAllocationHistory array
+ * @param machineId    The machine's id (Machines.Id)
+ * @param dateStr      "YYYY-MM-DD" production date to resolve as of
+ * @returns            Array of shiftIds assigned as of that date
+ */
+export const resolveMachineShiftsAsOf = (historyRows, machineId, dateStr) => {
+  if (!Array.isArray(historyRows) || !machineId || !dateStr) return [];
+  const anchor = new Date(`${dateStr}T08:00:00+05:30`).getTime();
+  if (Number.isNaN(anchor)) return [];
+  const latestByShift = new Map(); // shiftId -> { action, t }
+  for (const h of historyRows) {
+    if (h.machineId !== machineId) continue;
+    const t = new Date(h.actionAt).getTime();
+    if (Number.isNaN(t) || t > anchor) continue;
+    const prev = latestByShift.get(h.shiftId);
+    if (!prev || t > prev.t) latestByShift.set(h.shiftId, { action: h.action, t });
+  }
+  return [...latestByShift.entries()]
+    .filter(([, v]) => v.action === "assigned")
+    .map(([shiftId]) => shiftId);
+};
+
 // ── Rule 2: Changeover detection ──────────────────────────────────────────────
 /**
  * @param records       Array of enriched production records

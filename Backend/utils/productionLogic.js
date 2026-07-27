@@ -191,11 +191,78 @@ export const mapDbRecord = (r) => {
 const MACHINE_POWER_KW = 5;
 
 /**
+ * Machine-wide OEE for a shift — backend port of usePartProcessOEE.js's
+ * computeOEE(). Unlike aggregateRecords' per-SAP-code rows (each with its
+ * own OEE%), this collapses the WHOLE shift into a single Availability/
+ * Performance/Quality/OEE figure the way OEE is actually meant to be read
+ * for a machine — averaging the per-row OEE percentages (which is what the
+ * "Average OEE" metric card used to show) isn't equivalent to this and can
+ * be pulled around by small-volume parts with an outsized share of rows.
+ *
+ * @param prodRecords  Production-state records for the shift (mapDbRecord shape)
+ * @param downRecords  Downtime-state records for the shift
+ * @param plannedMins  The shift's configured duration in minutes
+ * @param materials    MaterialConfigs rows
+ */
+export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials }) => {
+  const ZERO = { A: 0, P: 100, Q: 100, OEE: 0, runTimeMins: 0, downMins: 0 };
+  if (!prodRecords.length && !downRecords.length) return ZERO;
+
+  const qty      = prodRecords.reduce((s, r) => s + (r.qty ?? 0), 0);
+  const downSecs = downRecords.reduce((s, r) => s + parseDurSecs(r.duration), 0);
+  const runSecs  = prodRecords.reduce((s, r) => s + parseDurSecs(r.duration), 0);
+  const downMins = Math.round(downSecs / 60);
+  const runTimeMins = Math.round(runSecs / 60);
+  if (qty === 0) return { ...ZERO, downMins, runTimeMins };
+
+  // A: Availability — planned shift duration less downtime.
+  const planned = Math.max(plannedMins, runTimeMins, 1);
+  const A = Math.min(100, Math.max(0, Math.round(((planned - downMins) / planned) * 100)));
+
+  // Component-unit quantities, tallied per model actually run so P below can
+  // weight each model by its OWN configured cycle time.
+  const hasQualityData = prodRecords.some((r) => r.quality != null && r.quality !== "");
+  const modelComponentTally = {};
+  prodRecords.forEach((r) => {
+    const mat = getMaterialByModel(materials, r.model);
+    const comp = componentQtyFromMachine(r.qty ?? 0, mat);
+    if (r.model) modelComponentTally[r.model] = (modelComponentTally[r.model] || 0) + comp;
+  });
+
+  // P: Performance — ideal production time (sum, across every model run, of
+  // that model's own component qty × its own DefinedComponentCycleTime) over
+  // net operating time. Models with no configured cycle time simply don't
+  // contribute to either side instead of penalising the whole shift.
+  let idealProdSecs = 0;
+  let anyIdealCycle = false;
+  Object.entries(modelComponentTally).forEach(([model, compQty]) => {
+    const mat = getMaterialByModel(materials, model);
+    const cycleSecs = mat?.definedComponentCycleTime > 0 ? mat.definedComponentCycleTime : null;
+    if (cycleSecs) {
+      idealProdSecs += compQty * cycleSecs;
+      anyIdealCycle = true;
+    }
+  });
+  const netSecs = Math.max(1, planned * 60 - downSecs);
+  const P = anyIdealCycle ? Math.min(100, Math.max(0, Math.round((idealProdSecs / netSecs) * 100))) : 100;
+
+  // Q: Quality — good qty / total qty across the whole shift.
+  const good = hasQualityData
+    ? prodRecords.filter((r) => r.quality === "GOOD").reduce((s, r) => s + (r.qty ?? 0), 0)
+    : qty;
+  const Q = qty > 0 ? Math.min(100, Math.round((good / qty) * 100)) : 100;
+
+  const OEE = Math.round((A * P * Q) / 10000);
+
+  return { A, P, Q, OEE, runTimeMins, downMins };
+};
+
+/**
  * Aggregate raw PartProcessEvents (already mapped via mapDbRecord) into
  * per-model OEE/production rows — backend port of ProductionReport.jsx's
  * aggregateRecords(), used to build the shift-end email report.
  */
-export const aggregateRecords = (records, materials, dateStr) => {
+export const aggregateRecords = (records, materials, dateStr, plans = [], shiftName = null, realShiftNames = []) => {
   if (!records.length) return [];
 
   // Downtime rows do not carry a model. Keep each stop with the model that
@@ -266,7 +333,31 @@ export const aggregateRecords = (records, materials, dateStr) => {
     }
   });
 
-  return Object.values(map)
+  // ---- Resolve planned qty per SAP code, consuming at most one plan each ----
+  // buildShiftReport already scopes `records`/this whole call to a single
+  // shift+date, so a plain SAP-code match here is equivalent to the
+  // date+shift+SAP match the frontend needs (Frontend/src/pages/PartProcess/
+  // ProductionReport.jsx's aggregateRecords) — no separate shift dimension
+  // needed in the grouping key. Plans aren't reliably tagged to a real shift
+  // (legacy rows use stale values that match nothing), so an exact shift
+  // match is tried first, falling back to "All Shifts"/unrecognized values.
+  // Each plan is consumed by at most one row; a leftover, unmatched plan
+  // becomes its own "planned but not yet produced" row below.
+  const availablePlans = plans
+    .filter((p) => p.status !== false && p.status !== 0)
+    .map((p) => ({ ...p, _used: false }));
+
+  const consumePlan = (sapCode) => {
+    let p = availablePlans.find((c) => !c._used && c.sapCode === sapCode && c.shift === shiftName);
+    if (!p) {
+      p = availablePlans.find((c) => !c._used && c.sapCode === sapCode &&
+        (c.shift === "All Shifts" || !realShiftNames.includes(c.shift)));
+    }
+    if (p) p._used = true;
+    return p;
+  };
+
+  const producedRows = Object.values(map)
     .filter((row) => row.sapCode !== "UNKNOWN")
     .map((row, idx) => {
       const avgCycleSecs = row.cycleSecs.length > 0
@@ -278,7 +369,11 @@ export const aggregateRecords = (records, materials, dateStr) => {
       const downMins = Math.round(row.downtimeSecs / 60);
       const idleMins = Math.round(row.idleSecs / 60);
       const lossMins = downMins + idleMins + coSt.overrunMins;
-      const planQty    = row.planQty > 0 ? row.planQty : Math.ceil(row.actualQty * 1.05);
+      // Plan Qty comes from the real Planning Configuration entry when one
+      // matches; otherwise falls back to a +5% estimate over actual qty.
+      const matchedPlan = consumePlan(row.sapCode);
+      const plannedQty  = matchedPlan ? Number(matchedPlan.targetQty) || 0 : 0;
+      const planQty     = plannedQty > 0 ? plannedQty : Math.ceil(row.actualQty * 1.05);
       const reqTimeMins = Math.round((planQty * row.definedCycleTime) / 60);
 
       const availableTimeSecs = planQty * row.definedCycleTime;
@@ -353,6 +448,33 @@ export const aggregateRecords = (records, materials, dateStr) => {
         quality,
         idealEnergyWh,
         actualEnergyWh,
+        planQtyFromConfig: plannedQty > 0,
+        isGhost: false,
       };
     });
+
+  // ---- Plans with no matching actual production become their own rows —
+  // "planned, not yet produced" — so the shift-end report shows what was
+  // due this shift but never started, instead of silently omitting it.
+  const ghostRows = availablePlans
+    .filter((p) => !p._used)
+    .map((p, i) => ({
+      srNo: producedRows.length + i + 1,
+      date: dateStr,
+      startedAt: "Not Stated", completedAt: "",
+      sapCode: p.sapCode,
+      itemDescription: p.partName || p.sapCode,
+      planQty: Number(p.targetQty) || 0,
+      actualQty: 0, isPunching: false, componentQty: 0, componentCycleTime: null,
+      reqTimeMins: 0, actualTimeMins: 0, definedCycleTime: 0, sheetCycleTime: 0,
+      stdChangeoverTime: STD_CHANGEOVER_MINS, actualChangeoverTime: 0,
+      plannedChangeovers: 0, actualChangeovers: 0, coOverrunMins: 0, coOverrunCount: 0,
+      idleMins: 0, rejects: 0, lossMins: 0,
+      oee: 0, availability: 0, performance: 0, quality: 0,
+      idealEnergyWh: 0, actualEnergyWh: 0,
+      planQtyFromConfig: true,
+      isGhost: true,
+    }));
+
+  return [...producedRows, ...ghostRows];
 };

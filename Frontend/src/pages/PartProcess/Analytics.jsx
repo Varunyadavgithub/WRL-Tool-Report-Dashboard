@@ -18,7 +18,7 @@ import {
 import toast from "react-hot-toast";
 import { shiftPlannedProductionMins } from "../../redux/slices/masterConfigSlice";
 import { usePartProcessOEE, computeOEE, parseDurSecs } from "./usePartProcessOEE";
-import { detectChangeovers, changeoverStats } from "../../utils/productionLogic.js";
+import { detectChangeovers, changeoverStats, resolveShiftAsOf } from "../../utils/productionLogic.js";
 import { getLastNDaysRange } from "../../utils/dateUtils.js";
 
 ChartJS.register(BarElement, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, Filler);
@@ -81,7 +81,7 @@ const ChartCard = ({ title, icon: Icon, height = 240, children, empty = false })
 
 const PartProcessAnalytics = () => {
   const {
-    records, loading, loadProgress, materials, shifts,
+    records, loading, loadProgress, materials, shifts, shiftHistory,
     rangeStart, rangeEnd, applyRange, loadForRange,
   } = usePartProcessOEE();
 
@@ -113,14 +113,19 @@ const PartProcessAnalytics = () => {
       if (!r.eventDate) return;
       (byDate[r.eventDate] ??= []).push(r);
     });
-    const plannedMins = shifts.length > 0 ? shifts.reduce((s, sh) => s + shiftPlannedProductionMins(sh), 0) : 1440;
-
     const days = [];
     const cos = [];
     Object.keys(byDate).sort().forEach((date) => {
       const dayRecords = byDate[date];
       const prod = dayRecords.filter((r) => r.state === "Production");
       const down = dayRecords.filter((r) => r.state === "Downtime");
+      // Each day resolves its OWN shift timing (resolveShiftAsOf) rather
+      // than today's live ShiftConfigs — otherwise every day in the trend
+      // used today's shift durations even if timing changed partway
+      // through the range.
+      const plannedMins = shifts.length > 0
+        ? shifts.reduce((s, sh) => s + shiftPlannedProductionMins(resolveShiftAsOf(shiftHistory, sh.id, date, sh)), 0)
+        : 1440;
       const oee  = computeOEE({ prodRecords: prod, downRecords: down, plannedMins, materials });
       const dayCos = detectChangeovers(dayRecords, undefined, null);
       const coS = changeoverStats(dayCos);
@@ -128,7 +133,7 @@ const PartProcessAnalytics = () => {
       dayCos.forEach((co) => cos.push({ ...co, date }));
     });
     return { dailyStats: days, allChangeovers: cos };
-  }, [records, shifts, materials]);
+  }, [records, shifts, materials, shiftHistory]);
 
   // ── Range summary KPIs ───────────────────────────────────────────────────
   const summary = useMemo(() => {
