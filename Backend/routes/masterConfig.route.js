@@ -5,7 +5,10 @@ import {
   getMaterials, createMaterial, updateMaterial, deleteMaterial, bulkUpsertMaterials,
   uploadMaterialDrawing as uploadMaterialDrawingHandler, deleteMaterialDrawing,
 } from "../controllers/masterConfig/materials.controller.js";
-import { getShifts, createShift, updateShift, deleteShift } from "../controllers/masterConfig/shifts.controller.js";
+import { getShifts, getShiftHistory, createShift, updateShift, deleteShift } from "../controllers/masterConfig/shifts.controller.js";
+import {
+  getMachineShiftAllocations, getMachineShiftAllocationHistory, setMachineShiftAllocations,
+} from "../controllers/masterConfig/machineShiftAllocations.controller.js";
 import {
   getDowntimeReasons, createDowntimeReason, updateDowntimeReason, deleteDowntimeReason,
 } from "../controllers/masterConfig/downtimeReasons.controller.js";
@@ -40,9 +43,15 @@ router.delete("/materials/:id/drawing",      authenticate, deleteMaterialDrawing
 
 // Shifts
 router.get("/shifts",        authenticate, getShifts);
+router.get("/shifts/history", authenticate, getShiftHistory);
 router.post("/shifts",       authenticate, createShift);
 router.put("/shifts/:id",    authenticate, updateShift);
 router.delete("/shifts/:id", authenticate, deleteShift);
+
+// Machine-Shift Allocations
+router.get("/machine-shift-allocations",         authenticate, getMachineShiftAllocations);
+router.get("/machine-shift-allocations/history", authenticate, getMachineShiftAllocationHistory);
+router.put("/machine-shift-allocations",          authenticate, setMachineShiftAllocations);
 
 // Downtime Reasons
 router.get("/downtime-reasons",        authenticate, getDowntimeReasons);

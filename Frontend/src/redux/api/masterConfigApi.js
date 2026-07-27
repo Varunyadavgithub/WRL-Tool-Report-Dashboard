@@ -4,7 +4,7 @@ import { baseURL } from "../../assets/assets.js";
 export const masterConfigApi = createApi({
   reducerPath: "masterConfigApi",
   baseQuery: fetchBaseQuery({ baseUrl: baseURL, credentials: "include" }),
-  tagTypes: ["Material", "Shift", "DowntimeReason", "Department", "QualityDefect", "MailSubscriber", "Machine", "Plan", "CheckpointLibrary"],
+  tagTypes: ["Material", "Shift", "MachineShiftAllocation", "DowntimeReason", "Department", "QualityDefect", "MailSubscriber", "Machine", "Plan", "CheckpointLibrary"],
   endpoints: (builder) => ({
     // ── Materials ────────────────────────────────────────────────────────────
     getMaterials: builder.query({
@@ -35,6 +35,14 @@ export const masterConfigApi = createApi({
       transformResponse: (res) => res.data ?? [],
       providesTags: ["Shift"],
     }),
+    // Full effective-dated history — small table, fetch-all. Consumers
+    // resolve "shift X as of date Y" locally via resolveShiftAsOf
+    // (Frontend/src/utils/productionLogic.js) instead of a per-date query.
+    getShiftHistory: builder.query({
+      query: () => "master-config/shifts/history",
+      transformResponse: (res) => res.data ?? [],
+      providesTags: ["Shift"],
+    }),
     addShift: builder.mutation({
       query: (body) => ({ url: "master-config/shifts", method: "POST", body }),
       invalidatesTags: ["Shift"],
@@ -46,6 +54,25 @@ export const masterConfigApi = createApi({
     deleteShift: builder.mutation({
       query: (id) => ({ url: `master-config/shifts/${id}`, method: "DELETE" }),
       invalidatesTags: ["Shift"],
+    }),
+
+    // ── Machine-Shift Allocations ────────────────────────────────────────────
+    getMachineShiftAllocations: builder.query({
+      query: () => "master-config/machine-shift-allocations",
+      transformResponse: (res) => res.data ?? [],
+      providesTags: ["MachineShiftAllocation"],
+    }),
+    // Full append-only action log — small table, fetch-all. Consumers resolve
+    // "machine X's shifts as of date Y" locally via resolveMachineShiftsAsOf
+    // (Frontend/src/utils/productionLogic.js).
+    getMachineShiftAllocationHistory: builder.query({
+      query: () => "master-config/machine-shift-allocations/history",
+      transformResponse: (res) => res.data ?? [],
+      providesTags: ["MachineShiftAllocation"],
+    }),
+    setMachineShiftAllocations: builder.mutation({
+      query: (body) => ({ url: "master-config/machine-shift-allocations", method: "PUT", body }),
+      invalidatesTags: ["MachineShiftAllocation"],
     }),
 
     // ── Downtime Reasons ─────────────────────────────────────────────────────
@@ -221,7 +248,8 @@ export const masterConfigApi = createApi({
 export const {
   useGetMaterialsQuery, useAddMaterialMutation, useUpdateMaterialMutation, useDeleteMaterialMutation, useBulkAddMaterialsMutation,
   useUploadMaterialDrawingMutation, useDeleteMaterialDrawingMutation,
-  useGetShiftsQuery, useAddShiftMutation, useUpdateShiftMutation, useDeleteShiftMutation,
+  useGetShiftsQuery, useGetShiftHistoryQuery, useAddShiftMutation, useUpdateShiftMutation, useDeleteShiftMutation,
+  useGetMachineShiftAllocationsQuery, useGetMachineShiftAllocationHistoryQuery, useSetMachineShiftAllocationsMutation,
   useGetDowntimeReasonsQuery, useAddDowntimeReasonMutation, useUpdateDowntimeReasonMutation, useDeleteDowntimeReasonMutation,
   useGetDepartmentsQuery, useAddDepartmentMutation, useUpdateDepartmentMutation, useDeleteDepartmentMutation,
   useGetQualityDefectsQuery, useAddQualityDefectMutation, useUpdateQualityDefectMutation, useDeleteQualityDefectMutation,

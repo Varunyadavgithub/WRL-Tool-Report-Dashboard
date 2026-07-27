@@ -21,6 +21,15 @@ const masterConfigSlice = createSlice({
     plans:            [],
     checkpointLibrary: [],
     shifts:           INIT_SHIFTS,
+    // Effective-dated snapshots of `shifts` — see selectShiftHistory /
+    // resolveShiftAsOf in utils/productionLogic.js for how a historical date
+    // resolves the shift config that actually applied on that date.
+    shiftHistory:     [],
+    // Which shift(s) each machine is currently assigned to, and the full
+    // assign/unassign log — see resolveMachineShiftsAsOf in
+    // utils/productionLogic.js.
+    machineShiftAllocations: [],
+    machineShiftAllocationHistory: [],
     // Logged entries captured from production reports
     downtimeEntries:  [],
     qualityEntries:   [],
@@ -74,6 +83,9 @@ const masterConfigSlice = createSlice({
     // Guard against undefined s.shifts (happens when redux-persist rehydrates
     // an older stored state that was saved before the shifts field was added).
     setShifts:   (s, { payload }) => { s.shifts = payload; },
+    setShiftHistory: (s, { payload }) => { s.shiftHistory = payload; },
+    setMachineShiftAllocations: (s, { payload }) => { s.machineShiftAllocations = payload; },
+    setMachineShiftAllocationHistory: (s, { payload }) => { s.machineShiftAllocationHistory = payload; },
     addShift:    (s, { payload }) => {
       if (!Array.isArray(s.shifts)) s.shifts = INIT_SHIFTS.map(x => ({ ...x }));
       s.shifts.push(payload);
@@ -142,7 +154,8 @@ export const {
   setMachines,
   setPlans,
   setCheckpointLibrary,
-  setShifts, addShift, updateShift, deleteShift,
+  setShifts, setShiftHistory, addShift, updateShift, deleteShift,
+  setMachineShiftAllocations, setMachineShiftAllocationHistory,
   setQualityPassword,
   logDowntimeEntry, logQualityEntry, deleteDowntimeEntry, deleteQualityEntry,
 } = masterConfigSlice.actions;
@@ -159,6 +172,9 @@ export const selectMachines        = (s) => s.masterConfig?.machines ?? [];
 export const selectPlans           = (s) => s.masterConfig?.plans ?? [];
 export const selectCheckpointLibrary = (s) => s.masterConfig?.checkpointLibrary ?? [];
 export const selectShifts          = (s) => s.masterConfig?.shifts ?? INIT_SHIFTS;
+export const selectShiftHistory    = (s) => s.masterConfig?.shiftHistory ?? [];
+export const selectMachineShiftAllocations        = (s) => s.masterConfig?.machineShiftAllocations ?? [];
+export const selectMachineShiftAllocationHistory  = (s) => s.masterConfig?.machineShiftAllocationHistory ?? [];
 export const selectDowntimeEntries = (s) => s.masterConfig?.downtimeEntries ?? [];
 export const selectQualityEntries  = (s) => s.masterConfig?.qualityEntries ?? [];
 export const selectQualityPassword = (s) => s.masterConfig?.qualityPassword ?? "";
