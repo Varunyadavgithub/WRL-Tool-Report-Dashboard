@@ -94,9 +94,16 @@ const groupSpans = (columns) => {
 // duplicating the sum/average rules.
 export const computeProductionTotals = (rows) => {
   const out = {};
+  // Rows with zero actual components — ghost rows ("planned, not yet
+  // produced" — see aggregateRecords) and any row whose only activity was a
+  // downtime event attributed to a model that never actually ran — have no
+  // real OEE to average in; including their 0% would drag the average down
+  // as if they were badly-performing production instead of simply not
+  // having started.
+  const producedRows = rows.filter((r) => r.componentQty > 0);
   VISIBLE_PRODUCTION_COLUMNS.forEach((c) => {
     if (AGG_SUM.has(c.key)) out[c.key] = rows.reduce((s, r) => s + (Number(c.value(r)) || 0), 0);
-    else if (AGG_AVG.has(c.key)) out[c.key] = rows.length ? rows.reduce((s, r) => s + (Number(c.value(r)) || 0), 0) / rows.length : 0;
+    else if (AGG_AVG.has(c.key)) out[c.key] = producedRows.length ? producedRows.reduce((s, r) => s + (Number(c.value(r)) || 0), 0) / producedRows.length : 0;
   });
   return out;
 };

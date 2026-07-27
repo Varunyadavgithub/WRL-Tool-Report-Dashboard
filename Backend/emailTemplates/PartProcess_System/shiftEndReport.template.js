@@ -15,8 +15,8 @@ const toDisplayDate = (isoDate) => {
   return year && month && day ? `${day}-${month}-${year}` : String(isoDate);
 };
 
-const metricCard = (label, value, color) => `
-  <td width="25%" style="padding:4px;vertical-align:top;">
+const metricCard = (label, value, color, width = "25%") => `
+  <td width="${width}" style="padding:4px;vertical-align:top;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e2e8f0;border-radius:8px;background:#ffffff;">
       <tr><td style="padding:14px 8px;text-align:center;">
         <div style="font-size:22px;line-height:26px;font-weight:700;color:${color};">${escapeHtml(value)}</div>
@@ -96,10 +96,20 @@ export const sendShiftEndReportMail = async ({ to, shiftName, date, rows, totals
           <div style="font-size:15px;font-weight:700;color:#1e293b;">Shift at a glance</div>
           <div style="margin-top:4px;font-size:12px;line-height:18px;color:#64748b;">Key production and quality indicators for the completed shift.</div>
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:12px;"><tr>
-            ${metricCard("Component quantity", safeTotals.componentQty ?? 0, "#2563eb")}
+            ${metricCard("Planned qty", safeTotals.planQty ?? 0, "#4f46e5")}
+            ${metricCard("Produced qty", safeTotals.componentQty ?? 0, "#2563eb")}
             ${metricCard("Accepted", safeTotals.accepted ?? 0, "#15803d")}
             ${metricCard("Rejected", safeTotals.rejected ?? 0, "#dc2626")}
-            ${metricCard("Average OEE", `${safeTotals.oee ?? 0}%`, oeeColor(Number(safeTotals.oee)))}
+          </tr></table>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:8px;"><tr>
+            ${metricCard("Machine OEE", `${safeTotals.machineOEE ?? 0}%`, oeeColor(Number(safeTotals.machineOEE)))}
+            ${metricCard("Runtime", `${safeTotals.runMins ?? 0} min`, "#16a34a")}
+            ${metricCard("Downtime", `${safeTotals.downMins ?? 0} min`, "#dc2626")}
+            ${metricCard("Idle time", `${safeTotals.idleMins ?? 0} min`, "#b45309")}
+          </tr></table>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:8px;"><tr>
+            ${metricCard("Planned changeovers", safeTotals.plannedChangeovers ?? 0, "#7c3aed", "50%")}
+            ${metricCard("Actual changeovers", safeTotals.actualChangeovers ?? 0, "#7c3aed", "50%")}
           </tr></table>
         </td></tr>
         <tr><td style="padding:20px 24px 0px;">
