@@ -2,13 +2,13 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSelector } from "react-redux";
 import toast from "react-hot-toast";
 import {
-  selectMaterials, selectShifts, getMaterialByModel,
+  selectMaterials, selectShifts, selectShiftHistory, getMaterialByModel,
   isActiveShift, shiftElapsedMins, shiftDurationMins, shiftPlannedProductionMins, toMins as sliceToMins,
 } from "../../redux/slices/masterConfigSlice";
 import axios from "axios";
 import { mapDbRecord } from "../../utils/mapDbRecord.js";
 import { PART_PROCESS_API } from "../../utils/factoryOsClient";
-import { enrichRecords, detectChangeovers, changeoverStats, isPunchingPart } from "../../utils/productionLogic.js";
+import { enrichRecords, detectChangeovers, changeoverStats, isPunchingPart, resolveShiftAsOf } from "../../utils/productionLogic.js";
 import { getTodayRange, getYesterdayRange, formatDateTimeLocal } from "../../utils/dateUtils.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -237,6 +237,7 @@ export const usePartProcessOEE = () => {
   const time      = useClock();
   const materials = useSelector(selectMaterials);
   const shifts    = useSelector(selectShifts).filter(s => s.status);
+  const shiftHistory = useSelector(selectShiftHistory);
 
   const [records, setRecords]           = useState([]);
   const [loading, setLoading]           = useState(false);
@@ -282,6 +283,16 @@ export const usePartProcessOEE = () => {
 
   const [selectedShift, setSelectedShift] = useState(
     () => shifts.find(isActiveShift) ?? null
+  );
+
+  // selectedShift's timing as it actually applied on selectedDate — not
+  // necessarily today's live ShiftConfigs values (see resolveShiftAsOf).
+  // Display-only fields (shiftName, color, id) stay off the live
+  // `selectedShift` object; only the time-derived computations below read
+  // from this.
+  const resolvedSelectedShift = useMemo(
+    () => (selectedShift ? resolveShiftAsOf(shiftHistory, selectedShift.id, selectedDate, selectedShift) : null),
+    [selectedShift, shiftHistory, selectedDate],
   );
 
   // ── Fetch records for a datetime range from the local DB ────────────────
@@ -391,10 +402,10 @@ export const usePartProcessOEE = () => {
     }
 
     // Older imports without ShiftName are still supported by the time window.
-    if (!selectedShift.startTime || !selectedShift.endTime) return [];
+    if (!resolvedSelectedShift?.startTime || !resolvedSelectedShift?.endTime) return [];
 
-    const ssm    = sliceToMins(selectedShift.startTime);
-    const sem    = sliceToMins(selectedShift.endTime);
+    const ssm    = sliceToMins(resolvedSelectedShift.startTime);
+    const sem    = sliceToMins(resolvedSelectedShift.endTime);
     const isON   = sem <= ssm;
     const nextDt = isON ? nextDateStr(selectedDate) : null;
 
@@ -413,12 +424,12 @@ export const usePartProcessOEE = () => {
       }
       return t >= ssm || t < sem;
     });
-  }, [records, selectedShift, selectedDate]);
+  }, [records, selectedShift, selectedDate, resolvedSelectedShift]);
 
   // ── Changeover analysis ─────────────────────────────────────────────────
   // For "All Shifts", use all records; for specific shift, use shiftRecords
   const changeoverRecords = selectedShift ? shiftRecords : records;
-  const shiftStartMins = selectedShift ? sliceToMins(selectedShift.startTime) : null;
+  const shiftStartMins = resolvedSelectedShift ? sliceToMins(resolvedSelectedShift.startTime) : null;
   const changeovers    = useMemo(
     () => detectChangeovers(changeoverRecords, undefined, shiftStartMins),
     [changeoverRecords, shiftStartMins],
@@ -433,14 +444,15 @@ export const usePartProcessOEE = () => {
     const down = records.filter(r => r.state === "Downtime");
 
     // plannedMins = sum of net production time (shift duration minus
-    // configured breaks) of all active shifts. This ensures the denominator
-    // is correct for "All Shifts" view.
+    // configured breaks) of all active shifts, each resolved to the timing
+    // that actually applied on selectedDate. This ensures the denominator
+    // is correct for "All Shifts" view even on a historical date.
     const plannedMins = shifts.length > 0
-      ? shifts.reduce((s, sh) => s + shiftPlannedProductionMins(sh), 0)
+      ? shifts.reduce((s, sh) => s + shiftPlannedProductionMins(resolveShiftAsOf(shiftHistory, sh.id, selectedDate, sh)), 0)
       : 480; // fallback to 8 hours if no shifts configured
 
     return computeOEE({ prodRecords: prod, downRecords: down, plannedMins, materials });
-  }, [records, shifts, materials]);
+  }, [records, shifts, materials, shiftHistory, selectedDate]);
 
   const shiftOEE = useMemo(() => {
     // shiftRecords is already time-filtered to the selected shift's window,
@@ -449,9 +461,9 @@ export const usePartProcessOEE = () => {
     // Use shiftRecords directly — no extra date filter needed here.
     const prod = shiftRecords.filter(r => r.state === "Production");
     const down = shiftRecords.filter(r => r.state === "Downtime");
-    const plannedMins = selectedShift ? Math.max(1, shiftPlannedProductionMins(selectedShift)) : 480;
+    const plannedMins = resolvedSelectedShift ? Math.max(1, shiftPlannedProductionMins(resolvedSelectedShift)) : 480;
     return computeOEE({ prodRecords: prod, downRecords: down, plannedMins, materials });
-  }, [shiftRecords, selectedShift, materials]);
+  }, [shiftRecords, resolvedSelectedShift, materials]);
 
   // Active OEE values (shift-scoped when a shift is selected)
   const activeOEEData    = selectedShift ? shiftOEE    : allShiftOEE;
@@ -556,13 +568,13 @@ export const usePartProcessOEE = () => {
   }, [selectedShift, isToday, time]);
 
   return {
-    time, materials, shifts,
+    time, materials, shifts, shiftHistory,
     records, loading, loadProgress,
     rangeMode, rangeStart, rangeEnd,
     customStart, setCustomStart, customEnd, setCustomEnd, showCustom, setShowCustom,
     selectedDate, isToday,
     applyRange, handleToday, handleYesterday, handleCustomApply,
-    selectedShift, setSelectedShift,
+    selectedShift, setSelectedShift, resolvedSelectedShift,
     loadForRange, loadToday,
     shiftRecords, changeoverRecords, shiftStartMins, changeovers, coStats,
     allShiftOEE, shiftOEE, activeOEEData,

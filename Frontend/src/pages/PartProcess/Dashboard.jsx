@@ -29,6 +29,7 @@ import {
   Minimize2,
   Timer,
   ArrowLeft,
+  FileText,
 } from "lucide-react";
 import axios from "axios";
 import { fileBaseURL } from "../../assets/assets.js";
@@ -65,6 +66,7 @@ import {
 import {
   IDLE_THRESHOLD_MINS,
   STD_CHANGEOVER_MINS,
+  resolveShiftAsOf,
 } from "../../utils/productionLogic.js";
 import {
   usePartProcessOEE,
@@ -231,6 +233,10 @@ const TimeMap = ({
   // Shift 2:     today 20:00 → tomorrow 08:00
   windowStartMs = null, // epoch ms of axis left edge
   windowEndMs = null, // epoch ms of axis right edge
+  // Background bands tagging which shift (and its Lunch/Dinner break
+  // sub-window) each part of the timeline belongs to — each item:
+  // { name, color, startMs, endMs, breakName, breakStartMs, breakEndMs }.
+  shiftBands = [],
 }) => {
   const scrollRef = useRef(null);
   const canvasRef = useRef(null);
@@ -565,7 +571,47 @@ const TimeMap = ({
     ctx.fillStyle = "#f8fafc";
     ctx.fillRect(0, 0, W, H);
 
-    // Bail after clearing — otherwise switching to a window with zero
+    // Shift bands — background tint per shift + a distinct sub-band for its
+    // Lunch/Dinner break, so which shift (and break window) a stretch of
+    // timeline belongs to reads at a glance instead of only being
+    // inferable from the header badge (which only applies when a single
+    // shift is selected, not in "All Shifts" view). Drawn before the
+    // zero-events bail below so bands still show on an otherwise-empty day.
+    const bandX = (ms) => ((ms - minMs) / rangeMs) * W;
+    shiftBands.forEach((band) => {
+      const bx = Math.max(0, bandX(band.startMs));
+      const bx2 = Math.min(W, bandX(band.endMs));
+      if (bx2 <= bx) return;
+      ctx.save();
+      ctx.globalAlpha = 0.07;
+      ctx.fillStyle = band.color;
+      ctx.fillRect(bx, 0, bx2 - bx, H);
+      ctx.restore();
+      ctx.font = "9px sans-serif";
+      ctx.fillStyle = band.color;
+      ctx.textBaseline = "top";
+      ctx.fillText(band.name, bx + 4, 2);
+
+      if (band.breakStartMs != null && band.breakEndMs != null) {
+        const brx = Math.max(0, bandX(band.breakStartMs));
+        const brx2 = Math.min(W, bandX(band.breakEndMs));
+        if (brx2 > brx) {
+          ctx.save();
+          ctx.globalAlpha = 0.16;
+          ctx.fillStyle = band.color;
+          ctx.fillRect(brx, 0, brx2 - brx, H);
+          ctx.restore();
+          if (brx2 - brx > 20) {
+            ctx.font = "8px sans-serif";
+            ctx.fillStyle = band.color;
+            ctx.textBaseline = "bottom";
+            ctx.fillText(band.breakName, brx + 2, H - 2);
+          }
+        }
+      }
+    });
+
+    // Bail after clearing/bands — otherwise switching to a window with zero
     // events (e.g. all events trimmed by the "now" clamp) left the
     // previous render's bars/markers stuck on screen instead of an
     // empty grey canvas.
@@ -700,7 +746,7 @@ const TimeMap = ({
       ctx.arc(nx, PAD, 4, 0, Math.PI * 2);
       ctx.fill();
     }
-  }, [events, coMarkers, minMs, maxMs, rangeMs, nowPct, zoom, canvasW]);
+  }, [events, coMarkers, minMs, maxMs, rangeMs, nowPct, zoom, canvasW, shiftBands]);
 
   const handleZoomIn = () => setZoom((z) => Math.min(z * 2, 32));
   const handleZoomOut = () => setZoom((z) => Math.max(z / 2, 1));
@@ -2159,6 +2205,7 @@ const PartProcessDashboard = () => {
     time,
     materials,
     shifts,
+    shiftHistory,
     records,
     loading,
     loadProgress,
@@ -2178,6 +2225,7 @@ const PartProcessDashboard = () => {
     handleCustomApply,
     selectedShift,
     setSelectedShift,
+    resolvedSelectedShift,
     loadToday,
     shiftRecords,
     changeoverRecords,
@@ -2554,6 +2602,12 @@ const PartProcessDashboard = () => {
     });
     return map;
   }, [plans, selectedDate, materials]);
+
+  const totalPlannedQty = useMemo(
+    () => Object.values(plannedModelMap).reduce((s, v) => s + v, 0),
+    [plannedModelMap],
+  );
+  const plannedPartCount = Object.keys(plannedModelMap).length;
 
   // Model Breakdown shows the union of "actually produced today" and "planned
   // for today" — a freshly-uploaded plan with zero production yet should still
@@ -3176,7 +3230,24 @@ const PartProcessDashboard = () => {
           )}
 
           {/* ── ROW 1: KPI Cards ── */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
+                <FileText className="w-5 h-5 text-indigo-500" />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
+                  {selectedShift ? `${selectedShift.shiftName} Planned Qty` : "Planned Qty"}
+                </p>
+                <p className="text-2xl font-bold font-mono text-indigo-600">
+                  {totalPlannedQty.toLocaleString()}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  {plannedPartCount} part{plannedPartCount === 1 ? "" : "s"} planned
+                </p>
+              </div>
+            </div>
+
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-4">
               <div className="relative shrink-0">
                 <RingProgress
@@ -3852,9 +3923,11 @@ const PartProcessDashboard = () => {
                 tlWindowStart = new Date(rangeStart).getTime();
                 tlWindowEnd = new Date(rangeEnd).getTime();
               } else {
-                // Parse "HH:MM" shift times against selectedDate in IST
-                const [sH, sM] = selectedShift.startTime.split(":").map(Number);
-                const [eH, eM] = selectedShift.endTime.split(":").map(Number);
+                // Parse "HH:MM" shift times (as they actually applied on
+                // selectedDate, not necessarily today's live config) against
+                // selectedDate in IST.
+                const [sH, sM] = resolvedSelectedShift.startTime.split(":").map(Number);
+                const [eH, eM] = resolvedSelectedShift.endTime.split(":").map(Number);
                 const [yr, mo, dy] = selectedDate.split("-").map(Number);
                 tlWindowStart = istToUtcMs(yr, mo, dy, sH, sM);
                 // End: same date if day shift, next date if overnight
@@ -3862,6 +3935,40 @@ const PartProcessDashboard = () => {
                 const endDy = isON ? dy + 1 : dy;
                 tlWindowEnd = istToUtcMs(yr, mo, endDy, eH, eM);
               }
+
+              // Background bands tagging which shift (and Lunch/Dinner
+              // break sub-window) each part of the timeline belongs to.
+              // Resolved the same way as tlWindowStart/End above — each
+              // shift's timing as of selectedDate, not today's live config.
+              const [anchorYr, anchorMo, anchorDy] = selectedDate.split("-").map(Number);
+              const shiftBands = shifts
+                .map((sh) => {
+                  const resolved = resolveShiftAsOf(shiftHistory, sh.id, selectedDate, sh);
+                  if (!resolved?.startTime || !resolved?.endTime) return null;
+                  const [sH, sM] = resolved.startTime.split(":").map(Number);
+                  const [eH, eM] = resolved.endTime.split(":").map(Number);
+                  const startMs = istToUtcMs(anchorYr, anchorMo, anchorDy, sH, sM);
+                  const isON = eH * 60 + eM <= sH * 60 + sM;
+                  const endMs = istToUtcMs(anchorYr, anchorMo, isON ? anchorDy + 1 : anchorDy, eH, eM);
+                  let breakStartMs = null;
+                  let breakEndMs = null;
+                  if (resolved.breakStart && resolved.breakEnd) {
+                    const [bsH, bsM] = resolved.breakStart.split(":").map(Number);
+                    const [beH, beM] = resolved.breakEnd.split(":").map(Number);
+                    breakStartMs = istToUtcMs(anchorYr, anchorMo, anchorDy, bsH, bsM);
+                    const breakOn = beH * 60 + beM <= bsH * 60 + bsM;
+                    breakEndMs = istToUtcMs(anchorYr, anchorMo, breakOn ? anchorDy + 1 : anchorDy, beH, beM);
+                  }
+                  // PartProcessEvents tags break-window records with
+                  // ShiftName "Lunch" (Shift 1) / "Dinner" (Shift 2), not a
+                  // generic "Break" — match that so the band label agrees
+                  // with what the bars/tooltip already call it.
+                  const breakName =
+                    sh.shiftName === "Shift 1" ? "Lunch" : sh.shiftName === "Shift 2" ? "Dinner" : "Break";
+                  return { name: sh.shiftName, color: sh.color || "#94a3b8", startMs, endMs, breakName, breakStartMs, breakEndMs };
+                })
+                .filter(Boolean);
+
               return (
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
                   <TimeMap
@@ -3872,6 +3979,7 @@ const PartProcessDashboard = () => {
                     shiftColor={selectedShift?.color}
                     windowStartMs={tlWindowStart}
                     windowEndMs={tlWindowEnd}
+                    shiftBands={shiftBands}
                   />
                 </div>
               );

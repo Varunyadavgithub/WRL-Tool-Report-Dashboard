@@ -16,7 +16,7 @@ import autoTable from "jspdf-autotable";
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import toast from "react-hot-toast";
 import {
-  selectMaterials, getMaterialByModel, selectPlans,
+  selectMaterials, getMaterialByModel, selectPlans, selectShifts,
 } from "../../redux/slices/masterConfigSlice";
 import {
   enrichRecords, detectChangeovers, changeoverStats, parseDurSecs,
@@ -104,21 +104,7 @@ const componentsPerUnit = (materials, model) => {
 /* ==================================================================
  * 4. Aggregation: raw records -> per-part summary rows
  * ================================================================== */
-// Sum configured Plan target qty for a SAP code across the queried date span
-// (a multi-day query collapses into one row per SAP code, so plans for every
-// day in that span are summed). Inactive plans (status === false) are ignored.
-const sumPlannedQty = (plans, sapCode, dateFrom, dateTo) => {
-  if (!plans?.length || !sapCode) return 0;
-  return plans.reduce((sum, p) => {
-    if (p.sapCode !== sapCode) return sum;
-    if (p.status === false || p.status === 0) return sum;
-    if (dateFrom && p.planDate < dateFrom) return sum;
-    if (dateTo && p.planDate > dateTo) return sum;
-    return sum + (Number(p.targetQty) || 0);
-  }, 0);
-};
-
-const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []) => {
+const aggregateRecords = (records, materials, qualityByPartName = {}, plans = [], realShiftNames = [], queryDateFrom = null, queryDateTo = null) => {
   if (!records.length) return [];
 
   // Enrich first — classifies Downtime >= 5 min as "Idle"
@@ -144,18 +130,20 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
   enriched.forEach((r) => {
     const mat     = getMaterialByModel(materials, r.model);
     const sapCode = mat?.sapCode || r.sapCode || "UNKNOWN";
-    const key = sapCode;
+    const day     = r._prodDay || null;
+    const shift   = r.shift || "—";
+    // Group by production day + shift + SAP code — matches how a Plan is
+    // actually scoped (SapCode+MachineName+PlanDate+Shift), instead of
+    // collapsing the whole queried range into one row per part.
+    const key = `${day}|${shift}|${sapCode}`;
 
     if (!map[key]) {
       map[key] = {
-        sapCode, model: r.model,
+        sapCode, model: r.model, shift,
         itemDescription: mat?.partName || r.model || "-",
         definedCycleTime: mat?.definedComponentCycleTime || 0,
         stdChangeoverTime: STD_CHANGEOVER_MINS,
-        // CHANGE: track the actual production-day span instead of forcing
-        // every row to the query's start date (fixes multi-day collapse).
-        dateFrom: r._prodDay || null,
-        dateTo: r._prodDay || null,
+        dateFrom: day, dateTo: day,
         startedAtMs: r._absMs ?? null, completedAtMs: r._absMsEnd ?? r._absMs ?? null,
         startedAt: r.startTime || "", completedAt: r.endTime || r.startTime || "",
         planQty: 0, actualQty: 0, goodQty: 0,
@@ -168,10 +156,6 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
 
     const g = map[key];
     g.rawRecords.push(r);
-    if (r._prodDay) {
-      if (!g.dateFrom || r._prodDay < g.dateFrom) g.dateFrom = r._prodDay;
-      if (!g.dateTo   || r._prodDay > g.dateTo)   g.dateTo   = r._prodDay;
-    }
     if (r._absMs != null && (g.startedAtMs == null || r._absMs < g.startedAtMs)) {
       g.startedAtMs = r._absMs;
       g.startedAt = r.startTime || "";
@@ -201,7 +185,34 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
     }
   });
 
-  return Object.values(map)
+  // ---- Resolve planned qty per group, consuming at most one plan each ----
+  // Plans aren't reliably tagged to a real shift (many legacy rows use a
+  // stale value that matches no configured shift — see PlanningConfig's
+  // shift dropdown fix), so an exact date+shift+SAP match is tried first,
+  // falling back to any plan matching only on date+SAP code ("All Shifts"
+  // or an unrecognized legacy value). Each plan is consumed by at most one
+  // group: fanning one plan's qty into every shift that produced the same
+  // part that day would double-count it, so instead a leftover, unmatched
+  // plan becomes its own "planned but not yet produced" row below.
+  // Bounded to the queried date range — otherwise every plan ever entered
+  // (past or far future) would surface here, not just the ones relevant to
+  // what's currently being viewed.
+  const availablePlans = plans
+    .filter((p) => p.status !== false && p.status !== 0)
+    .filter((p) => (!queryDateFrom || p.planDate >= queryDateFrom) && (!queryDateTo || p.planDate <= queryDateTo))
+    .map((p) => ({ ...p, _used: false }));
+
+  const consumePlan = (day, shift, sapCode) => {
+    let p = availablePlans.find((c) => !c._used && c.sapCode === sapCode && c.planDate === day && c.shift === shift);
+    if (!p) {
+      p = availablePlans.find((c) => !c._used && c.sapCode === sapCode && c.planDate === day &&
+        (c.shift === "All Shifts" || !realShiftNames.includes(c.shift)));
+    }
+    if (p) p._used = true;
+    return p;
+  };
+
+  const producedRows = Object.values(map)
     .filter((row) => row.sapCode !== "UNKNOWN")
     .map((row, idx) => {
       const avgCycleSecs = row.cycleSecs.length > 0
@@ -236,9 +247,10 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
         : row.actualQty;
 
       // Plan Qty comes from the Planning Configuration upload when available
-      // (summed across the queried date span); otherwise falls back to a
-      // +5% estimate over components produced.
-      const plannedQty = sumPlannedQty(plans, row.sapCode, row.dateFrom, row.dateTo);
+      // (matched to this exact date+shift, see consumePlan above); otherwise
+      // falls back to a +5% estimate over components produced.
+      const matchedPlan = consumePlan(row.dateFrom, row.shift, row.sapCode);
+      const plannedQty = matchedPlan ? Number(matchedPlan.targetQty) || 0 : 0;
       const planQty = plannedQty > 0 ? plannedQty : Math.ceil(compQty * 1.05);
       const planQtyFromConfig = plannedQty > 0;
 
@@ -314,6 +326,8 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
         sheetSapCode: matForRow?.sheetSapCode || "",
         sheetDescription: matForRow?.sheetDescription || "",
         model: row.model,
+        shift: row.shift,
+        isGhost: false,
         planQty,
         planQtyFromConfig,
         actualQty: row.actualQty,                 // Sheet Qty
@@ -344,7 +358,40 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
         goodQty: row.goodQty,
       };
     });
+
+  // ---- Plans with no matching actual production become their own rows —
+  // "planned, not yet produced" — instead of being silently dropped or
+  // folded into another part's numbers. Every field the table can't know
+  // without actual data stays zeroed/blank; `isGhost` lets the table render
+  // those as "—"/"Not Stated" instead of misleading zeros.
+  const ghostRows = availablePlans
+    .filter((p) => !p._used)
+    .map((p, i) => ({
+      srNo: producedRows.length + i + 1,
+      dateFrom: p.planDate, dateTo: p.planDate, date: p.planDate,
+      startedAt: "Not Stated", completedAt: "",
+      sapCode: p.sapCode,
+      itemDescription: p.partName || p.sapCode,
+      sheetSapCode: "", sheetDescription: "",
+      model: null, shift: p.shift,
+      isGhost: true,
+      planQty: Number(p.targetQty) || 0, planQtyFromConfig: true,
+      actualQty: 0, isPunching: false, componentQty: 0, goodComponentQty: 0,
+      componentCycleTime: null, reqTimeMins: 0, actualTimeMins: 0,
+      definedCycleTime: 0, sheetCycleTime: 0, machineCycleSecs: 0,
+      noOfSheet: 0, compPerSheet: 0, loadUnload: 0,
+      stdChangeoverTime: STD_CHANGEOVER_MINS, actualChangeoverTime: 0,
+      plannedChangeovers: 0, actualChangeovers: 0, coOverrunMins: 0, coOverrunCount: 0,
+      idleMins: 0, downMins: 0, totalDowntimeMins: 0, rejects: 0, accepted: 0, lossMins: 0,
+      oee: 0, availability: 0, performance: 0, quality: 0,
+      idealEnergyWh: 0, actualEnergyWh: 0, sheetWeightKg: 0, scrapWeightKg: 0,
+      actualCompCT: 0, availableTimeSecs: 0, actualTimeSecs: 0, netOperatingSecs: 0,
+      downtimeSecs: 0, idleSecs: 0, goodQty: 0,
+    }));
+
+  return [...producedRows, ...ghostRows];
 };
+
 
 /* ==================================================================
  * 5. Reusable presentational pieces
@@ -732,10 +779,19 @@ const exportPDF = async (rows, columns, meta) => {
  * 8. Main component
  * ================================================================== */
 const PAGE_SIZES = [10, 25, 50, 100];
+// Columns that still render normally on a "planned, not yet produced" ghost
+// row (see aggregateRecords' ghostRows) — everything else shows a dash
+// instead of a misleading zero, since there's no actual data to report yet.
+const GHOST_VISIBLE_KEYS = new Set([
+  "srNo", "date", "startedAt", "completedAt", "sapCode", "itemDescription",
+  "sheetSapCode", "sheetDescription", "planQty",
+]);
 
 const PartProcessProductionReport = () => {
   const materials = useSelector(selectMaterials);
   const plans = useSelector(selectPlans);
+  const shifts = useSelector(selectShifts);
+  const shiftNames = useMemo(() => shifts.filter((s) => s.status).map((s) => s.shiftName), [shifts]);
 
   const [startTime, setStartTime] = useState(`${todayStr()} 08:00`);
   const [endTime, setEndTime]     = useState(`${todayStr()} 20:00`);
@@ -912,10 +968,15 @@ const PartProcessProductionReport = () => {
     return map;
   }, [dbQLogs]);
 
-  /* ----- aggregated summary ----- */
+  /* ----- aggregated summary — one row per date+shift+part, plus a
+     "planned but not yet produced" row for any plan in the queried range
+     that has no matching actual production (covers both "how did today's
+     plan vs actual compare" and "what's still coming up" in one table) ----- */
+  const queryDateFrom = startTime ? startTime.slice(0, 10) : null;
+  const queryDateTo = endTime ? endTime.slice(0, 10) : null;
   const summary = useMemo(
-    () => aggregateRecords(filteredRecords, materials, qualityByPartName, plans),
-    [filteredRecords, materials, qualityByPartName, plans]);
+    () => aggregateRecords(filteredRecords, materials, qualityByPartName, plans, shiftNames, queryDateFrom, queryDateTo),
+    [filteredRecords, materials, qualityByPartName, plans, shiftNames, queryDateFrom, queryDateTo]);
 
   /* ----- columns ----- */
   const columns = useMemo(() => buildColumns(materials), [materials]);
@@ -961,8 +1022,16 @@ const PartProcessProductionReport = () => {
   /* ----- totals (over the searched set, component-first) ----- */
   const totals = useMemo(() => {
     const rows = searchedRows;
-    const n = rows.length || 1;
     const sum = (f) => rows.reduce((s, r) => s + f(r), 0);
+    // Rows with zero actual components — ghost rows ("planned, not yet
+    // produced") and any row whose only activity was a downtime event
+    // attributed to a model that never actually ran — have no real OEE to
+    // average in; including their 0% would drag the average down as if
+    // they were badly-performing production instead of simply not having
+    // started.
+    const producedRows = rows.filter((r) => r.componentQty > 0);
+    const n = producedRows.length || 1;
+    const sumProduced = (f) => producedRows.reduce((s, r) => s + f(r), 0);
     return {
       planQty: sum((r) => r.planQty),
       componentQty: sum((r) => r.componentQty),
@@ -974,10 +1043,10 @@ const PartProcessProductionReport = () => {
       lossMins: sum((r) => r.lossMins),
       totalDowntimeMins: sum((r) => r.totalDowntimeMins),
       idleMins: sum((r) => r.idleMins),
-      availability: (sum((r) => r.availability) / n).toFixed(1),
-      performance: (sum((r) => r.performance) / n).toFixed(1),
-      quality: (sum((r) => r.quality) / n).toFixed(1),
-      oee: (sum((r) => r.oee) / n).toFixed(1),
+      availability: (sumProduced((r) => r.availability) / n).toFixed(1),
+      performance: (sumProduced((r) => r.performance) / n).toFixed(1),
+      quality: (sumProduced((r) => r.quality) / n).toFixed(1),
+      oee: (sumProduced((r) => r.oee) / n).toFixed(1),
       idealEnergyWh: sum((r) => r.idealEnergyWh),
       actualEnergyWh: sum((r) => r.actualEnergyWh),
     };
@@ -1021,7 +1090,8 @@ const PartProcessProductionReport = () => {
         </div>
         {hasData && (
           <div className="flex items-center gap-2 flex-wrap">
-            <StatCard icon={FiGrid} label="Components" value={totals.componentQty.toLocaleString()} tone="violet" />
+            <StatCard icon={FiFile} label="Planned Qty" value={totals.planQty.toLocaleString()} tone="indigo" />
+            <StatCard icon={FiGrid} label="Components Produced" value={totals.componentQty.toLocaleString()} tone="violet" />
             <StatCard icon={FiPackage} label="Sheets" value={totals.actualQty.toLocaleString()} tone="blue" />
             <StatCard icon={FiPackage} label="Sheet Wt Used" value={`${totals.sheetWeightKg.toLocaleString()} kg`} tone="amber" />
             <StatCard icon={FiAlertTriangle} label="Total Scrap" value={`${totals.scrapWeightKg.toLocaleString()} kg`} tone="rose" />
@@ -1186,10 +1256,12 @@ const PartProcessProductionReport = () => {
                     </td></tr>
                   ) : pagedRows.length > 0 ? (
                     pagedRows.map((r) => (
-                      <tr key={r.sapCode} className="hover:bg-blue-50/30 transition-colors even:bg-slate-50/30">
+                      <tr key={`${r.dateFrom}|${r.shift}|${r.sapCode}|${r.srNo}`} className={`hover:bg-blue-50/30 transition-colors even:bg-slate-50/30 ${r.isGhost ? "bg-slate-50/60" : ""}`}>
                         {visibleColumns.map((c) => (
                           <td key={c.key} className={`px-2.5 py-2.5 border-b border-r border-slate-100 ${c.align === "center" ? "text-center" : ""}`}>
-                            {c.cell(r)}
+                            {r.isGhost && !GHOST_VISIBLE_KEYS.has(c.key)
+                              ? <span className="text-slate-300 text-xs">—</span>
+                              : c.cell(r)}
                           </td>
                         ))}
                       </tr>
@@ -1225,8 +1297,6 @@ const PartProcessProductionReport = () => {
             )}
           </SectionCard>
         )}
-
-
       </div>
     </div>
   );

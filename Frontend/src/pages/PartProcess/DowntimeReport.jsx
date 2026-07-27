@@ -28,7 +28,7 @@ import {
 import {
   selectMaterials, getMaterialByModel, selectShifts,
   getShiftWindow, toMins, selectDowntimeEntries, selectDepartments,
-  selectDowntimeReasons,
+  selectDowntimeReasons, selectPlans,
 } from "../../redux/slices/masterConfigSlice";
 
 ChartJS.register(BarElement, ArcElement, CategoryScale, LinearScale, Tooltip, Legend);
@@ -202,6 +202,7 @@ const PartProcessDowntimeReport = () => {
   const reduxEntries        = useSelector(selectDowntimeEntries);
   const departments         = useSelector(selectDepartments);
   const downtimeReasons     = useSelector(selectDowntimeReasons);
+  const plans               = useSelector(selectPlans);
 
   // Map reason name → department for fallback when logged entry has no category saved
   const reasonNameToDept = useMemo(()=>{
@@ -373,6 +374,27 @@ const PartProcessDowntimeReport = () => {
     return detectChangeovers(records,undefined,anchor);
   },[records,appliedRange]);
   const coSt = useMemo(()=>changeoverStats(changeovers),[changeovers]);
+  const coCountByShift = useMemo(() => {
+    const m = {};
+    changeovers.forEach((c) => { m[c.shift || "—"] = (m[c.shift || "—"] || 0) + 1; });
+    return m;
+  }, [changeovers]);
+
+  // "Planned changeovers" — number of distinct models/parts planned (Planning
+  // Config) for the queried date span, i.e. how many changeovers you'd expect
+  // if production followed the plan — compared against coSt.count (actual).
+  const [reportDateFrom, reportDateTo] = useMemo(() => {
+    if (!records.length) return [null, null];
+    const days = records.map((r) => r._prodDay).filter(Boolean).sort();
+    return [days[0], days[days.length - 1]];
+  }, [records]);
+  const plannedChangeoverCount = useMemo(() => {
+    if (!reportDateFrom || !reportDateTo) return 0;
+    const active = plans.filter((p) =>
+      p.status !== false && p.status !== 0 &&
+      p.planDate >= reportDateFrom && p.planDate <= reportDateTo);
+    return new Set(active.map((p) => p.sapCode)).size;
+  }, [plans, reportDateFrom, reportDateTo]);
 
   const totalDTSecs = useMemo(()=>allDT.reduce((s,r)=>s+parseDurSecs(r.duration),0),[allDT]);
   const idleSecs    = useMemo(()=>idleDT.reduce((s,r)=>s+parseDurSecs(r.duration),0),[idleDT]);
@@ -657,10 +679,11 @@ const PartProcessDowntimeReport = () => {
         {!isAnyLoading && hasData && (
           <>
             {/* ── KPI ROW ── */}
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
               <KpiCard icon={TimerOff}    label="Total Downtime"  value={`${secsToMins(totalDTSecs)}m`} sub={`${allDT.length} events`}         accent="rose"/>
               <KpiCard icon={Activity}    label="Brief Downtime"  value={briefDT.length} sub={`<${IDLE_THRESHOLD_MINS}m · ${secsToMins(briefSecs)}m total`} accent="rose"/>
               <KpiCard icon={Clock}       label="Idle Events"     value={idleDT.length}  sub={`≥${IDLE_THRESHOLD_MINS}m · ${secsToMins(idleSecs)}m total`}  accent="amber"/>
+              <KpiCard icon={ListChecks}  label="Planned Changeovers" value={plannedChangeoverCount} sub="distinct models planned"          accent="blue"/>
               <KpiCard icon={ArrowRight}  label="Changeovers"     value={coSt.count}     sub={`${coSt.totalMins}m total CO time`}             accent="violet"/>
               <KpiCard icon={TrendingDown}label="CO Overrun Loss" value={`${coSt.overrunMins}m`} sub={`${coSt.overrunCount} COs > ${STD_CHANGEOVER_MINS}m std`} accent="purple"/>
             </div>
@@ -718,6 +741,9 @@ const PartProcessDowntimeReport = () => {
                           <div className="h-full bg-rose-400 rounded-full transition-all" style={{width:`${pct}%`}}/>
                         </div>
                         <p className="text-[10px] text-slate-400 mt-1">{pct}% of total</p>
+                        <p className="text-[10px] font-semibold text-violet-500 mt-1.5 pt-1.5 border-t border-slate-200">
+                          {coCountByShift[sh] || 0} changeover{(coCountByShift[sh] || 0) === 1 ? "" : "s"}
+                        </p>
                       </div>
                     );
                   })}

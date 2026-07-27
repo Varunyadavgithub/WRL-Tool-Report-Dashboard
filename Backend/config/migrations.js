@@ -829,5 +829,99 @@ export const runMigrations = async (pool3) => {
     END
   `);
 
+  // ── ShiftConfigHistory: effective-dated snapshots of ShiftConfigs ─────────
+  // ShiftConfigs itself is a flat "current state" table with no history —
+  // editing a shift's timing (Shift Master admin UI) overwrites in place, so
+  // any report/dashboard rendering a HISTORICAL date was silently using
+  // TODAY's shift timing instead of what was actually in effect back then.
+  // This table is the fix: an append-only, never-UPDATEd log of shift
+  // snapshots, each tagged with the DATETIME it started applying
+  // (EffectiveFrom). Resolving "shift X as of date Y" means picking the
+  // snapshot with the latest EffectiveFrom <= Y. Written to (never mutated)
+  // by shifts.controller.js's createShift/updateShift.
+  await pool3.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ShiftConfigHistory')
+    BEGIN
+      CREATE TABLE ShiftConfigHistory (
+        Id            INT IDENTITY(1,1) PRIMARY KEY,
+        ShiftId       INT           NOT NULL, -- not FK-constrained: history must survive shift deletion
+        ShiftName     NVARCHAR(100) NOT NULL,
+        ShiftCode     NVARCHAR(20)  NULL,
+        StartTime     NVARCHAR(10)  NULL,
+        EndTime       NVARCHAR(10)  NULL,
+        BreakStart    NVARCHAR(10)  NULL,
+        BreakEnd      NVARCHAR(10)  NULL,
+        TeaBreaks     NVARCHAR(10)  NULL,
+        Color         NVARCHAR(20)  NULL,
+        OvertimeShift BIT           NOT NULL DEFAULT 0,
+        WeeklyOff     NVARCHAR(200) NULL,
+        Status        BIT           NOT NULL DEFAULT 1,
+        EffectiveFrom DATETIME      NOT NULL,
+        CreatedAt     DATETIME      NOT NULL DEFAULT GETDATE()
+      );
+      CREATE INDEX IX_ShiftConfigHistory_ShiftId_EffectiveFrom ON ShiftConfigHistory (ShiftId, EffectiveFrom);
+
+      -- Baseline: seed one snapshot per existing shift from its current
+      -- values, effective since it was last saved (UpdatedAt).
+      INSERT INTO ShiftConfigHistory (ShiftId, ShiftName, ShiftCode, StartTime, EndTime, BreakStart, BreakEnd, TeaBreaks, Color, OvertimeShift, WeeklyOff, Status, EffectiveFrom)
+      SELECT Id, ShiftName, ShiftCode, StartTime, EndTime, BreakStart, BreakEnd, TeaBreaks, Color, OvertimeShift, WeeklyOff, Status, UpdatedAt
+      FROM ShiftConfigs;
+
+      -- One-time manual correction: Shift 1's EndTime was 20:00 before it
+      -- was edited to 18:00 on 2026-07-21 (confirmed with the user; the old
+      -- value isn't recoverable from ShiftConfigs itself since the UPDATE
+      -- overwrote it with no record). Backdates an earlier snapshot so
+      -- dates before the edit resolve correctly.
+      INSERT INTO ShiftConfigHistory (ShiftId, ShiftName, ShiftCode, StartTime, EndTime, BreakStart, BreakEnd, TeaBreaks, Color, OvertimeShift, WeeklyOff, Status, EffectiveFrom)
+      SELECT Id, ShiftName, ShiftCode, StartTime, '20:00', BreakStart, BreakEnd, TeaBreaks, Color, OvertimeShift, WeeklyOff, Status, CreatedAt
+      FROM ShiftConfigs WHERE ShiftName = 'Shift 1';
+
+      PRINT 'Migration: Created ShiftConfigHistory table (+ Shift 1 backdated correction)';
+    END
+  `);
+
+  // ── MachineShiftAllocations / MachineShiftAllocationHistory ──────────────
+  // Which shift(s) a machine is assigned to (some machines run a single 10h
+  // shift, others run back-to-back for ~22h) — a many-to-many relationship
+  // between Machines and ShiftConfigs. MachineShiftAllocations is the
+  // current-state table (Status=1 = currently assigned); every change is
+  // also logged to MachineShiftAllocationHistory (append-only, never
+  // UPDATEd — same Action/ActionAt shape as the existing AuditTemplateHistory
+  // table) so a historical date can be resolved via resolveMachineShiftsAsOf
+  // (Frontend/src/utils/productionLogic.js) instead of only ever reflecting
+  // today's assignment. No FK constraints on MachineId/ShiftId, same
+  // reasoning as ShiftConfigHistory: history must survive the machine or
+  // shift it refers to being deleted later.
+  await pool3.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='MachineShiftAllocations')
+    BEGIN
+      CREATE TABLE MachineShiftAllocations (
+        Id        INT IDENTITY(1,1) PRIMARY KEY,
+        MachineId INT NOT NULL,
+        ShiftId   INT NOT NULL,
+        Status    BIT NOT NULL DEFAULT 1,
+        CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+        UpdatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT UQ_MachineShiftAllocations UNIQUE (MachineId, ShiftId)
+      );
+      PRINT 'Migration: Created MachineShiftAllocations table';
+    END
+  `);
+
+  await pool3.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='MachineShiftAllocationHistory')
+    BEGIN
+      CREATE TABLE MachineShiftAllocationHistory (
+        Id        INT IDENTITY(1,1) PRIMARY KEY,
+        MachineId INT NOT NULL,
+        ShiftId   INT NOT NULL,
+        Action    NVARCHAR(20) NOT NULL, -- 'assigned' | 'unassigned'
+        ActionAt  DATETIME NOT NULL DEFAULT GETDATE()
+      );
+      CREATE INDEX IX_MachineShiftAllocationHistory_MachineId_ActionAt ON MachineShiftAllocationHistory (MachineId, ActionAt);
+      PRINT 'Migration: Created MachineShiftAllocationHistory table';
+    END
+  `);
+
   console.log("Migrations completed.");
 };
