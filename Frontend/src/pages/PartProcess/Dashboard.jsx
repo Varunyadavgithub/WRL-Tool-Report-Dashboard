@@ -329,16 +329,6 @@ const TimeMap = ({
   const rawEvents = useMemo(() => {
     return records
       .filter((r) => r.startTime && r.endTime)
-      // 0-qty "Production" rows are in-progress placeholders the sync writes
-      // while a cycle is still open — their EndTime is hard-set to the
-      // shift's closing boundary (e.g. 18:00 on a 10h shift), not the real
-      // moment the machine actually stopped, and several stale duplicates
-      // for the same barcode/StartTime can pile up before a real cycle
-      // supersedes them. Rendered as-is these paint a single solid green
-      // bar running all the way to shift end regardless of when production
-      // genuinely paused. Cycle-time averaging elsewhere already excludes
-      // qty=0 rows for the same reason — do the same here.
-      .filter((r) => r.state !== "Production" || (r.qty ?? 0) > 0)
       .map((r) => {
         const s = recordToMs(r, "startTime");
         const e = recordToMs(r, "endTime");
@@ -373,6 +363,13 @@ const TimeMap = ({
         // even on a shift whose full length only makes sense once the
         // break is subtracted out (e.g. a 10h shift = ~9.5h run + break).
         const isBreakShift = r.shift === "Lunch" || r.shift === "Dinner";
+        // 0-qty "Production" rows are rework/correction sub-cycles (a flawed
+        // component gets a short corrective pass that doesn't add a new
+        // completed unit) — genuine production activity, not a sync
+        // artifact, so they render as ordinary Production here. Cycle-time
+        // AVERAGING still excludes them elsewhere (their duration isn't a
+        // representative per-unit cycle time), but that's a different
+        // concern from what colour the timeline shows.
         return {
           startMs: cs,
           endMs: ce,
@@ -3252,15 +3249,15 @@ const PartProcessDashboard = () => {
               <div className="relative shrink-0">
                 <RingProgress
                   value={displayComponentQty}
-                  max={Math.max(displayComponentQty, 500)}
+                  max={Math.max(displayComponentQty, totalPlannedQty, 1)}
                   color={selectedShift?.color || "#3b82f6"}
                 />
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="text-xs font-bold font-mono text-slate-700">
-                    {displayComponentQty > 0
+                    {displayComponentQty > 0 && totalPlannedQty > 0
                       ? Math.min(
                           100,
-                          Math.round((displayComponentQty / 500) * 100),
+                          Math.round((displayComponentQty / totalPlannedQty) * 100),
                         )
                       : 0}
                     %
