@@ -9,7 +9,6 @@ import {
   dbConfig1,
   dbConfig2,
   dbConfig3,
-  dbConfig4,
 } from "./config/db.config.js";
 import { startCalibrationCron } from "./cron/calibrationEscalation.js";
 import { startManpowerCron } from "../Backend/cron/manpower.cron.js";
@@ -52,12 +51,6 @@ app.use("/uploads", express.static(path.resolve("uploads"))); // Static files
       console.log("Successfully connected to Server 2.");
     } catch (error) {
       console.warn("Server 2 (WWMS) unreachable, skipping:", error.message);
-    }
-    try {
-      global.pool4 = await connectToDB(dbConfig4);
-      console.log("Successfully connected to Server 4.");
-    } catch (error) {
-      console.warn("Server 4 (CLMS) unreachable, skipping:", error.message);
     }
   } catch (error) {
     console.error("Database connection failed:", error);

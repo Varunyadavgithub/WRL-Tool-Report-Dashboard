@@ -33,9 +33,7 @@ const HourlyReport = lazy(() => import("../pages/Production/HourlyReport"));
 const LineHourlyReport = lazy(
   () => import("../pages/Production/LineHourlyReport"),
 );
-const LineWiseReport = lazy(
-  () => import("../pages/Production/LineWiseReport"),
-);
+const LineWiseReport = lazy(() => import("../pages/Production/LineWiseReport"));
 const ConsolidatedReport = lazy(
   () => import("../pages/Production/ConsolidatedReport/ConsolidatedReport"),
 );
@@ -47,7 +45,6 @@ const TotalProduction = lazy(
   () => import("../pages/Production/TotalProduction"),
 );
 const StopLossReport = lazy(() => import("../pages/Production/StopLossReport"));
-const ManpowerReport = lazy(() => import("../pages/Production/manPowerReport"));
 
 const ReworkReport = lazy(() => import("../pages/Quality/ReworkReport"));
 const GasChargingReport = lazy(
@@ -130,8 +127,12 @@ const SerialScan = lazy(
 const AuditList = lazy(() => import("../pages/AuditReport/Audit/AuditList"));
 const AuditEntry = lazy(() => import("../pages/AuditReport/Audit/AuditEntry"));
 const AuditView = lazy(() => import("../pages/AuditReport/Audit/AuditView"));
-const AuditApproval = lazy(() => import("../pages/AuditReport/Audit/AuditApproval"));
-const AuditDashboard = lazy(() => import("../pages/AuditReport/Auditdashboard"));
+const AuditApproval = lazy(
+  () => import("../pages/AuditReport/Audit/AuditApproval"),
+);
+const AuditDashboard = lazy(
+  () => import("../pages/AuditReport/Auditdashboard"),
+);
 
 const DehumidifierDashboard = lazy(
   () => import("../pages/Readings/DehumidifierDashboard"),
@@ -139,46 +140,58 @@ const DehumidifierDashboard = lazy(
 const EnergyMeterDashboard = lazy(
   () => import("../pages/Readings/EnergyMeterDashboard"),
 );
-
-const ManpowerForm = lazy(() => import("../pages/Forms/ManpowerForm"));
-const ManpowerApproval = lazy(() => import("../pages/Forms/ManpowerApproval"));
-const SecurityManpowerList = lazy(
-  () => import("../pages/Forms/SecurityManpowerList"),
-);
-const AttendanceRegister = lazy(() => import("../pages/Forms/AttendanceRegister"));
-const ApprenticeDashboard = lazy(() => import("../pages/Apprentice/Dashboard"));
-const ApprenticeUpload    = lazy(() => import("../pages/Apprentice/Upload"));
-const ApprenticeSlips     = lazy(() => import("../pages/Apprentice/SlipList"));
-const MyAttendance = lazy(() => import("../pages/Forms/MyAttendance"));
-const AttendanceDashboard = lazy(() => import("../pages/Forms/AttendanceDashboard"));
-const LeaveApplication = lazy(() => import("../pages/Forms/LeaveApplication"));
-const LeaveApproval = lazy(() => import("../pages/Forms/LeaveApproval"));
 const Monitoring = lazy(() => import("../pages/Display/Monitoring"));
 const Management = lazy(() => import("../pages/Display/Management"));
 const WIPCapture = lazy(() => import("../pages/Production/WIPCapture"));
 
 // ── Master Config ─────────────────────────────────────────────────────────────
-const MasterConfigOverview = lazy(() => import("../pages/MasterConfig/Overview"));
-const MaterialConfig       = lazy(() => import("../pages/MasterConfig/MaterialConfig"));
-const CheckpointLibraryConfig = lazy(() => import("../pages/MasterConfig/CheckpointLibraryConfig"));
-const ShiftConfig          = lazy(() => import("../pages/MasterConfig/ShiftConfig"));
-const DowntimeConfig       = lazy(() => import("../pages/MasterConfig/DowntimeConfig"));
-const QualityConfig        = lazy(() => import("../pages/MasterConfig/QualityConfig"));
-const MachineConfig        = lazy(() => import("../pages/MasterConfig/MachineConfig"));
-const PlanningConfig       = lazy(() => import("../pages/MasterConfig/PlanningConfig"));
-const MailConfig           = lazy(() => import("../pages/MasterConfig/MailConfig"));
-const AuditTrail           = lazy(() => import("../pages/MasterConfig/AuditTrail"));
+const MasterConfigOverview = lazy(
+  () => import("../pages/MasterConfig/Overview"),
+);
+const MaterialConfig = lazy(
+  () => import("../pages/MasterConfig/MaterialConfig"),
+);
+const CheckpointLibraryConfig = lazy(
+  () => import("../pages/MasterConfig/CheckpointLibraryConfig"),
+);
+const ShiftConfig = lazy(() => import("../pages/MasterConfig/ShiftConfig"));
+const DowntimeConfig = lazy(
+  () => import("../pages/MasterConfig/DowntimeConfig"),
+);
+const QualityConfig = lazy(() => import("../pages/MasterConfig/QualityConfig"));
+const MachineConfig = lazy(() => import("../pages/MasterConfig/MachineConfig"));
+const PlanningConfig = lazy(
+  () => import("../pages/MasterConfig/PlanningConfig"),
+);
+const MailConfig = lazy(() => import("../pages/MasterConfig/MailConfig"));
+const AuditTrail = lazy(() => import("../pages/MasterConfig/AuditTrail"));
 
 // ── Part Process ──────────────────────────────────────────────────────────────
-const PartProcessOverview      = lazy(() => import("../pages/PartProcess/Overview"));
-const PartProcessDashboard     = lazy(() => import("../pages/PartProcess/Dashboard"));
-const PartProcessProductionReport = lazy(() => import("../pages/PartProcess/ProductionReport"));
-const PartProcessHourlyReport  = lazy(() => import("../pages/PartProcess/HourlyReport"));
-const PartProcessQualityReport = lazy(() => import("../pages/PartProcess/QualityReport"));
-const PartProcessDowntimeReport = lazy(() => import("../pages/PartProcess/DowntimeReport"));
-const FactoryMonitor           = lazy(() => import("../pages/PartProcess/FactoryMonitor"));
-const FactoryOsSyncLog         = lazy(() => import("../pages/PartProcess/FactoryOsSyncLog"));
-const PartProcessOEEReport     = lazy(() => import("../pages/PartProcess/OEEReport"));
+const PartProcessOverview = lazy(() => import("../pages/PartProcess/Overview"));
+const PartProcessDashboard = lazy(
+  () => import("../pages/PartProcess/Dashboard"),
+);
+const PartProcessProductionReport = lazy(
+  () => import("../pages/PartProcess/ProductionReport"),
+);
+const PartProcessHourlyReport = lazy(
+  () => import("../pages/PartProcess/HourlyReport"),
+);
+const PartProcessQualityReport = lazy(
+  () => import("../pages/PartProcess/QualityReport"),
+);
+const PartProcessDowntimeReport = lazy(
+  () => import("../pages/PartProcess/DowntimeReport"),
+);
+const FactoryMonitor = lazy(
+  () => import("../pages/PartProcess/FactoryMonitor"),
+);
+const FactoryOsSyncLog = lazy(
+  () => import("../pages/PartProcess/FactoryOsSyncLog"),
+);
+const PartProcessOEEReport = lazy(
+  () => import("../pages/PartProcess/OEEReport"),
+);
 
 // ─── Role Constants ───────────────────────────────────────────────────────────
 export const ROLES = {
@@ -217,7 +230,7 @@ export const ROLES = {
   CHEM_DATA_USER: "chem data user", // 225007
   VISI2_POST_QA: "visi-2 post qa", // 226002
   VISI_COMP_SCAN: "visi comp scan", // 226003
-  PART_PROCESS_PLANING:"part process planing"
+  PART_PROCESS_PLANING: "part process planing",
 };
 
 // ─── Route Configuration ──────────────────────────────────────────────────────
@@ -272,22 +285,76 @@ export const ROUTE_CONFIG = [
     basePath: "/production",
     subgroupConfig: [
       { key: "operations", label: "Operations" },
-      { key: "reports",    label: "Reports" },
+      { key: "reports", label: "Reports" },
       { key: "traceability", label: "Traceability" },
     ],
     items: [
-      { path: "/production/overview",                    label: "Production Report",             component: ProductionOverview,             group: "operations" },
-      { path: "/production/wip-capture",                 label: "WIP Capture",                   component: WIPCapture,                     group: "operations" },
-      { path: "/production/model-name-update",           label: "Model Name Update",              component: ModelNameUpdate,                group: "operations" },
-      { path: "/production/hourly-report",               label: "Hourly Report",                 component: HourlyReport,                   group: "reports" },
-      { path: "/production/line-hourly-report",          label: "Line Hourly Report",             component: LineHourlyReport,               group: "reports" },
-      { path: "/production/line-wise-report",            label: "Line Wise Report",               component: LineWiseReport,                 group: "reports" },
-      { path: "/production/consolidated-report",         label: "Consolidated Report",            component: ConsolidatedReport,             group: "reports" },
-      { path: "/production/nfc-report",                  label: "NFC Report",                    component: NFCReport,                      group: "reports" },
-      { path: "/production/total-production",            label: "Total Production",               component: TotalProduction,                group: "reports" },
-      { path: "/production/stop-loss-report",            label: "Stop Loss Report",               component: StopLossReport,                 group: "reports" },
-      { path: "/production/manpower-report",             label: "Manpower Report",               component: ManpowerReport,                 group: "reports" },
-      { path: "/production/component-traceability-report", label: "Component Traceability Report", component: ComponentTraceabilityReport,  group: "traceability" },
+      {
+        path: "/production/overview",
+        label: "Production Report",
+        component: ProductionOverview,
+        group: "operations",
+      },
+      {
+        path: "/production/wip-capture",
+        label: "WIP Capture",
+        component: WIPCapture,
+        group: "operations",
+      },
+      {
+        path: "/production/model-name-update",
+        label: "Model Name Update",
+        component: ModelNameUpdate,
+        group: "operations",
+      },
+      {
+        path: "/production/hourly-report",
+        label: "Hourly Report",
+        component: HourlyReport,
+        group: "reports",
+      },
+      {
+        path: "/production/line-hourly-report",
+        label: "Line Hourly Report",
+        component: LineHourlyReport,
+        group: "reports",
+      },
+      {
+        path: "/production/line-wise-report",
+        label: "Line Wise Report",
+        component: LineWiseReport,
+        group: "reports",
+      },
+      {
+        path: "/production/consolidated-report",
+        label: "Consolidated Report",
+        component: ConsolidatedReport,
+        group: "reports",
+      },
+      {
+        path: "/production/nfc-report",
+        label: "NFC Report",
+        component: NFCReport,
+        group: "reports",
+      },
+      {
+        path: "/production/total-production",
+        label: "Total Production",
+        component: TotalProduction,
+        group: "reports",
+      },
+      {
+        path: "/production/stop-loss-report",
+        label: "Stop Loss Report",
+        component: StopLossReport,
+        group: "reports",
+      },
+      {
+        path: "/production/component-traceability-report",
+        label: "Component Traceability Report",
+        component: ComponentTraceabilityReport,
+        group: "traceability",
+      },
     ],
   },
 
@@ -299,19 +366,69 @@ export const ROUTE_CONFIG = [
     basePath: "/master-config",
     subgroupConfig: [
       { key: "config", label: "Configuration" },
-      { key: "admin",  label: "Admin" },
+      { key: "admin", label: "Admin" },
     ],
     items: [
-      { path: "/master-config/overview",            label: "Overview",                 component: MasterConfigOverview,      group: "admin"   },
-      { path: "/master-config/mail",                label: "Mail & Notifications",     component: MailConfig,                group: "admin"   },
-      { path: "/master-config/audit",               label: "Audit Trail",              component: AuditTrail,                group: "admin"   },
-      { path: "/master-config/material",            label: "Material",                 component: MaterialConfig,            group: "config"  },
-      { path: "/master-config/checkpoint-library",  label: "Checkpoint Library",       component: CheckpointLibraryConfig,   group: "config"  },
-      { path: "/master-config/shift",               label: "Shift",                    component: ShiftConfig,               group: "config"  },
-      { path: "/master-config/downtime",            label: "Downtime",                 component: DowntimeConfig,            group: "config"  },
-      { path: "/master-config/quality",             label: "Quality",                  component: QualityConfig,             group: "config"  },
-      { path: "/master-config/machine",             label: "Machine",                  component: MachineConfig,             group: "config"  },
-      { path: "/master-config/planning",            label: "Planning",                 component: PlanningConfig,            group: "config"  },
+      {
+        path: "/master-config/overview",
+        label: "Overview",
+        component: MasterConfigOverview,
+        group: "admin",
+      },
+      {
+        path: "/master-config/mail",
+        label: "Mail & Notifications",
+        component: MailConfig,
+        group: "admin",
+      },
+      {
+        path: "/master-config/audit",
+        label: "Audit Trail",
+        component: AuditTrail,
+        group: "admin",
+      },
+      {
+        path: "/master-config/material",
+        label: "Material",
+        component: MaterialConfig,
+        group: "config",
+      },
+      {
+        path: "/master-config/checkpoint-library",
+        label: "Checkpoint Library",
+        component: CheckpointLibraryConfig,
+        group: "config",
+      },
+      {
+        path: "/master-config/shift",
+        label: "Shift",
+        component: ShiftConfig,
+        group: "config",
+      },
+      {
+        path: "/master-config/downtime",
+        label: "Downtime",
+        component: DowntimeConfig,
+        group: "config",
+      },
+      {
+        path: "/master-config/quality",
+        label: "Quality",
+        component: QualityConfig,
+        group: "config",
+      },
+      {
+        path: "/master-config/machine",
+        label: "Machine",
+        component: MachineConfig,
+        group: "config",
+      },
+      {
+        path: "/master-config/planning",
+        label: "Planning",
+        component: PlanningConfig,
+        group: "config",
+      },
     ],
   },
 
@@ -379,29 +496,109 @@ export const ROUTE_CONFIG = [
     basePath: "/quality",
     subgroupConfig: [
       { key: "general", label: "General" },
-      { key: "lpt",     label: "LPT" },
-      { key: "fpa",     label: "FPA" },
-      { key: "bis",     label: "BIS" },
+      { key: "lpt", label: "LPT" },
+      { key: "fpa", label: "FPA" },
+      { key: "bis", label: "BIS" },
     ],
     items: [
-      { path: "/quality/rework-report",       label: "Rework Report",       component: ReworkReport,       group: "general" },
-      { path: "/quality/gas-charging-report", label: "Gas Charging Report", component: GasChargingReport,  group: "general" },
-      { path: "/quality/est-report",          label: "EST Report",          component: ESTReport,          group: "general" },
-      { path: "/quality/cpt-report",          label: "CPT Report",          component: CPTReport,          group: "general" },
-      { path: "/quality/dispatch-hold",       label: "Dispatch Hold",       component: DispatchHold,       group: "general" },
-      { path: "/quality/hold-cabinate-details", label: "Hold Cabinet Details", component: HoldCabinateDetails, group: "general" },
-      { path: "/quality/tag-update",          label: "Tag Update",          component: TagUpdate,          group: "general" },
-      { path: "/quality/lpt",                 label: "LPT",                 component: LPT,                group: "lpt" },
-      { path: "/quality/lpt-report",          label: "LPT Report",          component: LPTReport,          group: "lpt" },
-      { path: "/quality/lpt-recipe",          label: "LPT Recipe",          component: LPTRecipe,          group: "lpt" },
-      { path: "/quality/mass-flow-report",    label: "Mass Flow Report",    component: MassFlowReport,     group: "lpt" },
-      { path: "/quality/fpa",                 label: "FPA",                 component: FPA,                group: "fpa" },
-      { path: "/quality/fpa-report",          label: "FPA Report",          component: FPAReports,         group: "fpa" },
-      { path: "/quality/fpa-history",         label: "FPA History",         component: FPAHistory,         group: "fpa" },
-      { path: "/quality/fpa-defect-report",   label: "FPA Defect Report",   component: FPADefectReport,    group: "fpa" },
-      { path: "/quality/upload-bis-report",   label: "Upload BIS Report",   component: UploadBISReport,    group: "bis" },
-      { path: "/quality/bis-reports",         label: "BIS Reports",         component: BISReports,         group: "bis" },
-      { path: "/quality/bee-calculation",     label: "BEE Calculation",     component: BEECalculation,     group: "bis" },
+      {
+        path: "/quality/rework-report",
+        label: "Rework Report",
+        component: ReworkReport,
+        group: "general",
+      },
+      {
+        path: "/quality/gas-charging-report",
+        label: "Gas Charging Report",
+        component: GasChargingReport,
+        group: "general",
+      },
+      {
+        path: "/quality/est-report",
+        label: "EST Report",
+        component: ESTReport,
+        group: "general",
+      },
+      {
+        path: "/quality/cpt-report",
+        label: "CPT Report",
+        component: CPTReport,
+        group: "general",
+      },
+      {
+        path: "/quality/dispatch-hold",
+        label: "Dispatch Hold",
+        component: DispatchHold,
+        group: "general",
+      },
+      {
+        path: "/quality/hold-cabinate-details",
+        label: "Hold Cabinet Details",
+        component: HoldCabinateDetails,
+        group: "general",
+      },
+      {
+        path: "/quality/tag-update",
+        label: "Tag Update",
+        component: TagUpdate,
+        group: "general",
+      },
+      { path: "/quality/lpt", label: "LPT", component: LPT, group: "lpt" },
+      {
+        path: "/quality/lpt-report",
+        label: "LPT Report",
+        component: LPTReport,
+        group: "lpt",
+      },
+      {
+        path: "/quality/lpt-recipe",
+        label: "LPT Recipe",
+        component: LPTRecipe,
+        group: "lpt",
+      },
+      {
+        path: "/quality/mass-flow-report",
+        label: "Mass Flow Report",
+        component: MassFlowReport,
+        group: "lpt",
+      },
+      { path: "/quality/fpa", label: "FPA", component: FPA, group: "fpa" },
+      {
+        path: "/quality/fpa-report",
+        label: "FPA Report",
+        component: FPAReports,
+        group: "fpa",
+      },
+      {
+        path: "/quality/fpa-history",
+        label: "FPA History",
+        component: FPAHistory,
+        group: "fpa",
+      },
+      {
+        path: "/quality/fpa-defect-report",
+        label: "FPA Defect Report",
+        component: FPADefectReport,
+        group: "fpa",
+      },
+      {
+        path: "/quality/upload-bis-report",
+        label: "Upload BIS Report",
+        component: UploadBISReport,
+        group: "bis",
+      },
+      {
+        path: "/quality/bis-reports",
+        label: "BIS Reports",
+        component: BISReports,
+        group: "bis",
+      },
+      {
+        path: "/quality/bee-calculation",
+        label: "BEE Calculation",
+        component: BEECalculation,
+        group: "bis",
+      },
     ],
   },
 
@@ -524,15 +721,45 @@ export const ROUTE_CONFIG = [
     basePath: "/auditreport",
     subgroupConfig: [
       { key: "templates", label: "Templates" },
-      { key: "audits",    label: "Audits" },
+      { key: "audits", label: "Audits" },
     ],
     items: [
-      { path: "/auditreport/templates",      label: "Templates",         component: TemplateList,     group: "templates" },
-      { path: "/auditreport/approval",       label: "Template Approval", component: TemplateApproval, group: "templates" },
-      { path: "/auditreport/serial-scan",    label: "Serial Scan",       component: SerialScan,       group: "templates" },
-      { path: "/auditreport/audits",         label: "Audits",            component: AuditList,        group: "audits" },
-      { path: "/auditreport/audit-approval", label: "Audit Approval",    component: AuditApproval,    group: "audits" },
-      { path: "/auditreport/dashboard",      label: "Dashboard",         component: AuditDashboard,   group: "audits" },
+      {
+        path: "/auditreport/templates",
+        label: "Templates",
+        component: TemplateList,
+        group: "templates",
+      },
+      {
+        path: "/auditreport/approval",
+        label: "Template Approval",
+        component: TemplateApproval,
+        group: "templates",
+      },
+      {
+        path: "/auditreport/serial-scan",
+        label: "Serial Scan",
+        component: SerialScan,
+        group: "templates",
+      },
+      {
+        path: "/auditreport/audits",
+        label: "Audits",
+        component: AuditList,
+        group: "audits",
+      },
+      {
+        path: "/auditreport/audit-approval",
+        label: "Audit Approval",
+        component: AuditApproval,
+        group: "audits",
+      },
+      {
+        path: "/auditreport/dashboard",
+        label: "Dashboard",
+        component: AuditDashboard,
+        group: "audits",
+      },
     ],
     hiddenItems: [
       {
@@ -570,7 +797,6 @@ export const ROUTE_CONFIG = [
     ],
   },
 
-
   // ── Utility / Readings ───────────────────────────────────────────────────
   {
     key: "reading",
@@ -588,41 +814,6 @@ export const ROUTE_CONFIG = [
         label: "Energy Meters",
         component: EnergyMeterDashboard,
       },
-    ],
-  },
-
-  // ── Apprentice Payroll ───────────────────────────────────────────────────
-  {
-    key: "apprentice",
-    icon: FileText,
-    label: "Apprentice Payroll",
-    basePath: "/apprentice",
-    items: [
-      { path: "/apprentice/dashboard", label: "Dashboard",     component: ApprenticeDashboard },
-      { path: "/apprentice/upload",    label: "Upload Files",  component: ApprenticeUpload    },
-      { path: "/apprentice/slips",     label: "Salary Slips",  component: ApprenticeSlips     },
-    ],
-  },
-
-  // ── Forms ────────────────────────────────────────────────────────────────
-  {
-    key: "forms",
-    icon: FileText,
-    label: "Forms",
-    basePath: "/forms",
-    subgroupConfig: [
-      { key: "hr",         label: "HR & Manpower" },
-      { key: "attendance", label: "Attendance" },
-    ],
-    items: [
-      { path: "/forms/manpower-form",        label: "Manpower Form",          component: ManpowerForm,          group: "hr" },
-      { path: "/forms/manpower-approval",    label: "Manpower Approval",      component: ManpowerApproval,      group: "hr" },
-      { path: "/forms/security-manpower",    label: "Security Manpower List", component: SecurityManpowerList,  group: "hr" },
-      { path: "/forms/attendance",           label: "Attendance Register",    component: AttendanceRegister,    group: "attendance" },
-      { path: "/forms/my-attendance",        label: "My Attendance",          component: MyAttendance,          group: "attendance" },
-      { path: "/forms/attendance-dashboard", label: "Attendance Dashboard",   component: AttendanceDashboard,   group: "attendance" },
-      { path: "/forms/leave-application",    label: "Leave Application",      component: LeaveApplication,      group: "attendance" },
-      { path: "/forms/leave-approval",       label: "Leave Approval",         component: LeaveApproval,         group: "attendance" },
     ],
   },
 ];
