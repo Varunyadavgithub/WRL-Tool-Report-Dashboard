@@ -136,7 +136,11 @@ export const resolveMachineShiftsAsOf = (historyRows, machineId, dateStr) => {
  *                      Used to fix the midnight sort bug for overnight shifts.
  */
 export const detectChangeovers = (records, stdMins = STD_CHANGEOVER_MINS, shiftStartMins = null) => {
-  const prod = records.filter(r => r.state === "Production" && r.model && r.startTime && (r.qty ?? 0) >= 0);
+  // qty > 0 (not >= 0) — a 0-qty "Production" row is a rework/correction
+  // sub-cycle on an already-produced part, not a new completed unit, so it
+  // must not mark a changeover boundary (its start/end time doesn't
+  // represent the real transition point between two models).
+  const prod = records.filter(r => r.state === "Production" && r.model && r.startTime && (r.qty ?? 0) > 0);
   if (!prod.length) return [];
 
   // ── Auto-detect midnight crossing ───────────────────────────────────────────
@@ -183,10 +187,16 @@ export const detectChangeovers = (records, stdMins = STD_CHANGEOVER_MINS, shiftS
     const endMins   = normalize(rawEnd);
 
     if (prevModel !== null && prevModel !== r.model) {
-      const gapMins = startMins - (prevEndMins ?? startMins);
-
+      const rawGapMins = startMins - (prevEndMins ?? startMins);
+      // A changeover can never take negative time. A negative rawGapMins
+      // means prevEndMins is unreliable — e.g. the previous model's last
+      // record had an anomalously long duration that overlapped several
+      // OTHER models' real cycles in between — not that the changeover
+      // ran backwards. Clamp to a zero-width marker at the new model's
+      // actual start instead of stretching back to the bad timestamp.
+      const gapMins = Math.max(0, rawGapMins);
       const overrunMins = Math.max(0, gapMins - stdMins);
-      const coStartMins = prevEndMins ?? startMins;
+      const coStartMins = rawGapMins < 0 ? startMins : (prevEndMins ?? startMins);
 
       changeovers.push({
         fromModel:    prevModel,
