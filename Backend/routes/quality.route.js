@@ -38,6 +38,10 @@ import {
   deleteBisPdfFile, updateBisPdfFile, getBisReportStatus,
   updateBisEnergyData, fetchBisEnergyData,
 } from "../controllers/quality/UploadBISReport.controller.js";
+import {
+  getBisCategories, createBisCategory, updateBisCategory, deleteBisCategory,
+  getType100Materials,
+} from "../controllers/quality/BisCategory.controller.js";
 import { getDispatchHoldDetails } from "../controllers/quality/holdCabinetDetails.controller.js";
 import { getCPTReport } from "../controllers/quality/cptReport.controller.js";
 import {
@@ -127,6 +131,13 @@ router.put("/update-bis-file/:srNo", authenticate, uploadBISReportPDF.single("fi
 router.get("/bis-status", authenticate, getBisReportStatus);
 router.put("/bis-energy-data/:srNo", authenticate, updateBisEnergyData);
 router.post("/bis-fetch-energy-data/:srNo", authenticate, fetchBisEnergyData);
+
+// BIS Config (BISCategory master — manually managed BIS/Non-BIS classification)
+router.get("/bis-category", authenticate, getBisCategories);
+router.post("/bis-category", authenticate, createBisCategory);
+router.put("/bis-category/:id", authenticate, updateBisCategory);
+router.delete("/bis-category/:id", authenticate, deleteBisCategory);
+router.get("/type100-materials", authenticate, getType100Materials);
 
 // BEE Calculation
 router.get("/bee/models", authenticate, getBeeModels);
