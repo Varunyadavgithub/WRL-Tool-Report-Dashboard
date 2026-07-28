@@ -433,15 +433,15 @@ export const getBisReportStatus = tryCatch(async (_, res) => {
         ),
         FilteredData AS (
           SELECT
-            m.Name                                                AS FullModel,
-            LEFT(m.Name, 9)                                       AS Model_Prefix,
+            bc.ModelName                                           AS FullModel,
+            LEFT(bc.ModelName, 9)                                   AS Model_Prefix,
             b.ActivityOn,
-            CASE WHEN RIGHT(m.Name, 1) = 'R' THEN 'R' ELSE '' END AS HasRT
+            CASE WHEN RIGHT(bc.ModelName, 2) = 'RT' THEN 'R' ELSE '' END AS HasRT
           FROM  Psno
-          JOIN  ProcessActivity b ON b.PSNo       = Psno.DocNo
-          JOIN  WorkCenter      c ON c.StationCode = b.StationCode
-          JOIN  Material        m ON m.MatCode     = Psno.Material
-          WHERE m.CertificateControl <> 0
+          JOIN  ProcessActivity b  ON b.PSNo        = Psno.DocNo
+          JOIN  WorkCenter      c  ON c.StationCode = b.StationCode
+          JOIN  BISCategory     bc ON bc.MaterialCode = Psno.Material
+          WHERE bc.Category     = 1
             AND b.ActivityType  = 5
             AND c.StationCode   = 1220010
             AND b.ActivityOn BETWEEN '2022-01-01 00:00:01' AND @CurrentDate
@@ -455,16 +455,6 @@ export const getBisReportStatus = tryCatch(async (_, res) => {
           FROM FilteredData
           GROUP BY Model_Prefix, YEAR(ActivityOn)
         ),
-        /*
-         * BUG (was): DedupedBIS partitioned only by LEFT(ModelName,9) and Year.
-         * If BISUpload contains both "MODELABC1" (non-RT) and "MODELABC1 RT"
-         * they share the same 9-char prefix and the same Year, so ROW_NUMBER()
-         * collapsed one of them, causing the wrong model (or no model) to join
-         * against ProductionSummary RT rows.
-         *
-         * FIX: Add a third partition key that distinguishes RT from non-RT,
-         * so each variant keeps exactly one representative row.
-         */
         DedupedBIS AS (
           SELECT *
           FROM (
@@ -481,10 +471,11 @@ export const getBisReportStatus = tryCatch(async (_, res) => {
         ),
         FinalResult AS (
           SELECT
-            COALESCE(
-              b.ModelName,
-              CONCAT(p.Model_Prefix, CASE WHEN p.LastChar = 'R' THEN ' RT' ELSE '' END)
-            )                                                   AS ModelName,
+            -- BUG (was): COALESCE'd to b.ModelName (BISUpload's raw entered name)
+            -- when present, only falling back to the derived Prefix+RT form
+            -- otherwise — inconsistent naming across rows. FIX: always derive
+            -- the actual model name from Model_Prefix + RT, same as HasRT above.
+            CONCAT(p.Model_Prefix, CASE WHEN p.LastChar = 'R' THEN ' RT' ELSE '' END) AS ModelName,
             p.Activity_Year                                     AS Year,
             b.Month,
             p.Model_Count                                       AS Prod_Count,
@@ -492,6 +483,7 @@ export const getBisReportStatus = tryCatch(async (_, res) => {
                  THEN 'Test Completed'
                  ELSE 'Test Pending'
             END                                                 AS Status,
+            b.ModelName                                         AS UploadedModelName,
             b.FileName,
             b.Description
           FROM ProductionSummary p

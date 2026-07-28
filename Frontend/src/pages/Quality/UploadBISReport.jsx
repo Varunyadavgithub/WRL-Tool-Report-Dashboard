@@ -26,6 +26,8 @@ import {
   ChevronDown,
   Zap,
   Tag,
+  Plus,
+  Settings2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
@@ -250,6 +252,71 @@ const MultiSelectDropdown = ({ label, options, selected, onChange, placeholder =
                   </button>
                 );
               })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Searchable single-select (type to filter, click to pick) ──────────────────
+const SearchableSelect = ({ options, value, onChange, placeholder = "Search…" }) => {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selectedOption = options.find((o) => o.value === value);
+  const filtered = query.trim()
+    ? options.filter((o) => o.label.toLowerCase().includes(query.trim().toLowerCase()))
+    : options;
+
+  return (
+    <div className="relative" ref={ref}>
+      <input
+        type="text"
+        value={open ? query : selectedOption?.label || ""}
+        onFocus={() => {
+          setOpen(true);
+          setQuery("");
+        }}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+        placeholder={placeholder}
+        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+      />
+      {open && (
+        <div className="absolute top-full mt-1 left-0 z-50 w-full bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+          <div className="py-1 max-h-52 overflow-auto">
+            {filtered.length === 0 ? (
+              <p className="px-3 py-3 text-[11px] text-slate-400 text-center">No matches</p>
+            ) : (
+              filtered.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(o.value);
+                    setQuery("");
+                    setOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors ${
+                    o.value === value ? "bg-blue-50 text-blue-700" : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))
             )}
           </div>
         </div>
@@ -555,6 +622,17 @@ const UploadBISReport = () => {
   const [energyModelFilter, setEnergyModelFilter] = useState([]); // [] = all models
   const [energyYearFilter, setEnergyYearFilter] = useState([]); // [] = all years
 
+  // ── BIS Config tab (BISCategory master: BIS / Non-BIS classification) ─────
+  const [bisCategories, setBisCategories] = useState([]);
+  const [type100Materials, setType100Materials] = useState([]);
+  const [categorySearch, setCategorySearch] = useState("");
+  const [categoryLoading, setCategoryLoading] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categoryModalMode, setCategoryModalMode] = useState("add"); // "add" | "edit"
+  const [categoryForm, setCategoryForm] = useState({ id: null, materialCode: "", modelName: "", category: "0" });
+  const [showDeleteCategoryModal, setShowDeleteCategoryModal] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
+
   // ── Derived ──────────────────────────────────────────────────────────────
   const filteredFiles = useMemo(() => {
     const { term = "", field = "all" } = searchParams;
@@ -702,6 +780,134 @@ const UploadBISReport = () => {
   useEffect(() => {
     fetchUploadedFiles();
   }, []);
+
+  // ── BIS Config API ──────────────────────────────────────────────────────
+  const fetchBisCategories = async () => {
+    try {
+      setCategoryLoading(true);
+      const res = await axios.get(`${baseURL}quality/bis-category`);
+      setBisCategories(res?.data?.categories || []);
+    } catch {
+      toast.error("Failed to fetch BIS categories");
+    } finally {
+      setCategoryLoading(false);
+    }
+  };
+  useEffect(() => {
+    fetchBisCategories();
+  }, []);
+
+  const fetchType100Materials = async () => {
+    try {
+      const res = await axios.get(`${baseURL}quality/type100-materials`);
+      setType100Materials(res?.data?.materials || []);
+    } catch {
+      toast.error("Failed to fetch materials");
+    }
+  };
+  useEffect(() => {
+    fetchType100Materials();
+  }, []);
+
+  // Same "9-char prefix + optional ' RT'" convention the backend derives
+  // BISCategory.ModelName with — kept in sync so the auto-filled Model Name
+  // matches what the rest of the BIS status query expects.
+  const deriveModelName = (name) => {
+    if (!name) return "";
+    const prefix = name.slice(0, 9);
+    return name.slice(-1).toUpperCase() === "R" ? `${prefix} RT` : prefix;
+  };
+
+  // Materials not yet classified — the ones relevant to "Add Model".
+  const unclassifiedMaterials = useMemo(() => {
+    const existingCodes = new Set(bisCategories.map((c) => c.materialCode));
+    return type100Materials.filter((m) => !existingCodes.has(m.matCode));
+  }, [type100Materials, bisCategories]);
+
+  const handleSelectMaterial = (matCode) => {
+    const material = type100Materials.find((m) => m.matCode === matCode);
+    setCategoryForm((p) => ({
+      ...p,
+      materialCode: matCode,
+      modelName: material ? deriveModelName(material.name) : "",
+    }));
+  };
+
+  const filteredCategories = useMemo(() => {
+    const term = categorySearch.trim().toLowerCase();
+    if (!term) return bisCategories;
+    return bisCategories.filter(
+      (c) =>
+        c.materialCode?.toLowerCase().includes(term) ||
+        c.materialName?.toLowerCase().includes(term) ||
+        c.modelName?.toLowerCase().includes(term),
+    );
+  }, [bisCategories, categorySearch]);
+
+  const openAddCategoryModal = () => {
+    setCategoryModalMode("add");
+    setCategoryForm({ id: null, materialCode: "", modelName: "", category: "0" });
+    setShowCategoryModal(true);
+  };
+
+  const openEditCategoryModal = (row) => {
+    setCategoryModalMode("edit");
+    setCategoryForm({
+      id: row.id,
+      materialCode: row.materialCode,
+      modelName: row.modelName,
+      category: String(row.category),
+    });
+    setShowCategoryModal(true);
+  };
+
+  const saveCategoryModal = async () => {
+    const { id, materialCode, modelName, category } = categoryForm;
+    if (!materialCode.trim()) return toast.error("Material Code is required");
+    if (!modelName.trim()) return toast.error("Model Name is required");
+
+    const payload = {
+      materialCode: materialCode.trim(),
+      modelName: modelName.trim(),
+      category: Number(category),
+    };
+
+    try {
+      setCategoryLoading(true);
+      if (categoryModalMode === "add") {
+        await axios.post(`${baseURL}quality/bis-category`, payload);
+        toast.success("BIS category added successfully");
+      } else {
+        await axios.put(`${baseURL}quality/bis-category/${id}`, payload);
+        toast.success("BIS category updated successfully");
+      }
+      setShowCategoryModal(false);
+      fetchBisCategories();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to save BIS category");
+    } finally {
+      setCategoryLoading(false);
+    }
+  };
+
+  const handleDeleteCategory = (row) => {
+    setCategoryToDelete(row);
+    setShowDeleteCategoryModal(true);
+  };
+
+  const confirmDeleteCategory = async () => {
+    try {
+      setCategoryLoading(true);
+      await axios.delete(`${baseURL}quality/bis-category/${categoryToDelete.id}`);
+      toast.success("BIS category deleted successfully");
+      fetchBisCategories();
+      setShowDeleteCategoryModal(false);
+    } catch {
+      toast.error("Failed to delete BIS category");
+    } finally {
+      setCategoryLoading(false);
+    }
+  };
 
   const validatePdf = (file) => {
     if (!file) return false;
@@ -915,6 +1121,7 @@ const UploadBISReport = () => {
     { key: "reports", label: "All Reports", icon: Table2 },
     { key: "energy", label: "Energy Analysis", icon: Zap },
     { key: "analytics", label: "Analytics", icon: BarChart2 },
+    { key: "config", label: "BIS Config", icon: Settings2 },
   ];
 
   const tooltipStyle = {
@@ -1942,6 +2149,123 @@ const UploadBISReport = () => {
               </div>
             </div>
           ))}
+
+        {/* ══════════════════════════════════════════════════════
+            TAB: BIS CONFIG
+        ══════════════════════════════════════════════════════ */}
+        {activeTab === "config" && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between gap-3 p-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-sm font-bold text-slate-800">
+                  BIS / Non-BIS Model Classification
+                </h2>
+                <p className="text-[11px] text-slate-400">
+                  Manage which models are BIS-controlled. New Type-100 models are auto-added as Non-BIS; edit them here to reclassify.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-300 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={categorySearch}
+                    onChange={(e) => setCategorySearch(e.target.value)}
+                    placeholder="Search material code / model"
+                    className="pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-lg outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 w-64"
+                  />
+                </div>
+                <button
+                  onClick={fetchBisCategories}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-600 transition-all"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                </button>
+                <button
+                  onClick={openAddCategoryModal}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Model
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-auto max-h-[calc(100vh-320px)]">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-slate-50 z-10">
+                  <tr>
+                    {["Material Code", "Material Name", "Model Name", "Category", "Updated", ""].map((h) => (
+                      <th
+                        key={h}
+                        className="px-3 py-2.5 text-left font-semibold text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-200"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCategories.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-16 text-center text-slate-400">
+                        {categoryLoading ? "Loading…" : "No models found."}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredCategories.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
+                      >
+                        <td className="px-3 py-2.5 border-b border-slate-100 font-mono text-slate-600">
+                          {row.materialCode}
+                        </td>
+                        <td className="px-3 py-2.5 border-b border-slate-100 text-slate-500">
+                          {row.materialName || "—"}
+                        </td>
+                        <td className="px-3 py-2.5 border-b border-slate-100 font-semibold text-slate-800">
+                          {row.modelName}
+                        </td>
+                        <td className="px-3 py-2.5 border-b border-slate-100">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                              row.category === 1
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                : "bg-slate-100 text-slate-500 border border-slate-200"
+                            }`}
+                          >
+                            {row.category === 1 ? "BIS" : "Non-BIS"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 border-b border-slate-100 text-slate-400">
+                          {row.updatedAt ? new Date(row.updatedAt).toLocaleDateString("en-IN") : "—"}
+                        </td>
+                        <td className="px-3 py-2.5 border-b border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => openEditCategoryModal(row)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
+                              title="Edit"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCategory(row)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── UPDATE MODAL ── */}
@@ -2114,6 +2438,93 @@ const UploadBISReport = () => {
           modalId="delete-modal"
           onConfirm={confirmDelete}
           onCancel={() => setShowDeleteModal(false)}
+          icon={<AlertTriangle className="w-10 h-10 text-red-500 mx-auto" />}
+          confirmButtonColor="bg-red-600 hover:bg-red-700"
+        />
+      )}
+
+      {/* ── BIS CATEGORY ADD/EDIT MODAL ── */}
+      {showCategoryModal && (
+        <PopupModal
+          title={categoryModalMode === "add" ? "Add BIS Category" : "Edit BIS Category"}
+          description=""
+          confirmText={categoryLoading ? "Saving…" : "Save"}
+          cancelText="Cancel"
+          modalId="category-modal"
+          onConfirm={saveCategoryModal}
+          onCancel={() => setShowCategoryModal(false)}
+          icon={<Settings2 className="w-8 h-8 text-blue-500 mx-auto" />}
+          confirmButtonColor="bg-blue-600 hover:bg-blue-700"
+          modalClassName="w-[95%] max-w-md"
+        >
+          <div className="mt-4 space-y-3 text-left">
+            {categoryModalMode === "add" ? (
+              <div>
+                <FieldLabel>Material (Material Code auto-filled)</FieldLabel>
+                <SearchableSelect
+                  placeholder="Type to search material name / code…"
+                  value={categoryForm.materialCode}
+                  onChange={handleSelectMaterial}
+                  options={unclassifiedMaterials.map((m) => ({
+                    value: m.matCode,
+                    label: `${m.name} (${m.matCode})`,
+                  }))}
+                />
+                {categoryForm.materialCode && (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Material Code: <span className="font-mono">{categoryForm.materialCode}</span>
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <FieldLabel>Material Code</FieldLabel>
+                <input
+                  type="text"
+                  value={categoryForm.materialCode}
+                  disabled
+                  className={`${inputCls} bg-slate-100 text-slate-400`}
+                />
+              </div>
+            )}
+            <div>
+              <FieldLabel>Model Name</FieldLabel>
+              <input
+                type="text"
+                value={categoryForm.modelName}
+                onChange={(e) =>
+                  setCategoryForm((p) => ({ ...p, modelName: e.target.value }))
+                }
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <FieldLabel>Category</FieldLabel>
+              <select
+                value={categoryForm.category}
+                onChange={(e) =>
+                  setCategoryForm((p) => ({ ...p, category: e.target.value }))
+                }
+                className={inputCls}
+              >
+                <option value="0">Non-BIS</option>
+                <option value="1">BIS</option>
+              </select>
+            </div>
+          </div>
+        </PopupModal>
+      )}
+
+      {/* ── BIS CATEGORY DELETE MODAL ── */}
+      {showDeleteCategoryModal && (
+        <PopupModal
+          title="Delete BIS Category"
+          description={`Are you sure you want to delete "${categoryToDelete?.modelName}" (${categoryToDelete?.materialCode})? This action cannot be undone.`}
+          confirmText={categoryLoading ? "Deleting…" : "Yes, Delete"}
+          cancelText="Cancel"
+          modalId="delete-category-modal"
+          onConfirm={confirmDeleteCategory}
+          onCancel={() => setShowDeleteCategoryModal(false)}
           icon={<AlertTriangle className="w-10 h-10 text-red-500 mx-auto" />}
           confirmButtonColor="bg-red-600 hover:bg-red-700"
         />
