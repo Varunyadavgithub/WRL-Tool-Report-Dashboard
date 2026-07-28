@@ -51,14 +51,6 @@ export const dbConfig3 = {
   ...baseOptions,
 };
 
-export const dbConfig4 = {
-  user:     process.env.DB_USER4,
-  password: process.env.DB_PASSWORD4,
-  server:   process.env.DB_SERVER4,
-  database: process.env.DB_NAME4,
-  ...(process.env.DB_PORT4 ? { port: Number(process.env.DB_PORT4) } : {}),
-  ...baseOptions,
-};
 
 // ── Singleton pool manager (unchanged — your existing logic) ──────────────
 const pools = new Map();
