@@ -42,5 +42,47 @@ export const runGarudaMigrations = async (pool1) => {
     `);
   }
 
+  // ── BISCategory: BIS/Non-BIS classification of finished-goods materials
+  //    (Material.Type = 100). Category: 0 = Non-BIS, 1 = BIS. Fully manually
+  //    managed from the BIS Config UI (Backend/controllers/quality/BisCategory
+  //    .controller.js) from this point on — the MERGE below only ever INSERTs
+  //    brand-new Type=100 materials that aren't classified yet (defaulting to
+  //    Non-BIS via CertificateControl), it never touches ModelName/Category on
+  //    a row that already exists, so manual edits survive server restarts.
+  await pool1.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'BISCategory')
+    BEGIN
+      CREATE TABLE BISCategory (
+        Id           INT IDENTITY(1,1) PRIMARY KEY,
+        MaterialCode NVARCHAR(50)  NOT NULL,
+        ModelName    NVARCHAR(300) NULL,
+        Category     TINYINT       NOT NULL DEFAULT 0,
+        CreatedAt    DATETIME      NOT NULL DEFAULT GETDATE(),
+        UpdatedAt    DATETIME      NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT UQ_BISCategory_MaterialCode UNIQUE (MaterialCode)
+      );
+      PRINT 'Migration: Created BISCategory table (GARUDA)';
+    END
+  `);
+
+  await pool1.request().query(`
+    MERGE BISCategory AS target
+    USING (
+      -- ModelName stored here matches the "actual model name" convention used
+      -- throughout the BIS status query/BISUpload (9-char prefix + optional
+      -- ' RT' suffix), not the raw full Material.Name.
+      SELECT
+        MatCode AS MaterialCode,
+        LEFT(Name, 9) + CASE WHEN RIGHT(Name, 1) = 'R' THEN ' RT' ELSE '' END AS ModelName,
+        CASE WHEN CertificateControl <> 0 THEN 1 ELSE 0 END AS Category
+      FROM Material
+      WHERE Type = 100
+    ) AS src
+    ON target.MaterialCode = src.MaterialCode
+    WHEN NOT MATCHED BY TARGET THEN
+      INSERT (MaterialCode, ModelName, Category)
+      VALUES (src.MaterialCode, src.ModelName, src.Category);
+  `);
+
   console.log("GARUDA migrations completed.");
 };
