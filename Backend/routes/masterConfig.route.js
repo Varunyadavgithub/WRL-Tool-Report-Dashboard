@@ -4,6 +4,7 @@ import { uploadMachineImage, uploadMaterialDrawing, handleMulterError } from "..
 import {
   getMaterials, createMaterial, updateMaterial, deleteMaterial, bulkUpsertMaterials,
   uploadMaterialDrawing as uploadMaterialDrawingHandler, deleteMaterialDrawing,
+  recalculateActualCycleTime,
 } from "../controllers/masterConfig/materials.controller.js";
 import { getShifts, getShiftHistory, createShift, updateShift, deleteShift } from "../controllers/masterConfig/shifts.controller.js";
 import {
@@ -36,6 +37,7 @@ const router = Router();
 router.get("/materials",                     authenticate, getMaterials);
 router.post("/materials",                    authenticate, createMaterial);
 router.post("/materials/bulk",               authenticate, bulkUpsertMaterials);
+router.post("/materials/recalculate-actual-ct", authenticate, recalculateActualCycleTime);
 router.put("/materials/:id",                 authenticate, updateMaterial);
 router.delete("/materials/:id",              authenticate, deleteMaterial);
 router.post("/materials/:id/drawing",        authenticate, uploadMaterialDrawing.single("drawing"), handleMulterError, uploadMaterialDrawingHandler);
