@@ -309,11 +309,6 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
       const idealEnergyWh  = Math.round((planQty * row.definedCycleTime * MACHINE_POWER_KW) / 3600);
       const actualEnergyWh = Math.round((row.actualQty * avgCycleSecs * MACHINE_POWER_KW) / 3600);
 
-      // Material weight (kg) — Sheet Wt Used and Scrap scale per sheet
-      // (row.actualQty); weight/scrapWeight are the per-sheet master values.
-      const sheetWeightKg = Math.round((Number(matForRow?.weight) || 0) * row.actualQty * 100) / 100;
-      const scrapWeightKg = Math.round((Number(matForRow?.scrapWeight) || 0) * row.actualQty * 100) / 100;
-
       return {
         srNo: idx + 1,
         dateFrom: row.dateFrom,
@@ -351,7 +346,6 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
         oee: isNaN(oee) ? 0 : oee,
         availability, performance, quality,
         idealEnergyWh, actualEnergyWh,
-        sheetWeightKg, scrapWeightKg,
         // OEE breakdown inputs (component units) — surfaced in the UI
         actualCompCT, availableTimeSecs, actualTimeSecs, netOperatingSecs,
         downtimeSecs: row.downtimeSecs, idleSecs: row.idleSecs,
@@ -384,7 +378,7 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
       plannedChangeovers: 0, actualChangeovers: 0, coOverrunMins: 0, coOverrunCount: 0,
       idleMins: 0, downMins: 0, totalDowntimeMins: 0, rejects: 0, accepted: 0, lossMins: 0,
       oee: 0, availability: 0, performance: 0, quality: 0,
-      idealEnergyWh: 0, actualEnergyWh: 0, sheetWeightKg: 0, scrapWeightKg: 0,
+      idealEnergyWh: 0, actualEnergyWh: 0,
       actualCompCT: 0, availableTimeSecs: 0, actualTimeSecs: 0, netOperatingSecs: 0,
       downtimeSecs: 0, idleSecs: 0, goodQty: 0,
     }));
@@ -453,7 +447,7 @@ const Delta = ({ actual, plan }) => {
  * ================================================================== */
 const safePct = (num, den) => (den > 0 ? Math.min(100, (num / den) * 100) : 0);
 
-const buildColumns = (materials) => [
+const buildColumns = (materials, showFormula) => [
   { key: "srNo", label: "Sr.", group: "info", sortable: true, always: true, align: "left",
     cell: (r) => <span className="text-[11px] text-slate-400 font-mono">{r.srNo}</span>,
     csv: (r) => r.srNo },
@@ -497,9 +491,11 @@ const buildColumns = (materials) => [
     cell: (r) => (
       <div className="text-center">
         <span className="font-mono font-semibold text-slate-700">{r.planQty.toLocaleString()}</span>
-        <div className="text-[9px] font-mono text-slate-400">
-          {r.planQtyFromConfig ? "from Planning Config" : `${r.componentQty}×1.05 (estimated)`}
-        </div>
+        {showFormula && (
+          <div className="text-[9px] font-mono text-slate-400">
+            {r.planQtyFromConfig ? "from Planning Config" : `${r.componentQty}×1.05 (estimated)`}
+          </div>
+        )}
       </div>
     ),
     csv: (r) => r.planQty },
@@ -514,7 +510,7 @@ const buildColumns = (materials) => [
           <div className={`h-full rounded-full ${r.componentQty >= r.planQty ? "bg-emerald-500" : "bg-blue-500"}`}
             style={{ width: `${safePct(r.componentQty, r.planQty)}%` }} />
         </div>
-        {r.isPunching && r.noOfSheet > 0 && r.compPerSheet > 0 && (
+        {showFormula && r.isPunching && r.noOfSheet > 0 && r.compPerSheet > 0 && (
           <div className="text-[9px] font-mono text-slate-400">{r.noOfSheet}×{r.compPerSheet}×{r.actualQty}</div>
         )}
       </div>
@@ -523,12 +519,6 @@ const buildColumns = (materials) => [
   { key: "actualQty", label: "Sheet Qty", group: "qty", sortable: true, align: "center",
     cell: (r) => <span className="font-bold font-mono text-sm text-slate-600">{r.actualQty.toLocaleString()}</span>,
     csv: (r) => r.actualQty },
-  { key: "sheetWeightKg", label: "Sheet Wt Used (kg)", group: "weight", sortable: true, align: "center",
-    cell: (r) => <span className="font-mono font-semibold text-slate-600">{r.sheetWeightKg > 0 ? r.sheetWeightKg.toLocaleString() : "-"}</span>,
-    csv: (r) => r.sheetWeightKg },
-  { key: "scrapWeightKg", label: "Scrap Wt (kg)", group: "weight", sortable: true, align: "center",
-    cell: (r) => <span className="font-mono font-semibold text-amber-600">{r.scrapWeightKg > 0 ? r.scrapWeightKg.toLocaleString() : "-"}</span>,
-    csv: (r) => r.scrapWeightKg },
   { key: "reqTimeMins", label: "Required Time", group: "time", sortable: true, align: "center",
     cell: (r) => <span className="font-mono text-violet-600 font-semibold">{r.reqTimeMins}</span>,
     csv: (r) => r.reqTimeMins },
@@ -547,7 +537,7 @@ const buildColumns = (materials) => [
       return (
         <div className="text-center">
           <span className={`font-mono font-bold ${good ? "text-emerald-600" : "text-amber-600"}`}>{r.sheetCycleTime > 0 ? r.sheetCycleTime : "-"}</span>
-          {r.isPunching && r.noOfSheet > 0 && <div className="text-[9px] font-mono text-slate-400">{r.machineCycleSecs} ÷ {r.noOfSheet}</div>}
+          {showFormula && r.isPunching && r.noOfSheet > 0 && <div className="text-[9px] font-mono text-slate-400">{r.machineCycleSecs} ÷ {r.noOfSheet}</div>}
         </div>
       );
     },
@@ -559,7 +549,7 @@ const buildColumns = (materials) => [
         ? (
           <div className="text-center">
             <span className="font-mono font-semibold text-indigo-600">{r.componentCycleTime}</span>
-            <div className="text-[9px] font-mono text-slate-400">({r.machineCycleSecs}+{r.loadUnload}) ÷ ({r.compPerSheet}×{r.noOfSheet})</div>
+            {showFormula && <div className="text-[9px] font-mono text-slate-400">({r.machineCycleSecs}+{r.loadUnload}) ÷ ({r.compPerSheet}×{r.noOfSheet})</div>}
           </div>
         )
         : <span className="text-slate-300 text-xs">—</span>
@@ -576,21 +566,21 @@ const buildColumns = (materials) => [
   { key: "availability", label: "A (%)", group: "oee", sortable: true, align: "center",
     cell: (r) => (
       <div className="text-center font-mono font-semibold text-slate-600">{r.availability}%
-        <div className="text-[9px] font-mono text-slate-400 whitespace-nowrap">({r.reqTimeMins} - {r.totalDowntimeMins}) / {r.reqTimeMins} x 100</div>
+        {showFormula && <div className="text-[9px] font-mono text-slate-400 whitespace-nowrap">({r.reqTimeMins} - {r.totalDowntimeMins}) / {r.reqTimeMins} x 100</div>}
       </div>
     ),
     csv: (r) => r.availability },
   { key: "performance", label: "P (%)", group: "oee", sortable: true, align: "center",
     cell: (r) => (
       <div className="text-center font-mono font-semibold text-slate-600">{r.performance}%
-        <div className="text-[9px] font-mono text-slate-400 whitespace-nowrap">({r.componentQty} x {r.definedCycleTime}) / (({r.reqTimeMins} - {r.totalDowntimeMins}) x 60) x 100</div>
+        {showFormula && <div className="text-[9px] font-mono text-slate-400 whitespace-nowrap">({r.componentQty} x {r.definedCycleTime}) / (({r.reqTimeMins} - {r.totalDowntimeMins}) x 60) x 100</div>}
       </div>
     ),
     csv: (r) => r.performance },
   { key: "quality", label: "Q (%)", group: "oee", sortable: true, align: "center",
     cell: (r) => (
       <div className="text-center font-mono font-semibold text-slate-600">{r.quality}%
-        <div className="text-[9px] font-mono text-slate-400 whitespace-nowrap">{r.accepted} / {r.componentQty} x 100</div>
+        {showFormula && <div className="text-[9px] font-mono text-slate-400 whitespace-nowrap">{r.accepted} / {r.componentQty} x 100</div>}
       </div>
     ),
     csv: (r) => r.quality },
@@ -603,7 +593,7 @@ const buildColumns = (materials) => [
             <div className={`h-full rounded-full ${oeeBarColor(r.oee)}`} style={{ width: `${r.oee}%` }} />
           </div>
         </div>
-        <div className="text-[9px] font-mono text-slate-400 mt-0.5 whitespace-nowrap">{r.availability} x {r.performance} x {r.quality} / 10,000</div>
+        {showFormula && <div className="text-[9px] font-mono text-slate-400 mt-0.5 whitespace-nowrap">{r.availability} x {r.performance} x {r.quality} / 10,000</div>}
       </div>
     ),
     csv: (r) => r.oee },
@@ -612,7 +602,6 @@ const buildColumns = (materials) => [
 const GROUP_META = {
   info:    { label: "Part Info",      tone: "text-slate-600  bg-slate-100" },
   qty:     { label: "Production Qty",  tone: "text-blue-700   bg-blue-50" },
-  weight:  { label: "Material Weight (kg)", tone: "text-amber-700  bg-amber-50" },
   time:    { label: "Time (min)",      tone: "text-violet-700 bg-violet-50" },
   ct:      { label: "Cycle Time (s)",  tone: "text-cyan-700   bg-cyan-50" },
   quality: { label: "Quality Log",     tone: "text-emerald-700 bg-emerald-50" },
@@ -634,7 +623,7 @@ const groupSpans = (cols) => {
  * 7. Export helpers
  * ================================================================== */
 // Which summary columns are additive (SUM) vs averaged (AVG) for footer rows.
-const AGG_SUM = new Set(["planQty", "componentQty", "actualQty", "sheetWeightKg", "scrapWeightKg", "reqTimeMins", "actualTimeMins", "totalDowntimeMins", "accepted", "rejected"]);
+const AGG_SUM = new Set(["planQty", "componentQty", "actualQty", "reqTimeMins", "actualTimeMins", "totalDowntimeMins", "accepted", "rejected"]);
 const AGG_AVG = new Set(["availability", "performance", "quality", "oee"]);
 
 const computeTotals = (rows, columns) => {
@@ -813,38 +802,18 @@ const PartProcessProductionReport = () => {
   // Sheet Qty + Sheet CT hidden by default; toggle on from the Columns menu.
   const [hiddenCols, setHiddenCols] = useState({
     actualQty: true, sheetCycleTime: true,
-    sheetSapCode: true, sheetDescription: true, sheetWeightKg: true, scrapWeightKg: true,
+    sheetSapCode: true, sheetDescription: true,
   });
   const [colMenuOpen, setColMenuOpen] = useState(false);
+  // Formula breakdown subtext under OEE/CT/Plan Qty cells — off by default to
+  // keep the table compact; toggled on for anyone who wants to verify the math.
+  const [showFormula, setShowFormula] = useState(false);
 
   // Advanced filters
   const [modelFilter, setModelFilter]   = useState("ALL");
   const [shiftFilter, setShiftFilter]   = useState("ALL");
 
   const isAnyLoading = loading || ydayLoading || todayLoading;
-
-  /* ----- demo fallback (now includes downtime so OEE is realistic) ----- */
-  const DEMO_RECORDS = useMemo(() => ([
-    { srNo: 1, shift: "Shift 2", state: "Production", model: "1127024-D-UNIT-FRAME-D150H", startTime: "08:00:41", endTime: "08:01:22", duration: "00:00:45", qty: 1, quality: "GOOD", operator: "OP-12", downtimeReason: null },
-    { srNo: 2, shift: "Shift 2", state: "Production", model: "1127024-D-UNIT-FRAME-D150H", startTime: "08:01:22", endTime: "08:02:10", duration: "00:00:48", qty: 1, quality: "GOOD", operator: "OP-12", downtimeReason: null },
-    { srNo: 3, shift: "Shift 2", state: "Downtime", model: null, startTime: "08:02:10", endTime: "08:15:46", duration: "00:13:36", qty: 0, quality: null, operator: null, downtimeReason: "Tool Change" },
-    ...Array.from({ length: 55 }, (_, i) => ({
-      srNo: i + 4, shift: "Shift 2", state: "Production",
-      model: i % 3 === 0 ? "0109855-C-INR-BTM-550G-RT-AS" : "1127024-D-UNIT-FRAME-D150H",
-      startTime: `${pad(8 + Math.floor(i / 8))}:${pad((i * 7) % 60)}:00`,
-      endTime: `${pad(8 + Math.floor(i / 8))}:${pad(((i * 7) + 43) % 60)}:00`,
-      duration: `00:00:${pad(41 + (i % 12))}`,
-      qty: 1, quality: i % 15 === 0 ? null : "GOOD", operator: `OP-${10 + (i % 3)}`, downtimeReason: null,
-    })),
-    { srNo: 60, shift: "Shift 2", state: "Downtime", model: null, startTime: "12:10:00", endTime: "12:17:30", duration: "00:07:30", qty: 0, quality: null, operator: null, downtimeReason: "Assign" },
-    ...Array.from({ length: 12 }, (_, i) => ({
-      srNo: i + 61, shift: "Shift 1", state: "Production", model: "0109855-D-INR-BTM-550G-RT-AS",
-      startTime: `0${pad(6 + Math.floor(i / 4))}:${pad((i * 9) % 60)}:00`,
-      endTime: `0${pad(6 + Math.floor(i / 4))}:${pad(((i * 9) + 38) % 60)}:00`,
-      duration: `00:00:${pad(38 + (i % 8))}`,
-      qty: 1, quality: "GOOD", operator: `OP-${20 + (i % 2)}`, downtimeReason: null,
-    })),
-  ].map((r) => ({ ...r, _prodDay: todayStr(), _absMs: null, _absMsEnd: null }))), []);
 
   /* ----- data fetch ----- */
   const fetchData = useCallback(async (start, end, setLoadFn) => {
@@ -926,12 +895,12 @@ const PartProcessProductionReport = () => {
 
       const prodCount = filtered.filter((r) => r.state === "Production").length;
       toast.success(`${prodCount} production + ${filtered.length - prodCount} downtime records loaded`);
-    } catch {
-      setRecords(DEMO_RECORDS);
+    } catch (err) {
+      setRecords([]);
       setDbQLogs([]);
-      toast("Demo data loaded - connect to DB for live data", { icon: "⚡" });
+      toast.error(err?.response?.data?.message || "Failed to fetch production records.");
     } finally { setLoadFn(false); }
-  }, [DEMO_RECORDS]);
+  }, []);
 
   const handleQuery = () => {
     if (!startTime || !endTime) { toast.error("Select a time range."); return; }
@@ -979,7 +948,7 @@ const PartProcessProductionReport = () => {
     [filteredRecords, materials, qualityByPartName, plans, shiftNames, queryDateFrom, queryDateTo]);
 
   /* ----- columns ----- */
-  const columns = useMemo(() => buildColumns(materials), [materials]);
+  const columns = useMemo(() => buildColumns(materials, showFormula), [materials, showFormula]);
   const visibleColumns = useMemo(() => columns.filter((c) => !hiddenCols[c.key]), [columns, hiddenCols]);
   // Group-header spans — recomputed so colSpans track hidden columns.
   const groupSegments = useMemo(() => groupSpans(visibleColumns), [visibleColumns]);
@@ -1036,8 +1005,6 @@ const PartProcessProductionReport = () => {
       planQty: sum((r) => r.planQty),
       componentQty: sum((r) => r.componentQty),
       actualQty: sum((r) => r.actualQty),
-      sheetWeightKg: Math.round(sum((r) => r.sheetWeightKg) * 100) / 100,
-      scrapWeightKg: Math.round(sum((r) => r.scrapWeightKg) * 100) / 100,
       rejects: sum((r) => r.rejects),
       accepted: sum((r) => r.accepted),
       lossMins: sum((r) => r.lossMins),
@@ -1093,8 +1060,6 @@ const PartProcessProductionReport = () => {
             <StatCard icon={FiFile} label="Planned Qty" value={totals.planQty.toLocaleString()} tone="indigo" />
             <StatCard icon={FiGrid} label="Components Produced" value={totals.componentQty.toLocaleString()} tone="violet" />
             <StatCard icon={FiPackage} label="Sheets" value={totals.actualQty.toLocaleString()} tone="blue" />
-            <StatCard icon={FiPackage} label="Sheet Wt Used" value={`${totals.sheetWeightKg.toLocaleString()} kg`} tone="amber" />
-            <StatCard icon={FiAlertTriangle} label="Total Scrap" value={`${totals.scrapWeightKg.toLocaleString()} kg`} tone="rose" />
             <StatCard icon={FiAlertTriangle} label="Rejects" value={totals.rejects.toLocaleString()} tone="rose" />
             <StatCard icon={FiClock} label="Downtime" value={`${totals.totalDowntimeMins} min`} tone="amber" />
             <StatCard icon={FiActivity} label="Avg OEE" value={`${totals.oee}%`} tone="emerald" />
@@ -1192,6 +1157,10 @@ const PartProcessProductionReport = () => {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-slate-400">{sortedRows.length} rows</span>
+                <button onClick={() => setShowFormula((v) => !v)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${showFormula ? "bg-blue-600 border-blue-600 text-white" : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"}`}>
+                  Show Formula
+                </button>
                 <div className="relative">
                   <button onClick={() => setColMenuOpen((v) => !v)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600">
