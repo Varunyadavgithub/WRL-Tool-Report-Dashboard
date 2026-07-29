@@ -142,6 +142,16 @@ export const getLogisticStatus = tryCatch(async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════
 // Component Details
 // BUG FIX: returns 200 + empty array instead of 404 (friendlier for frontend EmptyState)
+// BUG FIX: first branch now reads Material directly off ProcessInputBOMScan
+//   (a.Material) instead of re-deriving it via a ProcessInputBOM join keyed
+//   on PSNo+RowID. That join required the scanned component to also be a
+//   registered BOM line (or alt-material) for this exact PSNo/RowID — a
+//   real, physically-scanned substitution that was never registered in the
+//   BOM master silently vanished from the results entirely (same class of
+//   bug fixed in componentTraceabilityReport.controller.js's BomMaterials
+//   CTE). All supporting lookups (Material/MaterialCategory/Ledger) are now
+//   LEFT JOINs with an ISNULL('NA') fallback too, so a component missing a
+//   category/ledger master entry still shows up instead of being dropped.
 // ═══════════════════════════════════════════════════════════════════
 export const getComponentDetails = tryCatch(async (req, res) => {
   const { componentIdentifier } = req.query;
@@ -164,34 +174,37 @@ export const getComponentDetails = tryCatch(async (req, res) => {
       RETURN;
     END
 
+    -- Components scanned through ProcessInputBOMScan
     SELECT
-      c.Name                   AS name,
+      ISNULL(c.Name, 'NA')    AS name,
       ISNULL(c.AltName, 'NA') AS sapCode,
-      a.Serial                 AS serial,
-      mc.Name                  AS type,
-      l.Name                   AS supplierName,
-      a.ScannedOn              AS scannedOn
+      a.Serial                AS serial,
+      ISNULL(mc.Name, 'NA')   AS type,
+      ISNULL(l.Name, 'NA')    AS supplierName,
+      a.ScannedOn             AS scannedOn
     FROM ProcessInputBOMScan a
-    JOIN ProcessInputBOM b   ON a.PSNo = b.PSNo AND a.RowID = b.RowID
-    JOIN Material c          ON b.Material = c.MatCode
-    JOIN MaterialCategory mc ON mc.CategoryCode = c.Category
-    JOIN Ledger l            ON l.LedgerCode = c.Ledger
+    LEFT JOIN Material c          ON a.Material = c.MatCode
+    LEFT JOIN MaterialCategory mc ON mc.CategoryCode = c.Category
+    LEFT JOIN Ledger l            ON l.LedgerCode = c.Ledger
     WHERE a.PSNo = @DocNo
 
     UNION ALL
 
+    -- Components available through MaterialBarcode
     SELECT
-      b.Name    AS name,
-      b.AltName AS sapCode,
-      a.Serial  AS serial,
-      mc.Name   AS type,
-      l.Name    AS supplierName,
-      a.CreatedOn AS scannedOn
+      ISNULL(b.Name, 'NA')    AS name,
+      ISNULL(b.AltName, 'NA') AS sapCode,
+      a.Serial                AS serial,
+      ISNULL(mc.Name, 'NA')   AS type,
+      ISNULL(l.Name, 'NA')    AS supplierName,
+      a.CreatedOn             AS scannedOn
     FROM MaterialBarcode a
-    JOIN Material b          ON a.Material = b.MatCode
-    JOIN MaterialCategory mc ON mc.CategoryCode = b.Category
-    JOIN Ledger l            ON l.LedgerCode = b.Ledger
-    WHERE a.DocNo = @DocNo AND a.VSerial IS NOT NULL;
+    LEFT JOIN Material b          ON a.Material = b.MatCode
+    LEFT JOIN MaterialCategory mc ON mc.CategoryCode = b.Category
+    LEFT JOIN Ledger l            ON l.LedgerCode = b.Ledger
+    WHERE a.DocNo = @DocNo AND a.VSerial IS NOT NULL
+
+    ORDER BY scannedOn;
   `;
 
   const pool = await new sql.ConnectionPool(dbConfig1).connect();

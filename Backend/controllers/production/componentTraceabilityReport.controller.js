@@ -126,10 +126,10 @@ function buildMainSelectBlock(whereExtras) {
     SELECT
         MATBM.Name                  AS Model_Name,
         b.Serial                    AS Component_Serial_Number,
-        mat.Name                    AS Component_Name,
+        ISNULL(mat.Name, 'NA')      AS Component_Name,
         ISNULL(mat.AltName, 'NA')   AS SAP_Code,
-        MatCat.Name                 AS Component_Type,
-        L.Name                      AS Supplier_Name,
+        ISNULL(MatCat.Name, 'NA')   AS Component_Type,
+        ISNULL(L.Name, 'NA')        AS Supplier_Name,
         b.ScannedOn                 AS Comp_ScanedOn,
         pa.ActivityOn               AS FG_Date,
         MATB.Serial                 AS Fg_Sr_No,
@@ -140,8 +140,12 @@ function buildMainSelectBlock(whereExtras) {
     INNER JOIN BomMaterials              c    ON  c.PSNo     = b.PSNo
                                              AND c.RowID    = b.RowID
                                              AND c.Material = b.Material
-    INNER JOIN Material                  mat  ON  mat.MatCode      = c.Material
-    INNER JOIN MaterialCategory          MatCat ON MatCat.CategoryCode = mat.Category
+    -- BUG FIX: Material/MaterialCategory were INNER JOINs — a scanned
+    -- component whose material has no MaterialCategory row (or an orphan
+    -- MatCode) vanished from the report entirely instead of just showing a
+    -- blank type, same class of bug fixed in getComponentDetails.
+    LEFT  JOIN Material                  mat  ON  mat.MatCode      = c.Material
+    LEFT  JOIN MaterialCategory          MatCat ON MatCat.CategoryCode = mat.Category
     INNER JOIN FGActivity                pa   ON  pa.PSNo    = a.PSNo
     INNER JOIN FGBarcode                 MATB ON  MATB.DocNo = a.PSNo
     LEFT  JOIN Material                  MATBM ON  MATBM.MatCode   = MATB.Material
@@ -232,15 +236,15 @@ export const getTraceabilitySummary = tryCatch(async (req, res) => {
         SELECT
             MATBM.Name                              AS Model_Name,
             b.Serial                                AS Component_Serial_Number,
-            MatCat.Name                             AS Component_Type,
-            L.Name                                  AS Supplier_Name,
+            ISNULL(MatCat.Name, 'NA')               AS Component_Type,
+            ISNULL(L.Name, 'NA')                    AS Supplier_Name,
             CAST(pa.ActivityOn AS DATE)             AS FG_Date,
             DATEPART(HOUR, b.ScannedOn)             AS Scan_Hour
         FROM       ProcessOrder              a
         INNER JOIN ProcessInputBOMScan       b    ON b.PSNo = a.PSNo
         INNER JOIN BomMaterials              c    ON c.PSNo = b.PSNo AND c.RowID = b.RowID AND c.Material = b.Material
-        INNER JOIN Material                  mat  ON mat.MatCode = c.Material
-        INNER JOIN MaterialCategory          MatCat ON MatCat.CategoryCode = mat.Category
+        LEFT  JOIN Material                  mat  ON mat.MatCode = c.Material
+        LEFT  JOIN MaterialCategory          MatCat ON MatCat.CategoryCode = mat.Category
         INNER JOIN FGActivity                pa   ON pa.PSNo = a.PSNo
         INNER JOIN FGBarcode                 MATB ON MATB.DocNo = a.PSNo
         LEFT  JOIN Material                  MATBM ON MATBM.MatCode = MATB.Material
@@ -322,8 +326,8 @@ export const getTraceabilityGrouped = tryCatch(async (req, res) => {
     FROM       ProcessOrder              a
     INNER JOIN ProcessInputBOMScan       b    ON  b.PSNo     = a.PSNo
     INNER JOIN BomMaterials              c    ON  c.PSNo     = b.PSNo AND c.RowID = b.RowID AND c.Material = b.Material
-    INNER JOIN Material                  mat  ON  mat.MatCode = c.Material
-    INNER JOIN MaterialCategory          MatCat ON MatCat.CategoryCode = mat.Category
+    LEFT  JOIN Material                  mat  ON  mat.MatCode = c.Material
+    LEFT  JOIN MaterialCategory          MatCat ON MatCat.CategoryCode = mat.Category
     INNER JOIN FGActivity                pa   ON  pa.PSNo    = a.PSNo
     INNER JOIN FGBarcode                 MATB ON  MATB.DocNo = a.PSNo
     LEFT  JOIN Material                  MATBM ON  MATBM.MatCode = MATB.Material
@@ -370,8 +374,8 @@ export const getTraceabilityTimeline = tryCatch(async (req, res) => {
     FROM       ProcessOrder              a
     INNER JOIN ProcessInputBOMScan       b    ON b.PSNo = a.PSNo
     INNER JOIN BomMaterials              c    ON c.PSNo = b.PSNo AND c.RowID = b.RowID AND c.Material = b.Material
-    INNER JOIN Material                  mat  ON mat.MatCode = c.Material
-    INNER JOIN MaterialCategory          MatCat ON MatCat.CategoryCode = mat.Category
+    LEFT  JOIN Material                  mat  ON mat.MatCode = c.Material
+    LEFT  JOIN MaterialCategory          MatCat ON MatCat.CategoryCode = mat.Category
     INNER JOIN FGActivity                pa   ON pa.PSNo = a.PSNo
     INNER JOIN FGBarcode                 MATB ON MATB.DocNo = a.PSNo
     LEFT  JOIN Material                  MATBM ON MATBM.MatCode = MATB.Material

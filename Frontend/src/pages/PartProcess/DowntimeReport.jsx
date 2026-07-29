@@ -951,7 +951,10 @@ const PartProcessDowntimeReport = () => {
                                 </td>
                                 <td className="px-3 py-2.5 border-b border-slate-100 font-mono text-slate-500 text-[11px] whitespace-nowrap">{sDate?`${sDate} ${co.startTime}`:co.startTime}</td>
                                 <td className="px-3 py-2.5 border-b border-slate-100 font-mono text-slate-500 text-[11px] whitespace-nowrap">{eDate?`${eDate} ${co.endTime}`:co.endTime}</td>
-                                <td className="px-3 py-2.5 border-b border-slate-100 font-bold font-mono text-slate-700">{co.durationMins.toFixed(1)}m</td>
+                                <td className="px-3 py-2.5 border-b border-slate-100 font-bold font-mono text-slate-700">
+                                  {co.durationMins.toFixed(1)}m
+                                  <div className="text-[9px] font-normal font-mono text-slate-400">std {co.stdMins}m</div>
+                                </td>
                                 <td className="px-3 py-2.5 border-b border-slate-100">
                                   {co.isOverrun ? (
                                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">+{co.overrunMins.toFixed(1)}m overrun</span>
