@@ -322,7 +322,8 @@ const TimeMap = ({
   // Number.isFinite (not `!== null`) so a NaN prop — e.g. new Date(badRangeStart)
   // upstream — falls back to data-derived bounds instead of silently
   // corrupting the entire axis (minMs/maxMs/nowPct/elapsedMs all NaN).
-  const hasWindow = Number.isFinite(windowStartMs) && Number.isFinite(windowEndMs);
+  const hasWindow =
+    Number.isFinite(windowStartMs) && Number.isFinite(windowEndMs);
   const windowSpan = hasWindow ? windowEndMs - windowStartMs : 0;
 
   // Build event array in absolute ms — clamp to window when known
@@ -344,7 +345,8 @@ const TimeMap = ({
         // actually plausible; otherwise the row is just malformed — drop it
         // via the es <= s check below instead of rendering a bogus span.
         const startIst = new Date(s + 5.5 * 3600_000);
-        const startTodMins = startIst.getUTCHours() * 60 + startIst.getUTCMinutes();
+        const startTodMins =
+          startIst.getUTCHours() * 60 + startIst.getUTCMinutes();
         const plausibleMidnightCross = startTodMins >= 20 * 60; // 20:00 IST+
         const es = e <= s && plausibleMidnightCross ? e + MS_PER_DAY : e;
         if (es <= s) return null;
@@ -469,7 +471,6 @@ const TimeMap = ({
     }
     return `${hh}:${mm}`;
   };
-
 
   // Stats exposed to JSX (rounded minutes for display)
   const runMins = Math.round(runMinsMs);
@@ -743,7 +744,17 @@ const TimeMap = ({
       ctx.arc(nx, PAD, 4, 0, Math.PI * 2);
       ctx.fill();
     }
-  }, [events, coMarkers, minMs, maxMs, rangeMs, nowPct, zoom, canvasW, shiftBands]);
+  }, [
+    events,
+    coMarkers,
+    minMs,
+    maxMs,
+    rangeMs,
+    nowPct,
+    zoom,
+    canvasW,
+    shiftBands,
+  ]);
 
   const handleZoomIn = () => setZoom((z) => Math.min(z * 2, 32));
   const handleZoomOut = () => setZoom((z) => Math.max(z / 2, 1));
@@ -1240,254 +1251,260 @@ const QuickDowntimeForm = ({
 
       {activeTab === "log" ? (
         <>
-      {/* Shift filter strip — only shown when events span multiple shifts */}
-      {eventShifts.length > 1 && (
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-100 bg-slate-50 shrink-0 flex-wrap">
-          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mr-1">
-            Shift
-          </span>
-          <button
-            onClick={() => setShiftFilter(null)}
-            className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${!shiftFilter ? "bg-slate-800 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
-          >
-            All
-          </button>
-          {eventShifts.map((s) => (
-            <button
-              key={s}
-              onClick={() => setShiftFilter(shiftFilter === s ? null : s)}
-              className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${shiftFilter === s ? "bg-rose-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="flex flex-1 overflow-hidden min-h-0">
-        {/* Event list */}
-        <div className="flex-1 overflow-auto border-r border-slate-100 p-4 flex flex-col gap-2">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
-              Events
-            </p>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-600">
-                {downtimeList.length} DT
+          {/* Shift filter strip — only shown when events span multiple shifts */}
+          {eventShifts.length > 1 && (
+            <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-100 bg-slate-50 shrink-0 flex-wrap">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mr-1">
+                Shift
               </span>
-              {changeovers.some((co) => co.isOverrun) && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                  {changeovers.filter((co) => co.isOverrun).length} CO
-                </span>
+              <button
+                onClick={() => setShiftFilter(null)}
+                className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${!shiftFilter ? "bg-slate-800 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+              >
+                All
+              </button>
+              {eventShifts.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setShiftFilter(shiftFilter === s ? null : s)}
+                  className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${shiftFilter === s ? "bg-rose-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="flex flex-1 overflow-hidden min-h-0">
+            {/* Event list */}
+            <div className="flex-1 overflow-auto border-r border-slate-100 p-4 flex flex-col gap-2">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
+                  Events
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-600">
+                    {downtimeList.length} DT
+                  </span>
+                  {changeovers.some((co) => co.isOverrun) && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                      {changeovers.filter((co) => co.isOverrun).length} CO
+                    </span>
+                  )}
+                </div>
+              </div>
+              {filteredList.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-10 text-slate-300">
+                  <TimerOff className="w-8 h-8 opacity-30" strokeWidth={1.2} />
+                  <p className="text-xs text-slate-400">
+                    No events for selected shift
+                  </p>
+                </div>
+              ) : (
+                filteredList.map((r, idx) => {
+                  const isCO = r._type === "Changeover";
+                  const isLogged = loggedSrNos.has(String(r.srNo));
+                  const isPending =
+                    !isCO &&
+                    (!r.downtimeReason || r.downtimeReason === "Assign");
+                  const isSel =
+                    selected?.srNo === r.srNo && selected?._type === r._type;
+                  return (
+                    <button
+                      key={idx}
+                      disabled={isLogged}
+                      onClick={() => {
+                        setSelected(r);
+                        setForm({ reasonId: "", remarks: "" });
+                      }}
+                      className={`w-full text-left p-3 rounded-xl border-2 transition-all ${isLogged ? "border-emerald-200 bg-emerald-50/60 cursor-not-allowed" : ""} ${
+                        isSel
+                          ? "border-rose-500 bg-rose-50 shadow-sm"
+                          : isCO
+                            ? r.isOverrun
+                              ? "border-red-300 bg-red-50/60 hover:border-red-500"
+                              : "border-amber-300 bg-amber-50/60 hover:border-amber-500"
+                            : isPending
+                              ? "border-amber-200 bg-amber-50/60 hover:border-amber-400"
+                              : "border-slate-200 bg-white hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-bold text-slate-500">
+                          {isCO ? r.srNo : `Sr #${r.srNo}`} · {r.shift || "—"}
+                        </span>
+                        <span
+                          className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                            isCO
+                              ? r.isOverrun
+                                ? "bg-red-100 text-red-700"
+                                : "bg-amber-100 text-amber-700"
+                              : isLogged
+                                ? "bg-emerald-100 text-emerald-700"
+                                : isPending
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {isLogged
+                            ? "✓ LOGGED"
+                            : isCO
+                              ? r.isOverrun
+                                ? "⏱ OVERRUN"
+                                : "↔ CHANGEOVER"
+                              : isPending
+                                ? "⚠ UNASSIGNED"
+                                : "✓ ASSIGNED"}
+                        </span>
+                      </div>
+                      {isCO && (
+                        <p className="text-[10px] text-slate-500 mb-1 truncate leading-snug">
+                          {r.fromModel}{" "}
+                          <span className="text-slate-400">→</span> {r.model}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="font-mono text-slate-600">
+                          {r.startTime}
+                        </span>
+                        <span className="text-slate-300">→</span>
+                        <span className="font-mono text-slate-600">
+                          {r.endTime}
+                        </span>
+                        <span
+                          className={`font-bold ml-auto ${isCO ? (r.isOverrun ? "text-red-600" : "text-amber-600") : "text-rose-600"}`}
+                        >
+                          {r.duration}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Right panel */}
+            <div className="w-100 shrink-0 p-4 flex flex-col gap-3 overflow-auto">
+              {selected ? (
+                <>
+                  <div
+                    className={`rounded-xl border p-3 shrink-0 ${selected._type === "Changeover" ? "bg-amber-50 border-amber-200" : "bg-rose-50 border-rose-200"}`}
+                  >
+                    <p
+                      className={`text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${selected._type === "Changeover" ? "text-amber-600" : "text-rose-500"}`}
+                    >
+                      {selected._type === "Changeover"
+                        ? "Changeover Event"
+                        : "Selected Downtime"}
+                    </p>
+                    {selected._type === "Changeover" && (
+                      <div className="text-[10px] text-slate-600 mb-1.5 leading-snug space-y-0.5">
+                        <p>
+                          <span className="font-semibold text-slate-500">
+                            From:
+                          </span>{" "}
+                          {selected.fromModel || "—"}
+                        </p>
+                        <p>
+                          <span className="font-semibold text-slate-500">
+                            To:
+                          </span>{" "}
+                          {selected.model || "—"}
+                        </p>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-mono text-slate-700">
+                        {selected.startTime}
+                      </span>
+                      <span className="text-slate-300">→</span>
+                      <span className="font-mono text-slate-700">
+                        {selected.endTime}
+                      </span>
+                    </div>
+                    <p
+                      className={`text-sm font-bold mt-1 ${selected._type === "Changeover" ? (selected.isOverrun ? "text-red-600" : "text-amber-600") : "text-rose-600"}`}
+                    >
+                      {selected.duration}
+                    </p>
+                    {selected._type === "Changeover" && selected.isOverrun && (
+                      <p className="text-[10px] text-red-600 font-semibold mt-0.5">
+                        ⏱ Changeover overrun
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <Lbl>
+                      Downtime Reason
+                      {selected._type !== "Changeover" && (
+                        <span className="text-rose-500"> *</span>
+                      )}
+                      {selected._type === "Changeover" && (
+                        <span className="text-slate-400"> (optional)</span>
+                      )}
+                    </Lbl>
+                    <select
+                      value={form.reasonId}
+                      onChange={sf("reasonId")}
+                      className={iC}
+                    >
+                      <option value="">
+                        {selected._type === "Changeover"
+                          ? "Changeover"
+                          : "Select Reason"}
+                      </option>
+                      {activeReasons.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.reason}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Lbl>Remarks</Lbl>
+                    <textarea
+                      value={form.remarks}
+                      onChange={sf("remarks")}
+                      className={`${iC} resize-none h-20`}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center flex-1 gap-3 border-2 border-dashed border-slate-200 rounded-xl text-center p-4">
+                  <TimerOff
+                    className="w-7 h-7 text-slate-300"
+                    strokeWidth={1.2}
+                  />
+                  <p className="text-xs text-slate-400">
+                    Select a downtime or changeover event to log
+                  </p>
+                </div>
               )}
             </div>
           </div>
-          {filteredList.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-10 text-slate-300">
-              <TimerOff className="w-8 h-8 opacity-30" strokeWidth={1.2} />
-              <p className="text-xs text-slate-400">
-                No events for selected shift
-              </p>
-            </div>
-          ) : (
-            filteredList.map((r, idx) => {
-              const isCO = r._type === "Changeover";
-              const isLogged = loggedSrNos.has(String(r.srNo));
-              const isPending =
-                !isCO && (!r.downtimeReason || r.downtimeReason === "Assign");
-              const isSel =
-                selected?.srNo === r.srNo && selected?._type === r._type;
-              return (
-                <button
-                  key={idx}
-                  disabled={isLogged}
-                  onClick={() => {
-                    setSelected(r);
-                    setForm({ reasonId: "", remarks: "" });
-                  }}
-                  className={`w-full text-left p-3 rounded-xl border-2 transition-all ${isLogged ? "border-emerald-200 bg-emerald-50/60 cursor-not-allowed" : ""} ${
-                    isSel
-                      ? "border-rose-500 bg-rose-50 shadow-sm"
-                      : isCO
-                        ? r.isOverrun
-                          ? "border-red-300 bg-red-50/60 hover:border-red-500"
-                          : "border-amber-300 bg-amber-50/60 hover:border-amber-500"
-                        : isPending
-                          ? "border-amber-200 bg-amber-50/60 hover:border-amber-400"
-                          : "border-slate-200 bg-white hover:border-slate-300"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-bold text-slate-500">
-                      {isCO ? r.srNo : `Sr #${r.srNo}`} · {r.shift || "—"}
-                    </span>
-                    <span
-                      className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                        isCO
-                          ? r.isOverrun
-                            ? "bg-red-100 text-red-700"
-                            : "bg-amber-100 text-amber-700"
-                          : isLogged
-                            ? "bg-emerald-100 text-emerald-700"
-                          : isPending
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {isLogged
-                        ? "✓ LOGGED"
-                        : isCO
-                        ? r.isOverrun
-                          ? "⏱ OVERRUN"
-                          : "↔ CHANGEOVER"
-                        : isPending
-                          ? "⚠ UNASSIGNED"
-                          : "✓ ASSIGNED"}
-                    </span>
-                  </div>
-                  {isCO && (
-                    <p className="text-[10px] text-slate-500 mb-1 truncate leading-snug">
-                      {r.fromModel} <span className="text-slate-400">→</span>{" "}
-                      {r.model}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-3 text-xs">
-                    <span className="font-mono text-slate-600">
-                      {r.startTime}
-                    </span>
-                    <span className="text-slate-300">→</span>
-                    <span className="font-mono text-slate-600">
-                      {r.endTime}
-                    </span>
-                    <span
-                      className={`font-bold ml-auto ${isCO ? (r.isOverrun ? "text-red-600" : "text-amber-600") : "text-rose-600"}`}
-                    >
-                      {r.duration}
-                    </span>
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
 
-        {/* Right panel */}
-        <div className="w-100 shrink-0 p-4 flex flex-col gap-3 overflow-auto">
-          {selected ? (
-            <>
-              <div
-                className={`rounded-xl border p-3 shrink-0 ${selected._type === "Changeover" ? "bg-amber-50 border-amber-200" : "bg-rose-50 border-rose-200"}`}
+          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 shrink-0">
+            <p className="text-[11px] text-slate-400">
+              {selected
+                ? `${selected._type === "Changeover" ? "Changeover" : "Downtime"} · ${selected.srNo} · ${selected.shift || "—"}`
+                : "No event selected"}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100"
               >
-                <p
-                  className={`text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${selected._type === "Changeover" ? "text-amber-600" : "text-rose-500"}`}
-                >
-                  {selected._type === "Changeover"
-                    ? "Changeover Event"
-                    : "Selected Downtime"}
-                </p>
-                {selected._type === "Changeover" && (
-                  <div className="text-[10px] text-slate-600 mb-1.5 leading-snug space-y-0.5">
-                    <p>
-                      <span className="font-semibold text-slate-500">
-                        From:
-                      </span>{" "}
-                      {selected.fromModel || "—"}
-                    </p>
-                    <p>
-                      <span className="font-semibold text-slate-500">To:</span>{" "}
-                      {selected.model || "—"}
-                    </p>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="font-mono text-slate-700">
-                    {selected.startTime}
-                  </span>
-                  <span className="text-slate-300">→</span>
-                  <span className="font-mono text-slate-700">
-                    {selected.endTime}
-                  </span>
-                </div>
-                <p
-                  className={`text-sm font-bold mt-1 ${selected._type === "Changeover" ? (selected.isOverrun ? "text-red-600" : "text-amber-600") : "text-rose-600"}`}
-                >
-                  {selected.duration}
-                </p>
-                {selected._type === "Changeover" && selected.isOverrun && (
-                  <p className="text-[10px] text-red-600 font-semibold mt-0.5">
-                    ⏱ Changeover overrun
-                  </p>
-                )}
-              </div>
-              <div>
-                <Lbl>
-                  Downtime Reason
-                  {selected._type !== "Changeover" && (
-                    <span className="text-rose-500"> *</span>
-                  )}
-                  {selected._type === "Changeover" && (
-                    <span className="text-slate-400"> (optional)</span>
-                  )}
-                </Lbl>
-                <select
-                  value={form.reasonId}
-                  onChange={sf("reasonId")}
-                  className={iC}
-                >
-                  <option value="">
-                    {selected._type === "Changeover"
-                      ? "Changeover"
-                      : "Select Reason"}
-                  </option>
-                  {activeReasons.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.reason}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Lbl>Remarks</Lbl>
-                <textarea
-                  value={form.remarks}
-                  onChange={sf("remarks")}
-                  className={`${iC} resize-none h-20`}
-                />
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center flex-1 gap-3 border-2 border-dashed border-slate-200 rounded-xl text-center p-4">
-              <TimerOff className="w-7 h-7 text-slate-300" strokeWidth={1.2} />
-              <p className="text-xs text-slate-400">
-                Select a downtime or changeover event to log
-              </p>
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={!canSave}
+                className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg text-white transition-colors ${!canSave ? "bg-rose-300 cursor-not-allowed" : "bg-rose-600 hover:bg-rose-700"}`}
+              >
+                <Plus className="w-4 h-4" /> Log Entry
+              </button>
             </div>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 shrink-0">
-        <p className="text-[11px] text-slate-400">
-          {selected
-            ? `${selected._type === "Changeover" ? "Changeover" : "Downtime"} · ${selected.srNo} · ${selected.shift || "—"}`
-            : "No event selected"}
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!canSave}
-            className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg text-white transition-colors ${!canSave ? "bg-rose-300 cursor-not-allowed" : "bg-rose-600 hover:bg-rose-700"}`}
-          >
-            <Plus className="w-4 h-4" /> Log Entry
-          </button>
-        </div>
-      </div>
+          </div>
         </>
       ) : (
         /* ── Entry Report tab ── */
@@ -1530,7 +1547,10 @@ const QuickDowntimeForm = ({
                   const isCO = e.isChangeover || e.IsChangeover;
                   const reason = e.reasonName || e.ReasonName;
                   return (
-                    <tr key={i} className="hover:bg-rose-50/30 transition-colors">
+                    <tr
+                      key={i}
+                      className="hover:bg-rose-50/30 transition-colors"
+                    >
                       <td className="px-3 py-2.5 border-b border-slate-100 font-mono text-slate-400">
                         {i + 1}
                       </td>
@@ -1564,9 +1584,13 @@ const QuickDowntimeForm = ({
                       </td>
                       <td className="px-3 py-2.5 border-b border-slate-100">
                         {reason ? (
-                          <span className="text-emerald-700 font-semibold">{reason}</span>
+                          <span className="text-emerald-700 font-semibold">
+                            {reason}
+                          </span>
                         ) : (
-                          <span className="text-amber-500 text-[10px] font-bold">Unassigned</span>
+                          <span className="text-amber-500 text-[10px] font-bold">
+                            Unassigned
+                          </span>
                         )}
                       </td>
                       <td className="px-3 py-2.5 border-b border-slate-100 text-slate-500">
@@ -2036,7 +2060,8 @@ const buildOeeTimeSeries = (
   // relied on detecting a quiet "gap" around midnight, which silently failed
   // — and dropped post-midnight data entirely — whenever production ran
   // continuously through midnight with no detectable gap.)
-  const autoNormalize = (m) => (m !== null && m < earliestShiftStart ? m + 1440 : m);
+  const autoNormalize = (m) =>
+    m !== null && m < earliestShiftStart ? m + 1440 : m;
 
   const hasShiftBounds = shiftStartMins !== null && shiftEndMins !== null;
   const normalize = hasShiftBounds
@@ -2105,13 +2130,13 @@ const buildOeeTimeSeries = (
   // Pre-compute normalised end times for downtime overlap clipping
   const withNormEndAll = withNorm.map((r) => {
     const durMins = parseDurSecs(r.duration) / 60;
-    const rawEnd  = r.endTime ? normalize(timeStrToMins(r.endTime)) : null;
-    return { ...r, _normEnd: rawEnd ?? (r._normStart + durMins) };
+    const rawEnd = r.endTime ? normalize(timeStrToMins(r.endTime)) : null;
+    return { ...r, _normEnd: rawEnd ?? r._normStart + durMins };
   });
 
   for (let t = startBucket + WINDOW; t <= endBucket; t += WINDOW) {
     const wStart = t - WINDOW;
-    const wEnd   = t;
+    const wEnd = t;
     labels.push(`${p2(Math.floor((wStart % 1440) / 60))}:${p2(wStart % 60)}`);
 
     // Records whose start falls in this window (for production counts)
@@ -2136,8 +2161,10 @@ const buildOeeTimeSeries = (
     const dtSecs = anyStarted
       .filter((r) => r.state === "Downtime")
       .reduce((sum, r) => {
-        const overlapMins =
-          Math.max(0, Math.min(wEnd, r._normEnd) - Math.max(wStart, r._normStart));
+        const overlapMins = Math.max(
+          0,
+          Math.min(wEnd, r._normEnd) - Math.max(wStart, r._normStart),
+        );
         return sum + overlapMins * 60;
       }, 0);
 
@@ -2148,7 +2175,7 @@ const buildOeeTimeSeries = (
     );
 
     const prod = inWindow.filter((r) => r.state === "Production");
-    const qty  = prod.reduce((s, r) => s + (r.qty ?? 0), 0);
+    const qty = prod.reduce((s, r) => s + (r.qty ?? 0), 0);
     const good = prod
       .filter((r) => r.quality === "GOOD")
       .reduce((s, r) => s + (r.qty ?? 0), 0);
@@ -2261,7 +2288,7 @@ const PartProcessDashboard = () => {
     if (!latest) return machines.find((m) => m.status) || null;
     const norm = (s) => (s || "").trim().toLowerCase();
     const byAsset = norm(latest.assetName);
-    const byLine  = norm(latest.lineName);
+    const byLine = norm(latest.lineName);
     return (
       machines.find((m) => byAsset && norm(m.machineName) === byAsset) ||
       machines.find((m) => byLine && norm(m.lineName) === byLine) ||
@@ -2275,7 +2302,9 @@ const PartProcessDashboard = () => {
     const fetch = async () => {
       try {
         const [dtRes, qRes] = await Promise.all([
-          axios.get(`${PART_PROCESS_API}/downtime-log`, { withCredentials: true }),
+          axios.get(`${PART_PROCESS_API}/downtime-log`, {
+            withCredentials: true,
+          }),
           axios.get(
             `${PART_PROCESS_API}/quality-log?startDate=${selectedDate}&endDate=${selectedDate}`,
             { withCredentials: true },
@@ -2353,10 +2382,11 @@ const PartProcessDashboard = () => {
   // disappears after refresh. Scope them here, alongside the event records,
   // before they feed any dashboard card or graph.
   const scopedLogEntries = useMemo(() => {
-    const normaliseShift = (value) => String(value || "")
-      .trim()
-      .replace(/\s+/g, " ")
-      .toLowerCase();
+    const normaliseShift = (value) =>
+      String(value || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .toLowerCase();
     const selectedShiftName = normaliseShift(selectedShift?.shiftName);
     const eventIdsInRange = new Set(
       records.map((r) => String(r.eventId ?? r.id)).filter(Boolean),
@@ -2375,7 +2405,11 @@ const PartProcessDashboard = () => {
       const eventId = entry.eventId ?? entry.EventId;
       // Older saved rows may not have EventDate. Keep them only when their
       // linked production event is in the currently loaded range.
-      if (eventDate ? eventDate !== selectedDate : !eventIdsInRange.has(String(eventId))) {
+      if (
+        eventDate
+          ? eventDate !== selectedDate
+          : !eventIdsInRange.has(String(eventId))
+      ) {
         return false;
       }
       if (!selectedShiftName) return true;
@@ -2505,10 +2539,7 @@ const PartProcessDashboard = () => {
     });
 
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
-  }, [
-    scopedDTEntries,
-    downtimeReasons,
-  ]);
+  }, [scopedDTEntries, downtimeReasons]);
 
   const DEPT_COLORS = [
     "#6366f1",
@@ -2550,7 +2581,9 @@ const PartProcessDashboard = () => {
     });
     const accepted = Math.max(0, displayComponentQty - rejected);
     const passRate =
-      displayComponentQty > 0 ? Math.round((accepted / displayComponentQty) * 100) : null;
+      displayComponentQty > 0
+        ? Math.round((accepted / displayComponentQty) * 100)
+        : null;
     return { inspected, rejected, accepted, passRate, hasData: inspected > 0 };
   }, [qualityByModel, displayComponentQty]);
 
@@ -2606,11 +2639,49 @@ const PartProcessDashboard = () => {
   );
   const plannedPartCount = Object.keys(plannedModelMap).length;
 
+  // Real configured shift names — same list PlanningConfig.jsx's shift
+  // dropdown now uses. Needed below to recognise legacy/unmatched Shift
+  // values (e.g. plans saved with the old hardcoded "Shift A/B/C" dropdown,
+  // before it was fixed to use real shift names) as unscoped rather than
+  // excluding them outright.
+  const realShiftNames = useMemo(
+    () => shifts.filter((s) => s.status).map((s) => s.shiftName),
+    [shifts],
+  );
+
+  // Planned Changeovers — distinct models with a Plan for this date (and this
+  // shift, when one's selected) implies that many model switches minus 1.
+  // Same key convention as plannedModelMap so it stays consistent with what
+  // "planned" means elsewhere on this page. Shift matching mirrors
+  // ProductionReport.jsx's consumePlan: an exact shift match is tried first,
+  // falling back to "All Shifts" or any legacy value that isn't a real
+  // configured shift name — otherwise plans tagged with a stale shift value
+  // would never match any shift and always show 0.
+  const plannedChangeoverCount = useMemo(() => {
+    const keys = new Set();
+    plans.forEach((p) => {
+      if (p.planDate !== selectedDate) return;
+      if (p.status === false || p.status === 0) return;
+      if (selectedShift) {
+        const matchesShift = p.shift === selectedShift.shiftName ||
+          p.shift === "All Shifts" ||
+          !realShiftNames.includes(p.shift);
+        if (!matchesShift) return;
+      }
+      const mat = materials.find((m) => m.sapCode === p.sapCode);
+      const key = mat?.partName || p.partName || p.sapCode;
+      if (key) keys.add(key);
+    });
+    return Math.max(0, keys.size - 1);
+  }, [plans, selectedDate, selectedShift, materials, realShiftNames]);
+
   // Model Breakdown shows the union of "actually produced today" and "planned
   // for today" — a freshly-uploaded plan with zero production yet should still
   // show its Target, not wait until the model starts running.
   const modelBreakdownLabels = useMemo(() => {
-    const planOnly = Object.keys(plannedModelMap).filter((k) => !(k in activeModelMap));
+    const planOnly = Object.keys(plannedModelMap).filter(
+      (k) => !(k in activeModelMap),
+    );
     return [...modelLabels, ...planOnly];
   }, [modelLabels, plannedModelMap, activeModelMap]);
 
@@ -2816,7 +2887,9 @@ const PartProcessDashboard = () => {
     <>
       <div className="part-process-dashboard h-full flex flex-col bg-slate-100 overflow-hidden">
         {/* ── STICKY HEADER ── */}
-          <div className={`sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm shrink-0 ${isFullscreen ? "hidden" : ""}`}>
+        <div
+          className={`sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm shrink-0 ${isFullscreen ? "hidden" : ""}`}
+        >
           {loading && loadProgress.total > 0 && (
             <div className="bg-blue-600 shrink-0">
               <div className="flex items-center justify-between px-5 py-1 text-[11px] text-white/80">
@@ -3194,14 +3267,9 @@ const PartProcessDashboard = () => {
                 <div className="flex gap-2 shrink-0">
                   {[
                     {
-                        label: "Qty",
-                        value: displayComponentQty.toLocaleString(),
-                        color: "text-blue-600",
-                      },
-                    {
-                      label: "Good",
-                      value: shiftOEE.good,
-                      color: "text-emerald-600",
+                      label: "Qty",
+                      value: displayComponentQty.toLocaleString(),
+                      color: "text-blue-600",
                     },
                     {
                       label: "Downtime",
@@ -3234,13 +3302,16 @@ const PartProcessDashboard = () => {
               </div>
               <div>
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
-                  {selectedShift ? `${selectedShift.shiftName} Planned Qty` : "Planned Qty"}
+                  {selectedShift
+                    ? `${selectedShift.shiftName} Planned Qty`
+                    : "Planned Qty"}
                 </p>
                 <p className="text-2xl font-bold font-mono text-indigo-600">
                   {totalPlannedQty.toLocaleString()}
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  {plannedPartCount} part{plannedPartCount === 1 ? "" : "s"} planned
+                  {plannedPartCount} part{plannedPartCount === 1 ? "" : "s"}{" "}
+                  planned
                 </p>
               </div>
             </div>
@@ -3257,7 +3328,9 @@ const PartProcessDashboard = () => {
                     {displayComponentQty > 0 && totalPlannedQty > 0
                       ? Math.min(
                           100,
-                          Math.round((displayComponentQty / totalPlannedQty) * 100),
+                          Math.round(
+                            (displayComponentQty / totalPlannedQty) * 100,
+                          ),
                         )
                       : 0}
                     %
@@ -3356,7 +3429,6 @@ const PartProcessDashboard = () => {
                 {qualityTotals.hasData && (
                   <>
                     <div className="w-px h-8 bg-slate-200" />
-
                   </>
                 )}
               </div>
@@ -3437,6 +3509,9 @@ const PartProcessDashboard = () => {
                   </p>
                   <p className="text-[9px] text-amber-500 font-medium">
                     Changeovers
+                  </p>
+                  <p className="text-[9px] text-slate-400 font-medium">
+                    Planned: {plannedChangeoverCount}
                   </p>
                 </div>
               </div>
@@ -3624,16 +3699,20 @@ const PartProcessDashboard = () => {
                   <table className="min-w-full text-[11px] border-separate border-spacing-0">
                     <thead className="sticky top-0 bg-slate-50">
                       <tr>
-                        {["Model", "Target", "Produced", "Accepted", "Rejected"].map(
-                          (h) => (
-                            <th
-                              key={h}
-                              className="px-3 py-2 text-[10px] font-semibold text-slate-400 border-b border-slate-200 text-left whitespace-nowrap"
-                            >
-                              {h}
-                            </th>
-                          ),
-                        )}
+                        {[
+                          "Model",
+                          "Target",
+                          "Produced",
+                          "Accepted",
+                          "Rejected",
+                        ].map((h) => (
+                          <th
+                            key={h}
+                            className="px-3 py-2 text-[10px] font-semibold text-slate-400 border-b border-slate-200 text-left whitespace-nowrap"
+                          >
+                            {h}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
@@ -3677,7 +3756,11 @@ const PartProcessDashboard = () => {
                               </div>
                             </td>
                             <td className="px-3 py-2.5 border-b border-slate-100 font-bold font-mono text-slate-500">
-                              {target > 0 ? target : <span className="text-slate-300">—</span>}
+                              {target > 0 ? (
+                                target
+                              ) : (
+                                <span className="text-slate-300">—</span>
+                              )}
                             </td>
                             <td className="px-3 py-2.5 border-b border-slate-100 font-bold font-mono text-blue-600">
                               {produced}
@@ -3688,7 +3771,8 @@ const PartProcessDashboard = () => {
                             <td
                               className="px-3 py-2.5 border-b border-slate-100 font-bold font-mono"
                               style={{
-                                color: qLog.rejected > 0 ? "#ef4444" : "#22c55e",
+                                color:
+                                  qLog.rejected > 0 ? "#ef4444" : "#22c55e",
                               }}
                             >
                               {qLog.rejected}
@@ -3923,8 +4007,12 @@ const PartProcessDashboard = () => {
                 // Parse "HH:MM" shift times (as they actually applied on
                 // selectedDate, not necessarily today's live config) against
                 // selectedDate in IST.
-                const [sH, sM] = resolvedSelectedShift.startTime.split(":").map(Number);
-                const [eH, eM] = resolvedSelectedShift.endTime.split(":").map(Number);
+                const [sH, sM] = resolvedSelectedShift.startTime
+                  .split(":")
+                  .map(Number);
+                const [eH, eM] = resolvedSelectedShift.endTime
+                  .split(":")
+                  .map(Number);
                 const [yr, mo, dy] = selectedDate.split("-").map(Number);
                 tlWindowStart = istToUtcMs(yr, mo, dy, sH, sM);
                 // End: same date if day shift, next date if overnight
@@ -3937,32 +4025,77 @@ const PartProcessDashboard = () => {
               // break sub-window) each part of the timeline belongs to.
               // Resolved the same way as tlWindowStart/End above — each
               // shift's timing as of selectedDate, not today's live config.
-              const [anchorYr, anchorMo, anchorDy] = selectedDate.split("-").map(Number);
+              const [anchorYr, anchorMo, anchorDy] = selectedDate
+                .split("-")
+                .map(Number);
               const shiftBands = shifts
                 .map((sh) => {
-                  const resolved = resolveShiftAsOf(shiftHistory, sh.id, selectedDate, sh);
+                  const resolved = resolveShiftAsOf(
+                    shiftHistory,
+                    sh.id,
+                    selectedDate,
+                    sh,
+                  );
                   if (!resolved?.startTime || !resolved?.endTime) return null;
                   const [sH, sM] = resolved.startTime.split(":").map(Number);
                   const [eH, eM] = resolved.endTime.split(":").map(Number);
-                  const startMs = istToUtcMs(anchorYr, anchorMo, anchorDy, sH, sM);
+                  const startMs = istToUtcMs(
+                    anchorYr,
+                    anchorMo,
+                    anchorDy,
+                    sH,
+                    sM,
+                  );
                   const isON = eH * 60 + eM <= sH * 60 + sM;
-                  const endMs = istToUtcMs(anchorYr, anchorMo, isON ? anchorDy + 1 : anchorDy, eH, eM);
+                  const endMs = istToUtcMs(
+                    anchorYr,
+                    anchorMo,
+                    isON ? anchorDy + 1 : anchorDy,
+                    eH,
+                    eM,
+                  );
                   let breakStartMs = null;
                   let breakEndMs = null;
                   if (resolved.breakStart && resolved.breakEnd) {
-                    const [bsH, bsM] = resolved.breakStart.split(":").map(Number);
+                    const [bsH, bsM] = resolved.breakStart
+                      .split(":")
+                      .map(Number);
                     const [beH, beM] = resolved.breakEnd.split(":").map(Number);
-                    breakStartMs = istToUtcMs(anchorYr, anchorMo, anchorDy, bsH, bsM);
+                    breakStartMs = istToUtcMs(
+                      anchorYr,
+                      anchorMo,
+                      anchorDy,
+                      bsH,
+                      bsM,
+                    );
                     const breakOn = beH * 60 + beM <= bsH * 60 + bsM;
-                    breakEndMs = istToUtcMs(anchorYr, anchorMo, breakOn ? anchorDy + 1 : anchorDy, beH, beM);
+                    breakEndMs = istToUtcMs(
+                      anchorYr,
+                      anchorMo,
+                      breakOn ? anchorDy + 1 : anchorDy,
+                      beH,
+                      beM,
+                    );
                   }
                   // PartProcessEvents tags break-window records with
                   // ShiftName "Lunch" (Shift 1) / "Dinner" (Shift 2), not a
                   // generic "Break" — match that so the band label agrees
                   // with what the bars/tooltip already call it.
                   const breakName =
-                    sh.shiftName === "Shift 1" ? "Lunch" : sh.shiftName === "Shift 2" ? "Dinner" : "Break";
-                  return { name: sh.shiftName, color: sh.color || "#94a3b8", startMs, endMs, breakName, breakStartMs, breakEndMs };
+                    sh.shiftName === "Shift 1"
+                      ? "Lunch"
+                      : sh.shiftName === "Shift 2"
+                        ? "Dinner"
+                        : "Break";
+                  return {
+                    name: sh.shiftName,
+                    color: sh.color || "#94a3b8",
+                    startMs,
+                    endMs,
+                    breakName,
+                    breakStartMs,
+                    breakEndMs,
+                  };
                 })
                 .filter(Boolean);
 
@@ -4349,9 +4482,12 @@ const PartProcessDashboard = () => {
                     withCredentials: true,
                   });
                   toast.success("Downtime logged.");
-                  const r = await axios.get(`${PART_PROCESS_API}/downtime-log`, {
-                    withCredentials: true,
-                  });
+                  const r = await axios.get(
+                    `${PART_PROCESS_API}/downtime-log`,
+                    {
+                      withCredentials: true,
+                    },
+                  );
                   setDbDTLogs(r.data?.data ?? []);
                 } catch (err) {
                   console.error("[Dashboard] downtime-log save:", err.message);

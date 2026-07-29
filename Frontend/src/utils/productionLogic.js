@@ -175,6 +175,42 @@ export const detectChangeovers = (records, stdMins = STD_CHANGEOVER_MINS, shiftS
 
   prod.sort((a, b) => normalize(toDecimalMins(a.startTime)) - normalize(toDecimalMins(b.startTime)));
 
+  // ── Scheduled break intervals (Shift Break — lunch/dinner/shift-over) ──────
+  // Wall-clock time already explained by a scheduled break must not ALSO be
+  // counted as changeover time — otherwise a model switch that happens to
+  // span a lunch/dinner break gets that same span counted TWICE: once as the
+  // break, again as changeover overrun. Deliberately does NOT include generic
+  // machine Downtime/Idle — a breakdown that occurs mid-changeover is real
+  // changeover-blocking time (the new model genuinely wasn't set up and
+  // running yet), so it stays counted as changeover, not netted out.
+  // Raw break logs for this line frequently nest a coarse gap-filler record
+  // around several finer-grained sub-records covering the same span, so the
+  // intervals are merged into a non-overlapping union first — summing each
+  // record's overlap independently would double/triple-count the overlapping
+  // portions.
+  const mergeIntervals = (intervals) => {
+    const sorted = [...intervals].sort((a, b) => a.start - b.start);
+    const merged = [];
+    for (const iv of sorted) {
+      const last = merged[merged.length - 1];
+      if (last && iv.start <= last.end) last.end = Math.max(last.end, iv.end);
+      else merged.push({ ...iv });
+    }
+    return merged;
+  };
+  const stoppages = mergeIntervals(
+    records
+      .filter(r => r.state === "Shift Break" && r.startTime)
+      .map(r => {
+        const s = normalize(toDecimalMins(r.startTime));
+        let e = normalize(toDecimalMins(r.endTime || r.startTime));
+        if (e < s) e += 1440;
+        return { start: s, end: e };
+      }),
+  );
+  const overlapMins = (aStart, aEnd, bStart, bEnd) =>
+    Math.max(0, Math.min(aEnd, bEnd) - Math.max(aStart, bStart));
+
   const changeovers = [];
   let prevModel   = null;
   let prevEndMins = null;  // already normalised
@@ -195,8 +231,16 @@ export const detectChangeovers = (records, stdMins = STD_CHANGEOVER_MINS, shiftS
       // ran backwards. Clamp to a zero-width marker at the new model's
       // actual start instead of stretching back to the bad timestamp.
       const gapMins = Math.max(0, rawGapMins);
-      const overrunMins = Math.max(0, gapMins - stdMins);
       const coStartMins = rawGapMins < 0 ? startMins : (prevEndMins ?? startMins);
+
+      // Net out any logged downtime/idle/break time inside this gap — the
+      // remainder is the actual changeover (tooling/setup) time.
+      const coveredMins = stoppages.reduce(
+        (sum, s) => sum + overlapMins(coStartMins, startMins, s.start, s.end),
+        0,
+      );
+      const netGapMins = Math.max(0, gapMins - coveredMins);
+      const overrunMins = Math.max(0, netGapMins - stdMins);
 
       changeovers.push({
         fromModel:    prevModel,
@@ -204,10 +248,10 @@ export const detectChangeovers = (records, stdMins = STD_CHANGEOVER_MINS, shiftS
         shift:        r.shift || prevShift || null,
         startMins:    coStartMins,          // normalised (may be > 1440 for overnight)
         endMins:      startMins,
-        durationMins: Math.round(gapMins * 10) / 10,
+        durationMins: Math.round(netGapMins * 10) / 10,
         stdMins,
         overrunMins:  Math.round(overrunMins * 10) / 10,
-        isOverrun:    gapMins > stdMins,
+        isOverrun:    netGapMins > stdMins,
         startTime:    fmtMins(coStartMins),
         endTime:      fmtMins(startMins),
       });
