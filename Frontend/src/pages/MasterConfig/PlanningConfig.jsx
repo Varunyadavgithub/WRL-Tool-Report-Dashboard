@@ -3,11 +3,15 @@ import { useSelector } from "react-redux";
 import * as XLSX from "xlsx";
 import {
   CalendarRange, Upload, Download, Trash2,
-  CheckCircle2, AlertTriangle, FileSpreadsheet, Info, Loader2, X,
+  CheckCircle2, AlertTriangle, FileSpreadsheet, Info, Loader2, X, Gauge,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { inputCls, selectCls, Field, Modal, TableActions, PageHeader, EmptyState, TH, TD } from "./_shared";
-import { selectPlans, selectShifts } from "../../redux/slices/masterConfigSlice";
+import {
+  selectPlans, selectShifts, selectMachines, selectMaterials,
+  selectMachineShiftAllocationHistory, selectShiftHistory, shiftPlannedProductionMins,
+} from "../../redux/slices/masterConfigSlice";
+import { resolveMachineShiftsAsOf, resolveShiftAsOf } from "../../utils/productionLogic";
 import {
   useAddPlanMutation, useUpdatePlanMutation, useDeletePlanMutation, useBulkAddPlansMutation,
 } from "../../redux/api/masterConfigApi";
@@ -21,7 +25,7 @@ yesterday.setDate(yesterday.getDate() - 1);
 const TODAY_STR = fmtDate(today);
 const YESTERDAY_STR = fmtDate(yesterday);
 
-const INIT = { machineName:"", sapCode:"", partName:"", modelCode:"", targetQty:"", shift:"All Shifts", planDate: fmtDate(today), priority:"Medium", customer:"", plannedCycleTime:"" };
+const INIT = { machineName:"", sapCode:"", partName:"", modelCode:"", targetQty:"", shift:"All Shifts", planDate: fmtDate(today), priority:"Medium", customer:"" };
 
 const PriorityBadge = ({ p }) => {
   const c = { High:"bg-rose-50 text-rose-700 border-rose-200", Medium:"bg-amber-50 text-amber-700 border-amber-200", Low:"bg-slate-100 text-slate-600 border-slate-200" };
@@ -39,7 +43,6 @@ const COLUMN_ALIASES = {
   planDate:         ["plan date","production date","date"],
   priority:         ["priority"],
   customer:         ["customer","client"],
-  plannedCycleTime: ["planned cycle time","cycle time","ct (s)","ct(s)","cycle time (s)"],
 };
 
 const ALIAS_PAIRS = Object.entries(COLUMN_ALIASES)
@@ -93,10 +96,10 @@ const normalizeDate = (val) => {
 const FIELD_LABELS = {
   machineName: "Machine Name *", sapCode: "SAP Code *", partName: "Part Name", modelCode: "Model Code",
   targetQty: "Target Qty *", shift: "Shift", planDate: "Plan Date *",
-  priority: "Priority", customer: "Customer", plannedCycleTime: "Planned Cycle Time (s)",
+  priority: "Priority", customer: "Customer",
 };
 
-const NUM_FIELDS = ["targetQty", "plannedCycleTime"];
+const NUM_FIELDS = ["targetQty"];
 
 /* ── Bulk Upload Modal ───────────────────────────────────────────────────── */
 const BulkUploadModal = ({ onClose, onImport }) => {
@@ -230,7 +233,7 @@ const BulkUploadModal = ({ onClose, onImport }) => {
                   <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wide">Expected Columns</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {["Machine Name","SAP Code","Part Name","Model Code","Target Qty","Shift","Plan Date","Priority","Customer","Planned Cycle Time (s)"].map((c) => (
+                  {["Machine Name","SAP Code","Part Name","Model Code","Target Qty","Shift","Plan Date","Priority","Customer"].map((c) => (
                     <span key={c} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{c}</span>
                   ))}
                 </div>
@@ -358,10 +361,10 @@ const BulkUploadModal = ({ onClose, onImport }) => {
 };
 
 /* ── Export helpers ──────────────────────────────────────────────────────── */
-const EXPORT_HEADERS = ["Machine Name","SAP Code","Part Name","Model Code","Target Qty","Shift","Plan Date","Priority","Customer","Planned Cycle Time (s)"];
+const EXPORT_HEADERS = ["Machine Name","SAP Code","Part Name","Model Code","Target Qty","Shift","Plan Date","Priority","Customer"];
 
 const downloadTemplate = () => {
-  const sample = [["Bending Machine 1","1127024","D-UNIT FRAME D150H","D150H","480","Shift A",fmtDate(today),"Medium","Whirlpool","45"]];
+  const sample = [["Bending Machine 1","1127024","D-UNIT FRAME D150H","D150H","480","Shift A",fmtDate(today),"Medium","Whirlpool"]];
   const ws = XLSX.utils.aoa_to_sheet([EXPORT_HEADERS, ...sample]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Plan");
@@ -371,12 +374,136 @@ const downloadTemplate = () => {
 const exportData = (data) => {
   const rows = data.map((r) => [
     r.machineName, r.sapCode, r.partName || "", r.modelCode || "", r.targetQty,
-    r.shift, r.planDate, r.priority, r.customer || "", r.plannedCycleTime || "",
+    r.shift, r.planDate, r.priority, r.customer || "",
   ]);
   const ws = XLSX.utils.aoa_to_sheet([EXPORT_HEADERS, ...rows]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Plan");
   XLSX.writeFile(wb, "production_plan.xlsx");
+};
+
+/* ── Machine Load panel ──────────────────────────────────────────────────────
+   Aggregates plans per Machine + Plan Date: required time (Target Qty ×
+   Material Config's Defined Component Cycle Time, looked up by SapCode) vs.
+   available production time (from that machine's assigned shift(s), resolved
+   as-of the plan date via the same resolveMachineShiftsAsOf/resolveShiftAsOf
+   history used by OEE reporting). Plans whose SapCode has no Defined
+   Component Cycle Time configured can't contribute a required-time figure
+   and are called out separately rather than silently ignored. */
+const loadBadgeCls = (pct) => {
+  if (pct == null) return "bg-slate-100 text-slate-500 border-slate-200";
+  if (pct > 100) return "bg-rose-50 text-rose-700 border-rose-200";
+  if (pct >= 80) return "bg-amber-50 text-amber-700 border-amber-200";
+  return "bg-emerald-50 text-emerald-700 border-emerald-200";
+};
+
+const MachineLoadPanel = ({ plans, machines, shifts, machineShiftAllocationHistory, shiftHistory, materials }) => {
+  const rows = useMemo(() => {
+    const groups = {};
+    const getGroup = (r) => {
+      const key = `${r.machineName}|${r.planDate}`;
+      if (!groups[key]) {
+        groups[key] = {
+          key, machineName: r.machineName, planDate: r.planDate,
+          requiredMins: 0, planCount: 0, skippedCount: 0,
+        };
+      }
+      return groups[key];
+    };
+
+    plans.forEach((r) => {
+      const g = getGroup(r);
+      const cycleSecs = Number(materials.find((m) => m.sapCode === r.sapCode)?.definedComponentCycleTime);
+      if (cycleSecs > 0) {
+        g.requiredMins += (Number(r.targetQty || 0) * cycleSecs) / 60;
+        g.planCount += 1;
+      } else {
+        g.skippedCount += 1;
+      }
+    });
+
+    return Object.values(groups).map((g) => {
+      const machine = machines.find(
+        (m) => m.machineName?.trim().toLowerCase() === g.machineName?.trim().toLowerCase(),
+      );
+
+      let availableMins = 0;
+      const shiftNames = [];
+      if (machine) {
+        const shiftIds = resolveMachineShiftsAsOf(machineShiftAllocationHistory, machine.id, g.planDate);
+        shiftIds.forEach((shiftId) => {
+          const fallback = shifts.find((s) => s.id === shiftId);
+          const shiftCfg = resolveShiftAsOf(shiftHistory, shiftId, g.planDate, fallback);
+          if (shiftCfg) {
+            availableMins += shiftPlannedProductionMins(shiftCfg);
+            shiftNames.push(shiftCfg.shiftName || fallback?.shiftName || "Shift");
+          }
+        });
+      }
+
+      const loadPct = availableMins > 0 ? Math.round((g.requiredMins / availableMins) * 1000) / 10 : null;
+
+      return {
+        ...g,
+        machineFound: !!machine,
+        requiredMins: Math.round(g.requiredMins),
+        availableMins: Math.round(availableMins),
+        loadPct,
+        shiftNames,
+      };
+    }).sort((a, b) => (b.loadPct ?? -1) - (a.loadPct ?? -1));
+  }, [plans, machines, shifts, machineShiftAllocationHistory, shiftHistory, materials]);
+
+  if (!rows.length) return null;
+
+  const fmtHrs = (mins) => `${(mins / 60).toFixed(1)}h`;
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-3">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100">
+        <Gauge className="w-4 h-4 text-blue-500" />
+        <span className="text-xs font-bold text-slate-700">Planned Machine Load</span>
+        <span className="text-[11px] text-slate-400">Required time vs. available shift time, per machine/date</span>
+      </div>
+      <div className="overflow-auto max-h-64">
+        <table className="min-w-full border-separate border-spacing-0">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-slate-50">
+              <TH>Machine</TH><TH center>Date</TH><TH>Shift(s)</TH>
+              <TH center>Required</TH><TH center>Available</TH><TH center>Load</TH>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key} className="hover:bg-blue-50/40 transition-colors even:bg-slate-50/30">
+                <TD cls="font-medium text-slate-700 whitespace-nowrap">{r.machineName}</TD>
+                <TD center mono cls="text-slate-500">{r.planDate}</TD>
+                <TD cls="text-slate-500 text-[11px]">
+                  {!r.machineFound ? (
+                    <span className="text-amber-600">No machine match</span>
+                  ) : r.shiftNames.length ? r.shiftNames.join(", ") : (
+                    <span className="text-amber-600">No shift assigned</span>
+                  )}
+                </TD>
+                <TD center cls="font-mono text-slate-600">
+                  {fmtHrs(r.requiredMins)}
+                  {r.skippedCount > 0 && (
+                    <span className="text-amber-500" title={`${r.skippedCount} plan(s) skipped — no Defined Component Cycle Time set in Material Config`}> *</span>
+                  )}
+                </TD>
+                <TD center cls="font-mono text-slate-600">{r.availableMins > 0 ? fmtHrs(r.availableMins) : "—"}</TD>
+                <TD center>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${loadBadgeCls(r.loadPct)}`}>
+                    {r.loadPct != null ? `${r.loadPct}%` : "—"}
+                  </span>
+                </TD>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 };
 
 /* ── Main page ────────────────────────────────────────────────────────────── */
@@ -392,6 +519,10 @@ const PlanningConfig = () => {
     () => ["All Shifts", ...shifts.filter((s) => s.status).map((s) => s.shiftName)],
     [shifts],
   );
+  const machines = useSelector(selectMachines);
+  const materials = useSelector(selectMaterials);
+  const machineShiftAllocationHistory = useSelector(selectMachineShiftAllocationHistory);
+  const shiftHistory = useSelector(selectShiftHistory);
   const [addPlan]      = useAddPlanMutation();
   const [updatePlan]   = useUpdatePlanMutation();
   const [deletePlan]   = useDeletePlanMutation();
@@ -405,13 +536,19 @@ const PlanningConfig = () => {
   const [dateFilter, setDateFilter] = useState(TODAY_STR);
   const [showBulk, setShowBulk] = useState(false);
 
+  // Date-only scope (no text search) — Machine Load reflects the whole day's
+  // plan set for a machine, not whatever the user currently has typed into
+  // the plan-table search box.
+  const dateScoped = useMemo(() =>
+    data.filter((r) => !dateFilter || r.planDate === dateFilter),
+    [data, dateFilter]);
+
   const filtered = useMemo(() =>
-    data.filter((r) =>
-      (!dateFilter || r.planDate === dateFilter) &&
+    dateScoped.filter((r) =>
       (r.machineName.toLowerCase().includes(search.toLowerCase()) ||
        r.sapCode.includes(search) ||
        (r.partName || "").toLowerCase().includes(search.toLowerCase()))
-    ), [data, search, dateFilter]);
+    ), [dateScoped, search]);
 
   const openAdd  = () => { setForm(INIT); setModal({ open:true, mode:"add" }); };
   const openEdit = (row) => { setForm({ ...row }); setModal({ open:true, mode:"edit", row }); };
@@ -496,6 +633,15 @@ const PlanningConfig = () => {
           </div>
         </div>
 
+        <MachineLoadPanel
+          plans={dateScoped}
+          machines={machines}
+          shifts={shifts}
+          machineShiftAllocationHistory={machineShiftAllocationHistory}
+          shiftHistory={shiftHistory}
+          materials={materials}
+        />
+
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="overflow-auto">
             <table className="min-w-full border-separate border-spacing-0">
@@ -535,7 +681,6 @@ const PlanningConfig = () => {
             <Field label="Part Name"><input value={form.partName} onChange={sf("partName")} placeholder="e.g. D-UNIT FRAME D150H" className={inputCls} /></Field>
             <Field label="Model Code"><input value={form.modelCode} onChange={sf("modelCode")} placeholder="e.g. D150H" className={inputCls} /></Field>
             <Field label="Target Quantity" required><input type="number" value={form.targetQty} onChange={sf("targetQty")} placeholder="e.g. 480" className={inputCls} min={1} /></Field>
-            <Field label="Planned Cycle Time (s)"><input type="number" value={form.plannedCycleTime} onChange={sf("plannedCycleTime")} placeholder="e.g. 45" className={inputCls} min={1} /></Field>
             <Field label="Shift">
               <select value={form.shift} onChange={sf("shift")} className={selectCls}>{shiftOptions.map((s) => <option key={s}>{s}</option>)}</select>
             </Field>

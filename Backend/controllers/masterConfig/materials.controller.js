@@ -4,6 +4,7 @@ import path from "path";
 import sql from "mssql";
 import { UPLOADS_DIR } from "../../utils/storage/config.js";
 import { numOrNull, strOrNull, toBit } from "./helpers.js";
+import { extractProgramName, getMaterialByModel, parseDurSecs } from "../../utils/productionLogic.js";
 
 const MATERIAL_SELECT = `
   SELECT
@@ -13,6 +14,8 @@ const MATERIAL_SELECT = `
     ComponentWeight AS componentWeight, ScrapWeight AS scrapWeight,
     NoOfSheet AS noOfSheet, ActualComponentsPerSheet AS actualComponentsPerSheet,
     PncLoadingUnloading AS pncLoadingUnloading, DefinedComponentCycleTime AS definedComponentCycleTime,
+    ActualComponentCycleTime AS actualComponentCycleTime, ActualCTUpdatedAt AS actualCTUpdatedAt,
+    ActualCTSampleCount AS actualCTSampleCount,
     DrawingNumber AS drawingNumber, DrawingRevision AS drawingRevision,
     DrawingPath AS drawingPath, Status AS status
   FROM MaterialConfigs`;
@@ -269,6 +272,96 @@ export const bulkUpsertMaterials = async (req, res) => {
 
     const all = await global.pool3.request().query(`${MATERIAL_SELECT} ORDER BY Id`);
     res.json({ success: true, inserted, updated, data: all.recordset });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * Recalculate ActualComponentCycleTime for every SAP code from real
+ * PartProcessEvents production history — a one-time/on-demand backfill
+ * triggered from the Material Config page, not an automatic sync.
+ *
+ * Same formula as the shift-end report's componentCycleTime (see
+ * aggregateRecords in productionLogic.js): for punching parts,
+ * (avg machine cycle secs + load/unload allowance) spread across every
+ * component produced per machine cycle; for non-punching parts, just the
+ * average machine cycle time itself (mirrors that function's sheetCycleTime
+ * fallback) so every SAP code with matching samples gets a value, not just
+ * punching parts.
+ *
+ * Matching a PartProcessEvents row to a SAP code has no direct FK — it goes
+ * through the same barcode-parsing heuristic (extractProgramName +
+ * getMaterialByModel) already used for shift OEE, so results here stay
+ * consistent with what the Production Report / shift emails show.
+ */
+export const recalculateActualCycleTime = async (req, res) => {
+  try {
+    const materialsResult = await global.pool3.request().query(`
+      SELECT SapCode AS sapCode, PncLoadingUnloading AS pncLoadingUnloading,
+             ActualComponentsPerSheet AS actualComponentsPerSheet, NoOfSheet AS noOfSheet
+      FROM MaterialConfigs
+    `);
+    const materials = materialsResult.recordset;
+
+    const eventsResult = await global.pool3.request().query(`
+      SELECT Barcode, Duration, PartsQty
+      FROM PartProcessEvents
+      WHERE Status = 1 AND EventType = 'Production'
+        AND PartsQty > 0 AND Duration IS NOT NULL AND Duration <> '00:00:00'
+    `);
+    const events = eventsResult.recordset;
+
+    const cycleSecsBySapCode = {};
+    let unmatchedEvents = 0;
+
+    for (const ev of events) {
+      const programName = extractProgramName(ev.Barcode);
+      const mat = getMaterialByModel(materials, programName);
+      if (!mat) { unmatchedEvents++; continue; }
+
+      const secs = parseDurSecs(ev.Duration);
+      if (secs <= 0) continue;
+
+      (cycleSecsBySapCode[mat.sapCode] ??= []).push(secs);
+    }
+
+    let updated = 0;
+    for (const mat of materials) {
+      const samples = cycleSecsBySapCode[mat.sapCode];
+      if (!samples?.length) continue;
+
+      const avgCycleSecs = samples.reduce((a, b) => a + b, 0) / samples.length;
+      const compPerSheet = Number(mat.actualComponentsPerSheet) || 0;
+      const noOfSheet    = Number(mat.noOfSheet) || 0;
+      const loadUnload   = Number(mat.pncLoadingUnloading) || 0;
+      const isPunching   = compPerSheet > 0 && noOfSheet > 0;
+
+      const actualCT = isPunching
+        ? ((avgCycleSecs + loadUnload) / (compPerSheet * noOfSheet))
+        : avgCycleSecs;
+
+      await global.pool3.request()
+        .input("sapCode",       sql.NVarChar(50),  mat.sapCode)
+        .input("actualCT",      sql.Decimal(12, 3), Math.round(actualCT * 100) / 100)
+        .input("sampleCount",   sql.Int,            samples.length)
+        .query(`
+          UPDATE MaterialConfigs
+          SET ActualComponentCycleTime = @actualCT,
+              ActualCTSampleCount      = @sampleCount,
+              ActualCTUpdatedAt        = GETDATE()
+          WHERE SapCode = @sapCode
+        `);
+      updated++;
+    }
+
+    res.json({
+      success: true,
+      updated,
+      totalMaterials: materials.length,
+      totalEvents: events.length,
+      unmatchedEvents,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
