@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 import {
   Package2, Upload, Download, Eye, Trash2,
   CheckCircle2, AlertTriangle, FileSpreadsheet,
-  Info, Loader2, X,
+  Info, Loader2, X, RefreshCw,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -14,7 +14,7 @@ import {
 import { selectMaterials, updateMaterial as updateMaterialSlice } from "../../redux/slices/masterConfigSlice";
 import {
   useAddMaterialMutation, useUpdateMaterialMutation, useDeleteMaterialMutation, useBulkAddMaterialsMutation,
-  useUploadMaterialDrawingMutation, useDeleteMaterialDrawingMutation,
+  useUploadMaterialDrawingMutation, useDeleteMaterialDrawingMutation, useRecalculateActualCycleTimeMutation,
 } from "../../redux/api/masterConfigApi";
 import { fileBaseURL } from "../../assets/assets";
 
@@ -434,12 +434,14 @@ const EXPORT_HEADERS = [
   "SAP Code","Description","Category","Sheet SAP Code","Sheet Description",
   "Length","Width","THK","Weight","Component Weight","Scrap Weight",
   "No of Sheet","No of Component per Sheet","Loading/Unloading Time","Defined Component Cycle Time (Secs)",
-  "Drawing No.","Rev.",
+  "Actual CT (Secs)","Drawing No.","Rev.",
 ];
 
 const downloadTemplate = () => {
   // No of Sheet left blank below to demonstrate the THK auto-fill / default-1 behaviour.
-  const sample = [["1124700","PC OUTER REAR NWHD70H1-HC WHITE_0108171","PC WHITE","1108171","PC WHITE SHEET 536X460","536","460","0.40","0.78","0.826","0.061","","2","15","25.00","",""]];
+  // Actual CT is a derived, read-only field (populated by "Recalculate Actual CT"),
+  // not something to fill in on import — left blank in the template.
+  const sample = [["1124700","PC OUTER REAR NWHD70H1-HC WHITE_0108171","PC WHITE","1108171","PC WHITE SHEET 536X460","536","460","0.40","0.78","0.826","0.061","","2","15","25.00","","",""]];
   const ws = XLSX.utils.aoa_to_sheet([EXPORT_HEADERS, ...sample]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Materials");
@@ -453,6 +455,7 @@ const exportData = (data) => {
     r.weight || "", r.componentWeight || "", r.scrapWeight || "",
     r.noOfSheet || "", r.actualComponentsPerSheet || "", r.pncLoadingUnloading || "",
     r.definedComponentCycleTime ? round2(+r.definedComponentCycleTime) : "",
+    r.actualComponentCycleTime ? round2(+r.actualComponentCycleTime) : "",
     r.drawingNumber, r.drawingRevision,
   ]);
   const ws = XLSX.utils.aoa_to_sheet([EXPORT_HEADERS, ...rows]);
@@ -468,6 +471,7 @@ const MaterialConfig = () => {
   const [updateMaterial]   = useUpdateMaterialMutation();
   const [deleteMaterial]   = useDeleteMaterialMutation();
   const [bulkAddMaterials] = useBulkAddMaterialsMutation();
+  const [recalculateActualCT, { isLoading: recalculating }] = useRecalculateActualCycleTimeMutation();
 
   const dispatch = useDispatch();
   const [uploadDrawing, { isLoading: drawingUploading }] = useUploadMaterialDrawingMutation();
@@ -555,6 +559,17 @@ const MaterialConfig = () => {
     }
   };
 
+  const handleRecalculateActualCT = async () => {
+    try {
+      const res = await recalculateActualCT().unwrap();
+      toast.success(
+        `Actual CT updated for ${res.updated} of ${res.totalMaterials} materials, from ${res.totalEvents.toLocaleString()} production events.`,
+      );
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to recalculate Actual CT.");
+    }
+  };
+
   const sf = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
 
   // THK drives the "No of Sheet" default until the user manually edits No of Sheet.
@@ -598,6 +613,15 @@ const MaterialConfig = () => {
             <Download className="w-3.5 h-3.5" /> Export Data
           </button>
           <button
+            onClick={handleRecalculateActualCT}
+            disabled={recalculating}
+            title="Recompute Actual CT for every SAP code from PartProcessEvents production history"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-emerald-200 bg-white hover:bg-emerald-50 text-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${recalculating ? "animate-spin" : ""}`} />
+            {recalculating ? "Recalculating…" : "Recalculate Actual CT"}
+          </button>
+          <button
             onClick={() => setConfirmClear(true)}
             disabled={!data.length}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-rose-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -629,6 +653,7 @@ const MaterialConfig = () => {
                   <TH center>No of Component per Sheet</TH>
                   <TH center>Loading/Unloading Time</TH>
                   <TH center>Defined Component Cycle Time (Secs)</TH>
+                  <TH center>Actual CT (Secs)</TH>
                   <TH>Drawing No.</TH>
                   <TH>Rev.</TH>
                   <TH center>Drawing File</TH>
@@ -654,6 +679,13 @@ const MaterialConfig = () => {
                     <TD center cls="font-mono font-bold text-slate-700">{r.actualComponentsPerSheet || "—"}</TD>
                     <TD center cls="font-mono text-amber-600">{r.pncLoadingUnloading || "—"}</TD>
                     <TD center cls="font-mono font-bold text-rose-600">{r.definedComponentCycleTime ? `${round2(+r.definedComponentCycleTime)}s` : "—"}</TD>
+                    <TD center cls="font-mono font-bold text-emerald-600">
+                      {r.actualComponentCycleTime ? (
+                        <span title={`${r.actualCTSampleCount ?? 0} samples${r.actualCTUpdatedAt ? ` · updated ${new Date(r.actualCTUpdatedAt).toLocaleDateString("en-IN")}` : ""}`}>
+                          {round2(+r.actualComponentCycleTime)}s
+                        </span>
+                      ) : "—"}
+                    </TD>
                     <TD mono cls="text-slate-500">{r.drawingNumber}</TD>
                     <TD>
                       {r.drawingRevision && (

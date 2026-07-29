@@ -656,7 +656,7 @@ const ComponentTraceabilityReport = () => {
             <div className="min-w-[190px] flex-1">
               <SelectField
                 label="Model Variant"
-                options={variants}
+                options={[{ value: "", label: "All Models" }, ...variants]}
                 value={selectedModelVariant?.value || ""}
                 onChange={(e) =>
                   handleFilterChange(setSelectedModelVariant)(
@@ -668,7 +668,7 @@ const ComponentTraceabilityReport = () => {
             <div className="min-w-[190px] flex-1">
               <SelectField
                 label="Component Type"
-                options={compTypes}
+                options={[{ value: "", label: "All Types" }, ...compTypes]}
                 value={selectedCompType?.value || ""}
                 onChange={(e) =>
                   handleFilterChange(setSelectedCompType)(

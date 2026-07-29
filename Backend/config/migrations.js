@@ -523,7 +523,6 @@ export const runMigrations = async (pool3) => {
         PlanDate           DATE           NOT NULL,
         Priority           NVARCHAR(20)   NOT NULL DEFAULT 'Medium',
         Customer           NVARCHAR(200)  NULL,
-        PlannedCycleTime   DECIMAL(12,3)  NULL,
         Status             BIT            NOT NULL DEFAULT 1,
         CreatedAt          DATETIME       NOT NULL DEFAULT GETDATE(),
         UpdatedAt          DATETIME       NOT NULL DEFAULT GETDATE(),
@@ -531,6 +530,23 @@ export const runMigrations = async (pool3) => {
       );
       CREATE INDEX IX_ProductionPlan_SapDate ON ProductionPlans (SapCode, PlanDate);
       PRINT 'Migration: Created ProductionPlans table';
+    END
+  `);
+
+  // ── ProductionPlans: drop PlannedCycleTime — MaterialConfigs.
+  //    DefinedComponentCycleTime (looked up by SapCode) is now the single
+  //    source of truth for cycle time, instead of duplicating/re-entering it
+  //    per plan. Every existing plan's SapCode already has a
+  //    DefinedComponentCycleTime configured, so this is not a data-coverage
+  //    regression.
+  await pool3.request().query(`
+    IF EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'ProductionPlans' AND COLUMN_NAME = 'PlannedCycleTime'
+    )
+    BEGIN
+      ALTER TABLE ProductionPlans DROP COLUMN PlannedCycleTime;
+      PRINT 'Migration: Dropped PlannedCycleTime column from ProductionPlans';
     END
   `);
 
@@ -879,6 +895,27 @@ export const runMigrations = async (pool3) => {
       PRINT 'Migration: Created ShiftConfigHistory table (+ Shift 1 backdated correction)';
     END
   `);
+
+  // ── MaterialConfigs: Actual Component Cycle Time (computed from real
+  //    PartProcessEvents production data, alongside the existing manually-
+  //    entered DefinedComponentCycleTime) ───────────────────────────────────
+  for (const col of [
+    { name: "ActualComponentCycleTime", def: "DECIMAL(12,3) NULL" },
+    { name: "ActualCTUpdatedAt",        def: "DATETIME      NULL" },
+    { name: "ActualCTSampleCount",      def: "INT           NULL" },
+  ]) {
+    await pool3.request().query(`
+      IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'MaterialConfigs')
+      AND NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = 'MaterialConfigs' AND COLUMN_NAME = '${col.name}'
+      )
+      BEGIN
+        ALTER TABLE MaterialConfigs ADD ${col.name} ${col.def};
+        PRINT 'Migration: Added ${col.name} column to MaterialConfigs';
+      END
+    `);
+  }
 
   // ── MachineShiftAllocations / MachineShiftAllocationHistory ──────────────
   // Which shift(s) a machine is assigned to (some machines run a single 10h

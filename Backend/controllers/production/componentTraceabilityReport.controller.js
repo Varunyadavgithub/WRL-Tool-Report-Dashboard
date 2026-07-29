@@ -76,7 +76,6 @@ const BASE_CTE = `
       FROM   ProcessInputBOM a
       INNER JOIN BOMInputAltMaterial b
           ON  a.RowID   = b.RowID
-          AND a.BOMCode = b.BOMCode
   ),
   FGActivity AS (
       SELECT * FROM (
