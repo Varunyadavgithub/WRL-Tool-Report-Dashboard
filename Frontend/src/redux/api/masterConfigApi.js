@@ -28,6 +28,10 @@ export const masterConfigApi = createApi({
       query: (materials) => ({ url: "master-config/materials/bulk", method: "POST", body: { materials } }),
       invalidatesTags: ["Material"],
     }),
+    recalculateActualCycleTime: builder.mutation({
+      query: () => ({ url: "master-config/materials/recalculate-actual-ct", method: "POST" }),
+      invalidatesTags: ["Material"],
+    }),
 
     // ── Shifts ───────────────────────────────────────────────────────────────
     getShifts: builder.query({
@@ -247,6 +251,7 @@ export const masterConfigApi = createApi({
 
 export const {
   useGetMaterialsQuery, useAddMaterialMutation, useUpdateMaterialMutation, useDeleteMaterialMutation, useBulkAddMaterialsMutation,
+  useRecalculateActualCycleTimeMutation,
   useUploadMaterialDrawingMutation, useDeleteMaterialDrawingMutation,
   useGetShiftsQuery, useGetShiftHistoryQuery, useAddShiftMutation, useUpdateShiftMutation, useDeleteShiftMutation,
   useGetMachineShiftAllocationsQuery, useGetMachineShiftAllocationHistoryQuery, useSetMachineShiftAllocationsMutation,

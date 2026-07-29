@@ -3,11 +3,15 @@ import sql from "mssql";
 import { numOrNull, strOrNull, toBit } from "./helpers.js";
 
 // ── Production Plans ─────────────────────────────────────────────────────────
+// Cycle time is no longer stored per-plan (PlannedCycleTime column removed) —
+// Material Config's DefinedComponentCycleTime is the single source of truth
+// now, looked up by SapCode client-side (Frontend already has the full
+// Materials list loaded via useSyncMasterConfig).
 const PLAN_SELECT = `
   SELECT
     Id AS id, MachineName AS machineName, SapCode AS sapCode, PartName AS partName, ModelCode AS modelCode,
     TargetQty AS targetQty, Shift AS shift, CONVERT(varchar(10), PlanDate, 23) AS planDate,
-    Priority AS priority, Customer AS customer, PlannedCycleTime AS plannedCycleTime, Status AS status
+    Priority AS priority, Customer AS customer, Status AS status
   FROM ProductionPlans`;
 
 export const getPlans = async (req, res) => {
@@ -36,19 +40,18 @@ export const createPlan = async (req, res) => {
       .input("planDate",         sql.Date, p.planDate)
       .input("priority",         sql.NVarChar(20),  p.priority || "Medium")
       .input("customer",         sql.NVarChar(200), strOrNull(p.customer))
-      .input("plannedCycleTime", sql.Decimal(12, 3), numOrNull(p.plannedCycleTime))
       .input("status",           sql.Bit, toBit(p.status ?? true))
       .query(`
         INSERT INTO ProductionPlans (
-          MachineName, SapCode, PartName, ModelCode, TargetQty, Shift, PlanDate, Priority, Customer, PlannedCycleTime, Status
+          MachineName, SapCode, PartName, ModelCode, TargetQty, Shift, PlanDate, Priority, Customer, Status
         )
         OUTPUT
           INSERTED.Id AS id, INSERTED.MachineName AS machineName, INSERTED.SapCode AS sapCode, INSERTED.PartName AS partName,
           INSERTED.ModelCode AS modelCode, INSERTED.TargetQty AS targetQty, INSERTED.Shift AS shift,
           CONVERT(varchar(10), INSERTED.PlanDate, 23) AS planDate, INSERTED.Priority AS priority,
-          INSERTED.Customer AS customer, INSERTED.PlannedCycleTime AS plannedCycleTime, INSERTED.Status AS status
+          INSERTED.Customer AS customer, INSERTED.Status AS status
         VALUES (
-          @machineName, @sapCode, @partName, @modelCode, @targetQty, @shift, @planDate, @priority, @customer, @plannedCycleTime, @status
+          @machineName, @sapCode, @partName, @modelCode, @targetQty, @shift, @planDate, @priority, @customer, @status
         )
       `);
 
@@ -77,19 +80,18 @@ export const updatePlan = async (req, res) => {
       .input("planDate",         sql.Date, p.planDate)
       .input("priority",         sql.NVarChar(20),  p.priority || "Medium")
       .input("customer",         sql.NVarChar(200), strOrNull(p.customer))
-      .input("plannedCycleTime", sql.Decimal(12, 3), numOrNull(p.plannedCycleTime))
       .input("status",           sql.Bit, toBit(p.status ?? true))
       .query(`
         UPDATE ProductionPlans SET
           MachineName = @machineName, SapCode = @sapCode, PartName = @partName, ModelCode = @modelCode,
           TargetQty = @targetQty, Shift = @shift, PlanDate = @planDate, Priority = @priority,
-          Customer = @customer, PlannedCycleTime = @plannedCycleTime, Status = @status,
+          Customer = @customer, Status = @status,
           UpdatedAt = GETDATE()
         OUTPUT
           INSERTED.Id AS id, INSERTED.MachineName AS machineName, INSERTED.SapCode AS sapCode, INSERTED.PartName AS partName,
           INSERTED.ModelCode AS modelCode, INSERTED.TargetQty AS targetQty, INSERTED.Shift AS shift,
           CONVERT(varchar(10), INSERTED.PlanDate, 23) AS planDate, INSERTED.Priority AS priority,
-          INSERTED.Customer AS customer, INSERTED.PlannedCycleTime AS plannedCycleTime, INSERTED.Status AS status
+          INSERTED.Customer AS customer, INSERTED.Status AS status
         WHERE Id = @id
       `);
 
@@ -132,7 +134,6 @@ export const bulkUpsertPlans = async (req, res) => {
         .input("planDate",         sql.Date, p.planDate)
         .input("priority",         sql.NVarChar(20),  p.priority || "Medium")
         .input("customer",         sql.NVarChar(200), strOrNull(p.customer))
-        .input("plannedCycleTime", sql.Decimal(12, 3), numOrNull(p.plannedCycleTime))
         .input("status",           sql.Bit, toBit(p.status ?? true));
 
       const result = await request.query(`
@@ -142,12 +143,12 @@ export const bulkUpsertPlans = async (req, res) => {
            AND target.PlanDate = src.PlanDate AND target.Shift = src.Shift
         WHEN MATCHED THEN UPDATE SET
           PartName = @partName, ModelCode = @modelCode, TargetQty = @targetQty,
-          Priority = @priority, Customer = @customer, PlannedCycleTime = @plannedCycleTime, Status = @status,
+          Priority = @priority, Customer = @customer, Status = @status,
           UpdatedAt = GETDATE()
         WHEN NOT MATCHED THEN INSERT (
-          MachineName, SapCode, PartName, ModelCode, TargetQty, Shift, PlanDate, Priority, Customer, PlannedCycleTime, Status
+          MachineName, SapCode, PartName, ModelCode, TargetQty, Shift, PlanDate, Priority, Customer, Status
         ) VALUES (
-          @machineName, @sapCode, @partName, @modelCode, @targetQty, @shift, @planDate, @priority, @customer, @plannedCycleTime, @status
+          @machineName, @sapCode, @partName, @modelCode, @targetQty, @shift, @planDate, @priority, @customer, @status
         )
         OUTPUT $action AS action;
       `);
