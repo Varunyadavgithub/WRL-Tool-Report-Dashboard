@@ -20,7 +20,7 @@ import {
 } from "../../redux/slices/masterConfigSlice";
 import {
   enrichRecords, detectChangeovers, changeoverStats, parseDurSecs,
-  STD_CHANGEOVER_MINS, isPunchingPart,
+  STD_CHANGEOVER_MINS, isPunchingPart, mergedStateMins,
 } from "../../utils/productionLogic.js";
 import { mapDbRecord } from "../../utils/mapDbRecord.js";
 import { PART_PROCESS_API } from "../../utils/factoryOsClient";
@@ -147,8 +147,8 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
         startedAtMs: r._absMs ?? null, completedAtMs: r._absMsEnd ?? r._absMs ?? null,
         startedAt: r.startTime || "", completedAt: r.endTime || r.startTime || "",
         planQty: 0, actualQty: 0, goodQty: 0,
-        downtimeSecs: 0, downtimeCount: 0, // brief downtime (<5m)
-        idleSecs: 0,    idleCount: 0,      // idle (>=5m)
+        downtimeCount: 0, // brief downtime (<5m)
+        idleCount: 0,     // idle (>=5m)
         cycleSecs: [], productionEvents: 0,
         rawRecords: [],
       };
@@ -177,10 +177,8 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
       if (dur > 0 && (r.qty ?? 0) > 0) g.cycleSecs.push(dur);
       g.productionEvents++;
     } else if (r.effectiveState === "Idle") {
-      g.idleSecs  += parseDurSecs(r.duration);
       g.idleCount += 1;
     } else if (r.effectiveState === "Downtime") {
-      g.downtimeSecs  += parseDurSecs(r.duration);
       g.downtimeCount += 1;
     }
   });
@@ -221,8 +219,14 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
 
       const cos      = detectChangeovers(row.rawRecords);
       const coSt     = changeoverStats(cos);
-      const downMins = Math.round(row.downtimeSecs / 60);
-      const idleMins = Math.round(row.idleSecs / 60);
+      // Merge overlapping/duplicate Downtime & Idle records before summing —
+      // raw sync data nests a coarse gap-filler record around several
+      // finer-grained sub-records covering the same span, so naive
+      // per-record summation double/triple-counts that overlap.
+      const downtimeSecs = mergedStateMins(row.rawRecords, "Downtime") * 60;
+      const idleSecs     = mergedStateMins(row.rawRecords, "Idle") * 60;
+      const downMins = Math.round(downtimeSecs / 60);
+      const idleMins = Math.round(idleSecs / 60);
       const lossMins = downMins + idleMins + coSt.overrunMins;
 
       // --- Punching component metrics ---
@@ -284,7 +288,7 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
 
       // Same availability rule as the Dashboard: planned time less every
       // recorded stop, including stops classified as Idle.
-      const totalDowntimeSecs = row.downtimeSecs + row.idleSecs;
+      const totalDowntimeSecs = downtimeSecs + idleSecs;
       const totalDowntimeMins = Math.round(totalDowntimeSecs / 60);
       const A = availableTimeSecs > 0
         ? Math.max(0, Math.min(1, (availableTimeSecs - totalDowntimeSecs) / availableTimeSecs))
@@ -348,7 +352,7 @@ const aggregateRecords = (records, materials, qualityByPartName = {}, plans = []
         idealEnergyWh, actualEnergyWh,
         // OEE breakdown inputs (component units) — surfaced in the UI
         actualCompCT, availableTimeSecs, actualTimeSecs, netOperatingSecs,
-        downtimeSecs: row.downtimeSecs, idleSecs: row.idleSecs,
+        downtimeSecs, idleSecs,
         goodQty: row.goodQty,
       };
     });
