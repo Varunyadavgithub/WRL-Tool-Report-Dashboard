@@ -8,7 +8,7 @@ import {
 import axios from "axios";
 import { mapDbRecord } from "../../utils/mapDbRecord.js";
 import { PART_PROCESS_API } from "../../utils/factoryOsClient";
-import { enrichRecords, detectChangeovers, changeoverStats, isPunchingPart, resolveShiftAsOf } from "../../utils/productionLogic.js";
+import { enrichRecords, detectChangeovers, changeoverStats, isPunchingPart, resolveShiftAsOf, mergedDurationMins } from "../../utils/productionLogic.js";
 import { getTodayRange, getYesterdayRange, formatDateTimeLocal } from "../../utils/dateUtils.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -131,9 +131,13 @@ export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials })
   if (!prodRecords.length && !downRecords.length) return ZERO;
 
   const qty      = prodRecords.reduce((s, r) => s + (r.qty ?? 0), 0);
-  const downSecs = downRecords.reduce((s, r) => s + parseDurSecs(r.duration), 0);
+  // Merge overlapping/duplicate downtime records before summing — raw sync
+  // data nests a coarse gap-filler record around several finer-grained
+  // sub-records covering the same span, so naive per-record summation
+  // double/triple-counts that overlap.
+  const downMins = Math.round(mergedDurationMins(downRecords));
+  const downSecs = downMins * 60;
   const runSecs  = prodRecords.reduce((s, r) => s + parseDurSecs(r.duration), 0);
-  const downMins = Math.round(downSecs / 60);
   const runTimeMins = Math.round(runSecs / 60);
 
   if (qty === 0) return { ...ZERO, downCount: downRecords.length, downMins, runTimeMins };
