@@ -24,6 +24,7 @@ import { PART_PROCESS_API } from "../../utils/factoryOsClient";
 import {
   enrichRecords, detectChangeovers, changeoverStats,
   parseDurSecs, IDLE_THRESHOLD_MINS, STD_CHANGEOVER_MINS,
+  mergedDurationMins, mergedStateMins,
 } from "../../utils/productionLogic.js";
 import {
   selectMaterials, getMaterialByModel, selectShifts,
@@ -40,9 +41,19 @@ const fmtAbs   = (ms, timeStr) => ms ? `${fmtYMD(new Date(ms))} ${timeStr||""}`.
 const todayStr = () => fmtYMD(new Date());
 const offsetDate = (days) => { const d = new Date(); d.setDate(d.getDate()+days); return fmtYMD(d); };
 const secsToMins = (s) => (s/60).toFixed(1);
-const fmtDur = (dur="00:00:00") => {
-  const [h,m,s] = (dur||"00:00:00").split(":").map(Number);
-  const total = (h||0)*60 + (m||0) + (s||0)/60;
+// Prefer the wall-clock span derived from Start/End (_absMs/_absMsEnd) over
+// the raw Duration field — FactoryOS occasionally syncs a negative/garbage
+// Duration for gap-filler placeholder records (e.g. "-12:49:01" for a span
+// that's actually +12:49:00), so trusting it directly can display or sum
+// wildly wrong numbers even though Start/End themselves are correct.
+const effectiveDurSecs = (r) => {
+  if (Number.isFinite(r._absMs) && Number.isFinite(r._absMsEnd)) {
+    return Math.max(0, (r._absMsEnd - r._absMs) / 1000);
+  }
+  return parseDurSecs(r.duration);
+};
+const fmtDurSecs = (secs) => {
+  const total = secs / 60;
   if (total >= 60) return `${Math.floor(total/60)}h ${Math.round(total%60)}m`;
   return `${total.toFixed(1)}m`;
 };
@@ -81,7 +92,7 @@ const exportCSV = (rows, changeovers) => {
     r.eventId||r.srNo, r.shift,
     r.effectiveState==="Idle" ? "Idle" : "Downtime",
     fmtAbs(r._absMs,r.startTime), fmtAbs(r._absMsEnd,r.endTime),
-    r.duration, r.downtimeReason||"Unassigned",
+    fmtDurSecs(effectiveDurSecs(r)), r.downtimeReason||"Unassigned",
   ]);
   const coRows = changeovers.map((c,i) => [
     `CO-${i+1}`, c.shift||"—", "Changeover",
@@ -330,8 +341,16 @@ const PartProcessDowntimeReport = () => {
       const startCal = new Date(startMs); startCal.setHours(0,0,0,0);
       const endCal   = new Date(endMs-1000); endCal.setHours(0,0,0,0);
 
+      // Exclude records with a negative raw Duration — confirmed (13 of 66k+
+      // rows, all StartTime = shift-start, synced well before the shift's real
+      // granular data) to be stale seed/placeholder rows the sync writes at
+      // shift-start and never cleans up once real data supersedes them. Their
+      // Start/End span is already covered by the real records logged later, so
+      // recomputing "a positive duration" from their Start/End would double
+      // count a span that's already captured elsewhere — they must be dropped
+      // entirely, not corrected.
       const filtered = allMapped
-        .filter((r)=>r._absMs!==null&&r._absMs>=startMs&&r._absMs<endMs&&parseDurSecs(r.duration)<=86400)
+        .filter((r)=>r._absMs!==null&&r._absMs>=startMs&&r._absMs<endMs&&effectiveDurSecs(r)<=86400&&parseDurSecs(r.duration)>=0)
         .sort((a,b)=>b._absMs-a._absMs);
 
       setRecords(filtered);
@@ -396,9 +415,17 @@ const PartProcessDowntimeReport = () => {
     return new Set(active.map((p) => p.sapCode)).size;
   }, [plans, reportDateFrom, reportDateTo]);
 
-  const totalDTSecs = useMemo(()=>allDT.reduce((s,r)=>s+parseDurSecs(r.duration),0),[allDT]);
-  const idleSecs    = useMemo(()=>idleDT.reduce((s,r)=>s+parseDurSecs(r.duration),0),[idleDT]);
-  const briefSecs   = useMemo(()=>briefDT.reduce((s,r)=>s+parseDurSecs(r.duration),0),[briefDT]);
+  // Merge overlapping/duplicate Downtime records before summing — raw sync
+  // data nests a coarse gap-filler record around several finer-grained
+  // sub-records covering the same span, so naive per-record summation
+  // double/triple-counts that overlap. totalDTSecs merges the WHOLE allDT
+  // set together (not brief+idle merged separately then added) since a
+  // coarse record can classify as Idle while a briefer one nested inside it
+  // classifies as Downtime — splitting by bucket first would miss that
+  // cross-classification overlap.
+  const totalDTSecs = useMemo(()=>mergedDurationMins(allDT)*60,[allDT]);
+  const idleSecs    = useMemo(()=>mergedStateMins(allDT,"Idle")*60,[allDT]);
+  const briefSecs   = useMemo(()=>mergedStateMins(allDT,"Downtime")*60,[allDT]);
 
   // Primary lookup: eventId (stable DB key)
   const loggedByEventId = useMemo(()=>{
@@ -454,14 +481,14 @@ const PartProcessDowntimeReport = () => {
 
   const reasonMap = useMemo(()=>{
     const m={};
-    allDT.forEach((r)=>{ const k=effectiveReason(r); m[k]=(m[k]||0)+parseDurSecs(r.duration); });
+    allDT.forEach((r)=>{ const k=effectiveReason(r); m[k]=(m[k]||0)+effectiveDurSecs(r); });
     return Object.entries(m).sort((a,b)=>b[1]-a[1]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[allDT, loggedByEventId, loggedByStartTime]);
 
   const shiftMap = useMemo(()=>{
     const m={};
-    allDT.forEach((r)=>{ m[r.shift]=(m[r.shift]||0)+parseDurSecs(r.duration); });
+    allDT.forEach((r)=>{ m[r.shift]=(m[r.shift]||0)+effectiveDurSecs(r); });
     return Object.entries(m).sort((a,b)=>b[1]-a[1]);
   },[allDT]);
 
@@ -478,7 +505,7 @@ const PartProcessDowntimeReport = () => {
     const m={};
     allDT.forEach((r)=>{
       const dept = effectiveDepartment(r) || "Unassigned";
-      m[dept] = (m[dept]||0) + parseDurSecs(r.duration);
+      m[dept] = (m[dept]||0) + effectiveDurSecs(r);
     });
     // Only include if at least one dept is assigned
     const hasAssigned = Object.keys(m).some(k => k !== "Unassigned");
@@ -550,7 +577,7 @@ const PartProcessDowntimeReport = () => {
       idx: idx + 1, shift: r.shift,
       type: (r.effectiveState || r.state) === "Idle" ? "Idle" : "Downtime",
       start: fmtAbs(r._absMs, r.startTime), end: fmtAbs(r._absMsEnd, r.endTime),
-      duration: fmtDur(r.duration), reason: effectiveReason(r),
+      duration: fmtDurSecs(effectiveDurSecs(r)), reason: effectiveReason(r),
       department: effectiveDepartment(r) || "—",
       remarks: ((r.eventId && loggedByEventId[String(r.eventId)]) || loggedByStartTime[String(r.startTime || "").substring(0, 8)])?.remarks || "—",
     }));
@@ -833,8 +860,8 @@ const PartProcessDowntimeReport = () => {
                         {(showAllDT?allDT:allDT.slice(0,12)).map((r,idx)=>{
                           const effState = r.effectiveState||r.state;
                           const isIdle   = effState==="Idle";
-                          const secs     = parseDurSecs(r.duration);
-                          const maxSecs  = Math.max(...allDT.map((x)=>parseDurSecs(x.duration)),1);
+                          const secs     = effectiveDurSecs(r);
+                          const maxSecs  = Math.max(...allDT.map((x)=>effectiveDurSecs(x)),1);
                           const logged     = (r.eventId && loggedByEventId[String(r.eventId)])
                             || loggedByStartTime[String(r.startTime||"").substring(0,8)];
                           const reasonText = effectiveReason(r);
@@ -847,7 +874,7 @@ const PartProcessDowntimeReport = () => {
                               <td className="px-3 py-2.5 border-b border-slate-100 font-mono text-slate-500 whitespace-nowrap text-[11px]">{fmtAbs(r._absMsEnd,r.endTime)}</td>
                               <td className="px-3 py-2.5 border-b border-slate-100">
                                 <div className="flex items-center gap-2">
-                                  <span className={`font-bold font-mono text-xs ${isIdle?"text-amber-600":"text-rose-500"}`}>{fmtDur(r.duration)}</span>
+                                  <span className={`font-bold font-mono text-xs ${isIdle?"text-amber-600":"text-rose-500"}`}>{fmtDurSecs(secs)}</span>
                                   <div className="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                     <div className={`h-full rounded-full ${isIdle?"bg-amber-400":"bg-rose-400"}`} style={{width:`${Math.min(100,(secs/maxSecs)*100)}%`}}/>
                                   </div>
