@@ -120,7 +120,7 @@ export const useClock = () => {
 //   • runTimeMins and downTimeMins are ALWAYS returned
 //   • No hardcoded P = 80
 
-export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials }) => {
+export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials, shiftStartMins = null }) => {
   const ZERO = {
     qty: 0, good: 0, bad: 0, componentQty: 0, componentGood: 0, componentBad: 0, passRate: 0,
     downCount: 0, downMins: 0, runTimeMins: 0, avgCycleSecs: 0,
@@ -135,12 +135,10 @@ export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials })
   // data nests a coarse gap-filler record around several finer-grained
   // sub-records covering the same span, so naive per-record summation
   // double/triple-counts that overlap.
-  const downMins = Math.round(mergedDurationMins(downRecords));
+  const downMins = Math.round(mergedDurationMins(downRecords, shiftStartMins));
   const downSecs = downMins * 60;
   const runSecs  = prodRecords.reduce((s, r) => s + parseDurSecs(r.duration), 0);
   const runTimeMins = Math.round(runSecs / 60);
-
-  if (qty === 0) return { ...ZERO, downCount: downRecords.length, downMins, runTimeMins };
 
   // ── A: Availability ───────────────────────────────────────────────────────
   // Planned time = configured shift duration (passed in as plannedMins).
@@ -154,6 +152,15 @@ export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials })
   // may be less than actual span when data covers 2 days. Use the larger value.
   const planned  = Math.max(plannedMins, runTimeMins, 1);
   const A        = Math.min(100, Math.max(0, Math.round(((planned - downMins) / planned) * 100)));
+
+  // Availability only needs runtime/downtime, both already known here — a
+  // window with zero COMPLETED parts (still mid-cycle, or a downtime-only
+  // window) can still have a real, non-zero A. Only P/Q/OEE genuinely need
+  // qty > 0 to mean anything, so they alone fall back (P/Q stay at ZERO's
+  // "unverified" 100, giving OEE = A × 100 × 100 ÷ 10000 = A).
+  if (qty === 0) {
+    return { ...ZERO, downCount: downRecords.length, downMins, runTimeMins, A, OEE: A };
+  }
 
   // ── Component-unit quantities ───────────────────────────────────────────
   // Convert every record's machine/sheet qty into component units (punching
@@ -349,7 +356,16 @@ export const usePartProcessOEE = () => {
           return ts >= rStart && ts <= rEnd;
         });
         const mapped = (filtered.length > 0 ? filtered : rows)
-          .map((r, i) => ({ ...mapDbRecord(r, i), eventDate: String(r.EventDate).slice(0, 10) }));
+          .map((r, i) => ({ ...mapDbRecord(r, i), eventDate: String(r.EventDate).slice(0, 10) }))
+          // FactoryOS occasionally syncs a negative/garbage Duration for a
+          // gap-filler placeholder record written at shift-start, before the
+          // real finer-grained records supersede it (same exclusion
+          // DowntimeReport.jsx applies, confirmed against the DB — a small
+          // fraction of rows, all with StartTime = shift-start). Its span is
+          // already covered by the real records logged later, so keeping it
+          // double-counts that span — it must be dropped entirely, not
+          // "corrected" by recomputing a positive duration from Start/End.
+          .filter(r => parseDurSecs(r.duration) >= 0);
         setRecords(enrichRecords(mapped));
       } else {
         setRecords([]);
@@ -434,9 +450,20 @@ export const usePartProcessOEE = () => {
   // For "All Shifts", use all records; for specific shift, use shiftRecords
   const changeoverRecords = selectedShift ? shiftRecords : records;
   const shiftStartMins = resolvedSelectedShift ? sliceToMins(resolvedSelectedShift.startTime) : null;
+  // The shift's own configured lunch/dinner break, resolved as it actually
+  // applied on selectedDate — so a changeover spanning the break gets that
+  // span netted out instead of the break being double-counted as changeover
+  // overrun. (Kept as primitive start/end minutes in the deps below, not the
+  // `breakWindowMins` object itself, so a fresh object each render doesn't
+  // defeat the memo.)
+  const breakStartMins = resolvedSelectedShift?.breakStart ? sliceToMins(resolvedSelectedShift.breakStart) : null;
+  const breakEndMins   = resolvedSelectedShift?.breakEnd   ? sliceToMins(resolvedSelectedShift.breakEnd)   : null;
+  const breakWindowMins = (breakStartMins != null && breakEndMins != null)
+    ? { start: breakStartMins, end: breakEndMins }
+    : null;
   const changeovers    = useMemo(
-    () => detectChangeovers(changeoverRecords, undefined, shiftStartMins),
-    [changeoverRecords, shiftStartMins],
+    () => detectChangeovers(changeoverRecords, undefined, shiftStartMins, breakWindowMins),
+    [changeoverRecords, shiftStartMins, breakStartMins, breakEndMins],
   );
   const coStats = useMemo(() => changeoverStats(changeovers), [changeovers]);
 
@@ -455,7 +482,11 @@ export const usePartProcessOEE = () => {
       ? shifts.reduce((s, sh) => s + shiftPlannedProductionMins(resolveShiftAsOf(shiftHistory, sh.id, selectedDate, sh)), 0)
       : 480; // fallback to 8 hours if no shifts configured
 
-    return computeOEE({ prodRecords: prod, downRecords: down, plannedMins, materials });
+    // "All Shifts" spans the whole (possibly multi-shift) record set, so it
+    // must keep the gap auto-detection (shiftStartMins: null) rather than the
+    // closure's current `shiftStartMins`, which belongs to whichever single
+    // shift happens to be selected right now (or none).
+    return computeOEE({ prodRecords: prod, downRecords: down, plannedMins, materials, shiftStartMins: null });
   }, [records, shifts, materials, shiftHistory, selectedDate]);
 
   const shiftOEE = useMemo(() => {
@@ -466,8 +497,12 @@ export const usePartProcessOEE = () => {
     const prod = shiftRecords.filter(r => r.state === "Production");
     const down = shiftRecords.filter(r => r.state === "Downtime");
     const plannedMins = resolvedSelectedShift ? Math.max(1, shiftPlannedProductionMins(resolvedSelectedShift)) : 480;
-    return computeOEE({ prodRecords: prod, downRecords: down, plannedMins, materials });
-  }, [shiftRecords, resolvedSelectedShift, materials]);
+    // Pass the known shift boundary (same one detectChangeovers uses above)
+    // so the downtime merge doesn't have to guess where the day rolls over —
+    // guessing is what let a plain day shift's own records get misread as
+    // spilling from the previous day, inflating downtime by ~24h.
+    return computeOEE({ prodRecords: prod, downRecords: down, plannedMins, materials, shiftStartMins });
+  }, [shiftRecords, resolvedSelectedShift, materials, shiftStartMins]);
 
   // Active OEE values (shift-scoped when a shift is selected)
   const activeOEEData    = selectedShift ? shiftOEE    : allShiftOEE;

@@ -86,6 +86,10 @@ const resolveShift = (startTime, configShifts) => {
     return tc >= s0 && tc < e0;
   }) ?? null;
 };
+// Same normalization the Dashboard uses (usePartProcessOEE.js) so a shift
+// name comparison here agrees with the Dashboard's — trim, collapse
+// whitespace, lowercase.
+const normaliseShift = (v) => String(v || "").trim().replace(/\s+/g, " ").toLowerCase();
 
 const exportCSV = (rows, changeovers) => {
   const dtRows = rows.map((r) => [
@@ -230,6 +234,10 @@ const PartProcessDowntimeReport = () => {
   const [todayLoading, setTodayLoading] = useState(false);
   const [records,      setRecords]      = useState([]);
   const [appliedRange, setAppliedRange] = useState(null);
+  // The shift object when a shift button is the active query (else null for
+  // Today/Yesterday/Custom) — drives both the ShiftName scoping filter below
+  // and the changeover anchor, matching how the Dashboard scopes a shift.
+  const [selectedShiftObj, setSelectedShiftObj] = useState(null);
   const [activeTab,    setActiveTab]    = useState("downtime"); // "downtime" | "changeover" | "logged"
   const [showAllDT,    setShowAllDT]    = useState(false);
   const [showAllCO,    setShowAllCO]    = useState(false);
@@ -282,7 +290,7 @@ const PartProcessDowntimeReport = () => {
     return [...map.values()].sort((a,b)=>new Date(b.loggedAt||0)-new Date(a.loggedAt||0));
   }, [dbEntries, reduxEntries]);
 
-  const fetchData = useCallback(async (start, end, setLoadFn) => {
+  const fetchData = useCallback(async (start, end, setLoadFn, shiftNameFilter = null) => {
     const startMs = new Date(start.replace(" ","T")+":00").getTime();
     const endMs   = new Date(end.replace(" ","T")+":00").getTime();
     if (Number.isNaN(startMs)||Number.isNaN(endMs)||endMs<=startMs) { toast.error("Invalid time range."); return; }
@@ -321,7 +329,14 @@ const PartProcessDowntimeReport = () => {
         const mapped = enrichRecords(
           raw.map((r,i)=>({...mapDbRecord(r,i), eventDate:date}))
         ).map((r) => {
-          const matched = resolveShift(r.startTime, shifts);
+          // Trust the DB's own ShiftName first (same as the Dashboard) —
+          // only derive a shift from the record's clock time when ShiftName
+          // is missing. Re-deriving unconditionally used the shift's
+          // *current* configured window even for historical dates, which
+          // could disagree with the Dashboard (which is shift-history-aware)
+          // right at the shift boundary.
+          const hasStoredShift = r.shift && r.shift !== "—";
+          const matched  = hasStoredShift ? null : resolveShift(r.startTime, shifts);
           const tod     = todSecs(r.startTime);
           const todEnd  = todSecs(r.endTime);
           const absMs   = tod===null ? null : midnight+tod*1000;
@@ -350,7 +365,13 @@ const PartProcessDowntimeReport = () => {
       // count a span that's already captured elsewhere — they must be dropped
       // entirely, not corrected.
       const filtered = allMapped
-        .filter((r)=>r._absMs!==null&&r._absMs>=startMs&&r._absMs<endMs&&effectiveDurSecs(r)<=86400&&parseDurSecs(r.duration)>=0)
+        .filter((r)=>r._absMs!==null&&r._absMs>=startMs&&r._absMs<endMs&&effectiveDurSecs(r)<=86400&&parseDurSecs(r.duration)>=0
+          // When a shift button is the active query, scope to that shift's
+          // ShiftName explicitly (same field/comparison the Dashboard uses)
+          // rather than relying on the time window alone — a record whose
+          // ShiftName doesn't match (e.g. logged a few minutes either side
+          // of the boundary) shouldn't count toward this shift's totals.
+          &&(!shiftNameFilter || normaliseShift(r.shift)===normaliseShift(shiftNameFilter)))
         .sort((a,b)=>b._absMs-a._absMs);
 
       setRecords(filtered);
@@ -368,16 +389,17 @@ const PartProcessDowntimeReport = () => {
     finally { setLoadFn(false); }
   }, [shifts]);
 
-  const handleQuery     = () => { if (!startTime||!endTime) { toast.error("Select a time range."); return; } fetchData(startTime,endTime,setLoading); };
-  const handleToday     = () => { const s=`${todayStr()} 08:00`,e=`${offsetDate(1)} 08:00`; setStartTime(s);setEndTime(e);fetchData(s,e,setTodayLoading); };
-  const handleYesterday = () => { const s=`${offsetDate(-1)} 08:00`,e=`${todayStr()} 08:00`; setStartTime(s);setEndTime(e);fetchData(s,e,setYdayLoading); };
+  const handleQuery     = () => { if (!startTime||!endTime) { toast.error("Select a time range."); return; } setSelectedShiftObj(null); fetchData(startTime,endTime,setLoading); };
+  const handleToday     = () => { const s=`${todayStr()} 08:00`,e=`${offsetDate(1)} 08:00`; setStartTime(s);setEndTime(e);setSelectedShiftObj(null);fetchData(s,e,setTodayLoading); };
+  const handleYesterday = () => { const s=`${offsetDate(-1)} 08:00`,e=`${todayStr()} 08:00`; setStartTime(s);setEndTime(e);setSelectedShiftObj(null);fetchData(s,e,setYdayLoading); };
   const handleShiftSelect = (shift) => {
     const curMins = new Date().getHours()*60+new Date().getMinutes();
     const ssm=toMins(shift.startTime),sem=toMins(shift.endTime),isON=sem<=ssm;
     const baseDate = isON&&curMins<sem ? offsetDate(-1) : todayStr();
     const win = getShiftWindow(shift,baseDate); if (!win) return;
     setStartTime(win.startDatetime); setEndTime(win.endDatetime);
-    fetchData(win.startDatetime,win.endDatetime,(v)=>setShiftLoading(v?shift.shiftName:null));
+    setSelectedShiftObj(shift);
+    fetchData(win.startDatetime,win.endDatetime,(v)=>setShiftLoading(v?shift.shiftName:null),shift.shiftName);
   };
 
   const isAnyLoading = loading||ydayLoading||todayLoading||shiftLoading!==null;
@@ -389,9 +411,22 @@ const PartProcessDowntimeReport = () => {
 
   const changeovers = useMemo(()=>{
     if (!records.length) return [];
-    const anchor = appliedRange?.crossesMidnight ? appliedRange.startMin : null;
-    return detectChangeovers(records,undefined,anchor);
-  },[records,appliedRange]);
+    // Anchor on the selected shift's own configured start (same convention
+    // the Dashboard uses) when one shift is the active query — falls back
+    // to the query window's own start only for Today/Yesterday/Custom,
+    // where there's no single shift boundary to anchor on.
+    const anchor = selectedShiftObj
+      ? toMins(selectedShiftObj.startTime)
+      : (appliedRange?.crossesMidnight ? appliedRange.startMin : null);
+    // Net the shift's own configured lunch/dinner break out of any
+    // changeover that happens to span it (same fix as the Dashboard) —
+    // otherwise that span gets counted twice: once as the break, again as
+    // changeover overrun.
+    const breakWindow = selectedShiftObj?.breakStart && selectedShiftObj?.breakEnd
+      ? { start: toMins(selectedShiftObj.breakStart), end: toMins(selectedShiftObj.breakEnd) }
+      : null;
+    return detectChangeovers(records,undefined,anchor,breakWindow);
+  },[records,appliedRange,selectedShiftObj]);
   const coSt = useMemo(()=>changeoverStats(changeovers),[changeovers]);
   const coCountByShift = useMemo(() => {
     const m = {};
