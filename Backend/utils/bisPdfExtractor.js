@@ -26,11 +26,12 @@ import { createWorker } from "tesseract.js";
  * summary and the page-3 table lost entirely in testing, even once the
  * numeric cells around it were reading correctly. Rather than depend on
  * OCR-ing that one word, it's computed from the declared/measured values
- * using the exact rule the report states ("Declared Annual Energy
- * Consumption shall be <= 1.1 * Measured Annual Energy Consumption") —
+ * using the rule the report itself states ("Declared Annual Energy
+ * Consumption shall be <= 1.05 * Measured Annual Energy Consumption") —
  * falling back to that only if the literal PASS/FAIL text isn't found.
  */
 const NUM = "-?\\d+(?:\\.\\d+)?";
+const DEVIATION_THRESHOLD_PCT = 5;
 
 // Below this, treat the PDF's native text layer as effectively empty (a
 // handful of stray characters from page furniture, not real content) and
@@ -104,7 +105,8 @@ const parseEnergyFields = (rawText) => {
   // reads fine) — derive it from the numbers instead of the literal text
   // whenever we have both and didn't already find the word itself.
   if (!result.testResult && result.declaredAnnualEnergy != null && result.measuredAnnualEnergy != null) {
-    result.testResult = result.declaredAnnualEnergy <= 1.1 * result.measuredAnnualEnergy ? "PASS" : "FAIL";
+    const limit = 1 + DEVIATION_THRESHOLD_PCT / 100;
+    result.testResult = result.declaredAnnualEnergy <= limit * result.measuredAnnualEnergy ? "PASS" : "FAIL";
   }
 
   return result;

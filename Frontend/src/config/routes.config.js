@@ -65,8 +65,7 @@ const HoldCabinateDetails = lazy(
 );
 const TagUpdate = lazy(() => import("../pages/Quality/TagUpdate"));
 const LPTRecipe = lazy(() => import("../pages/Quality/LPTRecipe"));
-const UploadBISReport = lazy(() => import("../pages/Quality/UploadBISReport"));
-const BISReports = lazy(() => import("../pages/Quality/BISReports"));
+const BISDashboard = lazy(() => import("../pages/Quality/BIS/BISDashboard"));
 const BEECalculation = lazy(() => import("../pages/Quality/BEECalculation"));
 
 const DispatchPerformanceReport = lazy(
@@ -582,15 +581,9 @@ export const ROUTE_CONFIG = [
         group: "fpa",
       },
       {
-        path: "/quality/upload-bis-report",
-        label: "Upload BIS Report",
-        component: UploadBISReport,
-        group: "bis",
-      },
-      {
         path: "/quality/bis-reports",
         label: "BIS Reports",
-        component: BISReports,
+        component: BISDashboard,
         group: "bis",
       },
       {

@@ -6,13 +6,15 @@
  */
 import { aggregateRecords, mapDbRecord, enrichRecords, detectChangeovers, parseDurSecs, computeOEE } from "../utils/productionLogic.js";
 
+// "HH:MM" -> minutes since midnight
+const toMins = (hhmm) => {
+  const [h, m] = String(hhmm || "0:0").split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
 // "HH:MM" -> minutes since midnight, wrapping for an overnight shift
 // (endTime <= startTime means it crosses midnight, e.g. Shift 2 20:00-08:00).
 const shiftDurationMins = (shift) => {
-  const toMins = (hhmm) => {
-    const [h, m] = String(hhmm || "0:0").split(":").map(Number);
-    return (h || 0) * 60 + (m || 0);
-  };
   const s = toMins(shift.startTime);
   let e = toMins(shift.endTime);
   if (e <= s) e += 1440;
@@ -83,7 +85,7 @@ export const buildShiftReport = async (pool, shift, dateStr) => {
         FROM ProductionPlans
         WHERE PlanDate = @date AND Status = 1
       `),
-    pool.request().query(`SELECT ShiftName FROM ShiftConfigs WHERE Status = 1`),
+    pool.request().query(`SELECT ShiftName, StartTime, EndTime, BreakStart, BreakEnd FROM ShiftConfigs WHERE Status = 1`),
   ]);
 
   const records   = eventsRes.recordset.map(mapDbRecord);
@@ -92,7 +94,19 @@ export const buildShiftReport = async (pool, shift, dateStr) => {
 
   const plans = plansRes.recordset;
   const realShiftNames = shiftsRes.recordset.map((s) => s.ShiftName);
-  const rows = aggregateRecords(records, materials, dateStr, plans, shift.shiftName, realShiftNames);
+
+  // This shift's own config row — resolves the shift's actual start time and
+  // configured lunch/dinner break, so detectChangeovers/mergedDurationMins
+  // below get a known boundary instead of guessing (which can misfire and
+  // inflate a total by a spurious ~24h), and a changeover spanning the break
+  // gets that span netted out instead of double-counted as overrun.
+  const shiftConfig = shiftsRes.recordset.find((s) => s.ShiftName === shift.shiftName);
+  const shiftStartMins = shiftConfig?.StartTime ? toMins(shiftConfig.StartTime) : null;
+  const breakWindowMins = shiftConfig?.BreakStart && shiftConfig?.BreakEnd
+    ? { start: toMins(shiftConfig.BreakStart), end: toMins(shiftConfig.BreakEnd) }
+    : null;
+
+  const rows = aggregateRecords(records, materials, dateStr, plans, shift.shiftName, realShiftNames, shiftStartMins, breakWindowMins);
   if (!rows.length) return null;
 
   const qualityByPartName = buildQualityByPartName(qLogRes.recordset);
@@ -163,7 +177,7 @@ export const buildShiftReport = async (pool, shift, dateStr) => {
   // "Actual changeovers" = real model-to-model transitions detected across
   // the whole shift.
   totals.plannedChangeovers = enrichedRows.filter((r) => r.planQtyFromConfig).length;
-  totals.actualChangeovers  = detectChangeovers(records).length;
+  totals.actualChangeovers  = detectChangeovers(records, undefined, shiftStartMins, breakWindowMins).length;
 
   // ---- Machine OEE — one shift-wide A/P/Q/OEE figure (computeOEE), not an
   // average of the per-model row percentages above. Averaging per-model
@@ -173,8 +187,15 @@ export const buildShiftReport = async (pool, shift, dateStr) => {
   const machine = computeOEE({
     prodRecords: records.filter((r) => r.state === "Production"),
     downRecords: records.filter((r) => r.state === "Downtime"),
-    plannedMins: shiftDurationMins(shift),
+    // BUG (was): shiftDurationMins(shift) — the `shift` param callers pass in
+    // is only ever { id, shiftName } (see shiftEndReport.cron.js), never
+    // carrying startTime/endTime, so this silently computed a 0-minute
+    // planned duration. `shiftConfig` (fetched above) is the real row.
+    plannedMins: shiftConfig
+      ? shiftDurationMins({ startTime: shiftConfig.StartTime, endTime: shiftConfig.EndTime })
+      : 480,
     materials,
+    shiftStartMins,
   });
   totals.machineOEE          = machine.OEE;
   totals.machineAvailability = machine.A;

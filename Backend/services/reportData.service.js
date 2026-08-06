@@ -20,9 +20,15 @@ const MATERIAL_SELECT = `
     Status AS status
   FROM MaterialConfigs WHERE Status = 1`;
 
+// "HH:MM" -> minutes since midnight
+const toMins = (hhmm) => {
+  const [h, m] = String(hhmm || "0:0").split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
 // ── Shared raw fetch — events, materials, downtime log for one shift occurrence ──
 export const fetchShiftRawData = async (pool, shift, dateStr) => {
-  const [eventsRes, materialsRes, dtLogRes] = await Promise.all([
+  const [eventsRes, materialsRes, dtLogRes, shiftsRes] = await Promise.all([
     pool.request().input("date", dateStr).input("shiftName", shift.shiftName).query(`
       SELECT EventId, EventDate, ShiftName, EventType, Barcode, StartTime, EndTime, Duration, PartsQty, PartsQuality
       FROM PartProcessEvents WHERE EventDate = @date AND ShiftName = @shiftName AND Status = 1 ORDER BY StartTime ASC`),
@@ -31,7 +37,21 @@ export const fetchShiftRawData = async (pool, shift, dateStr) => {
       SELECT Id, SrNo, EventId, ShiftName, EventDate, StartTime, EndTime, Duration, Model, FromModel,
              IsChangeover, ReasonCode, ReasonName, Category, Planned, Remarks, LoggedAt
       FROM PartProcessDowntimeLog WHERE EventDate = @date AND ShiftName = @shiftName ORDER BY LoggedAt DESC`),
+    pool.request().input("shiftName", shift.shiftName).query(`
+      SELECT TOP 1 StartTime, EndTime, BreakStart, BreakEnd
+      FROM ShiftConfigs WHERE ShiftName = @shiftName AND Status = 1`),
   ]);
+
+  // Resolves the shift's actual start time and configured lunch/dinner
+  // break, so detectChangeovers below gets a known boundary instead of
+  // guessing (which can misfire and inflate a total by a spurious ~24h),
+  // and a changeover spanning the break gets that span netted out instead
+  // of double-counted as overrun.
+  const shiftConfig = shiftsRes.recordset[0] || null;
+  const shiftStartMins = shiftConfig?.StartTime ? toMins(shiftConfig.StartTime) : null;
+  const breakWindowMins = shiftConfig?.BreakStart && shiftConfig?.BreakEnd
+    ? { start: toMins(shiftConfig.BreakStart), end: toMins(shiftConfig.BreakEnd) }
+    : null;
 
   return {
     records: eventsRes.recordset.map(mapDbRecord),
@@ -39,6 +59,8 @@ export const fetchShiftRawData = async (pool, shift, dateStr) => {
     dtLogRows: dtLogRes.recordset,
     dateStr,
     shiftName: shift.shiftName,
+    shiftStartMins,
+    breakWindowMins,
   };
 };
 
@@ -58,7 +80,7 @@ export const buildDowntimeReportBlocks = (raw) => {
     };
   });
 
-  const changeovers = detectChangeovers(raw.records);
+  const changeovers = detectChangeovers(raw.records, undefined, raw.shiftStartMins, raw.breakWindowMins);
   const coRows = changeovers.map((c, i) => ({
     idx: i + 1, shift: c.shift || "—",
     fromModel: getMaterialByModel(materials, c.fromModel)?.partName || c.fromModel,

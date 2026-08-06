@@ -57,40 +57,70 @@ export const mergeIntervals = (intervals) => {
 };
 
 /**
- * Total minutes covered by records whose (effectiveState || state) matches
- * `state`, after merging overlapping/duplicate records — so a coarse
- * downtime record and its nested finer sub-records aren't summed multiple
- * times over the same wall-clock span. Same midnight-crossing normalization
- * as detectChangeovers (auto-detected from the FULL record set passed in,
- * not just the matching subset, so an overnight shift's boundary is found
- * correctly even when e.g. all the Idle records happen to fall on one side).
+ * Builds {start, end} decimal-minute intervals for `subset`, correctly
+ * ordered across midnight — mirrors Frontend/src/utils/productionLogic.js's
+ * buildIntervals (minus the eventDate-based day-indexing, since every
+ * caller here is already scoped to a single EventDate/shift by SQL, so the
+ * cross-day ambiguity that needed doesn't arise — only the intra-shift
+ * midnight-crossing case does, same as detectChangeovers below).
  *
- * @param records  Enriched records for ONE shift/date scope
- * @param state    "Idle" | "Downtime" | "Shift Break" | any effectiveState/state value
+ * @param subset          The records to build intervals for.
+ * @param thresholdSource  Records to detect the gap-guess threshold from when
+ *                 falling back (mergedStateMins wants this to be the FULL
+ *                 record set, not just its matching subset). Defaults to `subset`.
+ * @param shiftStartMins  Minutes-since-midnight of the shift's start time —
+ *                 pass this whenever it's known (see detectChangeovers) to
+ *                 skip the fragile gap-guess auto-detection, which can
+ *                 misfire on a plain day shift and inflate the total by a
+ *                 spurious ~24h.
  */
-export const mergedStateMins = (records, state) => {
-  const matching = records.filter((r) => (r.effectiveState || r.state) === state && r.startTime);
-  if (!matching.length) return 0;
+const buildIntervals = (subset, thresholdSource, shiftStartMins) => {
+  const withTimes = subset.filter((r) => r.startTime);
+  if (!withTimes.length) return [];
 
-  const rawTimes = records.filter((r) => r.startTime).map((r) => toDecimalMins(r.startTime)).sort((a, b) => a - b);
+  const rawTimes = (thresholdSource ?? withTimes)
+    .filter((r) => r.startTime)
+    .map((r) => toDecimalMins(r.startTime))
+    .sort((a, b) => a - b);
   let autoThreshold = null;
-  let biggestGap = 0;
-  let gapMid     = null;
-  for (let i = 1; i < rawTimes.length; i++) {
-    const gap = rawTimes[i] - rawTimes[i - 1];
-    if (gap > biggestGap) { biggestGap = gap; gapMid = (rawTimes[i - 1] + rawTimes[i]) / 2; }
+  if (shiftStartMins !== null && shiftStartMins !== undefined) {
+    autoThreshold = shiftStartMins;
+  } else {
+    let biggestGap = 0;
+    let gapMid     = null;
+    for (let i = 1; i < rawTimes.length; i++) {
+      const gap = rawTimes[i] - rawTimes[i - 1];
+      if (gap > biggestGap) { biggestGap = gap; gapMid = (rawTimes[i - 1] + rawTimes[i]) / 2; }
+    }
+    if (biggestGap > 360 && gapMid !== null && rawTimes[0] < 480) autoThreshold = gapMid;
   }
-  if (biggestGap > 360 && gapMid !== null && rawTimes[0] < 480) autoThreshold = gapMid;
   const normalize = (m) => (autoThreshold !== null && m < autoThreshold) ? m + 1440 : m;
 
-  const intervals = matching.map((r) => {
+  return withTimes.map((r) => {
     const s = normalize(toDecimalMins(r.startTime));
     let e = normalize(toDecimalMins(r.endTime || r.startTime));
     if (e < s) e += 1440;
     return { start: s, end: e };
   });
+};
 
-  return mergeIntervals(intervals).reduce((sum, iv) => sum + (iv.end - iv.start), 0);
+/**
+ * Total minutes covered by records whose (effectiveState || state) matches
+ * `state`, after merging overlapping/duplicate records — so a coarse
+ * downtime record and its nested finer sub-records aren't summed multiple
+ * times over the same wall-clock span.
+ *
+ * @param records  Enriched records for ONE shift/date scope
+ * @param state    "Idle" | "Downtime" | "Shift Break" | any effectiveState/state value
+ * @param shiftStartMins  See buildIntervals — pass the shift's own start time
+ *                 whenever known.
+ */
+export const mergedStateMins = (records, state, shiftStartMins = null) => {
+  const matching = records.filter((r) => (r.effectiveState || r.state) === state && r.startTime);
+  if (!matching.length) return 0;
+
+  return mergeIntervals(buildIntervals(matching, records, shiftStartMins))
+    .reduce((sum, iv) => sum + (iv.end - iv.start), 0);
 };
 
 /**
@@ -102,33 +132,21 @@ export const mergedStateMins = (records, state) => {
  * bucket separately would miss overlaps that span BOTH classifications (a
  * coarse multi-hour record classifies as Idle while a brief record nested
  * inside it classifies as Downtime, even though they cover the same span).
+ *
+ * @param shiftStartMins  See buildIntervals — pass the shift's own start time
+ *                 whenever known.
  */
-export const mergedDurationMins = (records) => {
-  const withTimes = records.filter((r) => r.startTime);
-  if (!withTimes.length) return 0;
+export const mergedDurationMins = (records, shiftStartMins = null) =>
+  mergeIntervals(buildIntervals(records, records, shiftStartMins))
+    .reduce((sum, iv) => sum + (iv.end - iv.start), 0);
 
-  const rawTimes = withTimes.map((r) => toDecimalMins(r.startTime)).sort((a, b) => a - b);
-  let autoThreshold = null;
-  let biggestGap = 0;
-  let gapMid     = null;
-  for (let i = 1; i < rawTimes.length; i++) {
-    const gap = rawTimes[i] - rawTimes[i - 1];
-    if (gap > biggestGap) { biggestGap = gap; gapMid = (rawTimes[i - 1] + rawTimes[i]) / 2; }
-  }
-  if (biggestGap > 360 && gapMid !== null && rawTimes[0] < 480) autoThreshold = gapMid;
-  const normalize = (m) => (autoThreshold !== null && m < autoThreshold) ? m + 1440 : m;
-
-  const intervals = withTimes.map((r) => {
-    const s = normalize(toDecimalMins(r.startTime));
-    let e = normalize(toDecimalMins(r.endTime || r.startTime));
-    if (e < s) e += 1440;
-    return { start: s, end: e };
-  });
-
-  return mergeIntervals(intervals).reduce((sum, iv) => sum + (iv.end - iv.start), 0);
-};
-
-export const detectChangeovers = (records, stdMins = STD_CHANGEOVER_MINS, shiftStartMins = null) => {
+/**
+ * @param breakWindowMins  { start, end } minutes-since-midnight of the
+ *                 shift's configured lunch/dinner break, so a changeover
+ *                 that happens to span the break doesn't get that same span
+ *                 counted twice. Pass null if unknown.
+ */
+export const detectChangeovers = (records, stdMins = STD_CHANGEOVER_MINS, shiftStartMins = null, breakWindowMins = null) => {
   // qty > 0 (not >= 0) — a 0-qty "Production" row is a rework/correction
   // sub-cycle on an already-produced part, not a new completed unit, so it
   // must not mark a changeover boundary (its start/end time doesn't
@@ -169,8 +187,14 @@ export const detectChangeovers = (records, stdMins = STD_CHANGEOVER_MINS, shiftS
   // intervals are merged into a non-overlapping union first (mergeIntervals,
   // exported above) — summing each record's overlap independently would
   // double/triple-count the overlapping portions.
-  const stoppages = mergeIntervals(
-    records
+  //
+  // `records` with state === "Shift Break" essentially never occurs in
+  // practice — FactoryOS's raw EventType is only ever "Production"/
+  // "Downtime" — so this filter alone was silently a no-op. `breakWindowMins`
+  // (the shift's own configured break, resolved by the caller) is the real
+  // source of truth and is what actually nets a break out below.
+  const stoppages = mergeIntervals([
+    ...records
       .filter((r) => r.state === "Shift Break" && r.startTime)
       .map((r) => {
         const s = normalize(toDecimalMins(r.startTime));
@@ -178,7 +202,13 @@ export const detectChangeovers = (records, stdMins = STD_CHANGEOVER_MINS, shiftS
         if (e < s) e += 1440;
         return { start: s, end: e };
       }),
-  );
+    ...(breakWindowMins ? [(() => {
+      const s = normalize(breakWindowMins.start);
+      let e = normalize(breakWindowMins.end);
+      if (e < s) e += 1440;
+      return { start: s, end: e };
+    })()] : []),
+  ]);
   const overlapMins = (aStart, aEnd, bStart, bEnd) =>
     Math.max(0, Math.min(aEnd, bEnd) - Math.max(aStart, bStart));
 
@@ -338,7 +368,7 @@ const MACHINE_POWER_KW = 5;
  * @param plannedMins  The shift's configured duration in minutes
  * @param materials    MaterialConfigs rows
  */
-export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials }) => {
+export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials, shiftStartMins = null }) => {
   const ZERO = { A: 0, P: 100, Q: 100, OEE: 0, runTimeMins: 0, downMins: 0 };
   if (!prodRecords.length && !downRecords.length) return ZERO;
 
@@ -347,15 +377,20 @@ export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials })
   // data nests a coarse gap-filler record around several finer-grained
   // sub-records covering the same span, so naive per-record summation
   // double/triple-counts that overlap.
-  const downMins = Math.round(mergedDurationMins(downRecords));
+  const downMins = Math.round(mergedDurationMins(downRecords, shiftStartMins));
   const downSecs = downMins * 60;
   const runSecs  = prodRecords.reduce((s, r) => s + parseDurSecs(r.duration), 0);
   const runTimeMins = Math.round(runSecs / 60);
-  if (qty === 0) return { ...ZERO, downMins, runTimeMins };
 
-  // A: Availability — planned shift duration less downtime.
+  // A: Availability — planned shift duration less downtime. Computed before
+  // the qty===0 short-circuit below: Availability only needs runtime/
+  // downtime (both already known here), so a window with zero COMPLETED
+  // parts (still mid-cycle, or a downtime-only window) can still have a
+  // real, non-zero A instead of being hardcoded to 0.
   const planned = Math.max(plannedMins, runTimeMins, 1);
   const A = Math.min(100, Math.max(0, Math.round(((planned - downMins) / planned) * 100)));
+
+  if (qty === 0) return { ...ZERO, downMins, runTimeMins, A, OEE: A };
 
   // Component-unit quantities, tallied per model actually run so P below can
   // weight each model by its OWN configured cycle time.
@@ -400,7 +435,7 @@ export const computeOEE = ({ prodRecords, downRecords, plannedMins, materials })
  * per-model OEE/production rows — backend port of ProductionReport.jsx's
  * aggregateRecords(), used to build the shift-end email report.
  */
-export const aggregateRecords = (records, materials, dateStr, plans = [], shiftName = null, realShiftNames = []) => {
+export const aggregateRecords = (records, materials, dateStr, plans = [], shiftName = null, realShiftNames = [], shiftStartMins = null, breakWindowMins = null) => {
   if (!records.length) return [];
 
   // Downtime rows do not carry a model. Keep each stop with the model that
@@ -500,14 +535,14 @@ export const aggregateRecords = (records, materials, dateStr, plans = [], shiftN
         ? Math.round(row.cycleSecs.reduce((a, b) => a + b, 0) / row.cycleSecs.length)
         : row.definedCycleTime;
 
-      const cos      = detectChangeovers(row.rawRecords);
+      const cos      = detectChangeovers(row.rawRecords, undefined, shiftStartMins, breakWindowMins);
       const coSt     = changeoverStats(cos);
       // Merge overlapping/duplicate Downtime & Idle records before summing —
       // raw sync data nests a coarse gap-filler record around several
       // finer-grained sub-records covering the same span, so naive
       // per-record summation double/triple-counts that overlap.
-      const downtimeSecs = mergedStateMins(row.rawRecords, "Downtime") * 60;
-      const idleSecs     = mergedStateMins(row.rawRecords, "Idle") * 60;
+      const downtimeSecs = mergedStateMins(row.rawRecords, "Downtime", shiftStartMins) * 60;
+      const idleSecs     = mergedStateMins(row.rawRecords, "Idle", shiftStartMins) * 60;
       const downMins = Math.round(downtimeSecs / 60);
       const idleMins = Math.round(idleSecs / 60);
       const lossMins = downMins + idleMins + coSt.overrunMins;
