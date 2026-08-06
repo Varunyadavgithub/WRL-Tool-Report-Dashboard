@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs";
 import sql from "mssql";
-import { dbConfig1 } from "../../config/db.config.js";
+import { dbConfig1, connectToDB } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 import { extractBisEnergyData } from "../../utils/bisPdfExtractor.js";
@@ -36,19 +36,17 @@ const getISTDate = () => {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────
-   HELPER – safe pool close
-   Prevents "Cannot read properties of undefined (reading 'close')" that
-   appears in downloadBisPdfFile / deleteBisPdfFile when pool was never
-   assigned before an early return or thrown error.
+   HELPER – optional pagination
+   page/pageSize are both optional query params — when omitted, callers get
+   every row (unchanged behavior for existing consumers). When both are
+   present, applies OFFSET/FETCH and the response includes a `pagination`
+   block with the total row count.
 ──────────────────────────────────────────────────────────────────────────*/
-const closePool = async (pool) => {
-  if (pool) {
-    try {
-      await pool.close();
-    } catch (_) {
-      // swallow – connection may already be closed
-    }
-  }
+const parsePagination = (query) => {
+  if (query.page == null || query.pageSize == null) return null;
+  const page = Math.max(1, parseInt(query.page, 10) || 1);
+  const pageSize = Math.max(1, parseInt(query.pageSize, 10) || 20);
+  return { page, pageSize, offset: (page - 1) * pageSize };
 };
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -69,10 +67,9 @@ export const uploadBisPdfFile = tryCatch(async (req, res) => {
   // Best-effort: a parse failure must never block the upload — extraction
   // already swallows its own errors and returns all-null fields.
   const energyData = await extractBisEnergyData(req.file.path);
-  let pool;
 
   try {
-    pool = await sql.connect(dbConfig1);
+    const pool = await connectToDB(dbConfig1);
 
     const query = `
       INSERT INTO BISUpload (
@@ -111,29 +108,37 @@ export const uploadBisPdfFile = tryCatch(async (req, res) => {
     });
   } catch (error) {
     throw new AppError(`Failed to upload the BIS Report data: ${error.message}`, 500);
-  } finally {
-    await closePool(pool);
   }
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
    LIST FILES
 ═══════════════════════════════════════════════════════════════════════ */
-export const getBisPdfFiles = tryCatch(async (_, res) => {
-  let pool;
-
+export const getBisPdfFiles = tryCatch(async (req, res) => {
   try {
-    pool = await sql.connect(dbConfig1);
+    const pool = await connectToDB(dbConfig1);
+    const pagination = parsePagination(req.query);
+
+    let total = null;
+    if (pagination) {
+      const countResult = await pool.request().query(`SELECT COUNT(*) AS total FROM BISUpload`);
+      total = countResult.recordset[0].total;
+    }
 
     // BUG (was): SELECT * — always use explicit columns so schema changes
     // don't silently break the mapping below.
-    const query = `
+    const request = pool.request();
+    if (pagination) {
+      request.input("Offset", sql.Int, pagination.offset);
+      request.input("PageSize", sql.Int, pagination.pageSize);
+    }
+    const result = await request.query(`
       SELECT SrNo, ModelName, Year, Month, TestFrequency, Description, FileName, UploadAt,
              DeclaredAnnualEnergy, MeasuredAnnualEnergy, EnergyDeviationPercent, TestResult
       FROM BISUpload
       ORDER BY SrNo DESC
-    `;
-    const result = await pool.request().query(query);
+      ${pagination ? "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY" : ""}
+    `);
 
     const files = result.recordset.map((file) => ({
       srNo:                   file.SrNo,
@@ -155,11 +160,10 @@ export const getBisPdfFiles = tryCatch(async (_, res) => {
       success: true,
       message: "BIS PDF Files retrieved successfully.",
       files,
+      ...(pagination ? { pagination: { ...pagination, total } } : {}),
     });
   } catch (error) {
     throw new AppError(`Failed to fetch the BIS PDF Files: ${error.message}`, 500);
-  } finally {
-    await closePool(pool);
   }
 });
 
@@ -174,7 +178,6 @@ export const downloadBisPdfFile = tryCatch(async (req, res) => {
   if (!filename)  throw new AppError("Missing required query param: filename.", 400);
 
   const filePath = path.join(uploadDir, filename);
-  let pool;
 
   try {
     // 1. Physical file check first – cheap, no DB round-trip
@@ -183,7 +186,7 @@ export const downloadBisPdfFile = tryCatch(async (req, res) => {
     }
 
     // 2. Verify the DB record exists
-    pool = await sql.connect(dbConfig1);
+    const pool = await connectToDB(dbConfig1);
 
     const result = await pool
       .request()
@@ -213,10 +216,6 @@ export const downloadBisPdfFile = tryCatch(async (req, res) => {
     });
   } catch (error) {
     throw new AppError(`Failed to download BIS PDF: ${error.message}`, 500);
-  } finally {
-    // BUG (was): pool.close() crashed with TypeError when pool was never
-    // assigned (i.e. early-return 404 paths). closePool() guards this.
-    await closePool(pool);
   }
 });
 
@@ -231,9 +230,6 @@ export const deleteBisPdfFile = tryCatch(async (req, res) => {
   if (!filename) throw new AppError("Missing required query param: filename.", 400);
 
   const filePath = path.join(uploadDir, filename);
-  // BUG (was): pool was declared inside the try block, making it
-  // inaccessible in the finally block → ReferenceError on every call.
-  let pool;
 
   try {
     // BUG (was): fs.unlinkSync() ran BEFORE the DB DELETE. If the DB
@@ -245,7 +241,7 @@ export const deleteBisPdfFile = tryCatch(async (req, res) => {
       return res.status(404).json({ success: false, message: "File not found on disk." });
     }
 
-    pool = await sql.connect(dbConfig1);
+    const pool = await connectToDB(dbConfig1);
 
     const result = await pool
       .request()
@@ -262,8 +258,6 @@ export const deleteBisPdfFile = tryCatch(async (req, res) => {
     res.status(200).json({ success: true, message: "File deleted successfully." });
   } catch (error) {
     throw new AppError(`Failed to delete the BIS PDF file: ${error.message}`, 500);
-  } finally {
-    await closePool(pool);
   }
 });
 
@@ -286,10 +280,8 @@ export const updateBisPdfFile = tryCatch(async (req, res) => {
     );
   }
 
-  let pool;
-
   try {
-    pool = await sql.connect(dbConfig1);
+    const pool = await connectToDB(dbConfig1);
 
     const existingResult = await pool
       .request()
@@ -375,27 +367,36 @@ export const updateBisPdfFile = tryCatch(async (req, res) => {
       if (fs.existsSync(p)) fs.unlinkSync(p);
     }
     throw new AppError(`Failed to update BIS Report: ${error.message}`, 500);
-  } finally {
-    await closePool(pool);
   }
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
    GET BIS REPORT STATUS  (files + compliance status combined)
 ═══════════════════════════════════════════════════════════════════════ */
-export const getBisReportStatus = tryCatch(async (_, res) => {
-  let pool;
-
+export const getBisReportStatus = tryCatch(async (req, res) => {
   try {
-    pool = await sql.connect(dbConfig1);
+    const pool = await connectToDB(dbConfig1);
+    const pagination = parsePagination(req.query);
 
     // ── Files ─────────────────────────────────────────────────────────
+    let filesTotal = null;
+    if (pagination) {
+      const countResult = await pool.request().query(`SELECT COUNT(*) AS total FROM BISUpload`);
+      filesTotal = countResult.recordset[0].total;
+    }
+
     // BUG (was): SELECT * — use explicit columns
-    const filesResult = await pool.request().query(`
+    const filesRequest = pool.request();
+    if (pagination) {
+      filesRequest.input("Offset", sql.Int, pagination.offset);
+      filesRequest.input("PageSize", sql.Int, pagination.pageSize);
+    }
+    const filesResult = await filesRequest.query(`
       SELECT SrNo, ModelName, Year, Month, TestFrequency, Description, FileName, UploadAt,
              DeclaredAnnualEnergy, MeasuredAnnualEnergy, EnergyDeviationPercent, TestResult
       FROM BISUpload
       ORDER BY SrNo DESC
+      ${pagination ? "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY" : ""}
     `);
 
     const files = filesResult.recordset.map((file) => ({
@@ -432,68 +433,56 @@ export const getBisReportStatus = tryCatch(async (_, res) => {
           WHERE  PrintStatus = 1 AND Status <> 99
         ),
         FilteredData AS (
-          SELECT
-            bc.ModelName                                           AS FullModel,
-            LEFT(bc.ModelName, 9)                                   AS Model_Prefix,
-            b.ActivityOn,
-            CASE WHEN RIGHT(bc.ModelName, 2) = 'RT' THEN 'R' ELSE '' END AS HasRT
+          SELECT bc.ModelName,
+                 b.ActivityOn
           FROM  Psno
-          JOIN  ProcessActivity b  ON b.PSNo        = Psno.DocNo
-          JOIN  WorkCenter      c  ON c.StationCode = b.StationCode
+          JOIN  ProcessActivity b  ON b.PSNo         = Psno.DocNo
+          JOIN  WorkCenter      c  ON c.StationCode  = b.StationCode
           JOIN  BISCategory     bc ON bc.MaterialCode = Psno.Material
-          WHERE bc.Category     = 1
-            AND b.ActivityType  = 5
-            AND c.StationCode   = 1220010
+          WHERE bc.Category    = 1
+            AND b.ActivityType = 5
+            AND c.StationCode  = 1220010
             AND b.ActivityOn BETWEEN '2022-01-01 00:00:01' AND @CurrentDate
         ),
         ProductionSummary AS (
-          SELECT
-            Model_Prefix,
-            YEAR(ActivityOn) AS Activity_Year,
-            MAX(HasRT)       AS LastChar,
-            COUNT(*)         AS Model_Count
-          FROM FilteredData
-          GROUP BY Model_Prefix, YEAR(ActivityOn)
+          SELECT ModelName,
+                 YEAR(ActivityOn) AS Activity_Year,
+                 COUNT(*)         AS Model_Count
+          FROM   FilteredData
+          GROUP  BY ModelName, YEAR(ActivityOn)
         ),
         DedupedBIS AS (
           SELECT *
           FROM (
-            SELECT *,
-              ROW_NUMBER() OVER (
-                PARTITION BY LEFT(ModelName, 9),
-                             Year,
-                             CASE WHEN RIGHT(ModelName, 2) = 'RT' THEN 'RT' ELSE '' END
-                ORDER BY ModelName
-              ) AS rn
-            FROM BISUpload
+              SELECT *,
+                     ROW_NUMBER() OVER (
+                         PARTITION BY ModelName, Year
+                         ORDER BY Month DESC          -- pick the latest upload
+                     ) AS rn
+              FROM BISUpload
           ) sub
           WHERE rn = 1
         ),
         FinalResult AS (
-          SELECT
-            -- BUG (was): COALESCE'd to b.ModelName (BISUpload's raw entered name)
-            -- when present, only falling back to the derived Prefix+RT form
-            -- otherwise — inconsistent naming across rows. FIX: always derive
-            -- the actual model name from Model_Prefix + RT, same as HasRT above.
-            CONCAT(p.Model_Prefix, CASE WHEN p.LastChar = 'R' THEN ' RT' ELSE '' END) AS ModelName,
-            p.Activity_Year                                     AS Year,
-            b.Month,
-            p.Model_Count                                       AS Prod_Count,
-            CASE WHEN b.ModelName IS NOT NULL
-                 THEN 'Test Completed'
-                 ELSE 'Test Pending'
-            END                                                 AS Status,
-            b.ModelName                                         AS UploadedModelName,
-            b.FileName,
-            b.Description
+          SELECT p.ModelName,
+                 p.Activity_Year AS Year,
+                 b.Month,
+                 p.Model_Count   AS Prod_Count,
+                 -- A model with an uploaded report that FAILED its energy
+                 -- test must not read the same as one that never had a
+                 -- report at all — surfaced as its own status, not folded
+                 -- into "Test Completed".
+                 CASE WHEN b.ModelName IS NULL  THEN 'Test Pending'
+                      WHEN b.TestResult = 'FAIL' THEN 'Test Failed'
+                      ELSE 'Test Completed' END AS Status,
+                 b.ModelName AS UploadedModelName,
+                 b.FileName,
+                 b.Description,
+                 b.TestResult
           FROM ProductionSummary p
           LEFT JOIN DedupedBIS b
-            ON  LEFT(b.ModelName, 9) = p.Model_Prefix
-            AND b.Year               = p.Activity_Year
-            AND (
-                  (RIGHT(b.ModelName, 2) != 'RT')                              -- normal model
-               OR (RIGHT(b.ModelName, 2)  = 'RT' AND p.LastChar = 'R')        -- RT model
-            )
+                 ON b.ModelName = p.ModelName
+                AND b.Year      = p.Activity_Year
         )
         SELECT *
         FROM   FinalResult
@@ -510,11 +499,10 @@ export const getBisReportStatus = tryCatch(async (_, res) => {
       message: "BIS Report status data retrieved successfully.",
       files,
       status,
+      ...(pagination ? { filesPagination: { ...pagination, total: filesTotal } } : {}),
     });
   } catch (error) {
     throw new AppError(`Failed to fetch BIS Report status data: ${error.message}`, 500);
-  } finally {
-    await closePool(pool);
   }
 });
 
@@ -532,10 +520,8 @@ export const updateBisEnergyData = tryCatch(async (req, res) => {
 
   if (!srNo) throw new AppError("Missing required field: SrNo.", 400);
 
-  let pool;
-
   try {
-    pool = await sql.connect(dbConfig1);
+    const pool = await connectToDB(dbConfig1);
 
     const result = await pool
       .request()
@@ -560,8 +546,6 @@ export const updateBisEnergyData = tryCatch(async (req, res) => {
     res.status(200).json({ success: true, message: "Energy data confirmed." });
   } catch (error) {
     throw new AppError(`Failed to update BIS energy data: ${error.message}`, 500);
-  } finally {
-    await closePool(pool);
   }
 });
 
@@ -577,10 +561,8 @@ export const fetchBisEnergyData = tryCatch(async (req, res) => {
   const { srNo } = req.params;
   if (!srNo) throw new AppError("Missing required field: SrNo.", 400);
 
-  let pool;
-
   try {
-    pool = await sql.connect(dbConfig1);
+    const pool = await connectToDB(dbConfig1);
 
     const result = await pool
       .request()
@@ -605,7 +587,5 @@ export const fetchBisEnergyData = tryCatch(async (req, res) => {
     });
   } catch (error) {
     throw new AppError(`Failed to fetch BIS energy data: ${error.message}`, 500);
-  } finally {
-    await closePool(pool);
   }
 });

@@ -1,30 +1,3 @@
-/**
- * productionLogic.js — shared business rules for production monitoring
- *
- * Rule 1 — Downtime classification
- *   Downtime duration < IDLE_THRESHOLD_MINS  →  "Downtime"  (brief mechanical stop)
- *   Downtime duration ≥ IDLE_THRESHOLD_MINS  →  "Idle"      (machine standing idle)
- *
- * Rule 2 — Changeover detection
- *   Whenever the production model changes (Part A → Part B), the elapsed time
- *   between the last Part-A cycle and the first Part-B cycle is the changeover.
- *   Standard changeover = STD_CHANGEOVER_MINS.
- *   Actual changeover   > STD_CHANGEOVER_MINS  →  excess is "changeover loss".
- *
- *   Known data issues handled here:
- *   a) Midnight bug: 23:36→00:07 naively sorts 00:07 first, giving a ~1408 min gap.
- *      Fix: normalise using shiftStartMins so overnight records sort correctly.
- *   b) Negative gaps (setup hidden as production): handled — not clamped to 0.
- *
- *   Every model switch is recorded as a changeover regardless of gap length —
- *   including near-instant ones (same die/tool, only a program change), which
- *   are real changeovers that just happen to run well inside STD_CHANGEOVER_MINS.
- *   This plant currently has a single machine feeding PartProcessEvents, so
- *   there's no interleaved-multi-machine data to produce false positives; if a
- *   second machine is ever added, group records by assetName before calling
- *   this so a "changeover" is never inferred across two different machines.
- */
-
 export const IDLE_THRESHOLD_MINS = 10;  // Downtime ≥ 10 min → Idle
 export const STD_CHANGEOVER_MINS = 5;   // Standard changeover allowance
 
@@ -145,42 +118,97 @@ export const mergeIntervals = (intervals) => {
   return merged;
 };
 
-/**
- * Total minutes covered by records whose (effectiveState || state) matches
- * `state`, after merging overlapping/duplicate records — so a coarse
- * downtime record and its nested finer sub-records aren't summed multiple
- * times over the same wall-clock span. Same midnight-crossing normalization
- * as detectChangeovers (auto-detected from the FULL record set passed in,
- * not just the matching subset, so an overnight shift's boundary is found
- * correctly even when e.g. all the Idle records happen to fall on one side).
- *
- * @param records  Enriched records for ONE shift/date scope (state, effectiveState,
- *                 startTime, endTime, duration)
- * @param state    "Idle" | "Downtime" | "Shift Break" | any effectiveState/state value
- */
-export const mergedStateMins = (records, state) => {
-  const matching = records.filter(r => (r.effectiveState || r.state) === state && r.startTime);
-  if (!matching.length) return 0;
+// Day index (integer) for a "YYYY-MM-DD" calendar date — used to place a
+// record on an absolute, day-indexed minute line instead of guessing its day
+// from bare time-of-day.
+const dayIndex = (dateStr) => {
+  const t = Date.parse(`${dateStr}T00:00:00Z`);
+  return Number.isFinite(t) ? t / 86400000 : 0;
+};
 
-  const rawTimes = records.filter(r => r.startTime).map(r => toDecimalMins(r.startTime)).sort((a, b) => a - b);
-  let autoThreshold = null;
-  let biggestGap = 0;
-  let gapMid     = null;
-  for (let i = 1; i < rawTimes.length; i++) {
-    const gap = rawTimes[i] - rawTimes[i - 1];
-    if (gap > biggestGap) { biggestGap = gap; gapMid = (rawTimes[i - 1] + rawTimes[i]) / 2; }
+/**
+ * Builds {start, end} decimal-minute intervals for `subset`, correctly
+ * ordered across midnight.
+ *
+ * Prefers each record's own `eventDate` (the true calendar date the DB says
+ * the event happened on) — this places every record on an absolute,
+ * day-indexed minute line with no guessing: exact, per-record, immune to
+ * how the records happen to be distributed across the window. Only falls
+ * back to reconstructing order from bare time-of-day (using the known
+ * `shiftStartMins` boundary, or guessing from the biggest time gap as a last
+ * resort) when `eventDate` isn't available on every record in `subset` —
+ * that guess can misfire on a plain day shift (or any record set spanning
+ * a full day) with an uneven distribution of events, wrongly treating part
+ * of the set as spilling over from the previous day and inflating the total
+ * by a spurious ~24h.
+ *
+ * @param subset          The records to build intervals for.
+ * @param thresholdSource  Records to detect the gap-guess threshold from when
+ *                 falling back (mergedStateMins wants this to be the FULL
+ *                 record set, not just its matching subset, so an overnight
+ *                 shift's boundary is found correctly even when e.g. all the
+ *                 Idle records happen to fall on one side). Defaults to `subset`.
+ * @param shiftStartMins  Minutes-since-midnight of the shift's start time
+ *                 (e.g. 1200 for "20:00"), same convention as detectChangeovers.
+ *                 Only consulted in the no-eventDate fallback path.
+ */
+const buildIntervals = (subset, thresholdSource, shiftStartMins) => {
+  const withTimes = subset.filter(r => r.startTime);
+  if (!withTimes.length) return [];
+
+  if (withTimes.every(r => r.eventDate)) {
+    return withTimes.map(r => {
+      const base = dayIndex(r.eventDate) * 1440;
+      const s = base + toDecimalMins(r.startTime);
+      let e = base + toDecimalMins(r.endTime || r.startTime);
+      if (e < s) e += 1440; // this record's own end-of-day time precedes its start → it crossed midnight
+      return { start: s, end: e };
+    });
   }
-  if (biggestGap > 360 && gapMid !== null && rawTimes[0] < 480) autoThreshold = gapMid;
+
+  const rawTimes = (thresholdSource ?? withTimes)
+    .filter(r => r.startTime)
+    .map(r => toDecimalMins(r.startTime))
+    .sort((a, b) => a - b);
+  let autoThreshold = null;
+  if (shiftStartMins !== null) {
+    autoThreshold = shiftStartMins;
+  } else {
+    let biggestGap = 0;
+    let gapMid     = null;
+    for (let i = 1; i < rawTimes.length; i++) {
+      const gap = rawTimes[i] - rawTimes[i - 1];
+      if (gap > biggestGap) { biggestGap = gap; gapMid = (rawTimes[i - 1] + rawTimes[i]) / 2; }
+    }
+    if (biggestGap > 360 && gapMid !== null && rawTimes[0] < 480) autoThreshold = gapMid;
+  }
   const normalize = (m) => (autoThreshold !== null && m < autoThreshold) ? m + 1440 : m;
 
-  const intervals = matching.map(r => {
+  return withTimes.map(r => {
     const s = normalize(toDecimalMins(r.startTime));
     let e = normalize(toDecimalMins(r.endTime || r.startTime));
     if (e < s) e += 1440;
     return { start: s, end: e };
   });
+};
 
-  return mergeIntervals(intervals).reduce((sum, iv) => sum + (iv.end - iv.start), 0);
+/**
+ * Total minutes covered by records whose (effectiveState || state) matches
+ * `state`, after merging overlapping/duplicate records — so a coarse
+ * downtime record and its nested finer sub-records aren't summed multiple
+ * times over the same wall-clock span.
+ *
+ * @param records  Enriched records for ONE shift/date scope (state, effectiveState,
+ *                 startTime, endTime, duration, ideally eventDate)
+ * @param state    "Idle" | "Downtime" | "Shift Break" | any effectiveState/state value
+ * @param shiftStartMins  See buildIntervals — only used when records lack eventDate.
+ */
+export const mergedStateMins = (records, state, shiftStartMins = null) => {
+  const matching = records.filter(r => (r.effectiveState || r.state) === state && r.startTime);
+  if (!matching.length) return 0;
+
+  return mergeIntervals(buildIntervals(matching, records, shiftStartMins))
+    .reduce((sum, iv) => sum + (iv.end - iv.start), 0);
 };
 
 /**
@@ -192,31 +220,12 @@ export const mergedStateMins = (records, state) => {
  * bucket separately would miss overlaps that span BOTH classifications (a
  * coarse multi-hour record classifies as Idle while a brief record nested
  * inside it classifies as Downtime, even though they cover the same span).
+ *
+ * @param shiftStartMins  See buildIntervals — only used when records lack eventDate.
  */
-export const mergedDurationMins = (records) => {
-  const withTimes = records.filter(r => r.startTime);
-  if (!withTimes.length) return 0;
-
-  const rawTimes = withTimes.map(r => toDecimalMins(r.startTime)).sort((a, b) => a - b);
-  let autoThreshold = null;
-  let biggestGap = 0;
-  let gapMid     = null;
-  for (let i = 1; i < rawTimes.length; i++) {
-    const gap = rawTimes[i] - rawTimes[i - 1];
-    if (gap > biggestGap) { biggestGap = gap; gapMid = (rawTimes[i - 1] + rawTimes[i]) / 2; }
-  }
-  if (biggestGap > 360 && gapMid !== null && rawTimes[0] < 480) autoThreshold = gapMid;
-  const normalize = (m) => (autoThreshold !== null && m < autoThreshold) ? m + 1440 : m;
-
-  const intervals = withTimes.map(r => {
-    const s = normalize(toDecimalMins(r.startTime));
-    let e = normalize(toDecimalMins(r.endTime || r.startTime));
-    if (e < s) e += 1440;
-    return { start: s, end: e };
-  });
-
-  return mergeIntervals(intervals).reduce((sum, iv) => sum + (iv.end - iv.start), 0);
-};
+export const mergedDurationMins = (records, shiftStartMins = null) =>
+  mergeIntervals(buildIntervals(records, records, shiftStartMins))
+    .reduce((sum, iv) => sum + (iv.end - iv.start), 0);
 
 // ── Rule 2: Changeover detection ──────────────────────────────────────────────
 /**
@@ -225,8 +234,14 @@ export const mergedDurationMins = (records) => {
  * @param shiftStartMins  Minutes-since-midnight of the shift's start time
  *                      (e.g. 1200 for "20:00").  Pass null for day shifts.
  *                      Used to fix the midnight sort bug for overnight shifts.
+ * @param breakWindowMins  { start, end } minutes-since-midnight of the shift's
+ *                      configured lunch/dinner break (e.g. shift.breakStart/
+ *                      breakEnd resolved via resolveShiftAsOf), so a
+ *                      changeover that happens to span the break doesn't get
+ *                      that same span counted twice. Pass null if unknown —
+ *                      the break then simply isn't netted out.
  */
-export const detectChangeovers = (records, stdMins = STD_CHANGEOVER_MINS, shiftStartMins = null) => {
+export const detectChangeovers = (records, stdMins = STD_CHANGEOVER_MINS, shiftStartMins = null, breakWindowMins = null) => {
   // qty > 0 (not >= 0) — a 0-qty "Production" row is a rework/correction
   // sub-cycle on an already-produced part, not a new completed unit, so it
   // must not mark a changeover boundary (its start/end time doesn't
@@ -279,8 +294,15 @@ export const detectChangeovers = (records, stdMins = STD_CHANGEOVER_MINS, shiftS
   // intervals are merged into a non-overlapping union first (mergeIntervals,
   // exported above) — summing each record's overlap independently would
   // double/triple-count the overlapping portions.
-  const stoppages = mergeIntervals(
-    records
+  //
+  // `records` with state === "Shift Break" essentially never occurs in
+  // practice — FactoryOS's raw EventType is only ever "Production"/"Downtime",
+  // there's no third state it emits for a break window — so this filter
+  // alone was silently a no-op. `breakWindowMins` (the shift's own configured
+  // break, resolved by the caller) is the real source of truth and is what
+  // actually nets a break out below.
+  const stoppages = mergeIntervals([
+    ...records
       .filter(r => r.state === "Shift Break" && r.startTime)
       .map(r => {
         const s = normalize(toDecimalMins(r.startTime));
@@ -288,7 +310,13 @@ export const detectChangeovers = (records, stdMins = STD_CHANGEOVER_MINS, shiftS
         if (e < s) e += 1440;
         return { start: s, end: e };
       }),
-  );
+    ...(breakWindowMins ? [(() => {
+      const s = normalize(breakWindowMins.start);
+      let e = normalize(breakWindowMins.end);
+      if (e < s) e += 1440;
+      return { start: s, end: e };
+    })()] : []),
+  ]);
   const overlapMins = (aStart, aEnd, bStart, bEnd) =>
     Math.max(0, Math.min(aEnd, bEnd) - Math.max(aStart, bStart));
 

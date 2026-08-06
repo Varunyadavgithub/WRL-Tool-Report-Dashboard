@@ -1,26 +1,14 @@
 import sql from "mssql";
-import { dbConfig1 } from "../../config/db.config.js";
+import { dbConfig1, connectToDB } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
-
-const closePool = async (pool) => {
-  if (pool) {
-    try {
-      await pool.close();
-    } catch (_) {
-      // swallow – connection may already be closed
-    }
-  }
-};
 
 /* ═══════════════════════════════════════════════════════════════════════
    LIST
 ═══════════════════════════════════════════════════════════════════════ */
 export const getBisCategories = tryCatch(async (_, res) => {
-  let pool;
-
   try {
-    pool = await sql.connect(dbConfig1);
+    const pool = await connectToDB(dbConfig1);
 
     // Inner-joined to Material (Type = 100) so the list reflects the
     // current material master — a row whose material later stops being
@@ -47,8 +35,6 @@ export const getBisCategories = tryCatch(async (_, res) => {
     res.status(200).json({ success: true, categories });
   } catch (error) {
     throw new AppError(`Failed to fetch BIS categories: ${error.message}`, 500);
-  } finally {
-    await closePool(pool);
   }
 });
 
@@ -56,10 +42,8 @@ export const getBisCategories = tryCatch(async (_, res) => {
    LIST TYPE-100 MATERIALS (for the Add-Model material picker)
 ═══════════════════════════════════════════════════════════════════════ */
 export const getType100Materials = tryCatch(async (_, res) => {
-  let pool;
-
   try {
-    pool = await sql.connect(dbConfig1);
+    const pool = await connectToDB(dbConfig1);
 
     const result = await pool.request().query(`
       SELECT MatCode, Name
@@ -76,8 +60,6 @@ export const getType100Materials = tryCatch(async (_, res) => {
     res.status(200).json({ success: true, materials });
   } catch (error) {
     throw new AppError(`Failed to fetch materials: ${error.message}`, 500);
-  } finally {
-    await closePool(pool);
   }
 });
 
@@ -99,10 +81,8 @@ export const createBisCategory = tryCatch(async (req, res) => {
     );
   }
 
-  let pool;
-
   try {
-    pool = await sql.connect(dbConfig1);
+    const pool = await connectToDB(dbConfig1);
 
     const existing = await pool
       .request()
@@ -134,8 +114,6 @@ export const createBisCategory = tryCatch(async (req, res) => {
   } catch (error) {
     if (error instanceof AppError) throw error;
     throw new AppError(`Failed to add BIS category: ${error.message}`, 500);
-  } finally {
-    await closePool(pool);
   }
 });
 
@@ -159,10 +137,8 @@ export const updateBisCategory = tryCatch(async (req, res) => {
     );
   }
 
-  let pool;
-
   try {
-    pool = await sql.connect(dbConfig1);
+    const pool = await connectToDB(dbConfig1);
 
     const result = await pool
       .request()
@@ -189,8 +165,6 @@ export const updateBisCategory = tryCatch(async (req, res) => {
       .json({ success: true, message: "BIS category updated successfully." });
   } catch (error) {
     throw new AppError(`Failed to update BIS category: ${error.message}`, 500);
-  } finally {
-    await closePool(pool);
   }
 });
 
@@ -201,10 +175,8 @@ export const deleteBisCategory = tryCatch(async (req, res) => {
   const { id } = req.params;
   if (!id) throw new AppError("Missing required field: id.", 400);
 
-  let pool;
-
   try {
-    pool = await sql.connect(dbConfig1);
+    const pool = await connectToDB(dbConfig1);
 
     const result = await pool
       .request()
@@ -222,7 +194,5 @@ export const deleteBisCategory = tryCatch(async (req, res) => {
       .json({ success: true, message: "BIS category deleted successfully." });
   } catch (error) {
     throw new AppError(`Failed to delete BIS category: ${error.message}`, 500);
-  } finally {
-    await closePool(pool);
   }
 });
