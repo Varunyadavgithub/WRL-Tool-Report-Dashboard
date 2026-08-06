@@ -1137,7 +1137,16 @@ const QuickDowntimeForm = ({
   onSave,
   onClose,
 }) => {
-  const downtimeList = records.filter((r) => r.state === "Downtime");
+  // Exclude scheduled lunch/dinner-break machine-idle time — FactoryOS has
+  // no third EventType for "on scheduled break", so it logs that time the
+  // exact same way as a genuine unplanned stop (EventType="Downtime"). Those
+  // records carry ShiftName "Lunch"/"Dinner" (see the changeover break-net
+  // fix elsewhere in this file), which is the only signal telling them apart
+  // from a real fault — without this, every lunch/dinner shows up here
+  // needing a manually-assigned reason like any other stoppage.
+  const downtimeList = records.filter(
+    (r) => r.state === "Downtime" && r.shift !== "Lunch" && r.shift !== "Dinner",
+  );
   const activeReasons = downtimeReasons.filter((r) => r.status);
   const [activeTab, setActiveTab] = useState("log"); // "log" | "report"
 
