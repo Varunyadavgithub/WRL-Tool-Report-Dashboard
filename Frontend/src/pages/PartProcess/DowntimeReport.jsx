@@ -405,7 +405,15 @@ const PartProcessDowntimeReport = () => {
   const isAnyLoading = loading||ydayLoading||todayLoading||shiftLoading!==null;
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  const allDT    = useMemo(()=>records.filter((r)=>r.state==="Downtime"),[records]);
+  // Excludes scheduled lunch/dinner-break machine-idle time — FactoryOS has
+  // no third EventType for "on scheduled break", so it logs that time the
+  // exact same way as a genuine unplanned stop (EventType="Downtime"). Those
+  // records carry ShiftName "Lunch"/"Dinner", the only signal telling them
+  // apart from a real fault — without this they'd inflate every downtime
+  // total/chart here and show up as "Unassigned" rows for something that
+  // was never a fault to explain (same fix as the Dashboard's Log Downtime
+  // worklist).
+  const allDT    = useMemo(()=>records.filter((r)=>r.state==="Downtime" && r.shift!=="Lunch" && r.shift!=="Dinner"),[records]);
   const briefDT  = useMemo(()=>allDT.filter((r)=>(r.effectiveState||r.state)==="Downtime"),[allDT]);
   const idleDT   = useMemo(()=>allDT.filter((r)=>(r.effectiveState||r.state)==="Idle"),[allDT]);
 
