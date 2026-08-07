@@ -68,7 +68,12 @@ export const fetchShiftRawData = async (pool, shift, dateStr) => {
 export const buildDowntimeReportBlocks = (raw) => {
   const { materials, dtLogRows } = raw;
   const enriched = enrichRecords(raw.records);
-  const allDT = enriched.filter((r) => r.state === "Downtime");
+  // Excludes scheduled lunch/dinner-break machine-idle time — same fix as
+  // the frontend Downtime Report/Dashboard: FactoryOS logs that time as a
+  // plain EventType="Downtime" row (ShiftName "Lunch"/"Dinner" is the only
+  // signal it's a scheduled break, not a fault), so without this it would
+  // inflate the emailed report's totals and show as "Unassigned".
+  const allDT = enriched.filter((r) => r.state === "Downtime" && r.shift !== "Lunch" && r.shift !== "Dinner");
 
   const dtRows = allDT.map((r, idx) => {
     const logged = dtLogRows.find((d) => d.EventId && String(d.EventId) === String(r.eventId));
