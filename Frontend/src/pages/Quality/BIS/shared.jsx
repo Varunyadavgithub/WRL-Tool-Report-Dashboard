@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { X, ChevronDown, Tag, CheckCircle2, FileSearch, Sparkles, FileText, Pencil, Download, Trash2, Calendar } from "lucide-react";
+import { X, ChevronDown, Tag, CheckCircle2, FileSearch, Sparkles, FileText, Pencil, Download, Trash2, Calendar, Plus, Copy, Lock, LockOpen } from "lucide-react";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 export const MONTHS = [
@@ -92,7 +92,7 @@ export const EnergyResult = ({ file, compact }) => {
 
 // ── Multi-select Dropdown ──────────────────────────────────────────────────────
 // Generic checklist dropdown with type-to-search — used for Model/Year filters.
-export const MultiSelectDropdown = ({ label, options, selected, onChange, placeholder = "All" }) => {
+export const MultiSelectDropdown = ({ label, options, selected, onChange, placeholder = "All", labelFor = (v) => v }) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const ref = useRef(null);
@@ -130,7 +130,7 @@ export const MultiSelectDropdown = ({ label, options, selected, onChange, placeh
         <span className="flex items-center gap-1.5 truncate">
           {selected.length > 0 && <Tag className="w-3 h-3 text-blue-500 shrink-0" />}
           <span className="truncate">
-            {selected.length === 0 ? placeholder : selected.length === 1 ? selected[0] : `${selected.length} selected`}
+            {selected.length === 0 ? placeholder : selected.length === 1 ? labelFor(selected[0]) : `${selected.length} selected`}
           </span>
         </span>
         <span className="flex items-center gap-1 shrink-0">
@@ -185,7 +185,7 @@ export const MultiSelectDropdown = ({ label, options, selected, onChange, placeh
                     <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${active ? "bg-blue-600 border-blue-600" : "border-slate-300 bg-white"}`}>
                       {active && <CheckCircle2 className="w-3 h-3 text-white" strokeWidth={3} />}
                     </span>
-                    {opt}
+                    {labelFor(opt)}
                   </button>
                 );
               })
@@ -475,4 +475,267 @@ export const usePagedSlice = (rows, limit) => {
   const safePage = Math.min(page, totalPages);
   const start = (safePage - 1) * limit;
   return { page: safePage, setPage, totalPages, slice: rows.slice(start, start + limit) };
+};
+
+// ── BIS Test Reports (Phase 2 — in-app report entry) ────────────────────────────
+export const BIS_REPORT_TYPES = ["Introduction", "Sound", "Volume"];
+
+// Display-only rename: the "Introduction" report is shown to users as
+// "Performance" (matches how the lab refers to it) — the underlying
+// reportType value/DB column/API payloads all stay "Introduction" since
+// that's wired through the schema, migrations, and stored data already.
+const REPORT_TYPE_LABELS = { Introduction: "Performance", Sound: "Sound", Volume: "Volume" };
+export const reportTypeLabel = (type) => REPORT_TYPE_LABELS[type] || type;
+
+// SQL rows come back PascalCase (TestDateTo, ModelName…) — form state is
+// camelCase to match the create/update payload shape the backend expects.
+export const toDateInputValue = (v) => (v ? String(v).slice(0, 10) : "");
+
+export const mapRowToCamel = (row) => {
+  if (!row) return {};
+  const out = {};
+  for (const [key, value] of Object.entries(row)) {
+    const camelKey = key.charAt(0).toLowerCase() + key.slice(1);
+    out[camelKey] = value;
+  }
+  return out;
+};
+
+// Applies mapRowToCamel plus date-input formatting for known date fields.
+export const mapHeaderToFormState = (row) => {
+  const h = mapRowToCamel(row);
+  for (const key of ["testDateFrom", "testDateTo", "sampleReceiptDate", "reportIssueDate"]) {
+    if (h[key] !== undefined) h[key] = toDateInputValue(h[key]);
+  }
+  return h;
+};
+
+export const mapEquipmentToFormState = (rows) =>
+  (rows || []).map((row) => {
+    const e = mapRowToCamel(row);
+    e.calibrationDueDate = toDateInputValue(e.calibrationDueDate);
+    return e;
+  });
+
+// Rounds to N decimals, passing through null/NaN — used by the auto-calculate
+// formulas ported from the original lab-report Excel templates.
+export const round = (v, decimals = 3) => {
+  const n = Number(v);
+  if (v === null || v === undefined || v === "" || Number.isNaN(n)) return null;
+  const f = 10 ** decimals;
+  return Math.round(n * f) / f;
+};
+
+export const SectionCard = ({ title, children, className = "" }) => (
+  <div className={`bg-white rounded-xl border border-slate-200 shadow-sm p-4 ${className}`}>
+    {title && <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-3">{title}</h3>}
+    {children}
+  </div>
+);
+
+// ── Result Toggle (PASS / FAIL / PENDING) ───────────────────────────────────────
+// `readOnly` renders this as a computed-value badge (no click targets) — used
+// wherever the result comes from a formula (e.g. Volume/Energy pass-fail),
+// matching the source template where those cells aren't user-editable.
+export const ResultToggle = ({ value, onChange, options = ["PASS", "FAIL", "PENDING"], readOnly = false }) => {
+  if (readOnly) {
+    return (
+      <span className={`inline-block px-3 py-1.5 rounded-lg text-xs font-bold ${
+        value === "PASS" ? "bg-emerald-100 text-emerald-700" : value === "FAIL" ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-500"
+      }`}>
+        {value || "—"} <span className="font-normal text-[10px] opacity-70">(computed)</span>
+      </span>
+    );
+  }
+  return (
+    <div className="flex gap-1.5">
+      {options.map((r) => (
+        <button
+          key={r}
+          type="button"
+          onClick={() => onChange(r)}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-all ${
+            value === r
+              ? r === "PASS" ? "bg-emerald-600 text-white border-emerald-600"
+                : r === "FAIL" ? "bg-red-600 text-white border-red-600"
+                : "bg-amber-500 text-white border-amber-500"
+              : "border-slate-200 text-slate-500 hover:border-slate-300 bg-slate-50"
+          }`}
+        >
+          {r}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+// Styled read-only display for formula-derived numeric/text fields — visually
+// distinct from a live input so it's clear the value comes from Calculate,
+// not direct typing (mirrors the source Excel template's non-highlighted,
+// formula-bearing cells).
+export const computedInputCls = "w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-500 bg-slate-50 cursor-not-allowed";
+
+// A computed section (formula-derived fields) is locked by default — this
+// toggles it into a normal editable state for the rare case the formula
+// doesn't cover (a manual override), and flags clearly when it's active so
+// nobody mistakes an overridden value for a freshly-calculated one.
+export const OverrideToggle = ({ active, onToggle }) => (
+  <button
+    type="button"
+    onClick={onToggle}
+    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border transition-all ${
+      active ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
+    }`}
+    title={active ? "Editing manually — click to go back to calculated values" : "Unlock to override the calculated values"}
+  >
+    {active ? <LockOpen className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+    {active ? "Manual Override" : "Unlock to Edit"}
+  </button>
+);
+
+// ── Report Header Fields (common to all 3 report types + Introduction-only
+//    nameplate fields) ────────────────────────────────────────────────────────
+export const ReportHeaderFields = ({ header, onChange, models, showIntroFields, resultReadOnly = false }) => {
+  // onChange is a curried setter — (field) => (value) => ... — same
+  // convention as makeSetter/setHeaderField in the 3 report forms.
+  const set = (field) => (e) => onChange(field)(e.target.value);
+  const selectedModel = models.find((m) => m.modelName === header.modelName);
+
+  return (
+    <SectionCard title="Report Header">
+      <div className="grid md:grid-cols-3 gap-3">
+        <div>
+          <FieldLabel>Model</FieldLabel>
+          <SearchableSelect
+            placeholder="Search BIS model…"
+            value={header.modelName || ""}
+            onChange={(modelName) => {
+              const m = models.find((x) => x.modelName === modelName);
+              onChange("modelName")(modelName);
+              onChange("materialCode")(m?.materialCode || "");
+            }}
+            options={models.map((m) => ({ value: m.modelName, label: m.modelName }))}
+          />
+          {selectedModel && <p className="text-[10px] text-slate-400 mt-1">Material Code: <span className="font-mono">{selectedModel.materialCode}</span></p>}
+        </div>
+        <div>
+          <FieldLabel>Machine Serial Number</FieldLabel>
+          <input type="text" value={header.machineSerialNumber || ""} onChange={set("machineSerialNumber")} className={inputCls} />
+        </div>
+        <div>
+          <FieldLabel>Test Report No.</FieldLabel>
+          <input type="text" value={header.testReportNo || ""} onChange={set("testReportNo")} className={inputCls} placeholder="e.g. WRL/TAD/26/0001" />
+        </div>
+        <div>
+          <FieldLabel>UID No.</FieldLabel>
+          <input type="text" value={header.uidNo || ""} onChange={set("uidNo")} className={inputCls} />
+        </div>
+        <div>
+          <FieldLabel>Test Date From</FieldLabel>
+          <input type="date" value={header.testDateFrom || ""} onChange={set("testDateFrom")} className={inputCls} />
+        </div>
+        <div>
+          <FieldLabel>Test Date To *</FieldLabel>
+          <input type="date" value={header.testDateTo || ""} onChange={set("testDateTo")} className={inputCls} required />
+        </div>
+        <div>
+          <FieldLabel>Tested By</FieldLabel>
+          <input type="text" value={header.testedBy || ""} onChange={set("testedBy")} className={inputCls} />
+        </div>
+        <div className="md:col-span-2">
+          <FieldLabel>Test Standard</FieldLabel>
+          <input type="text" value={header.testStandard || ""} onChange={set("testStandard")} className={inputCls} placeholder="e.g. IS 7872 : 2020 Deep Freezers - Specification" />
+        </div>
+        <div>
+          <FieldLabel>Result{resultReadOnly && " (from location statuses below)"}</FieldLabel>
+          <ResultToggle value={header.result} onChange={(v) => onChange("result")(v)} readOnly={resultReadOnly} />
+        </div>
+
+        {showIntroFields && (
+          <>
+            <div><FieldLabel>Appliance Type</FieldLabel><input type="text" value={header.applianceType || ""} onChange={set("applianceType")} className={inputCls} placeholder="e.g. Deep Freezer" /></div>
+            <div><FieldLabel>Manufacturer</FieldLabel><input type="text" value={header.manufacturer || ""} onChange={set("manufacturer")} className={inputCls} /></div>
+            <div><FieldLabel>Product Variant / Type</FieldLabel><input type="text" value={header.productVariant || ""} onChange={set("productVariant")} className={inputCls} placeholder="e.g. Glass Top Deep Freezer" /></div>
+            <div><FieldLabel>Refrigerant Name</FieldLabel><input type="text" value={header.refrigerantName || ""} onChange={set("refrigerantName")} className={inputCls} placeholder="e.g. R-290 (77 gram)" /></div>
+            <div><FieldLabel>Rated Voltage / Freq / Phase</FieldLabel><input type="text" value={header.ratedVoltageFreqPhase || ""} onChange={set("ratedVoltageFreqPhase")} className={inputCls} placeholder="e.g. 230V / 50Hz / 1 Ph" /></div>
+            <div><FieldLabel>Unit Picked From</FieldLabel><input type="text" value={header.unitPickedFrom || ""} onChange={set("unitPickedFrom")} className={inputCls} /></div>
+            <div><FieldLabel>Rated Gross Volume (L)</FieldLabel><input type="number" step="any" value={header.ratedGrossVolumeLitre || ""} onChange={set("ratedGrossVolumeLitre")} className={inputCls} /></div>
+            <div><FieldLabel>Rated Storage Volume (L)</FieldLabel><input type="number" step="any" value={header.ratedStorageVolumeLitre || ""} onChange={set("ratedStorageVolumeLitre")} className={inputCls} /></div>
+            <div><FieldLabel>Annual Electricity Consumption (kWh/yr)</FieldLabel><input type="number" step="any" value={header.annualElectricityConsumptionKwh || ""} onChange={set("annualElectricityConsumptionKwh")} className={inputCls} /></div>
+            <div><FieldLabel>Report Issue Date</FieldLabel><input type="date" value={header.reportIssueDate || ""} onChange={set("reportIssueDate")} className={inputCls} /></div>
+            <div><FieldLabel>Total Pages</FieldLabel><input type="number" value={header.totalPages || ""} onChange={set("totalPages")} className={inputCls} /></div>
+            <div><FieldLabel>Sample Receipt Date</FieldLabel><input type="date" value={header.sampleReceiptDate || ""} onChange={set("sampleReceiptDate")} className={inputCls} /></div>
+            <div><FieldLabel>Condition of Sample on Receipt</FieldLabel><input type="text" value={header.sampleCondition || ""} onChange={set("sampleCondition")} className={inputCls} placeholder="e.g. Satisfactory" /></div>
+            <div><FieldLabel>Purpose of Testing</FieldLabel><input type="text" value={header.purposeOfTesting || ""} onChange={set("purposeOfTesting")} className={inputCls} placeholder="e.g. For BIS Requirement" /></div>
+            <div><FieldLabel>Prepared By</FieldLabel><input type="text" value={header.preparedBy || ""} onChange={set("preparedBy")} className={inputCls} /></div>
+            <div><FieldLabel>Reviewed By</FieldLabel><input type="text" value={header.reviewedBy || ""} onChange={set("reviewedBy")} className={inputCls} /></div>
+            <div><FieldLabel>Authorized By</FieldLabel><input type="text" value={header.authorizedBy || ""} onChange={set("authorizedBy")} className={inputCls} /></div>
+          </>
+        )}
+
+        <div className="md:col-span-3">
+          <FieldLabel>Remarks</FieldLabel>
+          <textarea value={header.remarks || ""} onChange={set("remarks")} rows={2} className={`${inputCls} resize-none`} />
+        </div>
+      </div>
+    </SectionCard>
+  );
+};
+
+// ── Equipment Editor (Test Equipment Used — shared across all 3 report types) ──
+export const EquipmentEditor = ({ equipment, onChange, onCopyFromLast, copying }) => {
+  const addRow = () => onChange([...equipment, { instrumentName: "", make: "", model: "", serialOrEquipmentId: "", calibrationDueDate: "" }]);
+  const removeRow = (idx) => onChange(equipment.filter((_, i) => i !== idx));
+  const updateRow = (idx, field, value) => onChange(equipment.map((row, i) => (i === idx ? { ...row, [field]: value } : row)));
+
+  return (
+    <SectionCard>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Test Equipment Used</h3>
+        <div className="flex items-center gap-2">
+          {onCopyFromLast && (
+            <button type="button" onClick={onCopyFromLast} disabled={copying}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 bg-white text-slate-500 hover:border-blue-300 hover:text-blue-600 transition-all disabled:opacity-50">
+              <Copy className="w-3 h-3" /> {copying ? "Loading…" : "Copy from last report"}
+            </button>
+          )}
+          <button type="button" onClick={addRow}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-all">
+            <Plus className="w-3 h-3" /> Add Instrument
+          </button>
+        </div>
+      </div>
+      {equipment.length === 0 ? (
+        <p className="text-xs text-slate-400 text-center py-4">No equipment added yet.</p>
+      ) : (
+        <div className="overflow-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr>
+                {["Instrument", "Make", "Model", "Serial / Equipment ID", "Calibration Due Date", ""].map((h) => (
+                  <th key={h} className="px-2 py-1.5 text-left font-semibold text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-200">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {equipment.map((row, idx) => (
+                <tr key={idx}>
+                  <td className="px-2 py-1.5 border-b border-slate-100"><input type="text" value={row.instrumentName} onChange={(e) => updateRow(idx, "instrumentName", e.target.value)} className={inputCls} /></td>
+                  <td className="px-2 py-1.5 border-b border-slate-100"><input type="text" value={row.make} onChange={(e) => updateRow(idx, "make", e.target.value)} className={inputCls} /></td>
+                  <td className="px-2 py-1.5 border-b border-slate-100"><input type="text" value={row.model} onChange={(e) => updateRow(idx, "model", e.target.value)} className={inputCls} /></td>
+                  <td className="px-2 py-1.5 border-b border-slate-100"><input type="text" value={row.serialOrEquipmentId} onChange={(e) => updateRow(idx, "serialOrEquipmentId", e.target.value)} className={inputCls} /></td>
+                  <td className="px-2 py-1.5 border-b border-slate-100"><input type="date" value={row.calibrationDueDate || ""} onChange={(e) => updateRow(idx, "calibrationDueDate", e.target.value)} className={inputCls} /></td>
+                  <td className="px-2 py-1.5 border-b border-slate-100">
+                    <button type="button" onClick={() => removeRow(idx)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </SectionCard>
+  );
 };

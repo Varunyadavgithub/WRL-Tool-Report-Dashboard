@@ -22,6 +22,7 @@ const toDecimalMins = (timeStr) => {
 };
 
 // Format decimal minutes → "HH:MM" (wraps at 24 h)
+
 const fmtMins = (m) =>
   `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(Math.floor(m % 60)).padStart(2, "0")}`;
 
