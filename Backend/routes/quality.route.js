@@ -42,6 +42,16 @@ import {
   getBisCategories, createBisCategory, updateBisCategory, deleteBisCategory,
   getType100Materials,
 } from "../controllers/quality/BisCategory.controller.js";
+import {
+  getBisTestFrequencyConfig, updateBisTestFrequencyConfig,
+} from "../controllers/quality/BisTestConfig.controller.js";
+import {
+  getBisTestSchedule, createBisTestBaseline, updateBisTestBaseline,
+} from "../controllers/quality/BisTestSchedule.controller.js";
+import {
+  createBisTestReport, getBisTestReports, getBisTestReportById,
+  updateBisTestReport, deleteBisTestReport, getBisTestReportHistory,
+} from "../controllers/quality/BisTestReport.controller.js";
 import { getDispatchHoldDetails } from "../controllers/quality/holdCabinetDetails.controller.js";
 import { getCPTReport } from "../controllers/quality/cptReport.controller.js";
 import {
@@ -138,6 +148,21 @@ router.post("/bis-category", authenticate, createBisCategory);
 router.put("/bis-category/:id", authenticate, updateBisCategory);
 router.delete("/bis-category/:id", authenticate, deleteBisCategory);
 router.get("/type100-materials", authenticate, getType100Materials);
+
+// BIS Test Schedule — frequency/duration config + computed schedule + one-time baseline setup
+router.get("/bis-test-config", authenticate, getBisTestFrequencyConfig);
+router.put("/bis-test-config", authenticate, updateBisTestFrequencyConfig);
+router.get("/bis-test-schedule", authenticate, getBisTestSchedule);
+router.post("/bis-test-baseline", authenticate, createBisTestBaseline);
+router.put("/bis-test-baseline/:id", authenticate, updateBisTestBaseline);
+
+// BIS Test Reports — in-app report creation replacing PDF upload
+router.get("/bis-test-reports", authenticate, getBisTestReports);
+router.post("/bis-test-reports", authenticate, createBisTestReport);
+router.get("/bis-test-reports/:id", authenticate, getBisTestReportById);
+router.put("/bis-test-reports/:id", authenticate, updateBisTestReport);
+router.delete("/bis-test-reports/:id", authenticate, deleteBisTestReport);
+router.get("/bis-test-reports/:id/history", authenticate, getBisTestReportHistory);
 
 // BEE Calculation
 router.get("/bee/models", authenticate, getBeeModels);
