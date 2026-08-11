@@ -1,29 +1,39 @@
 import { useEffect, useState, useMemo } from "react";
 import {
-  FileText, Layers, CheckCircle, Clock, RefreshCw, CloudUpload, Table2,
+  FileText, Layers, CheckCircle, Clock, RefreshCw,
   Zap, Settings2, ShieldCheck, AlertTriangle, Pencil, FileUp, CloudUpload as CloudUploadIcon,
+  CalendarClock, FileStack, Archive,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
 import PopupModal from "../../../components/ui/PopupModal";
 import { baseURL } from "../../../assets/assets";
-import { FieldLabel, inputCls, MONTHS, YEARS, ScanningModal, ConfirmEnergyModal, SearchableSelect, SCAN_STEPS } from "./shared";
-import BISUploadTab from "./BISUploadTab";
+import { FieldLabel, inputCls, MONTHS, YEARS, ScanningModal, ConfirmEnergyModal, SearchableSelect, SCAN_STEPS, reportTypeLabel } from "./shared";
+import BISTestReportsTab from "./BISTestReportsTab";
 import BISReportsTab from "./BISReportsTab";
 import BISComplianceTab from "./BISComplianceTab";
 import BISEnergyTab from "./BISEnergyTab";
 import BISConfigTab from "./BISConfigTab";
+import BISTestScheduleTab from "./BISTestScheduleTab";
 
 const TABS = [
-  { key: "upload", label: "Upload Report", icon: CloudUpload },
-  { key: "reports", label: "All Reports", icon: Table2 },
+  { key: "testReports", label: "Test Reports", icon: FileStack },
+  { key: "schedule", label: "Test Schedule", icon: CalendarClock },
+  { key: "reports", label: "Legacy PDF Reports (Archive)", icon: Archive },
   { key: "compliance", label: "Compliance Status", icon: ShieldCheck },
   { key: "energy", label: "Energy Analysis", icon: Zap },
   { key: "config", label: "BIS Config", icon: Settings2 },
 ];
 
+const OVERRIDE_FIELDS = [
+  "introductionFrequencyMonths", "introductionDurationDays",
+  "soundFrequencyMonths", "soundDurationDays",
+  "volumeFrequencyMonths", "volumeDurationDays",
+];
+const emptyOverrides = Object.fromEntries(OVERRIDE_FIELDS.map((k) => [k, ""]));
+
 const BISDashboard = () => {
-  const [activeTab, setActiveTab] = useState("upload");
+  const [activeTab, setActiveTab] = useState("testReports");
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [status, setStatus] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -58,9 +68,17 @@ const BISDashboard = () => {
   const [categoryLoading, setCategoryLoading] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categoryModalMode, setCategoryModalMode] = useState("add");
-  const [categoryForm, setCategoryForm] = useState({ id: null, materialCode: "", modelName: "", category: "0" });
+  const [categoryForm, setCategoryForm] = useState({ id: null, materialCode: "", modelName: "", category: "0", ...emptyOverrides });
   const [showDeleteCategoryModal, setShowDeleteCategoryModal] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState(null);
+  const [showOverrideSection, setShowOverrideSection] = useState(false);
+
+  // ── BIS Test Schedule (frequency config + computed schedule) ──────────────
+  const [testConfig, setTestConfig] = useState(null);
+  const [testConfigLoading, setTestConfigLoading] = useState(false);
+  const [schedule, setSchedule] = useState([]);
+  const [scheduleSummary, setScheduleSummary] = useState({ overdue: 0, dueSoon: 0, scheduled: 0, noBaseline: 0 });
+  const [scheduleLoading, setScheduleLoading] = useState(false);
 
   const stats = useMemo(() => ({
     totalFiles: uploadedFiles.length,
@@ -95,6 +113,7 @@ const BISDashboard = () => {
   const refreshAll = () => {
     fetchUploadedFiles();
     fetchStatus();
+    fetchSchedule();
   };
 
   // ── BIS Config API ──────────────────────────────────────────────────────
@@ -121,6 +140,72 @@ const BISDashboard = () => {
   };
   useEffect(() => { fetchType100Materials(); }, []);
 
+  // ── BIS Test Schedule API ───────────────────────────────────────────────
+  const fetchTestConfig = async () => {
+    try {
+      setTestConfigLoading(true);
+      const res = await axios.get(`${baseURL}quality/bis-test-config`);
+      setTestConfig(res?.data?.config || null);
+    } catch {
+      toast.error("Failed to fetch BIS test schedule settings");
+    } finally {
+      setTestConfigLoading(false);
+    }
+  };
+  useEffect(() => { fetchTestConfig(); }, []);
+
+  const saveTestConfig = async (form) => {
+    try {
+      await axios.put(`${baseURL}quality/bis-test-config`, form);
+      toast.success("Test schedule settings saved");
+      fetchTestConfig();
+      fetchSchedule();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to save schedule settings");
+    }
+  };
+
+  const fetchSchedule = async () => {
+    try {
+      setScheduleLoading(true);
+      const res = await axios.get(`${baseURL}quality/bis-test-schedule`);
+      setSchedule(res?.data?.schedule || []);
+      setScheduleSummary(res?.data?.summary || { overdue: 0, dueSoon: 0, scheduled: 0, noBaseline: 0 });
+    } catch {
+      toast.error("Failed to fetch BIS test schedule");
+    } finally {
+      setScheduleLoading(false);
+    }
+  };
+  useEffect(() => { fetchSchedule(); }, []);
+
+  // Sets the one-time "last test date" for one model, one or more report
+  // types at once — entered inline in the Test Schedule tab's merged
+  // No-Baseline row.
+  const handleSaveBaseline = async (entries) => {
+    try {
+      const res = await axios.post(`${baseURL}quality/bis-test-baseline`, { entries });
+      toast.success(res?.data?.message || "Baseline saved");
+      fetchSchedule();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to save baseline");
+      throw err;
+    }
+  };
+
+  // Corrects an already-set baseline date (Status='Baseline' rows only —
+  // dates from a submitted report are edited via the report itself).
+  const handleEditBaselineDate = async (item, lastTestDate) => {
+    try {
+      await axios.put(`${baseURL}quality/bis-test-baseline/${item.sourceReportId}`, { lastTestDate });
+      toast.success("Last test date updated");
+      fetchSchedule();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update date");
+      throw err;
+    }
+  };
+
   // Same "9-char prefix + optional ' RT'" convention the backend derives
   // BISCategory.ModelName with.
   const deriveModelName = (name) => {
@@ -141,22 +226,25 @@ const BISDashboard = () => {
 
   const openAddCategoryModal = () => {
     setCategoryModalMode("add");
-    setCategoryForm({ id: null, materialCode: "", modelName: "", category: "0" });
+    setCategoryForm({ id: null, materialCode: "", modelName: "", category: "0", ...emptyOverrides });
+    setShowOverrideSection(false);
     setShowCategoryModal(true);
   };
 
   const openEditCategoryModal = (row) => {
     setCategoryModalMode("edit");
-    setCategoryForm({ id: row.id, materialCode: row.materialCode, modelName: row.modelName, category: String(row.category) });
+    const overrides = Object.fromEntries(OVERRIDE_FIELDS.map((k) => [k, row[k] ?? ""]));
+    setCategoryForm({ id: row.id, materialCode: row.materialCode, modelName: row.modelName, category: String(row.category), ...overrides });
+    setShowOverrideSection(OVERRIDE_FIELDS.some((k) => row[k] !== null && row[k] !== undefined));
     setShowCategoryModal(true);
   };
 
   const saveCategoryModal = async () => {
-    const { id, materialCode, modelName, category } = categoryForm;
+    const { id, materialCode, modelName, category, ...overrides } = categoryForm;
     if (!materialCode.trim()) return toast.error("Material Code is required");
     if (!modelName.trim()) return toast.error("Model Name is required");
 
-    const payload = { materialCode: materialCode.trim(), modelName: modelName.trim(), category: Number(category) };
+    const payload = { materialCode: materialCode.trim(), modelName: modelName.trim(), category: Number(category), ...overrides };
 
     try {
       setCategoryLoading(true);
@@ -169,10 +257,30 @@ const BISDashboard = () => {
       }
       setShowCategoryModal(false);
       fetchBisCategories();
+      fetchSchedule();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to save BIS category");
     } finally {
       setCategoryLoading(false);
+    }
+  };
+
+  // Inline schedule-override save from the BIS Config model table — reuses
+  // the same update-category endpoint, just without opening the full modal.
+  const saveCategoryOverridesInline = async (row, overrides) => {
+    try {
+      await axios.put(`${baseURL}quality/bis-category/${row.id}`, {
+        materialCode: row.materialCode,
+        modelName: row.modelName,
+        category: row.category,
+        ...overrides,
+      });
+      toast.success("Schedule override saved");
+      fetchBisCategories();
+      fetchSchedule();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to save schedule override");
+      throw err;
     }
   };
 
@@ -192,46 +300,6 @@ const BISDashboard = () => {
       toast.error("Failed to delete BIS category");
     } finally {
       setCategoryLoading(false);
-    }
-  };
-
-  // ── Upload ──────────────────────────────────────────────────────────────
-  const handleUpload = async ({ modelName, year, month, testFrequency, description, file }) => {
-    const formData = new FormData();
-    formData.append("modelName", modelName);
-    formData.append("year", year);
-    formData.append("month", month);
-    formData.append("testFrequency", testFrequency);
-    formData.append("description", description);
-    formData.append("file", file);
-
-    try {
-      setLoading(true);
-      setShowScanningModal(true);
-      const res = await axios.post(`${baseURL}quality/upload-bis-pdf`, formData, { headers: { "Content-Type": "multipart/form-data" } });
-      if (res?.data?.success) {
-        toast.success("BIS Report uploaded successfully");
-        fetchUploadedFiles();
-        fetchStatus();
-        setActiveTab("reports");
-
-        const energyData = res.data.energyData || {};
-        setConfirmData({
-          srNo: res.data.srNo,
-          declaredAnnualEnergy: energyData.declaredAnnualEnergy ?? "",
-          measuredAnnualEnergy: energyData.measuredAnnualEnergy ?? "",
-          energyDeviationPercent: energyData.energyDeviationPercent ?? "",
-          testResult: energyData.testResult || "",
-        });
-        return true;
-      }
-      return false;
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to upload BIS Report");
-      return false;
-    } finally {
-      setLoading(false);
-      setShowScanningModal(false);
     }
   };
 
@@ -432,10 +500,21 @@ const BISDashboard = () => {
           ))}
         </div>
 
-        {activeTab === "upload" && <BISUploadTab uploading={loading} onUpload={handleUpload} />}
+        {activeTab === "testReports" && <BISTestReportsTab />}
 
         {activeTab === "reports" && (
           <BISReportsTab files={uploadedFiles} onEdit={handleUpdate} onDownload={handleDownload} onDelete={handleDeleteFile} onFetchData={handleFetchEnergyData} />
+        )}
+
+        {activeTab === "schedule" && (
+          <BISTestScheduleTab
+            schedule={schedule}
+            summary={scheduleSummary}
+            loading={scheduleLoading}
+            onRefresh={fetchSchedule}
+            onSaveBaseline={handleSaveBaseline}
+            onEditBaselineDate={handleEditBaselineDate}
+          />
         )}
 
         {activeTab === "compliance" &&
@@ -469,6 +548,10 @@ const BISDashboard = () => {
             onAddCategory={openAddCategoryModal}
             onEditCategory={openEditCategoryModal}
             onDeleteCategory={handleDeleteCategory}
+            testConfig={testConfig}
+            testConfigLoading={testConfigLoading}
+            onSaveTestConfig={saveTestConfig}
+            onInlineUpdateOverrides={saveCategoryOverridesInline}
           />
         )}
       </div>
@@ -570,6 +653,10 @@ const BISDashboard = () => {
 
       {/* ── BIS CATEGORY ADD/EDIT MODAL ── */}
       {showCategoryModal && (
+        // Forced-light: contains the schedule-override section, only designed
+        // for light mode — browsers that force-invert undeclared-scheme pages
+        // otherwise wash this out under a dark OS/browser theme.
+        <div style={{ colorScheme: "light" }}>
         <PopupModal
           title={categoryModalMode === "add" ? "Add BIS Category" : "Edit BIS Category"}
           description=""
@@ -580,7 +667,7 @@ const BISDashboard = () => {
           onCancel={() => setShowCategoryModal(false)}
           icon={<Settings2 className="w-8 h-8 text-blue-500 mx-auto" />}
           confirmButtonColor="bg-blue-600 hover:bg-blue-700"
-          modalClassName="w-[95%] max-w-md"
+          modalClassName="w-[95%] max-w-lg"
         >
           <div className="mt-4 space-y-3 text-left">
             {categoryModalMode === "add" ? (
@@ -613,8 +700,41 @@ const BISDashboard = () => {
                 <option value="1">BIS</option>
               </select>
             </div>
+
+            {categoryForm.category === "1" && (
+              <div className="border-t border-slate-100 pt-3">
+                <button type="button" onClick={() => setShowOverrideSection((v) => !v)} className="text-[11px] font-semibold text-blue-600 hover:underline">
+                  {showOverrideSection ? "− Hide" : "+ Override"} schedule for this model
+                </button>
+                {showOverrideSection && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-[10px] text-slate-400">Leave blank to use the global default from BIS Config's Test Schedule Settings.</p>
+                    {[
+                      { type: "Introduction", freqKey: "introductionFrequencyMonths", durKey: "introductionDurationDays" },
+                      { type: "Sound", freqKey: "soundFrequencyMonths", durKey: "soundDurationDays" },
+                      { type: "Volume", freqKey: "volumeFrequencyMonths", durKey: "volumeDurationDays" },
+                    ].map(({ type, freqKey, durKey }) => (
+                      <div key={type} className="grid grid-cols-3 gap-2 items-end">
+                        <p className="text-[11px] font-semibold text-slate-600">{reportTypeLabel(type)}</p>
+                        <div>
+                          <FieldLabel>Freq (months)</FieldLabel>
+                          <input type="number" min={1} placeholder="Default" value={categoryForm[freqKey]}
+                            onChange={(e) => setCategoryForm((p) => ({ ...p, [freqKey]: e.target.value }))} className={inputCls} />
+                        </div>
+                        <div>
+                          <FieldLabel>Duration (days)</FieldLabel>
+                          <input type="number" min={1} placeholder="Default" value={categoryForm[durKey]}
+                            onChange={(e) => setCategoryForm((p) => ({ ...p, [durKey]: e.target.value }))} className={inputCls} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </PopupModal>
+        </div>
       )}
 
       {/* ── BIS CATEGORY DELETE MODAL ── */}

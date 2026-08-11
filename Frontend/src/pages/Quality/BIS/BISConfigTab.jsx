@@ -1,12 +1,130 @@
-import { useState, useMemo } from "react";
-import { Search, RefreshCw, Plus, Pencil, Trash2 } from "lucide-react";
+import { useState, useMemo, useEffect, Fragment } from "react";
+import { Search, RefreshCw, Plus, Pencil, Trash2, CalendarClock, Save, X, SlidersHorizontal } from "lucide-react";
 import Pagination from "../../../components/ui/Pagination";
-import { usePagedSlice } from "./shared";
+import { usePagedSlice, FieldLabel, inputCls, reportTypeLabel } from "./shared";
+
+const FREQUENCY_FIELDS = [
+  { type: "Introduction", freqKey: "introductionFrequencyMonths", durKey: "introductionDurationDays", freqUnit: "months", durUnit: "days" },
+  { type: "Sound", freqKey: "soundFrequencyMonths", durKey: "soundDurationDays", freqUnit: "months", durUnit: "days" },
+  { type: "Volume", freqKey: "volumeFrequencyMonths", durKey: "volumeDurationDays", freqUnit: "months", durUnit: "days" },
+];
+const OVERRIDE_KEYS = FREQUENCY_FIELDS.flatMap(({ freqKey, durKey }) => [freqKey, durKey]);
+
+// Inline schedule-override editor — expands under a model row so frequency/
+// duration overrides can be edited without opening the full Add/Edit modal.
+const InlineOverrideEditor = ({ row, onSave, onCancel }) => {
+  const [draft, setDraft] = useState(() => Object.fromEntries(OVERRIDE_KEYS.map((k) => [k, row[k] ?? ""])));
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave(draft);
+    setSaving(false);
+  };
+
+  return (
+    <tr className="bg-indigo-50/40">
+      <td colSpan={7} className="px-4 py-3 border-b border-indigo-100">
+        <div className="flex flex-wrap items-end gap-3">
+          {FREQUENCY_FIELDS.map(({ type, freqKey, durKey }) => (
+            <div key={type} className="border border-slate-200 bg-white rounded-lg p-2.5 flex items-end gap-2">
+              <p className="text-[11px] font-semibold text-slate-600 w-16 shrink-0">{reportTypeLabel(type)}</p>
+              <div>
+                <FieldLabel>Freq (mo)</FieldLabel>
+                <input type="number" min={1} placeholder="Default" value={draft[freqKey]}
+                  onChange={(e) => setDraft((p) => ({ ...p, [freqKey]: e.target.value }))} className={`${inputCls} w-20`} />
+              </div>
+              <div>
+                <FieldLabel>Dur (days)</FieldLabel>
+                <input type="number" min={1} placeholder="Default" value={draft[durKey]}
+                  onChange={(e) => setDraft((p) => ({ ...p, [durKey]: e.target.value }))} className={`${inputCls} w-20`} />
+              </div>
+            </div>
+          ))}
+          <div className="flex items-center gap-2 ml-auto">
+            <button onClick={onCancel} disabled={saving} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-all disabled:opacity-50">
+              <X className="w-3.5 h-3.5" /> Cancel
+            </button>
+            <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-all disabled:opacity-50">
+              <Save className="w-3.5 h-3.5" /> {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+        <p className="text-[10px] text-slate-400 mt-2">Leave a field blank to fall back to the global default in Test Schedule Settings above.</p>
+      </td>
+    </tr>
+  );
+};
+
+// Global BIS test-frequency defaults (Introduction/Sound/Volume cadence +
+// typical test duration) — falls back for any model without a per-model
+// override on BISConfigTab's model table below.
+const BISTestFrequencySettings = ({ testConfig, testConfigLoading, onSaveTestConfig }) => {
+  const [form, setForm] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (testConfig) setForm(testConfig);
+  }, [testConfig]);
+
+  if (!form) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 text-xs text-slate-400">
+        {testConfigLoading ? "Loading schedule settings…" : "Schedule settings unavailable."}
+      </div>
+    );
+  }
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSaveTestConfig(form);
+    setSaving(false);
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <CalendarClock className="w-4 h-4 text-blue-500" /> Test Schedule Settings
+          </h2>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            Default frequency and typical duration for each BIS report type. Individual models can override these on the model table below.
+          </p>
+        </div>
+        <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-all">
+          <Save className="w-3.5 h-3.5" /> {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+      <div className="grid md:grid-cols-3 gap-3">
+        {FREQUENCY_FIELDS.map(({ type, freqKey, durKey }) => (
+          <div key={type} className="border border-slate-100 rounded-lg p-3 bg-slate-50/50">
+            <p className="text-xs font-bold text-slate-700 mb-2">{reportTypeLabel(type)} Report</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <FieldLabel>Frequency (months)</FieldLabel>
+                <input type="number" min={1} value={form[freqKey] ?? ""} onChange={(e) => setForm((p) => ({ ...p, [freqKey]: e.target.value }))} className={inputCls} />
+              </div>
+              <div>
+                <FieldLabel>Duration (days)</FieldLabel>
+                <input type="number" min={1} value={form[durKey] ?? ""} onChange={(e) => setForm((p) => ({ ...p, [durKey]: e.target.value }))} className={inputCls} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 // BISCategory management — which models are BIS-controlled (BIS / Non-BIS
 // classification).
-const BISConfigTab = ({ categories, categorySearch, setCategorySearch, categoryLoading, onRefresh, onAddCategory, onEditCategory, onDeleteCategory }) => {
+const BISConfigTab = ({
+  categories, categorySearch, setCategorySearch, categoryLoading, onRefresh, onAddCategory, onEditCategory, onDeleteCategory,
+  testConfig, testConfigLoading, onSaveTestConfig, onInlineUpdateOverrides,
+}) => {
   const [limit, setLimit] = useState(25);
+  const [editingOverrideId, setEditingOverrideId] = useState(null);
 
   const filteredCategories = useMemo(() => {
     const term = categorySearch.trim().toLowerCase();
@@ -20,6 +138,8 @@ const BISConfigTab = ({ categories, categorySearch, setCategorySearch, categoryL
 
   return (
     <div className="flex flex-col gap-4">
+      <BISTestFrequencySettings testConfig={testConfig} testConfigLoading={testConfigLoading} onSaveTestConfig={onSaveTestConfig} />
+
       {/* Category management */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
         <div className="flex items-center justify-between gap-3 p-4 border-b border-slate-100">
@@ -48,17 +168,21 @@ const BISConfigTab = ({ categories, categorySearch, setCategorySearch, categoryL
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-slate-50 z-10">
               <tr>
-                {["Material Code", "Material Name", "Model Name", "Category", "Updated", ""].map((h) => (
+                {["Material Code", "Material Name", "Model Name", "Category", "Schedule", "Updated", ""].map((h) => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-200">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {pagedCategories.length === 0 ? (
-                <tr><td colSpan={6} className="px-3 py-16 text-center text-slate-400">{categoryLoading ? "Loading…" : "No models found."}</td></tr>
+                <tr><td colSpan={7} className="px-3 py-16 text-center text-slate-400">{categoryLoading ? "Loading…" : "No models found."}</td></tr>
               ) : (
-                pagedCategories.map((row) => (
-                  <tr key={row.id} className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40">
+                pagedCategories.map((row) => {
+                  const hasOverride = ["introductionFrequencyMonths", "introductionDurationDays", "soundFrequencyMonths", "soundDurationDays", "volumeFrequencyMonths", "volumeDurationDays"]
+                    .some((k) => row[k] !== null && row[k] !== undefined);
+                  return (
+                  <Fragment key={row.id}>
+                  <tr className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40">
                     <td className="px-3 py-2.5 border-b border-slate-100 font-mono text-slate-600">{row.materialCode}</td>
                     <td className="px-3 py-2.5 border-b border-slate-100 text-slate-500">{row.materialName || "—"}</td>
                     <td className="px-3 py-2.5 border-b border-slate-100 font-semibold text-slate-800">{row.modelName}</td>
@@ -66,6 +190,21 @@ const BISConfigTab = ({ categories, categorySearch, setCategorySearch, categoryL
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${row.category === 1 ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
                         {row.category === 1 ? "BIS" : "Non-BIS"}
                       </span>
+                    </td>
+                    <td className="px-3 py-2.5 border-b border-slate-100">
+                      {row.category === 1 ? (
+                        <button
+                          onClick={() => setEditingOverrideId((id) => (id === row.id ? null : row.id))}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
+                            hasOverride ? "bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200"
+                          }`}
+                          title="Edit schedule override"
+                        >
+                          <SlidersHorizontal className="w-2.5 h-2.5" /> {hasOverride ? "Custom" : "Default"}
+                        </button>
+                      ) : (
+                        <span className="text-slate-300 text-[10px]">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 border-b border-slate-100 text-slate-400">{row.updatedAt ? new Date(row.updatedAt).toLocaleDateString("en-IN") : "—"}</td>
                     <td className="px-3 py-2.5 border-b border-slate-100">
@@ -79,7 +218,23 @@ const BISConfigTab = ({ categories, categorySearch, setCategorySearch, categoryL
                       </div>
                     </td>
                   </tr>
-                ))
+                  {editingOverrideId === row.id && (
+                    <InlineOverrideEditor
+                      row={row}
+                      onCancel={() => setEditingOverrideId(null)}
+                      onSave={async (draft) => {
+                        try {
+                          await onInlineUpdateOverrides(row, draft);
+                          setEditingOverrideId(null);
+                        } catch {
+                          // Keep the editor open on failure — the toast already reported it.
+                        }
+                      }}
+                    />
+                  )}
+                  </Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>

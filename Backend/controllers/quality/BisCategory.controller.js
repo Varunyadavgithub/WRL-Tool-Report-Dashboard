@@ -3,6 +3,23 @@ import { dbConfig1, connectToDB } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 
+// Per-model schedule overrides — every field is optional; blank/undefined
+// means "fall back to the BISTestFrequencyConfig global default" (NULL).
+const OVERRIDE_FIELDS = [
+  "introductionFrequencyMonths", "introductionDurationDays",
+  "soundFrequencyMonths", "soundDurationDays",
+  "volumeFrequencyMonths", "volumeDurationDays",
+];
+
+const parseOverride = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  const n = Number(value);
+  if (Number.isNaN(n) || n <= 0) {
+    throw new AppError("Schedule override values must be positive numbers, or left blank to use the default.", 400);
+  }
+  return n;
+};
+
 /* ═══════════════════════════════════════════════════════════════════════
    LIST
 ═══════════════════════════════════════════════════════════════════════ */
@@ -15,7 +32,10 @@ export const getBisCategories = tryCatch(async (_, res) => {
     // Type 100 drops out here — and surfaces Material's own Name alongside
     // BISCategory's ModelName for reference/future material codes.
     const result = await pool.request().query(`
-      SELECT BC.Id, BC.MaterialCode, m.Name AS MaterialName, BC.ModelName, BC.Category, BC.CreatedAt, BC.UpdatedAt
+      SELECT BC.Id, BC.MaterialCode, m.Name AS MaterialName, BC.ModelName, BC.Category, BC.CreatedAt, BC.UpdatedAt,
+             BC.IntroductionFrequencyMonths, BC.IntroductionDurationDays,
+             BC.SoundFrequencyMonths, BC.SoundDurationDays,
+             BC.VolumeFrequencyMonths, BC.VolumeDurationDays
       FROM BISCategory BC
       INNER JOIN Material m ON m.MatCode = BC.MaterialCode
       WHERE m.Type = 100
@@ -30,6 +50,12 @@ export const getBisCategories = tryCatch(async (_, res) => {
       category: row.Category,
       createdAt: row.CreatedAt,
       updatedAt: row.UpdatedAt,
+      introductionFrequencyMonths: row.IntroductionFrequencyMonths,
+      introductionDurationDays: row.IntroductionDurationDays,
+      soundFrequencyMonths: row.SoundFrequencyMonths,
+      soundDurationDays: row.SoundDurationDays,
+      volumeFrequencyMonths: row.VolumeFrequencyMonths,
+      volumeDurationDays: row.VolumeDurationDays,
     }));
 
     res.status(200).json({ success: true, categories });
@@ -81,6 +107,10 @@ export const createBisCategory = tryCatch(async (req, res) => {
     );
   }
 
+  const overrides = Object.fromEntries(
+    OVERRIDE_FIELDS.map((key) => [key, parseOverride(req.body[key])]),
+  );
+
   try {
     const pool = await connectToDB(dbConfig1);
 
@@ -100,10 +130,26 @@ export const createBisCategory = tryCatch(async (req, res) => {
       .request()
       .input("MaterialCode", sql.NVarChar(50), materialCode)
       .input("ModelName", sql.NVarChar(300), modelName)
-      .input("Category", sql.TinyInt, category ? 1 : 0).query(`
-        INSERT INTO BISCategory (MaterialCode, ModelName, Category)
+      .input("Category", sql.TinyInt, category ? 1 : 0)
+      .input("IntroductionFrequencyMonths", sql.Int, overrides.introductionFrequencyMonths)
+      .input("IntroductionDurationDays", sql.Int, overrides.introductionDurationDays)
+      .input("SoundFrequencyMonths", sql.Int, overrides.soundFrequencyMonths)
+      .input("SoundDurationDays", sql.Int, overrides.soundDurationDays)
+      .input("VolumeFrequencyMonths", sql.Int, overrides.volumeFrequencyMonths)
+      .input("VolumeDurationDays", sql.Int, overrides.volumeDurationDays).query(`
+        INSERT INTO BISCategory (
+          MaterialCode, ModelName, Category,
+          IntroductionFrequencyMonths, IntroductionDurationDays,
+          SoundFrequencyMonths, SoundDurationDays,
+          VolumeFrequencyMonths, VolumeDurationDays
+        )
         OUTPUT INSERTED.Id
-        VALUES (@MaterialCode, @ModelName, @Category)
+        VALUES (
+          @MaterialCode, @ModelName, @Category,
+          @IntroductionFrequencyMonths, @IntroductionDurationDays,
+          @SoundFrequencyMonths, @SoundDurationDays,
+          @VolumeFrequencyMonths, @VolumeDurationDays
+        )
       `);
 
     res.status(200).json({
@@ -137,6 +183,10 @@ export const updateBisCategory = tryCatch(async (req, res) => {
     );
   }
 
+  const overrides = Object.fromEntries(
+    OVERRIDE_FIELDS.map((key) => [key, parseOverride(req.body[key])]),
+  );
+
   try {
     const pool = await connectToDB(dbConfig1);
 
@@ -145,11 +195,23 @@ export const updateBisCategory = tryCatch(async (req, res) => {
       .input("Id", sql.Int, parseInt(id, 10))
       .input("MaterialCode", sql.NVarChar(50), materialCode)
       .input("ModelName", sql.NVarChar(300), modelName)
-      .input("Category", sql.TinyInt, category ? 1 : 0).query(`
+      .input("Category", sql.TinyInt, category ? 1 : 0)
+      .input("IntroductionFrequencyMonths", sql.Int, overrides.introductionFrequencyMonths)
+      .input("IntroductionDurationDays", sql.Int, overrides.introductionDurationDays)
+      .input("SoundFrequencyMonths", sql.Int, overrides.soundFrequencyMonths)
+      .input("SoundDurationDays", sql.Int, overrides.soundDurationDays)
+      .input("VolumeFrequencyMonths", sql.Int, overrides.volumeFrequencyMonths)
+      .input("VolumeDurationDays", sql.Int, overrides.volumeDurationDays).query(`
         UPDATE BISCategory
         SET MaterialCode = @MaterialCode,
             ModelName    = @ModelName,
             Category     = @Category,
+            IntroductionFrequencyMonths = @IntroductionFrequencyMonths,
+            IntroductionDurationDays    = @IntroductionDurationDays,
+            SoundFrequencyMonths        = @SoundFrequencyMonths,
+            SoundDurationDays           = @SoundDurationDays,
+            VolumeFrequencyMonths       = @VolumeFrequencyMonths,
+            VolumeDurationDays          = @VolumeDurationDays,
             UpdatedAt    = GETDATE()
         WHERE Id = @Id
       `);

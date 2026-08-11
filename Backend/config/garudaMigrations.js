@@ -84,5 +84,292 @@ export const runGarudaMigrations = async (pool1) => {
       VALUES (src.MaterialCode, src.ModelName, src.Category);
   `);
 
+  // ── BISCategory: per-model schedule overrides for the BIS test-scheduling
+  //    feature. NULL on any of these means "use the global default from
+  //    BISTestFrequencyConfig" — only set when a specific model deviates
+  //    from the standard IS 7872 cadence.
+  for (const col of [
+    { name: "IntroductionFrequencyMonths", def: "INT NULL" },
+    { name: "IntroductionDurationDays",    def: "INT NULL" },
+    { name: "SoundFrequencyMonths",        def: "INT NULL" },
+    { name: "SoundDurationDays",           def: "INT NULL" },
+    { name: "VolumeFrequencyMonths",       def: "INT NULL" },
+    { name: "VolumeDurationDays",          def: "INT NULL" },
+  ]) {
+    await pool1.request().query(`
+      IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = 'BISCategory' AND COLUMN_NAME = '${col.name}'
+      )
+      BEGIN
+        ALTER TABLE BISCategory ADD ${col.name} ${col.def};
+        PRINT 'Migration: Added ${col.name} column to BISCategory (GARUDA)';
+      END
+    `);
+  }
+
+  // ── BISTestFrequencyConfig: single global-settings row for the 3 BIS test
+  //    cadences (Introduction/Sound/Volume). FrequencyMonths drives when the
+  //    next test falls due; DurationDays is how long that test typically
+  //    takes, used to draw the due window on the schedule calendar.
+  await pool1.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'BISTestFrequencyConfig')
+    BEGIN
+      CREATE TABLE BISTestFrequencyConfig (
+        Id                       INT IDENTITY(1,1) PRIMARY KEY,
+        IntroductionFrequencyMonths INT NOT NULL DEFAULT 12,
+        IntroductionDurationDays    INT NOT NULL DEFAULT 6,
+        SoundFrequencyMonths        INT NOT NULL DEFAULT 6,
+        SoundDurationDays           INT NOT NULL DEFAULT 1,
+        VolumeFrequencyMonths       INT NOT NULL DEFAULT 3,
+        VolumeDurationDays          INT NOT NULL DEFAULT 1,
+        UpdatedBy                NVARCHAR(100) NULL,
+        UpdatedAt                DATETIME NOT NULL DEFAULT GETDATE()
+      );
+      INSERT INTO BISTestFrequencyConfig DEFAULT VALUES;
+      PRINT 'Migration: Created BISTestFrequencyConfig table (GARUDA)';
+    END
+  `);
+
+  // ── BISTestReport: header row for every in-app BIS test report (and, with
+  //    Status='Baseline', the one-time "last test date" seed rows used before
+  //    any real report exists for a model/type). Child tables holding the
+  //    per-report-type test data (Pull Down / Energy / Sound / Volume / etc.)
+  //    are added in a later migration once the report-entry forms land.
+  await pool1.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'BISTestReport')
+    BEGIN
+      CREATE TABLE BISTestReport (
+        Id                  INT IDENTITY(1,1) PRIMARY KEY,
+        ReportType          NVARCHAR(20)  NOT NULL, -- Introduction | Sound | Volume
+        MaterialCode        NVARCHAR(50)  NOT NULL,
+        ModelName           NVARCHAR(300) NOT NULL,
+        MachineSerialNumber NVARCHAR(100) NULL,
+        TestReportNo        NVARCHAR(100) NULL,
+        UidNo               NVARCHAR(100) NULL,
+        TestDateFrom        DATE          NULL,
+        TestDateTo          DATE          NOT NULL, -- what scheduling reads as "last test date"
+        TestedBy            NVARCHAR(150) NULL,
+        TestStandard        NVARCHAR(300) NULL,
+        Result              NVARCHAR(20)  NULL,     -- PASS | FAIL | PENDING
+        SampleReceiptDate   DATE          NULL,
+        SampleCondition     NVARCHAR(100) NULL,
+        PurposeOfTesting    NVARCHAR(200) NULL,
+        Remarks             NVARCHAR(MAX) NULL,
+        PreparedBy          NVARCHAR(150) NULL,
+        ReviewedBy          NVARCHAR(150) NULL,
+        AuthorizedBy        NVARCHAR(150) NULL,
+        Status              NVARCHAR(20)  NOT NULL DEFAULT 'Draft', -- Baseline | Draft | Final | Superseded
+        RootReportId        INT           NULL,     -- self-FK; NULL = this row is v1/root
+        Version             INT           NOT NULL DEFAULT 1,
+        IsCurrent           BIT           NOT NULL DEFAULT 1,
+        CreatedBy           NVARCHAR(100) NULL,
+        CreatedAt           DATETIME      NOT NULL DEFAULT GETDATE(),
+        UpdatedBy           NVARCHAR(100) NULL,
+        UpdatedAt           DATETIME      NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_BISTestReport_Root FOREIGN KEY (RootReportId) REFERENCES BISTestReport(Id)
+      );
+      CREATE INDEX IX_BISTestReport_Model_Type_Current ON BISTestReport (ModelName, ReportType, IsCurrent);
+      PRINT 'Migration: Created BISTestReport table (GARUDA)';
+    END
+  `);
+
+  // ── BISTestReport: appliance-spec header fields that only the Introduction
+  //    report captures (nameplate data — manufacturer, refrigerant, rated
+  //    volumes/energy — read once at that test, not repeated on Sound/Volume
+  //    reports). Kept on the shared header table rather than a dedicated
+  //    1:1 child table since they're still header-grain, not test-data-grain.
+  for (const col of [
+    { name: "ApplianceType", def: "NVARCHAR(100) NULL" },
+    { name: "Manufacturer", def: "NVARCHAR(200) NULL" },
+    { name: "ProductVariant", def: "NVARCHAR(200) NULL" },
+    { name: "RefrigerantName", def: "NVARCHAR(100) NULL" },
+    { name: "RatedVoltageFreqPhase", def: "NVARCHAR(100) NULL" },
+    { name: "RatedGrossVolumeLitre", def: "DECIMAL(10,2) NULL" },
+    { name: "RatedStorageVolumeLitre", def: "DECIMAL(10,2) NULL" },
+    { name: "AnnualElectricityConsumptionKwh", def: "DECIMAL(10,2) NULL" },
+    { name: "ReportIssueDate", def: "DATE NULL" },
+    { name: "TotalPages", def: "INT NULL" },
+    { name: "UnitPickedFrom", def: "NVARCHAR(200) NULL" },
+  ]) {
+    await pool1.request().query(`
+      IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = 'BISTestReport' AND COLUMN_NAME = '${col.name}'
+      )
+      BEGIN
+        ALTER TABLE BISTestReport ADD ${col.name} ${col.def};
+        PRINT 'Migration: Added ${col.name} column to BISTestReport (GARUDA)';
+      END
+    `);
+  }
+
+  // ── Introduction-report child tables (1:1 with BISTestReport) — one per
+  //    sub-test sheet in the lab template (Pull Down / Energy / Thermal
+  //    Insulation / Temperature Rise). Spec/measured pairs are text where the
+  //    lab records a mixed value ("−23.3°C at 200minute", "Not applicable")
+  //    and numeric where the sheet is a clean reading (voltage, frequency).
+  const introChildTables = {
+    BISPullDownTest: `
+      Id INT IDENTITY(1,1) PRIMARY KEY,
+      ReportId INT NOT NULL,
+      AmbientConditionsSpec NVARCHAR(150) NULL,
+      AmbientConditionsMeasured NVARCHAR(150) NULL,
+      TestVoltageSpec NVARCHAR(50) NULL,
+      TestVoltageMeasured DECIMAL(6,2) NULL,
+      TestFrequencySpec NVARCHAR(50) NULL,
+      TestFrequencyMeasured DECIMAL(6,2) NULL,
+      F1TempSpec NVARCHAR(150) NULL,
+      F1TempMeasured NVARCHAR(150) NULL,
+      F2TempSpec NVARCHAR(150) NULL,
+      F2TempMeasured NVARCHAR(150) NULL,
+      MaxWarmestTempSpec NVARCHAR(150) NULL,
+      MaxWarmestTempMeasured NVARCHAR(150) NULL,
+      ThermostatSetting NVARCHAR(50) NULL,
+      PullDownTimeSpec NVARCHAR(50) NULL,
+      PullDownTimeMeasuredMinutes DECIMAL(8,2) NULL,
+      Result NVARCHAR(20) NULL,
+      Remarks NVARCHAR(MAX) NULL,
+      CONSTRAINT FK_BISPullDownTest_Report FOREIGN KEY (ReportId) REFERENCES BISTestReport(Id) ON DELETE CASCADE
+    `,
+    BISEnergyTest: `
+      Id INT IDENTITY(1,1) PRIMARY KEY,
+      ReportId INT NOT NULL,
+      AmbientConditionsSpec NVARCHAR(150) NULL,
+      AmbientConditionsWarm NVARCHAR(150) NULL,
+      AmbientConditionsCold NVARCHAR(150) NULL,
+      TestVoltageSpec NVARCHAR(50) NULL,
+      TestVoltageWarm DECIMAL(6,2) NULL,
+      TestVoltageCold DECIMAL(6,2) NULL,
+      TestFrequencySpec NVARCHAR(50) NULL,
+      TestFrequencyWarm DECIMAL(6,2) NULL,
+      TestFrequencyCold DECIMAL(6,2) NULL,
+      AvgCompartmentTempSpec NVARCHAR(100) NULL,
+      AvgCompartmentTempWarm DECIMAL(6,2) NULL,
+      AvgCompartmentTempCold DECIMAL(6,2) NULL,
+      EnergyMeterReadingWarmWh DECIMAL(10,3) NULL,
+      EnergyMeterReadingColdWh DECIMAL(10,3) NULL,
+      TimeElapsedWarmMinutes DECIMAL(8,2) NULL,
+      TimeElapsedColdMinutes DECIMAL(8,2) NULL,
+      PercentRunningTimeWarm DECIMAL(6,3) NULL,
+      PercentRunningTimeCold DECIMAL(6,3) NULL,
+      TargetTempTx DECIMAL(6,2) NULL,
+      MeasuredTempT1 DECIMAL(6,2) NULL,
+      EnergyRateE1 DECIMAL(10,4) NULL,
+      MeasuredTempT2 DECIMAL(6,2) NULL,
+      EnergyRateE2 DECIMAL(10,4) NULL,
+      CalculatedEnergyRateExKwhDay DECIMAL(10,4) NULL,
+      EnergyPerDayWh DECIMAL(10,2) NULL,
+      AnnualEnergyDeclaredKwh DECIMAL(10,2) NULL,
+      AnnualEnergyMeasuredKwh DECIMAL(10,3) NULL,
+      DeviationSpec NVARCHAR(50) NULL,
+      DeviationPercent DECIMAL(6,3) NULL,
+      Result NVARCHAR(20) NULL,
+      Remarks NVARCHAR(MAX) NULL,
+      CONSTRAINT FK_BISEnergyTest_Report FOREIGN KEY (ReportId) REFERENCES BISTestReport(Id) ON DELETE CASCADE
+    `,
+    BISThermalInsulationTest: `
+      Id INT IDENTITY(1,1) PRIMARY KEY,
+      ReportId INT NOT NULL,
+      AmbientConditionsSpec NVARCHAR(150) NULL,
+      AmbientConditionsMeasured NVARCHAR(150) NULL,
+      TestVoltageSpec NVARCHAR(50) NULL,
+      TestVoltageMeasured DECIMAL(6,2) NULL,
+      TestFrequencySpec NVARCHAR(50) NULL,
+      TestFrequencyMeasured DECIMAL(6,2) NULL,
+      AvgCompartmentTempSpec NVARCHAR(100) NULL,
+      AvgCompartmentTempMeasured NVARCHAR(100) NULL,
+      CondensationSpec NVARCHAR(300) NULL,
+      CondensationObservation NVARCHAR(300) NULL,
+      Result NVARCHAR(20) NULL,
+      Remarks NVARCHAR(MAX) NULL,
+      CONSTRAINT FK_BISThermalInsulationTest_Report FOREIGN KEY (ReportId) REFERENCES BISTestReport(Id) ON DELETE CASCADE
+    `,
+    BISTemperatureRiseTest: `
+      Id INT IDENTITY(1,1) PRIMARY KEY,
+      ReportId INT NOT NULL,
+      AmbientConditionsSpec NVARCHAR(150) NULL,
+      AmbientConditionsMeasured NVARCHAR(150) NULL,
+      TestVoltageSpec NVARCHAR(50) NULL,
+      TestVoltageMeasured DECIMAL(6,2) NULL,
+      TestFrequencySpec NVARCHAR(50) NULL,
+      TestFrequencyMeasured DECIMAL(6,2) NULL,
+      WarmestPackageTempSpec NVARCHAR(100) NULL,
+      WarmestPackageTempMeasured NVARCHAR(100) NULL,
+      TimeToThresholdSpec NVARCHAR(50) NULL,
+      TimeToThresholdMeasured NVARCHAR(50) NULL,
+      Result NVARCHAR(20) NULL,
+      Remarks NVARCHAR(MAX) NULL,
+      CONSTRAINT FK_BISTemperatureRiseTest_Report FOREIGN KEY (ReportId) REFERENCES BISTestReport(Id) ON DELETE CASCADE
+    `,
+    // ── Sound report child (1:many — one row per measurement location) ──────
+    BISSoundMeasurement: `
+      Id INT IDENTITY(1,1) PRIMARY KEY,
+      ReportId INT NOT NULL,
+      Location NVARCHAR(20) NOT NULL, -- Front | Right | Left
+      SpecificationLimit NVARCHAR(50) NULL,
+      BackgroundNoiseDba DECIMAL(6,2) NULL,
+      MeasuredNoiseDba DECIMAL(6,2) NULL,
+      Status NVARCHAR(20) NULL,
+      CONSTRAINT FK_BISSoundMeasurement_Report FOREIGN KEY (ReportId) REFERENCES BISTestReport(Id) ON DELETE CASCADE
+    `,
+    // ── Volume report children (1:many line items + 1:1 summary) ────────────
+    BISVolumeMeasurementItem: `
+      Id INT IDENTITY(1,1) PRIMARY KEY,
+      ReportId INT NOT NULL,
+      Category NVARCHAR(30) NOT NULL, -- GrossMeasured | GrossDeductible | StorageMeasured | StorageDeductible
+      PartName NVARCHAR(200) NULL,
+      WidthMm DECIMAL(8,2) NULL,
+      DepthMm DECIMAL(8,2) NULL,
+      HeightMm DECIMAL(8,2) NULL,
+      Quantity INT NULL,
+      VolumeLitre DECIMAL(10,3) NULL,
+      CONSTRAINT FK_BISVolumeMeasurementItem_Report FOREIGN KEY (ReportId) REFERENCES BISTestReport(Id) ON DELETE CASCADE
+    `,
+    BISVolumeSummary: `
+      Id INT IDENTITY(1,1) PRIMARY KEY,
+      ReportId INT NOT NULL,
+      TestAmbientSpec NVARCHAR(50) NULL,
+      TestAmbientMeasured NVARCHAR(50) NULL,
+      GrossTotalMeasuredLitre DECIMAL(10,3) NULL,
+      GrossTotalDeductibleLitre DECIMAL(10,3) NULL,
+      GrossDeclaredLitre DECIMAL(10,3) NULL,
+      GrossMeasuredLitre DECIMAL(10,3) NULL,
+      GrossObservationPercent DECIMAL(6,3) NULL,
+      GrossResult NVARCHAR(20) NULL,
+      StorageTotalMeasuredLitre DECIMAL(10,3) NULL,
+      StorageTotalDeductibleLitre DECIMAL(10,3) NULL,
+      StorageDeclaredLitre DECIMAL(10,3) NULL,
+      StorageMeasuredLitre DECIMAL(10,3) NULL,
+      StorageObservationPercent DECIMAL(6,3) NULL,
+      StorageResult NVARCHAR(20) NULL,
+      Remarks NVARCHAR(MAX) NULL,
+      CONSTRAINT FK_BISVolumeSummary_Report FOREIGN KEY (ReportId) REFERENCES BISTestReport(Id) ON DELETE CASCADE
+    `,
+    // ── Shared across all 3 report types (1:many) ────────────────────────────
+    BISTestReportEquipment: `
+      Id INT IDENTITY(1,1) PRIMARY KEY,
+      ReportId INT NOT NULL,
+      SrNo INT NULL,
+      InstrumentName NVARCHAR(200) NULL,
+      Make NVARCHAR(100) NULL,
+      Model NVARCHAR(100) NULL,
+      SerialOrEquipmentId NVARCHAR(100) NULL,
+      CalibrationDueDate DATE NULL,
+      CONSTRAINT FK_BISTestReportEquipment_Report FOREIGN KEY (ReportId) REFERENCES BISTestReport(Id) ON DELETE CASCADE
+    `,
+  };
+
+  for (const [tableName, definition] of Object.entries(introChildTables)) {
+    await pool1.request().query(`
+      IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '${tableName}')
+      BEGIN
+        CREATE TABLE ${tableName} (${definition});
+        CREATE INDEX IX_${tableName}_ReportId ON ${tableName} (ReportId);
+        PRINT 'Migration: Created ${tableName} table (GARUDA)';
+      END
+    `);
+  }
+
   console.log("GARUDA migrations completed.");
 };
