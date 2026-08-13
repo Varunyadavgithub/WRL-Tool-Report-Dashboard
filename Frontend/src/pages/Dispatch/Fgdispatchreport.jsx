@@ -4,11 +4,13 @@ import toast from "react-hot-toast";
 import {
   FiSearch, FiCalendar, FiFilter, FiInbox,
   FiHash, FiCheckCircle, FiClock, FiList,
-  FiBarChart2, FiX, FiLoader, FiChevronDown, FiTruck,
+  FiBarChart2, FiX, FiLoader, FiTruck,
   FiPackage, FiTag, FiZap, FiAnchor, FiMonitor, FiGrid,
   FiActivity, FiMapPin, FiLayers, FiArrowRight,
 } from "react-icons/fi";
 import ExportButton from "../../components/ui/ExportButton";
+import DateTimePicker from "../../components/ui/DateTimePicker";
+import SelectField from "../../components/ui/SelectField";
 import { baseURL } from "../../assets/assets";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -26,8 +28,10 @@ const SCAN_OPTIONS = [
   { label: "All",               value: "all" },
   { label: "Label Printed",     value: "label" },
   { label: "Auto Scanned",      value: "auto" },
+  { label: "Unloading Scanned", value: "unloading" },
   { label: "Missing Label",     value: "missing_label" },
   { label: "Missing Auto Scan", value: "missing_auto" },
+  { label: "Missing Unloading", value: "missing_unloading" },
 ];
 
 const SUMMARY_GROUP_OPTIONS = [
@@ -66,7 +70,7 @@ const StatCard = ({ icon: Icon, label, value, sub, color }) => {
   return (
     <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex items-start gap-3">
       <div className={`p-2.5 rounded-xl border ${colors[color]}`}>
-        <Icon size={16} />
+        {Icon && <Icon size={16} />}
       </div>
       <div>
         <p className="text-xs text-gray-400 tracking-wide uppercase">{label}</p>
@@ -102,7 +106,7 @@ const PipelineBar = ({ label, scanned, total, icon: Icon, color }) => {
   return (
     <div className="flex-1 bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
       <div className="flex items-center gap-2 mb-3">
-        <Icon size={14} className={textColors[color]} />
+        {Icon && <Icon size={14} className={textColors[color]} />}
         <p className="text-xs font-semibold text-gray-600 tracking-wide uppercase">{label}</p>
       </div>
       <p className={`text-2xl font-bold ${textColors[color]} mb-1`}>{pct}%</p>
@@ -200,8 +204,10 @@ const FGDispatchReport = () => {
     let d = data;
     if      (scanFilter.value === "label")         d = d.filter(r => r.FG_LabelPrinting === SCANNED);
     else if (scanFilter.value === "auto")          d = d.filter(r => r.FG_Auto_Scan     === SCANNED);
+    else if (scanFilter.value === "unloading")  d = d.filter(r => r.FG_Unloading     === SCANNED);
     else if (scanFilter.value === "missing_label") d = d.filter(r => r.FG_LabelPrinting !== SCANNED);
     else if (scanFilter.value === "missing_auto")  d = d.filter(r => r.FG_Auto_Scan     !== SCANNED);
+    else if (scanFilter.value === "missing_unloading")  d = d.filter(r => r.FG_Unloading     !== SCANNED);
 
     if (debouncedSearch) {
       const s = debouncedSearch.toLowerCase();
@@ -229,20 +235,21 @@ const FGDispatchReport = () => {
   const anyLoading = loading || ydayLoading || todayLoading || monthLoading;
 
   return (
-    <div
-      className="min-h-screen bg-gray-50 text-gray-800 p-5"
-      style={{ fontFamily: "'DM Mono', 'Courier New', monospace" }}
-    >
+    <div className="h-full w-full flex flex-col overflow-hidden bg-slate-50 text-gray-800">
       {/* ── Header ── */}
-      <div className="mb-6 flex items-center justify-between border-b border-gray-200 pb-5">
-        <div>
-          <p className="text-xs tracking-[0.3em] text-gray-400 uppercase mb-1">
-            Dispatch · FG Tracking
-          </p>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
-            <FiTruck className="text-blue-500" size={22} />
-            FG Dispatch Report
-          </h1>
+      <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 shrink-0 bg-white shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-100 text-blue-600 shrink-0">
+            <FiTruck size={20} />
+          </div>
+          <div>
+            <p className="text-xs tracking-[0.3em] text-gray-400 uppercase mb-1">
+              Dispatch · FG Tracking
+            </p>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900 leading-none">
+              FG Dispatch Report
+            </h1>
+          </div>
         </div>
         <div className="text-right">
           <p className="text-xs text-gray-400 mb-1">Total Unloaded</p>
@@ -250,50 +257,32 @@ const FGDispatchReport = () => {
         </div>
       </div>
 
+      <div className="flex-1 min-h-0 overflow-hidden p-5 flex flex-col gap-4">
       {/* ── Filter Row ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 shrink-0">
         <div className="lg:col-span-2 bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
           <p className="text-xs tracking-widest text-gray-400 uppercase mb-4 flex items-center gap-2">
             <FiFilter size={12} /> Filters
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                <FiCalendar size={11} /> Start Time
-              </label>
-              <input
-                type="datetime-local"
-                value={startTime}
-                onChange={e => setStartTime(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                <FiCalendar size={11} /> End Time
-              </label>
-              <input
-                type="datetime-local"
-                value={endTime}
-                onChange={e => setEndTime(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                <FiFilter size={11} /> Scan Status
-              </label>
-              <div className="relative">
-                <select
-                  value={scanFilter.value}
-                  onChange={e => setScanFilter(SCAN_OPTIONS.find(o => o.value === e.target.value))}
-                  className="w-full appearance-none px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all pr-8"
-                >
-                  {SCAN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-                <FiChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
-              </div>
-            </div>
+            <DateTimePicker
+              label="Start Time"
+              name="startTime"
+              value={startTime}
+              onChange={e => setStartTime(e.target.value)}
+            />
+            <DateTimePicker
+              label="End Time"
+              name="endTime"
+              value={endTime}
+              onChange={e => setEndTime(e.target.value)}
+            />
+            <SelectField
+              label="Scan Status"
+              options={SCAN_OPTIONS}
+              value={scanFilter.value}
+              onChange={e => setScanFilter(SCAN_OPTIONS.find(o => o.value === e.target.value))}
+            />
           </div>
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-[160px]">
@@ -350,38 +339,10 @@ const FGDispatchReport = () => {
         </div>
       </div>
 
-      {/* ── KPI Cards ── */}
-      {stats.total > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-          <StatCard icon={FiPackage} label="Total Units"   value={stats.total}        color="blue"    />
-          <StatCard icon={FiTag}     label="Label Printed" value={stats.labelScanned}
-            sub={`${Math.round((stats.labelScanned / stats.total) * 100)}%`}          color="violet"  />
-          <StatCard icon={FiZap}     label="Auto Scanned"  value={stats.autoScanned}
-            sub={`${Math.round((stats.autoScanned  / stats.total) * 100)}%`}          color="emerald" />
-          <StatCard icon={FiTruck}   label="Vehicles"      value={stats.vehicles}     color="amber"   />
-          <StatCard icon={FiMapPin}  label="Docks Used"    value={stats.docks}        color="red"     />
-          <StatCard icon={FiLayers}  label="Sessions"      value={stats.sessions}     color="gray"    />
-        </div>
-      )}
 
-      {/* ── Pipeline Progress ── */}
-      {stats.total > 0 && (
-        <div className="mb-4">
-          <p className="text-xs tracking-widest text-gray-400 uppercase mb-3 flex items-center gap-2">
-            <FiActivity size={12} /> Scanning Pipeline
-          </p>
-          <div className="flex gap-3 items-stretch">
-            <PipelineBar label="FG Label Printing" scanned={stats.labelScanned} total={stats.total} icon={FiTag}    color="blue"    />
-            <div className="flex items-center text-gray-300 self-center"><FiArrowRight size={18} /></div>
-            <PipelineBar label="FG Auto Scan"      scanned={stats.autoScanned}  total={stats.total} icon={FiZap}    color="emerald" />
-            <div className="flex items-center text-gray-300 self-center"><FiArrowRight size={18} /></div>
-            <PipelineBar label="FG Unloading"      scanned={stats.total}        total={stats.total} icon={FiAnchor} color="violet"  />
-          </div>
-        </div>
-      )}
 
       {/* ── Tab Bar ── */}
-      <div className="flex items-center gap-1 mb-4 bg-white border border-gray-200 rounded-xl p-1 w-fit shadow-sm">
+      <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-1 w-fit shadow-sm shrink-0">
         {[
           { key: "table",   label: "Detail View", icon: FiList      },
           { key: "summary", label: "Summary",     icon: FiBarChart2 },
@@ -396,7 +357,7 @@ const FGDispatchReport = () => {
                 : "text-gray-400 hover:text-gray-700"
             }`}
           >
-            <Icon size={14} /> {label}
+            {Icon && <Icon size={14} />} {label}
           </button>
         ))}
         {filteredData.length > 0 && (
@@ -408,8 +369,8 @@ const FGDispatchReport = () => {
 
       {/* ── Detail Table ── */}
       {activeTab === "table" && (
-        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="flex-1 min-h-0 bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between shrink-0">
             <p className="text-xs tracking-widest text-gray-400 uppercase flex items-center gap-2">
               <FiList size={12} /> Records
             </p>
@@ -419,7 +380,7 @@ const FGDispatchReport = () => {
               </span>
             )}
           </div>
-          <div className="max-h-[560px] overflow-auto">
+          <div className="flex-1 overflow-auto">
             {anyLoading ? (
               <div className="flex items-center justify-center py-20 gap-3 text-gray-400">
                 <FiLoader size={20} className="animate-spin text-blue-500" />
@@ -452,7 +413,7 @@ const FGDispatchReport = () => {
                       ["Vehicle Entry",   FiClock],
                     ].map(([h, Icon]) => (
                       <th key={h} className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                        <span className="flex items-center gap-1"><Icon size={10} /> {h}</span>
+                        <span className="flex items-center gap-1">{Icon && <Icon size={10} />} {h}</span>
                       </th>
                     ))}
                   </tr>
@@ -514,8 +475,8 @@ const FGDispatchReport = () => {
 
       {/* ── Summary Tab ── */}
       {activeTab === "summary" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm lg:col-span-1">
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm lg:col-span-1 overflow-auto">
             <p className="text-xs tracking-widest text-gray-400 uppercase mb-4 flex items-center gap-2">
               <FiBarChart2 size={12} /> Group By
             </p>
@@ -544,8 +505,8 @@ const FGDispatchReport = () => {
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm lg:col-span-2">
-            <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm lg:col-span-2 flex flex-col">
+            <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between shrink-0">
               <p className="text-xs tracking-widest text-gray-400 uppercase flex items-center gap-2">
                 <FiBarChart2 size={12} /> {groupBy.label} Breakdown
               </p>
@@ -555,7 +516,7 @@ const FGDispatchReport = () => {
                 </span>
               )}
             </div>
-            <div className="max-h-[480px] overflow-y-auto">
+            <div className="flex-1 overflow-y-auto">
               {groupedData.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-300 select-none">
                   <FiInbox size={36} />
@@ -603,13 +564,13 @@ const FGDispatchReport = () => {
 
       {/* ── By Vehicle Tab ── */}
       {activeTab === "vehicle" && (
-        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100">
+        <div className="flex-1 min-h-0 bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+          <div className="px-5 py-3 border-b border-gray-100 shrink-0">
             <p className="text-xs tracking-widest text-gray-400 uppercase flex items-center gap-2">
               <FiTruck size={12} /> Vehicle-wise Dispatch Summary
             </p>
           </div>
-          <div className="max-h-[540px] overflow-auto">
+          <div className="flex-1 overflow-auto">
             {data.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 gap-2 text-gray-300 select-none">
                 <FiInbox size={40} />
@@ -696,6 +657,7 @@ const FGDispatchReport = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };
