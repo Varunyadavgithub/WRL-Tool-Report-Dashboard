@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 import ExcelJS from "exceljs";
@@ -25,6 +26,7 @@ import {
   PackageOpen,
   Shield,
   Table2,
+  Search,
 } from "lucide-react";
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -58,30 +60,6 @@ const MODE_CONFIG = {
 
 const Spinner = ({ cls = "w-4 h-4" }) => (
   <Loader2 className={`animate-spin ${cls}`} />
-);
-
-// ─── KPI Card ──────────────────────────────────────────────────────────────────
-
-const KpiCard = ({ icon: Icon, label, value, borderColor }) => (
-  <div
-    className="bg-white border rounded-xl px-4 py-3 flex items-center gap-3 shadow-sm flex-1 min-w-[140px]"
-    style={{ borderTopWidth: 3, borderTopColor: borderColor }}
-  >
-    <div
-      className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-      style={{ backgroundColor: `${borderColor}18`, color: borderColor }}
-    >
-      <Icon className="w-5 h-5" />
-    </div>
-    <div className="min-w-0">
-      <div className="text-xl font-extrabold text-slate-900 leading-tight tracking-tight">
-        {value}
-      </div>
-      <div className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide mt-0.5">
-        {label}
-      </div>
-    </div>
-  </div>
 );
 
 // ─── Skipped Modal ─────────────────────────────────────────────────────────────
@@ -163,6 +141,7 @@ const SkippedModal = ({ skipped, mode, onClose }) => {
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 const DispatchHold = () => {
+  const navigate = useNavigate();
   const { user } = useSelector((store) => store.auth);
 
   const [loading, setLoading] = useState(false);
@@ -375,6 +354,15 @@ const DispatchHold = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Query existing hold/release records */}
+          <button
+            onClick={() => navigate("/quality/hold-cabinate-details")}
+            className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-full border border-slate-200 text-slate-500 hover:text-blue-700 hover:border-blue-200 hover:bg-blue-50 transition-all"
+          >
+            <Search className="w-3 h-3" />
+            Query Hold Records
+          </button>
+
           {/* Mode Badge */}
           <span
             className={`flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-full border ${cfg.badgeBg}`}

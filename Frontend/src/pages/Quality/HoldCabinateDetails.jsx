@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets";
@@ -98,7 +99,7 @@ const KpiCard = ({ icon: Icon, label, value, borderColor, sub }) => (
       className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
       style={{ backgroundColor: `${borderColor}18`, color: borderColor }}
     >
-      <Icon className="w-5 h-5" />
+      {Icon && <Icon className="w-5 h-5" />}
     </div>
     <div className="min-w-0">
       <div className="text-xl font-extrabold text-slate-900 leading-tight tracking-tight">
@@ -466,6 +467,7 @@ const GroupSummaryTable = ({ grouped, groupLabel, totalCount }) => {
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 const HoldCabinateDetails = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -599,6 +601,13 @@ const HoldCabinateDetails = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/quality/dispatch-hold")}
+            className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-full border border-slate-200 text-slate-500 hover:text-amber-700 hover:border-amber-200 hover:bg-amber-50 transition-all"
+          >
+            <Lock className="w-3 h-3" />
+            Hold / Release Serials
+          </button>
           {lastFetched && (
             <span className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-full font-medium">
               <Clock className="w-3 h-3" />
