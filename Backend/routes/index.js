@@ -17,6 +17,7 @@ import factoryOsRoute     from "./factoryOs.route.js";
 import partProcessRoute   from "./partProcess.route.js";
 import masterConfigRoute  from "./masterConfig.route.js";
 import energyMeterRoute   from "./energyMeter.route.js";
+import visionReportRoute  from "./visionReport.route.js";
 
 const routers = Router();
 
@@ -38,5 +39,6 @@ routers.use("/factory-os",   factoryOsRoute);
 routers.use("/part-process", partProcessRoute);
 routers.use("/master-config", masterConfigRoute);
 routers.use("/energy-meters", energyMeterRoute);
+routers.use("/vision-report", visionReportRoute);
 
 export default routers;

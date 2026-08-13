@@ -22,6 +22,7 @@ import {
   Clock,
   BookOpen,
   Database,
+  ScanEye,
 } from "lucide-react";
 
 // Lazy loaded components
@@ -192,6 +193,9 @@ const PartProcessOEEReport = lazy(
   () => import("../pages/PartProcess/OEEReport"),
 );
 
+// ── Vision Report ─────────────────────────────────────────────────────────
+const VisionReport = lazy(() => import("../pages/VisionReport/VisionReport"));
+
 // ─── Role Constants ───────────────────────────────────────────────────────────
 export const ROLES = {
   SUPER_ADMIN: "super admin", // 226005 — full access incl. in-progress modules
@@ -361,7 +365,7 @@ export const ROUTE_CONFIG = [
   {
     key: "masterConfig",
     icon: Settings2,
-    label: "Master Config",
+    label: "IOT Config",
     basePath: "/master-config",
     subgroupConfig: [
       { key: "config", label: "Configuration" },
@@ -435,7 +439,7 @@ export const ROUTE_CONFIG = [
   {
     key: "partProcess",
     icon: Cog,
-    label: "Part Process",
+    label: "IOT",
     basePath: "/part-process",
     items: [
       {
@@ -595,11 +599,26 @@ export const ROUTE_CONFIG = [
     ],
   },
 
+  // ── Vision Report ────────────────────────────────────────────────────────
+  {
+    key: "visionReport",
+    icon: ScanEye,
+    label: "Vision Camera",
+    basePath: "/vision-report",
+    items: [
+      {
+        path: "/vision-report",
+        label: "Inspection Report",
+        component: VisionReport,
+      },
+    ],
+  },
+
   // ── Dispatch ─────────────────────────────────────────────────────────────
   {
     key: "dispatch",
     icon: Truck,
-    label: "Dispatch",
+    label: "Logistic",
     basePath: "/dispatch",
     items: [
       {
