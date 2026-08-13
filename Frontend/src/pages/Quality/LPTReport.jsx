@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import SelectField from "../../components/ui/SelectField";
 import ExportButton from "../../components/ui/ExportButton";
+import { exportToXls } from "../../utils/exportToXls.js";
 import { baseURL } from "../../assets/assets";
 import { useGetModelVariantsQuery } from "../../redux/api/commonApi.js";
 import Loader from "../../components/ui/Loader";
@@ -37,6 +38,7 @@ import {
   TrendingDown,
   Shield,
   ListOrdered,
+  Download,
 } from "lucide-react";
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -471,6 +473,25 @@ const ModelSummaryPanel = ({ data, resolveBIS = deriveBIS }) => {
   const bisGroup = data.filter((r) => resolveBIS(r.ModelName) === "BIS");
   const nonBisGroup = data.filter((r) => resolveBIS(r.ModelName) === "Non BIS");
 
+  const toExportRows = (rows) =>
+    rows.map((row) => {
+      const pending = row.PendingSample ?? row.LPT - row.SampleInspected;
+      return {
+        "Model Name": row.ModelName,
+        Production: row.ModelCount,
+        LPT: row.LPT,
+        Tested: row.SampleInspected,
+        Pending: pending,
+        "LPT %": row.LPT_Percentage ?? 0,
+      };
+    });
+
+  const handleExportGroup = (rows, label) => {
+    if (!rows.length) return;
+    const date = new Date().toISOString().split("T")[0];
+    exportToXls(toExportRows(rows), `LPT_Model_Summary_${label}_${date}.xlsx`);
+  };
+
   const renderRows = (rows) =>
     rows.map((row, i) => {
       const pending = row.PendingSample ?? (row.LPT - row.SampleInspected);
@@ -522,9 +543,27 @@ const ModelSummaryPanel = ({ data, resolveBIS = deriveBIS }) => {
             Model Summary
           </span>
         </div>
-        <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-[11px] font-semibold rounded-full border border-indigo-100">
-          {data.length} models
-        </span>
+        <div className="flex items-center gap-2">
+          {bisGroup.length > 0 && (
+            <button
+              onClick={() => handleExportGroup(bisGroup, "BIS")}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 text-[11px] font-semibold rounded-full border border-blue-200 hover:bg-blue-100 transition-colors"
+            >
+              <Download className="w-3 h-3" /> Export BIS
+            </button>
+          )}
+          {nonBisGroup.length > 0 && (
+            <button
+              onClick={() => handleExportGroup(nonBisGroup, "Non_BIS")}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 text-slate-700 text-[11px] font-semibold rounded-full border border-slate-200 hover:bg-slate-100 transition-colors"
+            >
+              <Download className="w-3 h-3" /> Export Non BIS
+            </button>
+          )}
+          <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-[11px] font-semibold rounded-full border border-indigo-100">
+            {data.length} models
+          </span>
+        </div>
       </div>
 
       <div className="overflow-auto">

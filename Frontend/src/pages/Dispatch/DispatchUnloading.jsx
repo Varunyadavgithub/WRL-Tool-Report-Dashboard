@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { baseURL } from "../../assets/assets";
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import ExportButton from "../../components/ui/ExportButton";
 
-import { FiSearch, FiXCircle, FiBox } from "react-icons/fi";
+import { FiSearch, FiX, FiXCircle, FiBox } from "react-icons/fi";
 import { MdOutlineInventory2 } from "react-icons/md";
 import { BsCalendarDay, BsCalendarCheck, BsCalendarRange } from "react-icons/bs";
 import { HiOutlineChip } from "react-icons/hi";
@@ -44,6 +44,7 @@ const DispatchUnloading = () => {
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [selectedModelName, setSelectedModelName] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const observer = useRef();
   const lastRowRef = useCallback(
@@ -165,18 +166,28 @@ const DispatchUnloading = () => {
 
   const anyLoading = ydayLoading || todayLoading || monthLoading;
 
-  const filteredData = selectedModelName
+  const modelFilteredData = selectedModelName
     ? [...fgUnloadingData]
         .filter((i) => i.ModelName === selectedModelName)
         .sort((a, b) => b.FGSerialNo.localeCompare(a.FGSerialNo))
     : [...fgUnloadingData].sort((a, b) => b.FGSerialNo.localeCompare(a.FGSerialNo));
 
+  const filteredData = useMemo(() => {
+    if (!searchTerm.trim()) return modelFilteredData;
+    const q = searchTerm.trim().toLowerCase();
+    return modelFilteredData.filter((item) =>
+      [item.ModelName, item.FGSerialNo, item.AssetCode, item.BatchCode, item.ScannerNo].some((v) =>
+        v?.toString().toLowerCase().includes(q)
+      )
+    );
+  }, [modelFilteredData, searchTerm]);
+
   const aggregated = aggregateFgUnloadingData();
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="h-full w-full flex flex-col overflow-hidden bg-slate-50">
       {/* ── Page Header ── */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3 shadow-sm">
+      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3 shadow-sm shrink-0">
         <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-amber-100 text-amber-600">
           <MdOutlineInventory2 size={22} />
         </div>
@@ -193,9 +204,9 @@ const DispatchUnloading = () => {
         )}
       </div>
 
-      <div className="px-6 py-5 space-y-4">
+      <div className="flex-1 min-h-0 overflow-hidden px-6 py-5 flex flex-col gap-4">
         {/* ── Filter Bar ── */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm shrink-0">
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-[170px]">
               <DateTimePicker
@@ -272,7 +283,7 @@ const DispatchUnloading = () => {
 
         {/* ── Active Filter Banner ── */}
         {selectedModelName && (
-          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2.5 rounded-xl text-sm font-semibold">
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2.5 rounded-xl text-sm font-semibold shrink-0">
             <HiOutlineChip size={16} />
             Filtering by model:&nbsp;
             <span className="font-black">{selectedModelName}</span>
@@ -288,21 +299,36 @@ const DispatchUnloading = () => {
         )}
 
         {/* ── Tables Row ── */}
-        <div className="flex gap-4 items-start">
+        <div className="flex-1 min-h-0 flex gap-4 items-stretch">
           {/* Production Records */}
-          <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2 bg-slate-50">
+          <div className="flex-1 min-w-0 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+            <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center gap-2 bg-slate-50 shrink-0">
               <FiBox size={14} className="text-slate-400" />
               <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">
                 Production Records
               </span>
               {filteredData.length > 0 && (
-                <span className="ml-auto bg-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums">
+                <span className="bg-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full tabular-nums">
                   {filteredData.length.toLocaleString()}
                 </span>
               )}
+              <div className="relative ml-auto w-full sm:w-56">
+                <FiSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Filter loaded rows…"
+                  className="w-full pl-7 pr-7 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+                {searchTerm && (
+                  <button onClick={() => setSearchTerm("")} className="absolute right-2 top-1/2 -translate-y-1/2">
+                    <FiX className="w-3 h-3 text-slate-400 hover:text-slate-600" />
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="max-h-[560px] overflow-auto">
+            <div className="flex-1 overflow-auto">
               <table className="min-w-full text-xs">
                 <thead className="sticky top-0 z-10 bg-white border-b border-slate-100">
                   <tr>
@@ -373,8 +399,8 @@ const DispatchUnloading = () => {
           </div>
 
           {/* Model Summary Panel */}
-          <div className="flex-shrink-0 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+          <div className="w-[560px] flex-shrink-0 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2 shrink-0">
               <RiBarChartBoxLine size={14} className="text-slate-400" />
               <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">
                 By Model
@@ -397,7 +423,7 @@ const DispatchUnloading = () => {
                 </div>
               )}
             </div>
-            <div className="max-h-[560px] overflow-auto">
+            <div className="flex-1 overflow-auto">
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-2 text-slate-400 text-sm">
                   <Spinner size={22} />

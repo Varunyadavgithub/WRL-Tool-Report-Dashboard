@@ -9,12 +9,11 @@ import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { HiOutlineExclamationCircle } from "react-icons/hi";
 import { MdOutlineTableChart } from "react-icons/md";
 import PopupModal from "../../components/ui/PopupModal.jsx";
-import Title from "../../components/ui/Title.jsx";
 
 // ── Placeholder ───────────────────────────────────────────────────────────────
 function QueryPlaceholder() {
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+    <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
       <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center mb-4">
         <MdOutlineTableChart size={36} className="text-red-300" />
       </div>
@@ -121,11 +120,25 @@ const RemoveDispatchSerials = () => {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 bg-gray-100 min-h-screen rounded-lg">
-      <Title title="Remove Dispatch Error Serials" align="center" />
+    <div className="h-full w-full flex flex-col overflow-hidden bg-slate-50">
+      {/* ── Page Header ── */}
+      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3 shadow-sm shrink-0">
+        <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-red-100 text-red-600">
+          <FiTrash2 size={20} />
+        </div>
+        <div>
+          <h1 className="text-lg font-black tracking-tight text-slate-800 leading-none">
+            Remove Dispatch Error Serials
+          </h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Preview and permanently remove serials from DispatchMaster and tempDispatch
+          </p>
+        </div>
+      </div>
 
+      <div className="flex-1 min-h-0 overflow-hidden px-6 py-5 flex flex-col gap-4">
       {/* ── Input Card ── */}
-      <div className="w-full rounded-2xl bg-white px-6 py-5 shadow-sm border border-gray-100 mt-5">
+      <div className="w-full rounded-2xl bg-white px-6 py-5 shadow-sm border border-gray-100 shrink-0">
         {/* Mode toggle + input */}
         <div className="flex flex-wrap items-end gap-4">
           {/* Left: toggle + input */}
@@ -277,10 +290,10 @@ const RemoveDispatchSerials = () => {
       </div>
 
       {/* ── Table Card ── */}
-      <div className="w-full rounded-2xl bg-white shadow-sm border border-gray-100 overflow-hidden mt-5">
+      <div className="flex-1 min-h-0 w-full rounded-2xl bg-white shadow-sm border border-gray-100 overflow-hidden flex flex-col">
         {/* Summary bar — only after result */}
         {stage === "result" && result && (
-          <div className="flex flex-wrap gap-3 px-6 py-4 border-b border-gray-100 bg-gray-50/60">
+          <div className="flex flex-wrap gap-3 px-6 py-4 border-b border-gray-100 bg-gray-50/60 shrink-0">
             {[
               {
                 label: "Total",
@@ -315,9 +328,9 @@ const RemoveDispatchSerials = () => {
         )}
 
         {/* Content */}
-        <div className="p-5">
+        <div className="flex-1 min-h-0 p-5 flex flex-col">
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20">
+            <div className="flex-1 flex flex-col items-center justify-center">
               <AiOutlineLoading3Quarters
                 size={28}
                 className="animate-spin text-indigo-400 mb-3"
@@ -329,7 +342,7 @@ const RemoveDispatchSerials = () => {
               </p>
             </div>
           ) : stage === "preview" && preview.length > 0 ? (
-            <div className="overflow-auto max-h-[480px]">
+            <div className="flex-1 overflow-auto">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-gray-50 z-10">
                   <tr>
@@ -379,7 +392,7 @@ const RemoveDispatchSerials = () => {
               </table>
             </div>
           ) : stage === "result" && result ? (
-            <div className="overflow-auto max-h-[480px]">
+            <div className="flex-1 overflow-auto">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-gray-50 z-10">
                   <tr>
@@ -479,6 +492,7 @@ const RemoveDispatchSerials = () => {
             <QueryPlaceholder />
           )}
         </div>
+      </div>
       </div>
 
       {/* ── Confirmation Modal ── */}
