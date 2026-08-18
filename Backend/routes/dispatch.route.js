@@ -1,5 +1,6 @@
 import express from "express";
 import { authenticate } from "../middlewares/auth.js";
+import { requireRoles } from "../middlewares/roleGuard.js";
 import {
   getDispatchCategoryModelCount,
   getDispatchCategorySummary,
@@ -22,8 +23,20 @@ import {
   removeDispatchErrorSerials,
 } from "../controllers/dispatch/removeDispatchError.controller.js";
 import { getFGDispatchReport } from "../controllers/dispatch/getFGDispatchReport.controller.js";
+import { scanFgUnloading } from "../controllers/dispatch/fgUnloadingScan.controller.js";
+import {
+  createOrResumeSession,
+  getOpenSessions,
+  getSessionDetail,
+  scanFgDispatch,
+  completeDispatch,
+  removeFgFromSession,
+} from "../controllers/dispatch/fgDispatchScan.controller.js";
 
 const router = express.Router();
+
+// Logistics scan module — restricted to the Logistic role (+ Super Admin)
+const canScan = requireRoles("logistic", "super admin");
 
 // -----------------> Performance Report Routes
 router.get("/vehicle-uph", authenticate, getDispatchVehicleUPH);
@@ -53,5 +66,16 @@ router.get("/error-log", authenticate, getDispatchErrorLog);
 // -----------------> Remove Dispatch Error Serials
 router.post("/fetch-error-serials", authenticate, fetchDispatchErrorSerials);
 router.post("/remove-error-serials", authenticate, removeDispatchErrorSerials);
+
+// -----------------> FG Unloading (Scan)
+router.post("/unloading/scan", authenticate, canScan, scanFgUnloading);
+
+// -----------------> FG Dispatch (Scan)
+router.post("/session/create", authenticate, canScan, createOrResumeSession);
+router.get("/session/open", authenticate, canScan, getOpenSessions);
+router.get("/session/:documentId", authenticate, canScan, getSessionDetail);
+router.post("/scan", authenticate, canScan, scanFgDispatch);
+router.post("/scan/remove", authenticate, canScan, removeFgFromSession);
+router.post("/complete", authenticate, canScan, completeDispatch);
 
 export default router;

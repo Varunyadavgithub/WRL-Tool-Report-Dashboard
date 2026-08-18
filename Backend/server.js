@@ -14,6 +14,7 @@ import { startCalibrationCron } from "./cron/calibrationEscalation.js";
 import { startManpowerCron } from "../Backend/cron/manpower.cron.js";
 import { startShiftEndReportCron } from "./cron/shiftEndReport.cron.js";
 import { startFactoryOsSyncCron } from "./cron/factoryOsSync.cron.js";
+import { startAutoAddNotPlannedFgCron } from "./cron/autoAddNotPlannedFg.cron.js";
 import { globalErrorHandler } from "./middlewares/errorHandler.js";
 import { runMigrations } from "./config/migrations.js";
 import { runGarudaMigrations } from "./config/garudaMigrations.js";
@@ -91,6 +92,7 @@ if (process.env.ENABLE_CRON === "true") {
   startManpowerCron();
   startShiftEndReportCron();
   startFactoryOsSyncCron();
+  startAutoAddNotPlannedFgCron();
   console.log("[Cron] Enabled (ENABLE_CRON=true).");
 } else {
   console.log(
