@@ -85,11 +85,14 @@ const RemoveDispatchSerials = lazy(
 const FGCasting = lazy(() => import("../pages/Dispatch/FGCasting"));
 const GateEntry = lazy(() => import("../pages/Dispatch/GateEntry"));
 const ErrorLog = lazy(() => import("../pages/Dispatch/ErrorLog"));
+const FGUnloadingScan = lazy(() => import("../pages/Dispatch/FGUnloadingScan"));
+const FGDispatchScan = lazy(() => import("../pages/Dispatch/FGDispatchScan"));
 
 const ProductionPlaning = lazy(
   () => import("../pages/Planing/ProductionPlaning"),
 );
 const DailyPlan = lazy(() => import("../pages/Planing/DailyPlan"));
+const PlanStatus = lazy(() => import("../pages/Planing/PlanStatus"));
 
 const Dashboard = lazy(() => import("../pages/Visitor/Dashboard"));
 const GeneratePass = lazy(() => import("../pages/Visitor/GeneratePass"));
@@ -276,6 +279,11 @@ export const ROUTE_CONFIG = [
         path: "/planing/daily-planing",
         label: "Daily Plan",
         component: DailyPlan,
+      },
+      {
+        path: "/planing/plan-status",
+        label: "Plan Status",
+        component: PlanStatus,
       },
     ],
   },
@@ -620,46 +628,72 @@ export const ROUTE_CONFIG = [
     icon: Truck,
     label: "Logistic",
     basePath: "/dispatch",
+    subgroupConfig: [
+      { key: "general", label: "General" },
+      { key: "report", label: "Report" },
+      { key: "scan", label: "Scanning" },
+      { key: "log", label: "Logs" },
+    ],
     items: [
+      {
+        path: "/dispatch/fg-unloading-scan",
+        label: "FG Unloading (Scan)",
+        component: FGUnloadingScan,
+        group: "scan",
+      },
+      {
+        path: "/dispatch/fg-dispatch-scan",
+        label: "FG Dispatch (Scan)",
+        component: FGDispatchScan,
+        group: "scan",
+      },
       {
         path: "/dispatch/dispatch-performance-report",
         label: "Dispatch Performance Report",
         component: DispatchPerformanceReport,
+        group: "report",
       },
       {
         path: "/dispatch/dispatch-report",
         label: "Dispatch Report",
         component: DispatchReport,
+        group: "report",
       },
       {
         path: "/dispatch/dispatch-unloading",
         label: "FG Unloading",
         component: DispatchUnloading,
+        group: "report",
       },
       {
         path: "/dispatch/fg-casting",
         label: "FG Casting",
         component: FGCasting,
+        group: "report",
       },
       {
         path: "/dispatch/fg-dispatchReport",
         label: "Unloading Status",
         component: FGDispatchReport,
+        group: "report",
       },
       {
         path: "/dispatch/gate-entry",
         label: "Gate Entry",
         component: GateEntry,
+        group: "scan",
       },
       {
         path: "/dispatch/error-log",
         label: "Error Log",
         component: ErrorLog,
+        group: "log",
       },
       {
         path: "/dispatch/remove-error-serials",
         label: "Remove Error Serials",
         component: RemoveDispatchSerials,
+        group: "scan",
       },
     ],
   },
