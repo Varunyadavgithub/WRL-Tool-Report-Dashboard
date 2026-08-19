@@ -379,6 +379,19 @@ const ProductionPlanning = () => {
     setRemark("");
   };
 
+  /* ── Fill Plan Details form from a clicked row ── */
+  const handleSelectPlanRow = (item) => {
+    setSelectedPlan(item.PlanType);
+    setSelectedPlanMonth({
+      label: String(item.PlanMonthYear),
+      value: String(item.PlanMonthYear),
+    });
+    setSelectedModelName({
+      label: item.Alias,
+      value: String(item.MatCode),
+    });
+  };
+
   /* ── Effects ── */
   useEffect(() => {
     fetchPlanMonthYear();
@@ -797,13 +810,14 @@ const ProductionPlanning = () => {
                 <span className="text-sm">Loading...</span>
               </div>
             ) : (
-              <table className="min-w-[1200px] w-full text-xs text-left border-separate border-spacing-0">
+              <table className="min-w-[1320px] w-full text-xs text-left border-separate border-spacing-0">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-slate-100">
                     {[
                       "Plan No.",
                       "Plan Month Year",
                       "Name",
+                      "Initial Plan",
                       "Plan Qty",
                       "Print Lbl",
                       "Plan Type",
@@ -833,8 +847,15 @@ const ProductionPlanning = () => {
                         <td className="px-3 py-2 border-b border-slate-100 font-medium text-slate-800 whitespace-nowrap">
                           {item.PlanMonthYear}
                         </td>
-                        <td className="px-3 py-2 border-b border-slate-100 font-medium text-slate-800 whitespace-nowrap">
+                        <td
+                          onClick={() => handleSelectPlanRow(item)}
+                          title="Click to load this plan into Plan Details above"
+                          className="px-3 py-2 border-b border-slate-100 font-medium text-slate-800 whitespace-nowrap cursor-pointer hover:text-blue-600 hover:underline"
+                        >
                           {item.Alias}
+                        </td>
+                        <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-400 whitespace-nowrap">
+                          {item.InitialPlanQty ?? "-"}
                         </td>
                         <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-700 whitespace-nowrap">
                           {item.PlanQty}
@@ -866,7 +887,7 @@ const ProductionPlanning = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={9} className="py-16 text-center">
+                      <td colSpan={10} className="py-16 text-center">
                         <div className="flex flex-col items-center gap-3 text-slate-400">
                           <PackageOpen
                             className="w-12 h-12 opacity-20"
