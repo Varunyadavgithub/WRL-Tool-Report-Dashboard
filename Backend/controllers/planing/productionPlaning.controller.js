@@ -3,9 +3,10 @@ import { dbConfig1 } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
 
-// PlanNo = Series (IDMaster) + Year (2-digit) + SLNo (IDValue), e.g. Series=2,
-// Year=26, SLNo=3319 -> PlanNo=2263319. SLNo is not zero-padded; NoOfDigit is
-// only used to detect overflow and roll the Series forward.
+// PlanNo = Series (IDMaster) + Year (2-digit) + SLNo (IDValue), with SLNo
+// zero-padded to NoOfDigit digits, e.g. Series=2, Year=26, SLNo=552,
+// NoOfDigit=5 -> PlanNo=22600552. NoOfDigit is also used to detect overflow
+// and roll the Series forward once SLNo exceeds its digit width.
 export const generatePlanNo = async (transaction, yearYY) => {
   const idMasterRes = await new sql.Request(transaction).query(`
     SELECT Series, NoOfDigit FROM IDMaster WITH (UPDLOCK, HOLDLOCK)
@@ -52,7 +53,8 @@ export const generatePlanNo = async (transaction, yearYY) => {
       );
   }
 
-  return Number(`${Series}${yearYY}${slNo}`);
+  const paddedSlNo = String(slNo).padStart(NoOfDigit, "0");
+  return Number(`${Series}${yearYY}${paddedSlNo}`);
 };
 
 export const getModelName = tryCatch(async (req, res) => {
@@ -141,9 +143,9 @@ export const productionPlaningData = tryCatch(async (req, res) => {
     }
 
     const query = `
-      SELECT 
-        PlanNo, PlanMonthYear, m.Alias, PlanQty, PrintLbl, PlanType, Remark, 
-        u.username, CreatedOn 
+      SELECT
+        PlanNo, PlanMonthYear, m.MatCode, m.Alias, PlanQty, InitialPlanQty, PrintLbl, PlanType, Remark,
+        u.username, CreatedOn
       FROM PlanOrderPrint AS pop
       JOIN material m ON m.matcode = pop.PlanMaterial
       JOIN users u ON u.userCode = pop.CreatedBy
@@ -284,9 +286,9 @@ export const addProductionPlaningData = tryCatch(async (req, res) => {
         .input("createdOn", sql.DateTime, currentDateTime)
         .query(`
           INSERT INTO PlanOrderPrint
-            (PlanNo, PlanMonthYear, PlanMaterial, PlanQty, PrintLbl, PlanType, Remark, CreatedBy, CreatedOn, Status)
+            (PlanNo, PlanMonthYear, PlanMaterial, PlanQty, InitialPlanQty, PrintLbl, PlanType, Remark, CreatedBy, CreatedOn, Status)
           VALUES
-            (@planNo, @planMonthYear, @planMaterial, @planQty, 0, @planType, @remark, @createdBy, @createdOn, 0)
+            (@planNo, @planMonthYear, @planMaterial, @planQty, @planQty, 0, @planType, @remark, @createdBy, @createdOn, 0)
         `);
 
       message = "Production Planing Data added successfully.";
@@ -337,6 +339,7 @@ export const planStatusData = tryCatch(async (req, res) => {
           m.Alias,
           pop.PlanNo,
           pop.PlanQty,
+          pop.InitialPlanQty,
           pop.PrintLbl,
           pop.Remark,
           pop.CreatedOn
@@ -471,9 +474,9 @@ export const bulkAddProductionPlaningData = tryCatch(async (req, res) => {
             .input("createdOn", sql.DateTime, currentDateTime)
             .query(`
               INSERT INTO PlanOrderPrint
-                (PlanNo, PlanMonthYear, PlanMaterial, PlanQty, PrintLbl, PlanType, Remark, CreatedBy, CreatedOn, Status)
+                (PlanNo, PlanMonthYear, PlanMaterial, PlanQty, InitialPlanQty, PrintLbl, PlanType, Remark, CreatedBy, CreatedOn, Status)
               VALUES
-                (@planNo, @planMonthYear, @planMaterial, @planQty, 0, @planType, @remark, @createdBy, @createdOn, 0)
+                (@planNo, @planMonthYear, @planMaterial, @planQty, @planQty, 0, @planType, @remark, @createdBy, @createdOn, 0)
             `);
 
           await transaction.commit();
