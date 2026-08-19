@@ -1,10 +1,10 @@
 import { useState } from "react";
-import ExportButton from "../../components/ui/ExportButton";
-import InputField from "../../components/ui/InputField";
-import DateTimePicker from "../../components/ui/DateTimePicker";
+import ExportButton from "../../../components/ui/ExportButton";
+import InputField from "../../../components/ui/InputField";
+import DateTimePicker from "../../../components/ui/DateTimePicker";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { baseURL } from "../../assets/assets";
+import { baseURL } from "../../../assets/assets";
 
 import { FiSearch, FiPackage, FiClipboard } from "react-icons/fi";
 import { TbFilterOff } from "react-icons/tb";
@@ -12,18 +12,26 @@ import { AiOutlineLoading3Quarters } from "react-icons/ai";
 
 // ─── Spinner ──────────────────────────────────────────────────────────────────
 const Spinner = ({ size = 16 }) => (
-  <AiOutlineLoading3Quarters size={size} className="animate-spin inline-block" />
+  <AiOutlineLoading3Quarters
+    size={size}
+    className="animate-spin inline-block"
+  />
 );
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 const StatCard = ({ label, value, color = "blue" }) => {
   const colors = {
     blue: "bg-blue-50 border-blue-200 text-blue-500 [&_span]:text-blue-700",
-    indigo: "bg-indigo-50 border-indigo-200 text-indigo-500 [&_span]:text-indigo-700",
+    indigo:
+      "bg-indigo-50 border-indigo-200 text-indigo-500 [&_span]:text-indigo-700",
   };
   return (
-    <div className={`flex flex-col gap-0.5 px-5 py-3 rounded-xl border ${colors[color]}`}>
-      <p className="text-[10px] uppercase tracking-widest font-semibold">{label}</p>
+    <div
+      className={`flex flex-col gap-0.5 px-5 py-3 rounded-xl border ${colors[color]}`}
+    >
+      <p className="text-[10px] uppercase tracking-widest font-semibold">
+        {label}
+      </p>
       <span className="text-2xl font-black tabular-nums">{value ?? "—"}</span>
     </div>
   );
@@ -40,7 +48,7 @@ const initialCastingState = {
   date: "",
 };
 
-const FGCasting = () => {
+const FGCastingReport = () => {
   const [loading, setLoading] = useState(false);
   const [serialNumber, setSerialNumber] = useState("");
   const [fetchFgCastingData, setFetchFgCastingData] = useState([]);
@@ -98,13 +106,19 @@ const FGCasting = () => {
         </div>
         <div>
           <h1 className="text-lg font-black tracking-tight text-slate-800 leading-none">
-            FG Casting
+            FG Casting Report
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">Serial lookup and casting/shipment details</p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Serial lookup and casting/shipment details
+          </p>
         </div>
         <div className="ml-auto flex items-center gap-3">
           {fetchFgCastingData.length > 0 && (
-            <StatCard label="Records" value={fetchFgCastingData.length} color="indigo" />
+            <StatCard
+              label="Records"
+              value={fetchFgCastingData.length}
+              color="indigo"
+            />
           )}
         </div>
       </div>
@@ -149,7 +163,8 @@ const FGCasting = () => {
                   AssetCode: item.VSerial,
                   CustomerQR: item.CustomerQR,
                   NFCID: item.NFCID,
-                  CreatedOn: item.CreatedOn?.replace("T", " ").replace("Z", "") || "",
+                  CreatedOn:
+                    item.CreatedOn?.replace("T", " ").replace("Z", "") || "",
                 }))}
                 filename="FG_Casting_Data"
               />
@@ -222,7 +237,12 @@ const FGCasting = () => {
               value={castingDetails.invoiceNo}
               onChange={handleChange}
             />
-            <DateTimePicker label="Date" name="date" value={castingDetails.date} onChange={handleChange} />
+            <DateTimePicker
+              label="Date"
+              name="date"
+              value={castingDetails.date}
+              onChange={handleChange}
+            />
           </div>
         </div>
 
@@ -238,7 +258,14 @@ const FGCasting = () => {
             <table className="min-w-full text-xs">
               <thead className="sticky top-0 z-10 bg-white border-b border-slate-100">
                 <tr>
-                  {["Model", "Serial", "Asset Code", "Customer QR", "NFC UID", "Created On"].map((h) => (
+                  {[
+                    "Model",
+                    "Serial",
+                    "Asset Code",
+                    "Customer QR",
+                    "NFC UID",
+                    "Created On",
+                  ].map((h) => (
                     <th
                       key={h}
                       className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest text-slate-400 font-semibold whitespace-nowrap"
@@ -250,12 +277,25 @@ const FGCasting = () => {
               </thead>
               <tbody>
                 {fetchFgCastingData.map((item, index) => (
-                  <tr key={index} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                    <td className="px-3 py-2 font-semibold text-slate-700 whitespace-nowrap">{item.ModelName}</td>
-                    <td className="px-3 py-2 text-slate-600 font-mono whitespace-nowrap">{item.FG_Serial}</td>
-                    <td className="px-3 py-2 text-slate-500 font-mono whitespace-nowrap">{item.VSerial}</td>
-                    <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{item.CustomerQR}</td>
-                    <td className="px-3 py-2 text-slate-500 font-mono whitespace-nowrap">{item.NFCID}</td>
+                  <tr
+                    key={index}
+                    className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
+                  >
+                    <td className="px-3 py-2 font-semibold text-slate-700 whitespace-nowrap">
+                      {item.ModelName}
+                    </td>
+                    <td className="px-3 py-2 text-slate-600 font-mono whitespace-nowrap">
+                      {item.FG_Serial}
+                    </td>
+                    <td className="px-3 py-2 text-slate-500 font-mono whitespace-nowrap">
+                      {item.VSerial}
+                    </td>
+                    <td className="px-3 py-2 text-slate-500 whitespace-nowrap">
+                      {item.CustomerQR}
+                    </td>
+                    <td className="px-3 py-2 text-slate-500 font-mono whitespace-nowrap">
+                      {item.NFCID}
+                    </td>
                     <td className="px-3 py-2 text-slate-400 whitespace-nowrap font-mono">
                       {item.CreatedOn?.replace("T", " ").replace("Z", "")}
                     </td>
@@ -264,9 +304,16 @@ const FGCasting = () => {
                 {!loading && fetchFgCastingData.length === 0 && (
                   <tr>
                     <td colSpan={6} className="py-20 text-center">
-                      <FiPackage size={36} className="mx-auto mb-3 text-slate-200" />
-                      <p className="text-sm font-semibold text-slate-300">No records found</p>
-                      <p className="text-xs text-slate-300 mt-1">Enter a serial number and click Query</p>
+                      <FiPackage
+                        size={36}
+                        className="mx-auto mb-3 text-slate-200"
+                      />
+                      <p className="text-sm font-semibold text-slate-300">
+                        No records found
+                      </p>
+                      <p className="text-xs text-slate-300 mt-1">
+                        Enter a serial number and click Query
+                      </p>
                     </td>
                   </tr>
                 )}
@@ -284,4 +331,4 @@ const FGCasting = () => {
   );
 };
 
-export default FGCasting;
+export default FGCastingReport;

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { baseURL } from "../../assets/assets";
-import DateTimePicker from "../../components/ui/DateTimePicker";
+import { baseURL } from "../../../assets/assets";
+import DateTimePicker from "../../../components/ui/DateTimePicker";
 
 import { FiSearch, FiTable, FiBarChart2 } from "react-icons/fi";
 import { BsCalendarDay, BsCalendarCheck, BsCalendarRange } from "react-icons/bs";
