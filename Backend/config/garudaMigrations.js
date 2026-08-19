@@ -371,5 +371,31 @@ export const runGarudaMigrations = async (pool1) => {
     `);
   }
 
+  // ── PlanOrderPrint: InitialPlanQty freezes the quantity a plan was first
+  //    created with. Set once on INSERT and never touched again — later
+  //    updates only change PlanQty, so this column stays a permanent record
+  //    of what the plan originally asked for.
+  await pool1.request().query(`
+    IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'PlanOrderPrint')
+    AND NOT EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'PlanOrderPrint' AND COLUMN_NAME = 'InitialPlanQty'
+    )
+    BEGIN
+      ALTER TABLE PlanOrderPrint ADD InitialPlanQty INT NULL;
+      PRINT 'Migration: Added InitialPlanQty column to PlanOrderPrint (GARUDA)';
+    END
+  `);
+
+  // Backfill: for existing rows created before this column existed, seed
+  // InitialPlanQty from the current PlanQty so the column isn't blank for
+  // plans added prior to this feature.
+  await pool1.request().query(`
+    IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'PlanOrderPrint' AND COLUMN_NAME = 'InitialPlanQty')
+    BEGIN
+      UPDATE PlanOrderPrint SET InitialPlanQty = PlanQty WHERE InitialPlanQty IS NULL;
+    END
+  `);
+
   console.log("GARUDA migrations completed.");
 };

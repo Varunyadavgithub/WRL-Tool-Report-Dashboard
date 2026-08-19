@@ -1,12 +1,33 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
+import ExcelJS from "exceljs";
+import { Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title as ChartTitle,
+  Tooltip as ChartTooltip,
+  Legend as ChartLegend,
+} from "chart.js";
+import ChartDataLabels from "chartjs-plugin-datalabels";
 import DateTimePicker from "../../components/ui/DateTimePicker";
-import ExportButton from "../../components/ui/ExportButton";
+import { exportSectionsToExcel } from "../../utils/reportExport.js";
 import { baseURL } from "../../assets/assets";
 import {
   Filter,
   ChevronRight,
+  ChevronDown,
   Search,
   X,
   Zap,
@@ -25,7 +46,18 @@ import {
   Gauge,
   Trophy,
   Activity,
+  Download,
 } from "lucide-react";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  ChartTitle,
+  ChartTooltip,
+  ChartLegend,
+  ChartDataLabels,
+);
 
 // ─── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -33,6 +65,22 @@ const formatDate = (date) => {
   const pad = (n) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
+
+const formatTimestamp = (ts) =>
+  ts ? String(ts).replace("T", " ").replace("Z", "").slice(0, 19) : "";
+
+const EXPORT_COLUMNS = [
+  { label: "ID", value: (r) => r.id },
+  { label: "Model Code", value: (r) => r.model_code },
+  { label: "Model Name", value: (r) => r.model_name },
+  { label: "Serial No", value: (r) => r.scan_data },
+  { label: "Flow (l/h)", value: (r) => r.leak_text },
+  { label: "Flow Value", value: (r) => r.leak_value },
+  { label: "Status", value: (r) => r.status },
+  { label: "ATEQ PRG", value: (r) => r.ateq_prg },
+  { label: "Timestamp", value: (r) => formatTimestamp(r.timestamp) },
+  { label: "Created At", value: (r) => formatTimestamp(r.created_at) },
+];
 
 // ─── Spinner ───────────────────────────────────────────────────────────────────
 
@@ -282,6 +330,571 @@ const AteqProgramPanel = ({ data }) => {
   );
 };
 
+// ─── Model Name Multi-Select ───────────────────────────────────────────────────
+
+const ModelMultiSelect = ({ options, selected, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggle = (val) => {
+    onChange(
+      selected.includes(val)
+        ? selected.filter((v) => v !== val)
+        : [...selected, val],
+    );
+  };
+
+  const label =
+    selected.length === 0
+      ? "All Models"
+      : selected.length === 1
+        ? selected[0]
+        : `${selected.length} models selected`;
+
+  return (
+    <div className="relative" ref={ref}>
+      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+        Model Name
+      </label>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between gap-2 px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+      >
+        <span className="truncate">{label}</span>
+        <ChevronDown
+          className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 w-56 max-h-64 overflow-auto bg-white border border-slate-200 rounded-lg shadow-lg py-1">
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-100 sticky top-0 bg-white">
+            <button
+              onClick={() => onChange(options)}
+              className="text-[11px] text-blue-600 font-semibold hover:underline"
+            >
+              Select all
+            </button>
+            <button
+              onClick={() => onChange([])}
+              className="text-[11px] text-slate-400 font-semibold hover:underline"
+            >
+              Clear
+            </button>
+          </div>
+          {options.length > 0 ? (
+            options.map((opt) => (
+              <label
+                key={opt}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.includes(opt)}
+                  onChange={() => toggle(opt)}
+                  className="w-3.5 h-3.5 accent-blue-600 shrink-0"
+                />
+                <span className="truncate">{opt}</span>
+              </label>
+            ))
+          ) : (
+            <div className="px-3 py-2 text-xs text-slate-400">
+              No models in current results
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Flow Value Distribution Histogram ─────────────────────────────────────────
+
+const FlowValueHistogram = forwardRef(({ data }, ref) => {
+  const [binSize, setBinSize] = useState(10);
+  const [selectedModels, setSelectedModels] = useState([]);
+  const [selectedBinIndex, setSelectedBinIndex] = useState(null);
+  const chartRef = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    getChartImage: () => chartRef.current?.toBase64Image?.() ?? null,
+  }));
+
+  const modelNameOptions = useMemo(
+    () => [...new Set(data.map((r) => r.model_name).filter(Boolean))].sort(),
+    [data],
+  );
+
+  // Reset the selection if the underlying data changes (e.g. a fresh Query)
+  // and it no longer contains any of the previously-selected models.
+  useEffect(() => {
+    setSelectedModels((prev) =>
+      prev.filter((m) => modelNameOptions.includes(m)),
+    );
+  }, [modelNameOptions]);
+
+  const scopedData = useMemo(
+    () =>
+      selectedModels.length > 0
+        ? data.filter((r) => selectedModels.includes(r.model_name))
+        : data,
+    [data, selectedModels],
+  );
+
+  // Rows with a valid numeric leak_value, paired with their parsed number —
+  // this is what actually gets binned (and drilled into on bar click).
+  const scopedRows = useMemo(
+    () =>
+      scopedData
+        .map((r) => ({ row: r, v: Number(r.leak_value) }))
+        .filter((r) => Number.isFinite(r.v)),
+    [scopedData],
+  );
+
+  const values = useMemo(() => scopedRows.map((r) => r.v), [scopedRows]);
+
+  const { labels, counts, binRows } = useMemo(() => {
+    if (!values.length || !binSize || binSize <= 0) {
+      return { labels: [], counts: [], binRows: [] };
+    }
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const start = Math.floor(min / binSize) * binSize;
+    const numBins = Math.max(1, Math.ceil((max - start) / binSize) || 1);
+    const bins = new Array(numBins).fill(0);
+    const rowsByBin = Array.from({ length: numBins }, () => []);
+    scopedRows.forEach(({ row, v }) => {
+      let idx = Math.floor((v - start) / binSize);
+      if (idx >= numBins) idx = numBins - 1;
+      if (idx < 0) idx = 0;
+      bins[idx]++;
+      rowsByBin[idx].push(row);
+    });
+    const fmt = (n) =>
+      Number.isInteger(binSize) ? n.toFixed(0) : n.toFixed(1);
+    const lbls = bins.map(
+      (_, i) => `${fmt(start + i * binSize)}-${fmt(start + (i + 1) * binSize)}`,
+    );
+    return { labels: lbls, counts: bins, binRows: rowsByBin };
+  }, [values, scopedRows, binSize]);
+
+  // Bin layout just changed (new data, new bin size) — any previously
+  // selected bin index may now point at a different range, so drop it.
+  useEffect(() => {
+    setSelectedBinIndex(null);
+  }, [labels]);
+
+  const [exportingChart, setExportingChart] = useState(false);
+
+  const THIN_BORDER = {
+    top: { style: "thin", color: { argb: "FFCBD5E1" } },
+    left: { style: "thin", color: { argb: "FFCBD5E1" } },
+    bottom: { style: "thin", color: { argb: "FFCBD5E1" } },
+    right: { style: "thin", color: { argb: "FFCBD5E1" } },
+  };
+  const HEADER_FILL = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FF0E7490" },
+  };
+  const STRIPE_FILL = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFECFEFF" },
+  };
+
+  const styleHeaderRow = (row) => {
+    row.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      cell.fill = HEADER_FILL;
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = THIN_BORDER;
+    });
+  };
+
+  const styleDataRow = (row, striped) => {
+    row.eachCell((cell) => {
+      cell.border = THIN_BORDER;
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      if (striped) cell.fill = STRIPE_FILL;
+    });
+  };
+
+  const handleHistogramExport = async () => {
+    if (!labels.length) {
+      toast.error("No distribution data to export.");
+      return;
+    }
+    setExportingChart(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+
+      const modelFilterLabel =
+        selectedModels.length > 0 ? selectedModels.join(", ") : "All Models";
+
+      const hasSelectedBin =
+        selectedBinIndex != null && binRows[selectedBinIndex];
+      const selectedRangeLabel = hasSelectedBin
+        ? `${labels[selectedBinIndex]} (${counts[selectedBinIndex]} readings)`
+        : "All Ranges";
+
+      // When a bin is selected, scope both sheets down to just that bin —
+      // matches exactly what the on-screen drill-down panel shows.
+      const exportLabels = hasSelectedBin ? [labels[selectedBinIndex]] : labels;
+      const exportCounts = hasSelectedBin ? [counts[selectedBinIndex]] : counts;
+      const exportRows = hasSelectedBin ? binRows[selectedBinIndex] : scopedData;
+
+      // Writes the currently-applied filter values (model filter, bin size,
+      // selected range, reading count) at the top of a sheet and returns the
+      // next free row.
+      const writeFilterInfo = (sheet, startRow) => {
+        const infoRows = [
+          ["Model Filter", modelFilterLabel],
+          ["Bin Size", binSize],
+          ["Selected Range", selectedRangeLabel],
+          ["Total Readings", exportRows.length],
+        ];
+        infoRows.forEach(([label, value], i) => {
+          const cell = sheet.getCell(startRow + i, 1);
+          cell.value = `${label}: ${value}`;
+          cell.font = { bold: true, color: { argb: "FF0E7490" }, size: 11 };
+        });
+        return startRow + infoRows.length + 1; // + 1 blank spacer row
+      };
+
+      // ── Sheet 1: filter info + chart image + binned distribution, gridlines off ──
+      const distSheet = workbook.addWorksheet("Distribution", {
+        views: [{ showGridLines: false }],
+      });
+      distSheet.getColumn(1).width = 20;
+      distSheet.getColumn(2).width = 14;
+
+      const nextRow = writeFilterInfo(distSheet, 1);
+
+      const chartImage = chartRef.current?.toBase64Image?.();
+      let headerRowIdx = nextRow;
+      if (chartImage) {
+        const imgId = workbook.addImage({
+          base64: chartImage,
+          extension: "png",
+        });
+        distSheet.addImage(imgId, {
+          tl: { col: 0, row: nextRow - 1 },
+          ext: { width: 640, height: 260 },
+        });
+        headerRowIdx = nextRow + 14;
+      }
+
+      const distHeader = distSheet.getRow(headerRowIdx);
+      distHeader.values = ["Flow Range", "Count"];
+      styleHeaderRow(distHeader);
+
+      exportLabels.forEach((label, i) => {
+        const row = distSheet.addRow([label, exportCounts[i]]);
+        row.getCell(2).numFmt = "0";
+        styleDataRow(row, i % 2 === 1);
+      });
+
+      // ── Sheet 2: filter info + the filtered readings behind the chart, gridlines off ──
+      const readingsSheet = workbook.addWorksheet("Readings", {
+        views: [{ showGridLines: false }],
+      });
+      readingsSheet.getColumn(1).width = 22;
+      readingsSheet.getColumn(2).width = 24;
+      readingsSheet.getColumn(3).width = 14;
+      readingsSheet.getColumn(4).width = 12;
+
+      const readingsHeaderRow = writeFilterInfo(readingsSheet, 1);
+      const readingsHeader = readingsSheet.getRow(readingsHeaderRow);
+      readingsHeader.values = [
+        "Serial No",
+        "Model Name",
+        "Flow Value",
+        "Status",
+      ];
+      styleHeaderRow(readingsHeader);
+
+      exportRows.forEach((r, i) => {
+        const row = readingsSheet.addRow([
+          r.scan_data,
+          r.model_name,
+          r.leak_value,
+          r.status,
+        ]);
+        row.getCell(3).numFmt = "0.00";
+        styleDataRow(row, i % 2 === 1);
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = hasSelectedBin
+        ? `Flow_Value_Distribution_${labels[selectedBinIndex]}.xlsx`
+        : "Flow_Value_Distribution.xlsx";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      toast.success("Distribution exported successfully.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to export distribution.");
+    } finally {
+      setExportingChart(false);
+    }
+  };
+
+  const chartData = useMemo(
+    () => ({
+      labels,
+      datasets: [
+        {
+          label: "Count",
+          data: counts,
+          backgroundColor: counts.map((_, i) =>
+            i === selectedBinIndex
+              ? "rgba(8,145,178,1)"
+              : "rgba(8,145,178,0.75)",
+          ),
+          borderColor: counts.map((_, i) =>
+            i === selectedBinIndex ? "#155e75" : "#0e7490",
+          ),
+          borderWidth: counts.map((_, i) => (i === selectedBinIndex ? 2.5 : 1.5)),
+          borderRadius: 6,
+          barPercentage: 0.85,
+          categoryPercentage: 0.9,
+        },
+      ],
+    }),
+    [labels, counts, selectedBinIndex],
+  );
+
+  const chartOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      onClick: (_evt, elements) => {
+        if (!elements.length) return;
+        const idx = elements[0].index;
+        setSelectedBinIndex((prev) => (prev === idx ? null : idx));
+      },
+      onHover: (evt, elements) => {
+        evt.native.target.style.cursor = elements.length
+          ? "pointer"
+          : "default";
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#1e293b",
+          titleColor: "#f8fafc",
+          bodyColor: "#e2e8f0",
+          padding: 12,
+          cornerRadius: 10,
+          callbacks: {
+            title: (items) => `Flow ${items[0].label}`,
+            label: (item) => `Count: ${item.formattedValue}`,
+          },
+        },
+        datalabels: {
+          display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
+          anchor: "end",
+          align: "top",
+          offset: 2,
+          color: "#0e2f38",
+          font: { size: 11, weight: "bold" },
+          formatter: (value) => value,
+          clip: false,
+          clamp: true,
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          border: { color: "#94a3b8" },
+          ticks: {
+            color: "#1e293b",
+            font: { size: 11, weight: "bold" },
+            maxRotation: 45,
+            minRotation: 0,
+          },
+          title: {
+            display: true,
+            text: "Flow Value",
+            color: "#1e293b",
+            font: { size: 12, weight: "bold" },
+          },
+        },
+        y: {
+          beginAtZero: true,
+          grace: "10%",
+          border: { display: false },
+          ticks: {
+            color: "#1e293b",
+            font: { size: 11, weight: "bold" },
+            precision: 0,
+          },
+          grid: { color: "#e2e8f0" },
+          title: {
+            display: true,
+            text: "Count",
+            color: "#1e293b",
+            font: { size: 12, weight: "bold" },
+          },
+        },
+      },
+    }),
+    [],
+  );
+
+  if (!data.length) return null;
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="w-3.5 h-3.5 text-cyan-600" />
+          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+            Flow Value Distribution
+          </span>
+          <span className="px-2 py-0.5 bg-cyan-50 text-cyan-700 text-[11px] font-semibold rounded-full border border-cyan-100">
+            {values.length} readings
+          </span>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="w-56">
+            <ModelMultiSelect
+              options={modelNameOptions}
+              selected={selectedModels}
+              onChange={setSelectedModels}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-[11px] font-semibold text-slate-500">
+              Bin Size
+            </label>
+            <input
+              type="number"
+              min="0.1"
+              step="0.1"
+              value={binSize}
+              onChange={(e) => setBinSize(Number(e.target.value) || 1)}
+              className="w-20 px-2 py-1 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+            />
+            <div className="flex items-center gap-1">
+              {[5, 10, 20, 50].map((preset) => (
+                <button
+                  key={preset}
+                  onClick={() => setBinSize(preset)}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-semibold border transition-all ${
+                    binSize === preset
+                      ? "bg-cyan-600 text-white border-cyan-600"
+                      : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button
+            onClick={handleHistogramExport}
+            disabled={exportingChart || !values.length}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+              exportingChart || !values.length
+                ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                : "bg-cyan-600 hover:bg-cyan-700 text-white shadow-sm shadow-cyan-200"
+            }`}
+          >
+            {exportingChart ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
+            {exportingChart ? "Exporting..." : "Export"}
+          </button>
+        </div>
+      </div>
+      {values.length > 0 ? (
+        <div className="h-64 relative">
+          <Bar ref={chartRef} data={chartData} options={chartOptions} />
+        </div>
+      ) : (
+        <div className="h-40 flex items-center justify-center text-xs text-slate-400">
+          No numeric flow values for the selected model(s).
+        </div>
+      )}
+
+      {selectedBinIndex != null && binRows[selectedBinIndex] && (
+        <div className="mt-3 border border-cyan-200 bg-cyan-50/40 rounded-lg overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 bg-cyan-50 border-b border-cyan-100">
+            <span className="text-xs font-bold text-cyan-800">
+              Flow {labels[selectedBinIndex]} · {binRows[selectedBinIndex].length}{" "}
+              reading{binRows[selectedBinIndex].length === 1 ? "" : "s"}
+            </span>
+            <button
+              onClick={() => setSelectedBinIndex(null)}
+              className="text-cyan-500 hover:text-cyan-700"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="max-h-[480px] overflow-auto">
+            <table className="w-full text-xs text-left border-separate border-spacing-0">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-white">
+                  {[
+                    "Serial No",
+                    "Model",
+                    "Flow Value",
+                    "Status",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="px-3 py-1.5 font-semibold text-slate-500 border-b border-cyan-100 whitespace-nowrap"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {binRows[selectedBinIndex].map((row, i) => (
+                  <tr key={i} className="even:bg-white/60">
+                    <td className="px-3 py-1.5 border-b border-cyan-100 font-mono text-slate-700 whitespace-nowrap">
+                      {row.scan_data ?? "—"}
+                    </td>
+                    <td className="px-3 py-1.5 border-b border-cyan-100 text-slate-700 whitespace-nowrap">
+                      {row.model_name ?? "—"}
+                    </td>
+                    <td className="px-3 py-1.5 border-b border-cyan-100 font-semibold text-slate-800 whitespace-nowrap">
+                      {row.leak_value}
+                    </td>
+                    <td className="px-3 py-1.5 border-b border-cyan-100 whitespace-nowrap">
+                      <StatusPill status={row.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+FlowValueHistogram.displayName = "FlowValueHistogram";
+
 // ─── Empty State ───────────────────────────────────────────────────────────────
 
 const EmptyState = () => (
@@ -468,6 +1081,8 @@ const MassFlowReport = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [details, setDetails] = useState("");
   const [lastFetched, setLastFetched] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const histogramRef = useRef(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDetails(searchTerm), 300);
@@ -555,6 +1170,47 @@ const MassFlowReport = () => {
       endDate: formatDate(now),
       ...(modelCode.trim() ? { model_code: modelCode.trim() } : {}),
     });
+  };
+
+  const handleExport = async () => {
+    if (!reportData.length) {
+      toast.error("No data available for export.");
+      return;
+    }
+    setExporting(true);
+    try {
+      const chartImage = histogramRef.current?.getChartImage?.() ?? null;
+      const blocks = [];
+      if (chartImage) {
+        blocks.push({
+          type: "image",
+          heading: "Flow Value Distribution",
+          dataUrl: chartImage,
+          width: 640,
+          height: 260,
+        });
+      }
+      blocks.push({
+        type: "table",
+        heading: "Mass Flow Data",
+        columns: EXPORT_COLUMNS,
+        rows: reportData,
+      });
+
+      await exportSectionsToExcel({
+        title: "Mass Flow Report",
+        subtitle:
+          startTime && endTime ? `${startTime} to ${endTime}` : undefined,
+        blocks,
+        filename: "Mass_Flow_Report.xlsx",
+      });
+      toast.success("Report exported successfully.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to export report.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const filteredData = useMemo(() => {
@@ -702,33 +1358,22 @@ const MassFlowReport = () => {
                     {loading ? "Loading..." : "Query"}
                   </button>
                   {reportData.length > 0 && (
-                    <ExportButton
-                      fetchData={() =>
-                        reportData.map((row) => ({
-                          ID: row.id,
-                          "Model Code": row.model_code,
-                          "Model Name": row.model_name,
-                          "Serial No": row.scan_data,
-                          "Flow (l/h)": row.leak_text,
-                          "Flow Value": row.leak_value,
-                          Status: row.status,
-                          "ATEQ PRG": row.ateq_prg,
-                          Timestamp: row.timestamp
-                            ? String(row.timestamp)
-                                .replace("T", " ")
-                                .replace("Z", "")
-                                .slice(0, 19)
-                            : "",
-                          "Created At": row.created_at
-                            ? String(row.created_at)
-                                .replace("T", " ")
-                                .replace("Z", "")
-                                .slice(0, 19)
-                            : "",
-                        }))
-                      }
-                      filename="Mass_Flow_Report"
-                    />
+                    <button
+                      onClick={handleExport}
+                      disabled={exporting}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                        exporting
+                          ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                          : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-200"
+                      }`}
+                    >
+                      {exporting ? (
+                        <Spinner cls="w-4 h-4" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                      {exporting ? "Exporting..." : "Export"}
+                    </button>
                   )}
                 </div>
               </div>
@@ -792,6 +1437,8 @@ const MassFlowReport = () => {
         {/* ── DATA PANELS ── */}
         {!loading && reportData.length > 0 && (
           <>
+            <FlowValueHistogram ref={histogramRef} data={filteredData} />
+
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
               <ModelPerformancePanel data={filteredData} />
               <AteqProgramPanel data={filteredData} />

@@ -356,13 +356,14 @@ const PlanStatus = () => {
                 <span className="text-sm">Loading...</span>
               </div>
             ) : (
-              <table className="min-w-[1100px] w-full text-xs text-left border-separate border-spacing-0">
+              <table className="min-w-[1220px] w-full text-xs text-left border-separate border-spacing-0">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-slate-100">
                     {[
                       "Mat Code",
                       "Name",
                       "Status",
+                      "Initial Plan",
                       "Plan Qty",
                       "Print Lbl",
                       "Remark",
@@ -406,6 +407,9 @@ const PlanStatus = () => {
                               </span>
                             )}
                           </td>
+                          <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-400 whitespace-nowrap">
+                            {item.InitialPlanQty ?? "-"}
+                          </td>
                           <td className="px-3 py-2 border-b border-slate-100 font-mono text-slate-700 whitespace-nowrap">
                             {item.PlanQty ?? "-"}
                           </td>
@@ -445,7 +449,7 @@ const PlanStatus = () => {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={8} className="py-16 text-center">
+                      <td colSpan={9} className="py-16 text-center">
                         <div className="flex flex-col items-center gap-3 text-slate-400">
                           <PackageOpen
                             className="w-12 h-12 opacity-20"
