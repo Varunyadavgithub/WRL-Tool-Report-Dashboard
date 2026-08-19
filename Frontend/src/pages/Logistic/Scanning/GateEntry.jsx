@@ -1,7 +1,7 @@
 import { useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { baseURL } from "../../assets/assets";
+import { baseURL } from "../../../assets/assets";
 
 import { FiSend, FiTrash2, FiClipboard } from "react-icons/fi";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
