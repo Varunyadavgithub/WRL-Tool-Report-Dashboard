@@ -70,23 +70,25 @@ const BISDashboard = lazy(() => import("../pages/Quality/BIS/BISDashboard"));
 const BEECalculation = lazy(() => import("../pages/Quality/BEECalculation"));
 
 const DispatchPerformanceReport = lazy(
-  () => import("../pages/Dispatch/DispatchPerformanceReport"),
+  () => import("../pages/Logistic/Reports/DispatchPerformanceReport"),
 );
-const DispatchReport = lazy(() => import("../pages/Dispatch/DispatchReport"));
+const DispatchReport = lazy(
+  () => import("../pages/Logistic/Reports/DispatchReport"),
+);
 const FGDispatchReport = lazy(
-  () => import("../pages/Dispatch/Fgdispatchreport"),
+  () => import("../pages/Logistic/Reports/UnloadingStatus"),
 );
 const DispatchUnloading = lazy(
-  () => import("../pages/Dispatch/DispatchUnloading"),
+  () => import("../pages/Logistic/Reports/FGUnloadingReport"),
 );
 const RemoveDispatchSerials = lazy(
-  () => import("../pages/Dispatch/RemoveDispatchSerials"),
+  () => import("../pages/Logistic/Scanning/RemoveDispatchSerials"),
 );
-const FGCasting = lazy(() => import("../pages/Dispatch/FGCasting"));
-const GateEntry = lazy(() => import("../pages/Dispatch/GateEntry"));
-const ErrorLog = lazy(() => import("../pages/Dispatch/ErrorLog"));
-const FGUnloadingScan = lazy(() => import("../pages/Dispatch/FGUnloadingScan"));
-const FGDispatchScan = lazy(() => import("../pages/Dispatch/FGDispatchScan"));
+const FGCasting = lazy(() => import("../pages/Logistic/Reports/FGCastingReport"));
+const GateEntry = lazy(() => import("../pages/Logistic/Scanning/GateEntry"));
+const ErrorLog = lazy(() => import("../pages/Logistic/Logs/ErrorLog"));
+const FGUnloadingScan = lazy(() => import("../pages/Logistic/Scanning/FGUnloadingScan"));
+const FGDispatchScan = lazy(() => import("../pages/Logistic/Scanning/FGDispatchScan"));
 
 const ProductionPlaning = lazy(
   () => import("../pages/Planing/ProductionPlaning"),
