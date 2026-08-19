@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { baseURL } from "../../assets/assets";
-import ScanErrorDialog from "./ScanErrorDialog";
+import { baseURL } from "../../../assets/assets";
+import ScanErrorDialog from "../../../components/Logistic/ScanErrorDialog";
 
 import { FiCheckCircle, FiPackage, FiHash } from "react-icons/fi";
 import { MdOutlineInventory2, MdQrCodeScanner } from "react-icons/md";

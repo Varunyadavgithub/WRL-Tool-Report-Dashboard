@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { baseURL } from "../../assets/assets";
+import { baseURL } from "../../../assets/assets";
 
 import { FiCheckCircle, FiTruck, FiHash, FiRefreshCw, FiTrash2 } from "react-icons/fi";
 import { MdQrCodeScanner, MdOutlineLocalShipping } from "react-icons/md";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import ScanErrorDialog from "./ScanErrorDialog";
+import ScanErrorDialog from "../../../components/Logistic/ScanErrorDialog";
 
 const Spinner = ({ size = 16 }) => (
   <AiOutlineLoading3Quarters size={size} className="animate-spin inline-block" />
