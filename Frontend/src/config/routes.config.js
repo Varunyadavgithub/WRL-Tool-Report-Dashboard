@@ -86,7 +86,7 @@ const RemoveDispatchSerials = lazy(
 );
 const FGCasting = lazy(() => import("../pages/Logistic/Reports/FGCastingReport"));
 const GateEntry = lazy(() => import("../pages/Logistic/Scanning/GateEntry"));
-const ErrorLog = lazy(() => import("../pages/Logistic/Logs/ErrorLog"));
+const ErrorLog = lazy(() => import("../pages/Logistic/Log/ErrorLog"));
 const FGUnloadingScan = lazy(() => import("../pages/Logistic/Scanning/FGUnloadingScan"));
 const FGDispatchScan = lazy(() => import("../pages/Logistic/Scanning/FGDispatchScan"));
 
