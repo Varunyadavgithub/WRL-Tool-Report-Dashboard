@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import {
   FileText, Layers, CheckCircle, Clock, RefreshCw,
   Zap, Settings2, ShieldCheck, AlertTriangle, Pencil, FileUp, CloudUpload as CloudUploadIcon,
-  CalendarClock, FileStack, Archive,
+  CalendarClock, FileStack, Archive, UserCheck,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
@@ -15,9 +15,11 @@ import BISComplianceTab from "./BISComplianceTab";
 import BISEnergyTab from "./BISEnergyTab";
 import BISConfigTab from "./BISConfigTab";
 import BISTestScheduleTab from "./BISTestScheduleTab";
+import BISApprovalQueue from "./BISApprovalQueue";
 
 const TABS = [
   { key: "testReports", label: "Test Reports", icon: FileStack },
+  { key: "approvals", label: "Approvals", icon: UserCheck },
   { key: "schedule", label: "Test Schedule", icon: CalendarClock },
   { key: "reports", label: "Legacy PDF Reports (Archive)", icon: Archive },
   { key: "compliance", label: "Compliance Status", icon: ShieldCheck },
@@ -72,6 +74,11 @@ const BISDashboard = () => {
   const [showDeleteCategoryModal, setShowDeleteCategoryModal] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState(null);
   const [showOverrideSection, setShowOverrideSection] = useState(false);
+
+  // ── BIS Approval Flow (Preparer/Reviewer/Authorizer assignment + signatures) ──
+  const [approvalFlow, setApprovalFlow] = useState(null);
+  const [approvalFlowLoading, setApprovalFlowLoading] = useState(false);
+  const [approvalUsers, setApprovalUsers] = useState([]);
 
   // ── BIS Test Schedule (frequency config + computed schedule) ──────────────
   const [testConfig, setTestConfig] = useState(null);
@@ -129,6 +136,52 @@ const BISDashboard = () => {
     }
   };
   useEffect(() => { fetchBisCategories(); }, []);
+
+  // ── BIS Approval Flow API ───────────────────────────────────────────────
+  const fetchApprovalFlow = async () => {
+    try {
+      setApprovalFlowLoading(true);
+      const res = await axios.get(`${baseURL}quality/bis-approval-flow`);
+      setApprovalFlow(res?.data?.flow || null);
+    } catch {
+      toast.error("Failed to fetch BIS approval flow");
+    } finally {
+      setApprovalFlowLoading(false);
+    }
+  };
+  useEffect(() => { fetchApprovalFlow(); }, []);
+
+  const fetchApprovalUsers = async () => {
+    try {
+      const res = await axios.get(`${baseURL}quality/bis-approval-users`);
+      setApprovalUsers(res?.data?.users || []);
+    } catch {
+      toast.error("Failed to fetch users");
+    }
+  };
+  useEffect(() => { fetchApprovalUsers(); }, []);
+
+  const saveApprovalFlow = async (form) => {
+    try {
+      await axios.put(`${baseURL}quality/bis-approval-flow`, form);
+      toast.success("Approval flow saved");
+      fetchApprovalFlow();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to save approval flow");
+    }
+  };
+
+  const uploadApprovalSignature = async (role, file) => {
+    try {
+      const formData = new FormData();
+      formData.append("signature", file);
+      await axios.post(`${baseURL}quality/bis-approval-flow/signature/${role}`, formData, { headers: { "Content-Type": "multipart/form-data" } });
+      toast.success("Signature uploaded");
+      fetchApprovalFlow();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to upload signature");
+    }
+  };
 
   const fetchType100Materials = async () => {
     try {
@@ -502,6 +555,8 @@ const BISDashboard = () => {
 
         {activeTab === "testReports" && <BISTestReportsTab />}
 
+        {activeTab === "approvals" && <BISApprovalQueue />}
+
         {activeTab === "reports" && (
           <BISReportsTab files={uploadedFiles} onEdit={handleUpdate} onDownload={handleDownload} onDelete={handleDeleteFile} onFetchData={handleFetchEnergyData} />
         )}
@@ -552,6 +607,11 @@ const BISDashboard = () => {
             testConfigLoading={testConfigLoading}
             onSaveTestConfig={saveTestConfig}
             onInlineUpdateOverrides={saveCategoryOverridesInline}
+            approvalFlow={approvalFlow}
+            approvalFlowLoading={approvalFlowLoading}
+            approvalUsers={approvalUsers}
+            onSaveApprovalFlow={saveApprovalFlow}
+            onUploadApprovalSignature={uploadApprovalSignature}
           />
         )}
       </div>

@@ -397,5 +397,61 @@ export const runGarudaMigrations = async (pool1) => {
     END
   `);
 
+  // ── BISApprovalFlow: single-row config naming which user currently holds
+  //    each of the 3 BIS report sign-off roles (Preparer/Reviewer/Authorizer)
+  //    and their signature image, used to route the approval queue and to
+  //    stamp new report submissions. Editable from BIS Config → Approval Flow.
+  await pool1.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'BISApprovalFlow')
+    BEGIN
+      CREATE TABLE BISApprovalFlow (
+        Id                      INT IDENTITY(1,1) PRIMARY KEY,
+        PreparerUserCode        NVARCHAR(50)  NULL,
+        PreparerSignaturePath   NVARCHAR(300) NULL,
+        ReviewerUserCode        NVARCHAR(50)  NULL,
+        ReviewerSignaturePath   NVARCHAR(300) NULL,
+        AuthorizerUserCode      NVARCHAR(50)  NULL,
+        AuthorizerSignaturePath NVARCHAR(300) NULL,
+        UpdatedBy               NVARCHAR(100) NULL,
+        UpdatedAt               DATETIME      NOT NULL DEFAULT GETDATE()
+      );
+      INSERT INTO BISApprovalFlow (PreparerUserCode, ReviewerUserCode, AuthorizerUserCode)
+      VALUES ('125016', '124042', '125031');
+      PRINT 'Migration: Created BISApprovalFlow table (GARUDA)';
+    END
+  `);
+
+  // ── BISTestReport: per-report snapshot of who actually acted at each
+  //    workflow stage and when, plus their signature image at that moment —
+  //    kept on the report row (not just read live from BISApprovalFlow) so a
+  //    later flow-config change never retroactively alters an already-signed
+  //    report. WorkflowRemarks holds the most recent reject reason, if any.
+  //    Status gains two new values used between Draft and Final: PendingReview
+  //    (submitted by the preparer, awaiting the reviewer) and PendingApproval
+  //    (reviewed, awaiting the authorizer) — both fit the existing NVARCHAR(20).
+  for (const col of [
+    { name: "PreparerUserCode", def: "NVARCHAR(50) NULL" },
+    { name: "PreparerSignaturePath", def: "NVARCHAR(300) NULL" },
+    { name: "PreparerActionAt", def: "DATETIME NULL" },
+    { name: "ReviewerUserCode", def: "NVARCHAR(50) NULL" },
+    { name: "ReviewerSignaturePath", def: "NVARCHAR(300) NULL" },
+    { name: "ReviewerActionAt", def: "DATETIME NULL" },
+    { name: "AuthorizerUserCode", def: "NVARCHAR(50) NULL" },
+    { name: "AuthorizerSignaturePath", def: "NVARCHAR(300) NULL" },
+    { name: "AuthorizerActionAt", def: "DATETIME NULL" },
+    { name: "WorkflowRemarks", def: "NVARCHAR(500) NULL" },
+  ]) {
+    await pool1.request().query(`
+      IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = 'BISTestReport' AND COLUMN_NAME = '${col.name}'
+      )
+      BEGIN
+        ALTER TABLE BISTestReport ADD ${col.name} ${col.def};
+        PRINT 'Migration: Added ${col.name} column to BISTestReport (GARUDA)';
+      END
+    `);
+  }
+
   console.log("GARUDA migrations completed.");
 };

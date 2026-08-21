@@ -31,7 +31,7 @@ import {
   getModlelName, holdCabinet, releaseCabinet,
 } from "../controllers/quality/dispatchHold.controller.js";
 import {
-  handleMulterError, uploadBISReportPDF, uploadFpaDefectImage,
+  handleMulterError, uploadBISReportPDF, uploadFpaDefectImage, uploadBisSignature,
 } from "../middlewares/uploadMiddleware.js";
 import {
   uploadBisPdfFile, getBisPdfFiles, downloadBisPdfFile,
@@ -51,7 +51,11 @@ import {
 import {
   createBisTestReport, getBisTestReports, getBisTestReportById,
   updateBisTestReport, deleteBisTestReport, getBisTestReportHistory,
+  submitBisTestReportForReview, reviewBisTestReport, authorizeBisTestReport, getBisApprovalQueue,
 } from "../controllers/quality/BisTestReport.controller.js";
+import {
+  getBisApprovalFlow, updateBisApprovalFlow, uploadBisApprovalSignature, getBisApprovalUsers,
+} from "../controllers/quality/BisApprovalFlow.controller.js";
 import { getDispatchHoldDetails } from "../controllers/quality/holdCabinetDetails.controller.js";
 import { getCPTReport } from "../controllers/quality/cptReport.controller.js";
 import {
@@ -60,6 +64,7 @@ import {
   getReworkReportExport,
   getReworkSummaryExport,
   getReworkDefectExport,
+  getReworkDefectOptions,
   getProductionReport,
 } from "../controllers/quality/rework.controller.js";
 import {
@@ -93,6 +98,7 @@ router.get("/rework-report-quick", authenticate, getReworkReportQuick);
 router.get("/rework-report-export", authenticate, getReworkReportExport);
 router.get("/rework-summary-export", authenticate, getReworkSummaryExport);
 router.get("/rework-defect-export", authenticate, getReworkDefectExport);
+router.get("/rework-defect-options", authenticate, getReworkDefectOptions);
 router.get("/production-report", authenticate, getProductionReport);
 
 // FPA Reports
@@ -163,6 +169,18 @@ router.get("/bis-test-reports/:id", authenticate, getBisTestReportById);
 router.put("/bis-test-reports/:id", authenticate, updateBisTestReport);
 router.delete("/bis-test-reports/:id", authenticate, deleteBisTestReport);
 router.get("/bis-test-reports/:id/history", authenticate, getBisTestReportHistory);
+
+// BIS Approval Workflow — Draft → PendingReview → PendingApproval → Final
+router.post("/bis-test-reports/:id/submit-for-review", authenticate, submitBisTestReportForReview);
+router.post("/bis-test-reports/:id/review", authenticate, reviewBisTestReport);
+router.post("/bis-test-reports/:id/authorize", authenticate, authorizeBisTestReport);
+router.get("/bis-approval-queue", authenticate, getBisApprovalQueue);
+
+// BIS Approval Flow config — who holds each role + their signature image
+router.get("/bis-approval-flow", authenticate, getBisApprovalFlow);
+router.put("/bis-approval-flow", authenticate, updateBisApprovalFlow);
+router.post("/bis-approval-flow/signature/:role", authenticate, uploadBisSignature.single("signature"), handleMulterError, uploadBisApprovalSignature);
+router.get("/bis-approval-users", authenticate, getBisApprovalUsers);
 
 // BEE Calculation
 router.get("/bee/models", authenticate, getBeeModels);

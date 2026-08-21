@@ -121,7 +121,7 @@ const BISSoundReportForm = ({ initialData, prefillHeader, models, onSave, onCanc
           <Save className="w-3.5 h-3.5" /> Save Draft
         </button>
         <button type="button" onClick={() => handleSubmit("Final")} disabled={saving} className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 transition-all disabled:opacity-50">
-          <Send className="w-3.5 h-3.5" /> {saving ? "Saving…" : "Submit Final"}
+          <Send className="w-3.5 h-3.5" /> {saving ? "Submitting…" : "Submit for Review"}
         </button>
       </div>
     </div>
