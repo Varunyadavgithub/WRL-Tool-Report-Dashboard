@@ -17,9 +17,12 @@ import BISReportDetailView from "./BISReportDetailView";
 const TYPE_ICON = { Introduction: Thermometer, Sound: Volume2, Volume: Box };
 const STATUS_STYLE = {
   Draft: "bg-slate-100 text-slate-600 border-slate-200",
+  PendingReview: "bg-blue-50 text-blue-700 border-blue-100",
+  PendingApproval: "bg-violet-50 text-violet-700 border-violet-100",
   Final: "bg-emerald-50 text-emerald-700 border-emerald-100",
   Superseded: "bg-amber-50 text-amber-700 border-amber-100",
 };
+const EDITABLE_STATUSES = ["Draft", "Final"]; // Pending* is locked to the approval actions
 const FORM_BY_TYPE = { Introduction: BISIntroductionReportForm, Sound: BISSoundReportForm, Volume: BISVolumeReportForm };
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—");
@@ -169,11 +172,24 @@ const BISTestReportsTab = () => {
     fetchSchedule();
   };
 
+  // The form always saves as a Draft; "Submit for Review" (status === "Final"
+  // from the form's own button, kept as that signal) chains a second call
+  // that hands the just-saved Draft to the approval flow's Preparer step.
+  const submitForReview = async (id) => {
+    try {
+      await axios.post(`${baseURL}quality/bis-test-reports/${id}/submit-for-review`);
+      toast.success("Report submitted for review");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Saved as Draft, but submitting for review failed");
+    }
+  };
+
   const handleCreate = async (payload, status) => {
     try {
       setSaving(true);
-      await axios.post(`${baseURL}quality/bis-test-reports`, { ...payload, status });
-      toast.success(status === "Final" ? "Report submitted" : "Draft saved");
+      const res = await axios.post(`${baseURL}quality/bis-test-reports`, payload);
+      if (status === "Final") await submitForReview(res.data.id);
+      else toast.success("Draft saved");
       backToList();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to save report");
@@ -185,8 +201,9 @@ const BISTestReportsTab = () => {
   const handleUpdate = async (payload, status) => {
     try {
       setSaving(true);
-      await axios.put(`${baseURL}quality/bis-test-reports/${detail.header.Id}`, { ...payload, status });
-      toast.success(status === "Final" ? "Report submitted" : "Draft saved");
+      await axios.put(`${baseURL}quality/bis-test-reports/${detail.header.Id}`, payload);
+      if (status === "Final") await submitForReview(detail.header.Id);
+      else toast.success("Draft saved");
       backToList();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to update report");
@@ -331,7 +348,7 @@ const BISTestReportsTab = () => {
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex flex-wrap items-center gap-3">
         <MultiSelectDropdown label="Report Type" options={BIS_REPORT_TYPES} selected={typeFilter} onChange={setTypeFilter} labelFor={reportTypeLabel} />
-        <MultiSelectDropdown label="Status" options={["Draft", "Final", "Superseded"]} selected={statusFilter} onChange={setStatusFilter} />
+        <MultiSelectDropdown label="Status" options={["Draft", "PendingReview", "PendingApproval", "Final", "Superseded"]} selected={statusFilter} onChange={setStatusFilter} />
         <div>
           <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Model</label>
           <div className="relative">
@@ -398,13 +415,18 @@ const BISTestReportsTab = () => {
                       </td>
                       <td className="px-3 py-2.5 border-b border-slate-100">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${STATUS_STYLE[row.Status] || STATUS_STYLE.Draft}`}>{row.Status}</span>
+                        {row.Status === "Draft" && row.WorkflowRemarks && (
+                          <p className="text-[10px] text-red-500 mt-0.5 max-w-[160px] truncate" title={row.WorkflowRemarks}>Rejected: {row.WorkflowRemarks}</p>
+                        )}
                       </td>
                       <td className="px-3 py-2.5 border-b border-slate-100 text-slate-400 font-mono">v{row.Version}</td>
                       <td className="px-3 py-2.5 border-b border-slate-100 text-slate-400">{fmtDate(row.UpdatedAt)}</td>
                       <td className="px-3 py-2.5 border-b border-slate-100">
                         <div className="flex items-center gap-1.5">
                           <button onClick={() => openView(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="View"><Eye className="w-3.5 h-3.5" /></button>
-                          <button onClick={() => openEdit(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
+                          {EDITABLE_STATUSES.includes(row.Status) && (
+                            <button onClick={() => openEdit(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
+                          )}
                           <button onClick={() => openHistory(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-all" title="History"><History className="w-3.5 h-3.5" /></button>
                           {row.Status === "Draft" && (
                             <button onClick={() => askDelete(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all" title="Delete Draft"><Trash2 className="w-3.5 h-3.5" /></button>

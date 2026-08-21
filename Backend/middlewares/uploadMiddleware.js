@@ -80,6 +80,12 @@ export const uploadMaterialDrawing = multer({
   limits: { fileSize: UPLOAD_CONFIGS.materialDrawing.maxSize },
 });
 
+export const uploadBisSignature = multer({
+  storage: createStorage("BISSignatures"),
+  fileFilter: createFileFilter("bisSignature"),
+  limits: { fileSize: UPLOAD_CONFIGS.bisSignature.maxSize },
+});
+
 /* ===================== ERROR HANDLER ===================== */
 
 export const handleMulterError = (err, _req, res, next) => {

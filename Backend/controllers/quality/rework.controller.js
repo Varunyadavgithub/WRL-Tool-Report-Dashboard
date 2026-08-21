@@ -10,6 +10,7 @@ import { convertToIST } from "../../utils/convertToIST.js";
 // router.get("/rework-report-export",   getReworkReportExport);   ← detail tab
 // router.get("/rework-summary-export",  getReworkSummaryExport);  ← summary tab
 // router.get("/rework-defect-export",   getReworkDefectExport);   ← defect tab
+// router.get("/rework-defect-options",  getReworkDefectOptions);  ← Defect filter dropdown
 // router.get("/production-report",      getProductionReport);
 
 // ─── Category reverse-map ─────────────────────────────────────────────────────
@@ -53,6 +54,22 @@ const expandCategories = (categoriesStr) => {
   return dbNames.length > 0 ? dbNames.join("|") : null;
 };
 
+/**
+ * Converts a pipe-separated string of exact Defect (DefectCodeMaster.Name)
+ * values into a pipe-separated string for use with STRING_SPLIT. Unlike
+ * categories, defect names pass straight through — the UI multi-select
+ * options are built from the exact DB values already, no group->DB mapping.
+ * Pipe-separated (not comma) since defect descriptions can contain commas.
+ */
+const expandDefects = (defectsStr) => {
+  if (!defectsStr) return null;
+  const list = defectsStr
+    .split("|")
+    .map((d) => d.trim())
+    .filter(Boolean);
+  return list.length > 0 ? list.join("|") : null;
+};
+
 // ─── Reusable SQL fragment: 1 when a record is "closed", else 0 ───────────────
 const CLOSED_CASE = `
   CASE
@@ -75,6 +92,12 @@ const CAT_FILTER = `(
 const CAT_FILTER_MC2 = `(
   @dbCategories IS NULL
   OR mc2.Name IN (SELECT value FROM STRING_SPLIT(@dbCategories, '|'))
+)`;
+
+// ─── Reusable SQL fragment: defect IN filter ──────────────────────────────────
+const DEFECT_FILTER = `(
+  @dbDefects IS NULL
+  OR Defect IN (SELECT value FROM STRING_SPLIT(@dbDefects, '|'))
 )`;
 
 // ─── Shared base CTE ──────────────────────────────────────────────────────────
@@ -136,7 +159,10 @@ const REWORK_BASE_CTE = `
 const getPool = () => new sql.ConnectionPool(dbConfig1).connect();
 
 // ─── Helper: bind all shared parameters onto an mssql Request ─────────────────
-const bindInputs = (request, { istStart, istEnd, model, dbCategories }) =>
+const bindInputs = (
+  request,
+  { istStart, istEnd, model, dbCategories, dbDefects },
+) =>
   request
     .input("startTime", sql.DateTime, istStart)
     .input("endTime", sql.DateTime, istEnd)
@@ -146,11 +172,12 @@ const bindInputs = (request, { istStart, istEnd, model, dbCategories }) =>
       sql.VarChar,
       model && model !== "0" && model.trim() !== "" ? model.trim() : null,
     )
-    .input("dbCategories", sql.VarChar, dbCategories ?? null);
+    .input("dbCategories", sql.VarChar, dbCategories ?? null)
+    .input("dbDefects", sql.VarChar, dbDefects ?? null);
 
 // ─── Helper: validate + parse common query params ─────────────────────────────
 const parseCommonParams = (query) => {
-  const { startTime, endTime, model, categories } = query;
+  const { startTime, endTime, model, categories, defects } = query;
   if (!startTime || !endTime)
     throw new AppError(
       "Missing required query parameters: startTime, endTime",
@@ -161,6 +188,7 @@ const parseCommonParams = (query) => {
     istEnd: convertToIST(endTime),
     model: model ?? null,
     dbCategories: expandCategories(categories),
+    dbDefects: expandDefects(defects),
   };
 };
 
@@ -185,6 +213,7 @@ export const getReworkReport = tryCatch(async (req, res) => {
         SELECT * FROM ReworkBase
         WHERE (@model IS NULL OR MatCode = @model)
           AND ${CAT_FILTER}
+          AND ${DEFECT_FILTER}
       )
       SELECT
         (SELECT COUNT(*) FROM Filtered) AS totalCount,
@@ -229,6 +258,7 @@ export const getReworkReportQuick = tryCatch(async (req, res) => {
       FROM ReworkBase
       WHERE (@model IS NULL OR MatCode = @model)
         AND ${CAT_FILTER}
+        AND ${DEFECT_FILTER}
       ORDER BY Rework_IN;
     `;
 
@@ -238,6 +268,31 @@ export const getReworkReportQuick = tryCatch(async (req, res) => {
       message: "Quick data fetched",
       data: result.recordset,
       totalCount: result.recordset.length,
+    });
+  } finally {
+    await pool.close();
+  }
+});
+
+// ─── GET /rework-defect-options  (full master list for the filter dropdown) ──
+// Reads straight from DefectCodeMaster (the source of dc.Name AS Defect in
+// ReworkBase) rather than enumerating what's present in the current query
+// results — so the dropdown always shows every possible defect, never goes
+// empty for a narrow date/model/category filter, and (like Category) never
+// shrinks to just what's currently checked.
+export const getReworkDefectOptions = tryCatch(async (req, res) => {
+  const pool = await getPool();
+  try {
+    const result = await pool.request().query(`
+      SELECT DISTINCT Name
+      FROM DefectCodeMaster
+      WHERE Name IS NOT NULL AND LTRIM(RTRIM(Name)) <> ''
+      ORDER BY Name;
+    `);
+    res.status(200).json({
+      success: true,
+      message: "Defect options fetched",
+      data: result.recordset.map((r) => r.Name),
     });
   } finally {
     await pool.close();
@@ -263,6 +318,7 @@ export const getReworkReportExport = tryCatch(async (req, res) => {
       FROM ReworkBase
       WHERE (@model IS NULL OR MatCode = @model)
         AND ${CAT_FILTER}
+        AND ${DEFECT_FILTER}
       ORDER BY Rework_IN;
     `;
 
@@ -292,6 +348,7 @@ export const getReworkSummaryExport = tryCatch(async (req, res) => {
         SELECT * FROM ReworkBase
         WHERE (@model IS NULL OR MatCode = @model)
           AND ${CAT_FILTER}
+          AND ${DEFECT_FILTER}
       )
       SELECT
         ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC)   AS Sr_No,
@@ -337,6 +394,7 @@ export const getReworkDefectExport = tryCatch(async (req, res) => {
         SELECT * FROM ReworkBase
         WHERE (@model IS NULL OR MatCode = @model)
           AND ${CAT_FILTER}
+          AND ${DEFECT_FILTER}
       )
 
       , ReworkAgg AS (
