@@ -15,6 +15,7 @@ export const DIRS = {
   auditTemplates: path.resolve(UPLOADS_DIR, "AuditTemplates"),
   machineImages: path.resolve(UPLOADS_DIR, "MachineImages"),
   materialDrawings: path.resolve(UPLOADS_DIR, "MaterialDrawings"),
+  bisSignatures: path.resolve(UPLOADS_DIR, "BISSignatures"),
 };
 
 /* ===================== ENSURE DIRS EXIST ===================== */
@@ -95,6 +96,12 @@ export const UPLOAD_CONFIGS = {
     ],
     errorMessage: "Only PDF or image files (JPG, PNG) are allowed for drawings",
     maxSize: 20 * 1024 * 1024, // 20MB
+  },
+
+  bisSignature: {
+    ...FILE_TYPES.image,
+    errorMessage: "Only JPEG, JPG or PNG images are allowed for signatures",
+    maxSize: 5 * 1024 * 1024, // 5MB — signatures are small
   },
 };
 
