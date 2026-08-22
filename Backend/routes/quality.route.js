@@ -31,7 +31,11 @@ import {
   getModlelName, holdCabinet, releaseCabinet,
 } from "../controllers/quality/dispatchHold.controller.js";
 import {
+<<<<<<< HEAD
   handleMulterError, uploadBISReportPDF, uploadFpaDefectImage,
+=======
+  handleMulterError, uploadBISReportPDF, uploadFpaDefectImage, uploadBisSignature,
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 } from "../middlewares/uploadMiddleware.js";
 import {
   uploadBisPdfFile, getBisPdfFiles, downloadBisPdfFile,
@@ -51,7 +55,15 @@ import {
 import {
   createBisTestReport, getBisTestReports, getBisTestReportById,
   updateBisTestReport, deleteBisTestReport, getBisTestReportHistory,
+<<<<<<< HEAD
 } from "../controllers/quality/BisTestReport.controller.js";
+=======
+  submitBisTestReportForReview, reviewBisTestReport, authorizeBisTestReport, getBisApprovalQueue,
+} from "../controllers/quality/BisTestReport.controller.js";
+import {
+  getBisApprovalFlow, updateBisApprovalFlow, uploadBisApprovalSignature, getBisApprovalUsers,
+} from "../controllers/quality/BisApprovalFlow.controller.js";
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 import { getDispatchHoldDetails } from "../controllers/quality/holdCabinetDetails.controller.js";
 import { getCPTReport } from "../controllers/quality/cptReport.controller.js";
 import {
@@ -60,6 +72,10 @@ import {
   getReworkReportExport,
   getReworkSummaryExport,
   getReworkDefectExport,
+<<<<<<< HEAD
+=======
+  getReworkDefectOptions,
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   getProductionReport,
 } from "../controllers/quality/rework.controller.js";
 import {
@@ -93,6 +109,10 @@ router.get("/rework-report-quick", authenticate, getReworkReportQuick);
 router.get("/rework-report-export", authenticate, getReworkReportExport);
 router.get("/rework-summary-export", authenticate, getReworkSummaryExport);
 router.get("/rework-defect-export", authenticate, getReworkDefectExport);
+<<<<<<< HEAD
+=======
+router.get("/rework-defect-options", authenticate, getReworkDefectOptions);
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 router.get("/production-report", authenticate, getProductionReport);
 
 // FPA Reports
@@ -164,6 +184,21 @@ router.put("/bis-test-reports/:id", authenticate, updateBisTestReport);
 router.delete("/bis-test-reports/:id", authenticate, deleteBisTestReport);
 router.get("/bis-test-reports/:id/history", authenticate, getBisTestReportHistory);
 
+<<<<<<< HEAD
+=======
+// BIS Approval Workflow — Draft → PendingReview → PendingApproval → Final
+router.post("/bis-test-reports/:id/submit-for-review", authenticate, submitBisTestReportForReview);
+router.post("/bis-test-reports/:id/review", authenticate, reviewBisTestReport);
+router.post("/bis-test-reports/:id/authorize", authenticate, authorizeBisTestReport);
+router.get("/bis-approval-queue", authenticate, getBisApprovalQueue);
+
+// BIS Approval Flow config — who holds each role + their signature image
+router.get("/bis-approval-flow", authenticate, getBisApprovalFlow);
+router.put("/bis-approval-flow", authenticate, updateBisApprovalFlow);
+router.post("/bis-approval-flow/signature/:role", authenticate, uploadBisSignature.single("signature"), handleMulterError, uploadBisApprovalSignature);
+router.get("/bis-approval-users", authenticate, getBisApprovalUsers);
+
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 // BEE Calculation
 router.get("/bee/models", authenticate, getBeeModels);
 router.post("/bee/models", authenticate, saveBeeModels);

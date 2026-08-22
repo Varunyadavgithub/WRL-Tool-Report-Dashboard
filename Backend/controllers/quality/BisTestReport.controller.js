@@ -325,9 +325,18 @@ const validatePayload = ({ reportType, header }) => {
    CREATE
 ═══════════════════════════════════════════════════════════════════════ */
 export const createBisTestReport = tryCatch(async (req, res) => {
+<<<<<<< HEAD
   const { reportType, header, testData, equipment, status } = req.body;
   validatePayload({ reportType, header });
   const finalStatus = status === "Final" ? "Final" : "Draft";
+=======
+  const { reportType, header, testData, equipment } = req.body;
+  validatePayload({ reportType, header });
+  // Reports always start life as a Draft now — "Final" is only reached by
+  // walking the Preparer → Reviewer → Authorizer approval chain (see
+  // submitBisTestReportForReview / reviewBisTestReport / authorizeBisTestReport
+  // below), never set directly from the create/edit form.
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   const createdBy = req.user?.name || req.user?.usercode || "system";
 
   const pool = await connectToDB(dbConfig1);
@@ -336,7 +345,11 @@ export const createBisTestReport = tryCatch(async (req, res) => {
 
   try {
     const reportId = await insertHeader(transaction, {
+<<<<<<< HEAD
       reportType, header, status: finalStatus, createdBy, rootReportId: null, version: 1,
+=======
+      reportType, header, status: "Draft", createdBy, rootReportId: null, version: 1,
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
     });
     await insertChildrenByType(transaction, reportType, reportId, testData, equipment);
     await transaction.commit();
@@ -374,7 +387,12 @@ export const getBisTestReports = tryCatch(async (req, res) => {
 
     const result = await request.query(`
       SELECT Id, ReportType, MaterialCode, ModelName, MachineSerialNumber, TestReportNo,
+<<<<<<< HEAD
              TestDateFrom, TestDateTo, TestedBy, Result, Status, Version, CreatedBy, CreatedAt, UpdatedBy, UpdatedAt
+=======
+             TestDateFrom, TestDateTo, TestedBy, Result, Status, Version, CreatedBy, CreatedAt, UpdatedBy, UpdatedAt,
+             WorkflowRemarks
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
       FROM BISTestReport
       WHERE ${conditions.join(" AND ")}
       ORDER BY UpdatedAt DESC
@@ -475,10 +493,16 @@ export const getBisTestReportHistory = tryCatch(async (req, res) => {
 ═══════════════════════════════════════════════════════════════════════ */
 export const updateBisTestReport = tryCatch(async (req, res) => {
   const { id } = req.params;
+<<<<<<< HEAD
   const { reportType, header, testData, equipment, status } = req.body;
   if (!id) throw new AppError("Missing required field: id.", 400);
   validatePayload({ reportType, header });
   const finalStatus = status === "Final" ? "Final" : "Draft";
+=======
+  const { reportType, header, testData, equipment } = req.body;
+  if (!id) throw new AppError("Missing required field: id.", 400);
+  validatePayload({ reportType, header });
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   const updatedBy = req.user?.name || req.user?.usercode || "system";
 
   const pool = await connectToDB(dbConfig1);
@@ -491,6 +515,15 @@ export const updateBisTestReport = tryCatch(async (req, res) => {
   if (existing.ReportType !== reportType) {
     throw new AppError("Report type cannot be changed on update.", 400);
   }
+<<<<<<< HEAD
+=======
+  if (existing.Status === "PendingReview" || existing.Status === "PendingApproval") {
+    throw new AppError(
+      `This report is currently ${existing.Status === "PendingReview" ? "pending review" : "pending approval"} and cannot be edited. Reject it back to Draft first, or wait for the approval decision.`,
+      409,
+    );
+  }
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
@@ -531,7 +564,11 @@ export const updateBisTestReport = tryCatch(async (req, res) => {
         .input("PreparedBy", sql.NVarChar(150), str(h.preparedBy))
         .input("ReviewedBy", sql.NVarChar(150), str(h.reviewedBy))
         .input("AuthorizedBy", sql.NVarChar(150), str(h.authorizedBy))
+<<<<<<< HEAD
         .input("Status", sql.NVarChar(20), finalStatus)
+=======
+        .input("Status", sql.NVarChar(20), "Draft")
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
         .input("UpdatedBy", sql.NVarChar(100), updatedBy)
         .input("ApplianceType", sql.NVarChar(100), str(h.applianceType))
         .input("Manufacturer", sql.NVarChar(200), str(h.manufacturer))
@@ -565,7 +602,11 @@ export const updateBisTestReport = tryCatch(async (req, res) => {
       // version the chain — insert a new row, retire the old one.
       const rootReportId = existing.RootReportId || existing.Id;
       reportId = await insertHeader(transaction, {
+<<<<<<< HEAD
         reportType, header, status: finalStatus, createdBy: updatedBy,
+=======
+        reportType, header, status: "Draft", createdBy: updatedBy,
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
         rootReportId, version: existing.Version + 1,
       });
       await new sql.Request(transaction).input("Id", sql.Int, existing.Id).query(`
@@ -610,3 +651,185 @@ export const deleteBisTestReport = tryCatch(async (req, res) => {
     throw new AppError(`Failed to delete BIS test report: ${error.message}`, 500);
   }
 });
+<<<<<<< HEAD
+=======
+
+/* ═══════════════════════════════════════════════════════════════════════
+   APPROVAL WORKFLOW — Draft → PendingReview → PendingApproval → Final.
+   Each step is gated to the one user currently holding that role in
+   BISApprovalFlow, and snapshots that user's name + signature image onto
+   the report row so a later flow-config change never rewrites who actually
+   signed an already-submitted report. A reject at either stage sends the
+   report back to Draft (still the same row/version) for the preparer to fix
+   and resubmit.
+═══════════════════════════════════════════════════════════════════════ */
+const getApprovalFlow = async (pool) => {
+  const result = await pool.request().query(`SELECT TOP 1 * FROM BISApprovalFlow ORDER BY Id`);
+  if (result.recordset.length === 0) {
+    throw new AppError("BIS approval flow is not configured. Set it up in BIS Config first.", 500);
+  }
+  return result.recordset[0];
+};
+
+const getCurrentReport = async (pool, reportId) => {
+  const result = await pool.request().input("Id", sql.Int, reportId)
+    .query(`SELECT * FROM BISTestReport WHERE Id = @Id AND IsCurrent = 1`);
+  if (result.recordset.length === 0) {
+    throw new AppError("Report not found or is not the current version.", 404);
+  }
+  return result.recordset[0];
+};
+
+export const submitBisTestReportForReview = tryCatch(async (req, res) => {
+  const { id } = req.params;
+  if (!id) throw new AppError("Missing required field: id.", 400);
+  const usercode = req.user?.usercode;
+
+  const pool = await connectToDB(dbConfig1);
+  const reportId = parseInt(id, 10);
+  const report = await getCurrentReport(pool, reportId);
+  if (report.Status !== "Draft") {
+    throw new AppError(`Only Draft reports can be submitted for review (current status: ${report.Status}).`, 409);
+  }
+
+  const flow = await getApprovalFlow(pool);
+  if (!flow.PreparerUserCode) throw new AppError("No preparer is configured in the BIS approval flow.", 400);
+  if (usercode !== flow.PreparerUserCode) {
+    throw new AppError("Only the assigned preparer can submit this report for review.", 403);
+  }
+
+  await pool.request()
+    .input("Id", sql.Int, reportId)
+    .input("PreparedBy", sql.NVarChar(150), req.user?.name || usercode)
+    .input("PreparerUserCode", sql.NVarChar(50), usercode)
+    .input("PreparerSignaturePath", sql.NVarChar(300), flow.PreparerSignaturePath)
+    .query(`
+      UPDATE BISTestReport SET
+        Status = 'PendingReview',
+        PreparedBy = @PreparedBy, PreparerUserCode = @PreparerUserCode,
+        PreparerSignaturePath = @PreparerSignaturePath, PreparerActionAt = GETDATE(),
+        WorkflowRemarks = NULL, UpdatedAt = GETDATE()
+      WHERE Id = @Id
+    `);
+
+  res.status(200).json({ success: true, message: "Report submitted for review." });
+});
+
+export const reviewBisTestReport = tryCatch(async (req, res) => {
+  const { id } = req.params;
+  const { decision, remarks } = req.body;
+  if (!id) throw new AppError("Missing required field: id.", 400);
+  if (!["approve", "reject"].includes(decision)) throw new AppError("decision must be 'approve' or 'reject'.", 400);
+  const usercode = req.user?.usercode;
+
+  const pool = await connectToDB(dbConfig1);
+  const reportId = parseInt(id, 10);
+  const report = await getCurrentReport(pool, reportId);
+  if (report.Status !== "PendingReview") {
+    throw new AppError(`Report is not awaiting review (current status: ${report.Status}).`, 409);
+  }
+
+  const flow = await getApprovalFlow(pool);
+  if (usercode !== flow.ReviewerUserCode) {
+    throw new AppError("Only the assigned reviewer can act on this report.", 403);
+  }
+
+  if (decision === "reject") {
+    if (!remarks?.trim()) throw new AppError("A remark is required when rejecting a report.", 400);
+    await pool.request().input("Id", sql.Int, reportId).input("Remarks", sql.NVarChar(500), remarks.trim())
+      .query(`UPDATE BISTestReport SET Status = 'Draft', WorkflowRemarks = @Remarks, UpdatedAt = GETDATE() WHERE Id = @Id`);
+    return res.status(200).json({ success: true, message: "Report rejected and returned to the preparer." });
+  }
+
+  await pool.request()
+    .input("Id", sql.Int, reportId)
+    .input("ReviewedBy", sql.NVarChar(150), req.user?.name || usercode)
+    .input("ReviewerUserCode", sql.NVarChar(50), usercode)
+    .input("ReviewerSignaturePath", sql.NVarChar(300), flow.ReviewerSignaturePath)
+    .query(`
+      UPDATE BISTestReport SET
+        Status = 'PendingApproval',
+        ReviewedBy = @ReviewedBy, ReviewerUserCode = @ReviewerUserCode,
+        ReviewerSignaturePath = @ReviewerSignaturePath, ReviewerActionAt = GETDATE(),
+        WorkflowRemarks = NULL, UpdatedAt = GETDATE()
+      WHERE Id = @Id
+    `);
+
+  res.status(200).json({ success: true, message: "Report approved and sent to the authorizer." });
+});
+
+export const authorizeBisTestReport = tryCatch(async (req, res) => {
+  const { id } = req.params;
+  const { decision, remarks } = req.body;
+  if (!id) throw new AppError("Missing required field: id.", 400);
+  if (!["approve", "reject"].includes(decision)) throw new AppError("decision must be 'approve' or 'reject'.", 400);
+  const usercode = req.user?.usercode;
+
+  const pool = await connectToDB(dbConfig1);
+  const reportId = parseInt(id, 10);
+  const report = await getCurrentReport(pool, reportId);
+  if (report.Status !== "PendingApproval") {
+    throw new AppError(`Report is not awaiting authorization (current status: ${report.Status}).`, 409);
+  }
+
+  const flow = await getApprovalFlow(pool);
+  if (usercode !== flow.AuthorizerUserCode) {
+    throw new AppError("Only the assigned authorizer can act on this report.", 403);
+  }
+
+  if (decision === "reject") {
+    if (!remarks?.trim()) throw new AppError("A remark is required when rejecting a report.", 400);
+    await pool.request().input("Id", sql.Int, reportId).input("Remarks", sql.NVarChar(500), remarks.trim())
+      .query(`UPDATE BISTestReport SET Status = 'Draft', WorkflowRemarks = @Remarks, UpdatedAt = GETDATE() WHERE Id = @Id`);
+    return res.status(200).json({ success: true, message: "Report rejected and returned to the preparer." });
+  }
+
+  await pool.request()
+    .input("Id", sql.Int, reportId)
+    .input("AuthorizedBy", sql.NVarChar(150), req.user?.name || usercode)
+    .input("AuthorizerUserCode", sql.NVarChar(50), usercode)
+    .input("AuthorizerSignaturePath", sql.NVarChar(300), flow.AuthorizerSignaturePath)
+    .query(`
+      UPDATE BISTestReport SET
+        Status = 'Final',
+        AuthorizedBy = @AuthorizedBy, AuthorizerUserCode = @AuthorizerUserCode,
+        AuthorizerSignaturePath = @AuthorizerSignaturePath, AuthorizerActionAt = GETDATE(),
+        WorkflowRemarks = NULL, UpdatedAt = GETDATE()
+      WHERE Id = @Id
+    `);
+
+  res.status(200).json({ success: true, message: "Report authorized and marked Final." });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   APPROVAL QUEUE — reports currently awaiting the logged-in user's action,
+   split by which of their role(s) (reviewer/authorizer) apply.
+═══════════════════════════════════════════════════════════════════════ */
+export const getBisApprovalQueue = tryCatch(async (req, res) => {
+  const usercode = req.user?.usercode;
+  const pool = await connectToDB(dbConfig1);
+  const flow = await getApprovalFlow(pool);
+
+  const isReviewer = Boolean(usercode) && usercode === flow.ReviewerUserCode;
+  const isAuthorizer = Boolean(usercode) && usercode === flow.AuthorizerUserCode;
+
+  const conditions = [];
+  if (isReviewer) conditions.push("Status = 'PendingReview'");
+  if (isAuthorizer) conditions.push("Status = 'PendingApproval'");
+
+  if (conditions.length === 0) {
+    return res.status(200).json({ success: true, reports: [], isReviewer, isAuthorizer });
+  }
+
+  const result = await pool.request().query(`
+    SELECT Id, ReportType, MaterialCode, ModelName, MachineSerialNumber, TestReportNo,
+           TestDateFrom, TestDateTo, TestedBy, Result, Status, Version,
+           PreparedBy, PreparerActionAt, ReviewedBy, ReviewerActionAt, WorkflowRemarks, UpdatedAt
+    FROM BISTestReport
+    WHERE IsCurrent = 1 AND (${conditions.join(" OR ")})
+    ORDER BY UpdatedAt ASC
+  `);
+
+  res.status(200).json({ success: true, reports: result.recordset, isReviewer, isAuthorizer });
+});
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
