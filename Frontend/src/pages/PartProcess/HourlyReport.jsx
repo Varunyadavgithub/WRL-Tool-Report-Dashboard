@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { Bar } from "react-chartjs-2";
 import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from "chart.js";
 import {
@@ -167,6 +167,13 @@ const PartProcessHourlyReport = () => {
     const start = `${offsetDate(-1)} 08:00`; const end = `${todayStr()} 08:00`;
     setStartTime(start); setEndTime(end); fetchData(start, end, setYdayLoading);
   };
+  // Default to Today's data on first load instead of sitting empty until a
+  // quick filter is clicked.
+  useEffect(() => {
+    handleToday();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const isAnyLoading = loading || ydayLoading || todayLoading;
 
   // Aggregate records by SHIFT + HOUR, sorted by shift name then hour

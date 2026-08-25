@@ -36,13 +36,21 @@ export const getLiveMeters = async (req, res) => {
 
 export const getMeterTrend = async (req, res) => {
   try {
-    const { meterId, hours } = req.query;
+    const { meterId, hours, from, to } = req.query;
     if (!meterId) return res.status(400).json({ success: false, message: "meterId is required" });
 
-    const result = await global.pool3.request()
-      .input("meterId", sql.Int, meterId)
-      .input("hours", sql.Int, Number(hours) > 0 ? Number(hours) : 24)
-      .query(`
+    const request = global.pool3.request().input("meterId", sql.Int, meterId);
+    let where;
+    if (from) {
+      request.input("from", sql.DateTime2, new Date(from));
+      request.input("to", sql.DateTime2, to ? new Date(to) : new Date());
+      where = "ts >= @from AND ts <= @to";
+    } else {
+      request.input("hours", sql.Int, Number(hours) > 0 ? Number(hours) : 24);
+      where = "ts >= DATEADD(HOUR, -@hours, GETDATE())";
+    }
+
+    const result = await request.query(`
         SELECT
           ts AS ts,
           current_a AS currentA, current_b AS currentB, current_c AS currentC, current_avg AS currentAvg,
@@ -52,7 +60,7 @@ export const getMeterTrend = async (req, res) => {
           pf_a AS pfA, pf_b AS pfB, pf_c AS pfC, pf_total AS pfTotal,
           frequency AS frequency, energy_kwh AS energyKwh, comm_status AS commStatus
         FROM EnergyMon.ReadingHistory
-        WHERE meter_id = @meterId AND ts >= DATEADD(HOUR, -@hours, GETDATE())
+        WHERE meter_id = @meterId AND ${where}
         ORDER BY ts
       `);
 

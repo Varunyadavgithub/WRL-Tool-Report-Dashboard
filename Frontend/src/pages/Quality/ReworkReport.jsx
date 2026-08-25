@@ -1648,6 +1648,13 @@ const ReworkReport = () => {
     );
   }, [fetchQuickData]);
 
+  // Default to Today's data on first load instead of sitting empty until a
+  // quick filter is clicked.
+  useEffect(() => {
+    fetchTodayData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Individual export helpers ───────────────────────────────────────────────
   const fetchDetailExport = async () => {
     if (!startTime || !endTime) {

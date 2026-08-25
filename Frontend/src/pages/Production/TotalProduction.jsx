@@ -269,6 +269,13 @@ const TotalProduction = () => {
     );
   };
 
+  // Default to Today's data on first load instead of sitting empty until a
+  // quick filter is clicked.
+  useEffect(() => {
+    fetchToday();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* ── query button ───────────────────────────────────────── */
   const handleQuery = async () => {
     setPage(1);

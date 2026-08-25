@@ -188,6 +188,13 @@ const UnloadingStatus = () => {
     setGroupBy(SUMMARY_GROUP_OPTIONS[0]);
   };
 
+  // Default to Today's data on first load instead of sitting empty until a
+  // quick filter is clicked.
+  useEffect(() => {
+    handleToday();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── derived stats ──────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const total        = data.length;

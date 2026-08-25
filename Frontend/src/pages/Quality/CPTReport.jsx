@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import ExportButton from "../../components/ui/ExportButton";
@@ -289,6 +289,13 @@ const CPTReport = () => {
     setActiveFilter(filterType);
     fetchDataWithDates(dates.start, dates.end, 1, limit);
   };
+
+  // Default to Today's data on first load instead of sitting empty until a
+  // filter is picked.
+  useEffect(() => {
+    handleQuickFilter("today");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleQuery = () => {
     if (!startTime || !endTime) {

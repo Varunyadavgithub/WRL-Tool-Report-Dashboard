@@ -10,7 +10,7 @@
  * LiveReading/ReadingHistory are written by the external meter-polling
  * system; this page only reads them and manages PDP/Meter config.
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -28,6 +28,8 @@ import {
   inputCls, selectCls, Field, StatusBadge, Modal, TableActions,
   PageHeader, EmptyState, TH, TD,
 } from "../MasterConfig/_shared";
+import DateTimePicker from "../../components/ui/DateTimePicker";
+import { getTodayRange, getYesterdayRange, getMTDRange, formatDateTimeLocal } from "../../utils/dateUtils";
 
 const API = `${baseURL}energy-meters/`;
 
@@ -351,9 +353,10 @@ const TodayConsumptionChart = ({ meterId }) => {
   );
 };
 
-const TrendSection = ({ meterId, hours }) => {
+const TrendSection = ({ meterId, hours, df }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const custom = df.active;
 
   useEffect(() => {
     if (!meterId) return;
@@ -361,20 +364,22 @@ const TrendSection = ({ meterId, hours }) => {
     const load = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(`${API}trend`, { params: { meterId, hours: Math.ceil(hours) } });
+        const params = custom ? { meterId, ...df.params } : { meterId, hours: Math.ceil(hours) };
+        const res = await axios.get(`${API}trend`, { params });
         if (!cancelled && res.data.success) {
           setData(res.data.data.map((r) => ({ ...r, timeLabel: new Date(r.ts).toLocaleString([], { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" }) })));
         }
       } catch (e) {} finally { if (!cancelled) setLoading(false); }
     };
     load();
+    // A custom historical range is static — no need to keep polling it.
+    if (custom) return () => { cancelled = true; };
     const iv = setInterval(load, 15000);
     return () => { cancelled = true; clearInterval(iv); };
-  }, [meterId, hours]);
+  }, [meterId, hours, custom, df.params]);
 
   return (
     <div>
-      <h3 className="text-sm font-bold text-slate-800 mb-3">Trend</h3>
       {loading && !data.length ? (
         <div className="h-64 flex items-center justify-center text-xs text-slate-400">Loading…</div>
       ) : !data.length ? (
@@ -507,7 +512,7 @@ const MeterOverviewCard = ({ m, todayKwh, selected, onSelect }) => {
   );
 };
 
-const MeterDetailPage = ({ meter, todayKwh, hours, onBack }) => (
+const MeterDetailPage = ({ meter, todayKwh, hours, dateRange, onDateRange, df, onBack }) => (
   <div>
     <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
       <div>
@@ -530,7 +535,14 @@ const MeterDetailPage = ({ meter, todayKwh, hours, onBack }) => (
       {buildPanels(meter, todayKwh).map((p) => <StatPanel key={p.title} {...p} />)}
     </div>
     <TodayConsumptionChart meterId={meter.meterId} />
-    <TrendSection meterId={meter.meterId} hours={hours} />
+    <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+      <h3 className="text-sm font-bold text-slate-800">Trend</h3>
+      <div className="flex items-center gap-3 flex-wrap">
+        <DateFilter value={dateRange} onChange={(k) => { onDateRange(k); df.clear(); }} />
+        <ReportDateFilter df={df} />
+      </div>
+    </div>
+    <TrendSection meterId={meter.meterId} hours={hours} df={df} />
   </div>
 );
 
@@ -549,6 +561,7 @@ const LiveTab = () => {
   const [todayKwh, setTodayKwh] = useState({}); // { [meterId]: totalKwh }
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState("today");
+  const trendDf = useReportDateFilter();
 
   const load = useCallback(async () => {
     try {
@@ -612,6 +625,9 @@ const LiveTab = () => {
           meter={selectedMeter}
           todayKwh={todayKwh[selectedMeter.meterId]}
           hours={resolveHours(dateRange)}
+          dateRange={dateRange}
+          onDateRange={setDateRange}
+          df={trendDf}
           onBack={() => setSelectedId(null)}
         />
       ) : (
@@ -628,7 +644,7 @@ const LiveTab = () => {
                 className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 w-56"
               />
             </div>
-            <DateFilter value={dateRange} onChange={setDateRange} />
+            <DateFilter value={dateRange} onChange={(k) => { setDateRange(k); trendDf.clear(); }} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -657,6 +673,135 @@ const REPORT_TYPES = [
   { k: "alert-summary",  l: "Alert Summary" },
 ];
 
+const PERIOD_OPTIONS = ["Hour", "Day"];
+
+// Shared datetime-range filter for the report tables/charts — built on the
+// same dateUtils quick-range helpers (Today/Yesterday/MTD, 8AM shift-anchored)
+// and DateTimePicker used by the other report pages (GasChargingReport,
+// ESTReport, CPTReport, …), instead of a page-local date-only reinvention.
+const QUICK_RANGES = [
+  { key: "today",     label: "Today",     range: getTodayRange },
+  { key: "yesterday", label: "Yesterday", range: getYesterdayRange },
+  { key: "mtd",       label: "MTD",       range: getMTDRange },
+];
+
+// `defaultQuick` pre-applies a quick range (e.g. "today") on first render —
+// used by the report tables so they open scoped to today instead of an
+// unbounded (and much heavier) all-time query. Pass nothing to start blank.
+const useReportDateFilter = (defaultQuick = null) => {
+  const [startTime, setStartTime] = useState(() => {
+    const range = defaultQuick && QUICK_RANGES.find((q) => q.key === defaultQuick)?.range();
+    return range ? formatDateTimeLocal(range.startDate) : "";
+  });
+  const [endTime, setEndTime] = useState(() => {
+    const range = defaultQuick && QUICK_RANGES.find((q) => q.key === defaultQuick)?.range();
+    return range ? formatDateTimeLocal(range.endDate) : "";
+  });
+  const [quickFilter, setQuickFilter] = useState(defaultQuick);
+
+  const applyQuick = useCallback((key) => {
+    const range = QUICK_RANGES.find((q) => q.key === key)?.range();
+    if (!range) return;
+    setStartTime(formatDateTimeLocal(range.startDate));
+    setEndTime(formatDateTimeLocal(range.endDate));
+    setQuickFilter(key);
+  }, []);
+
+  const setCustomStart = useCallback((v) => { setStartTime(v); setQuickFilter(null); }, []);
+  const setCustomEnd = useCallback((v) => { setEndTime(v); setQuickFilter(null); }, []);
+  const clear = useCallback(() => { setStartTime(""); setEndTime(""); setQuickFilter(null); }, []);
+
+  // Memoized so effects/callbacks that depend on it only re-run when the
+  // range actually changes, not on every render.
+  const params = useMemo(() => {
+    const p = {};
+    if (startTime) p.from = new Date(startTime).toISOString();
+    if (endTime) p.to = new Date(endTime).toISOString();
+    return p;
+  }, [startTime, endTime]);
+
+  return { startTime, endTime, quickFilter, applyQuick, setCustomStart, setCustomEnd, clear, params, active: Boolean(startTime || endTime) };
+};
+
+const ReportDateFilter = ({ df }) => (
+  <div className="flex items-end gap-2 flex-wrap">
+    <div>
+      <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Quick Range</label>
+      <div className="flex gap-1.5">
+        {QUICK_RANGES.map((q) => (
+          <button key={q.key} onClick={() => df.applyQuick(q.key)}
+            className={`px-3 py-1.5 text-[11px] font-semibold rounded-lg border transition-colors ${
+              df.quickFilter === q.key ? "bg-blue-600 text-white border-blue-600" : "text-slate-500 border-slate-200 hover:bg-slate-50"
+            }`}>{q.label}</button>
+        ))}
+      </div>
+    </div>
+    <DateTimePicker label="From" name="from" value={df.startTime} onChange={(e) => df.setCustomStart(e.target.value)} className="w-44" />
+    <DateTimePicker label="To" name="to" value={df.endTime} onChange={(e) => df.setCustomEnd(e.target.value)} className="w-44" />
+    {df.active && (
+      <button onClick={df.clear}
+        className="px-2.5 py-2 text-[11px] font-semibold text-slate-400 hover:text-slate-600 border border-slate-200 rounded-lg transition-colors">
+        Clear
+      </button>
+    )}
+  </div>
+);
+
+const formatPeriodLabel = (periodStart, periodType) => {
+  const d = new Date(periodStart);
+  if (periodType === "Hour")  return d.toLocaleString([], { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  if (periodType === "Month") return d.toLocaleDateString([], { month: "short", year: "numeric" });
+  return d.toLocaleDateString([], { month: "short", day: "2-digit", year: "2-digit" });
+};
+
+// Multiple meters can share the same period — sum them into one bar so
+// "All Meters" reads as plant-wide consumption rather than overlapping series.
+const buildConsumptionChartData = (rows, periodType) => {
+  const byPeriod = new Map();
+  rows.forEach((r) => {
+    const key = new Date(r.periodStart).getTime();
+    const acc = byPeriod.get(key) || { periodStart: r.periodStart, consumptionKwh: 0 };
+    acc.consumptionKwh += Number(r.consumptionKwh);
+    byPeriod.set(key, acc);
+  });
+  const sorted = [...byPeriod.values()].sort((a, b) => new Date(a.periodStart) - new Date(b.periodStart));
+  let cumulative = 0;
+  return sorted.map((r) => {
+    cumulative += r.consumptionKwh;
+    return { ...r, label: formatPeriodLabel(r.periodStart, periodType), cumulativeKwh: cumulative };
+  });
+};
+
+const ConsumptionChart = ({ data }) => {
+  if (!data.length) return null;
+  const totalKwh = data.reduce((a, r) => a + r.consumptionKwh, 0);
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-4">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h3 className="text-sm font-bold text-slate-800">Consumption Trend</h3>
+        <span className="text-xs font-mono font-bold text-amber-600">
+          {totalKwh.toLocaleString(undefined, { maximumFractionDigits: 2 })} kWh total
+        </span>
+      </div>
+      <ResponsiveContainer width="100%" height={260}>
+        <ComposedChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" vertical={false} />
+          <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} interval="preserveStartEnd" />
+          <YAxis yAxisId="period" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} width={40} />
+          <YAxis yAxisId="cumulative" orientation="right" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} width={48} />
+          <Tooltip
+            contentStyle={{ fontSize: 12, borderRadius: 10, border: "1px solid #e2e8f0" }}
+            formatter={(v, name) => [`${fmt(v, 3)} kWh`, name === "cumulativeKwh" ? "Cumulative" : "Consumption"]}
+          />
+          <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => (v === "cumulativeKwh" ? "Cumulative" : "Consumption")} />
+          <Bar yAxisId="period" dataKey="consumptionKwh" fill="#60a5fa" radius={[4, 4, 0, 0]} />
+          <Line yAxisId="cumulative" type="monotone" dataKey="cumulativeKwh" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3, fill: "#2563eb" }} activeDot={{ r: 5 }} />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
 const ReportsTab = ({ meters }) => {
   const [reportType, setReportType] = useState("consumption");
   return (
@@ -679,7 +824,11 @@ const ReportsTab = ({ meters }) => {
 
 const ConsumptionReport = ({ meters }) => {
   const [meterId, setMeterId] = useState("all");
-  const [periodType, setPeriodType] = useState("Day");
+  // Hour rollups close every hour, so pairing with the default "Today" date
+  // range actually shows data straight away — a "Day" default would sit
+  // empty until the day itself closes at midnight.
+  const [periodType, setPeriodType] = useState("Hour");
+  const df = useReportDateFilter("today");
   const [rows, setRows] = useState([]);
   const [partialRows, setPartialRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -687,22 +836,20 @@ const ConsumptionReport = ({ meters }) => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { periodType };
+      const params = { periodType, ...df.params };
       if (meterId !== "all") params.meterId = meterId;
       const res = await axios.get(`${API}consumption`, { params });
       if (res.data.success) setRows(res.data.data);
     } catch (e) {} finally { setLoading(false); }
-  }, [meterId, periodType]);
+  }, [meterId, periodType, df.params]);
 
-  // Day/Month rollups only appear once that period fully closes (midnight /
-  // month-end). Until then, show a running total for the still-open period —
-  // summed live from completed Hour rows — so the tab isn't just empty.
+  // Day rollups only appear once that period fully closes (midnight).
+  // Until then, show a running total for the still-open period — summed
+  // live from completed Hour rows — so the tab isn't just empty.
   const loadPartial = useCallback(async () => {
     if (periodType === "Hour") { setPartialRows([]); return; }
     const now = new Date();
-    const periodStart = periodType === "Day"
-      ? new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      : new Date(now.getFullYear(), now.getMonth(), 1);
+    const periodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     try {
       const params = { periodType: "Hour", from: periodStart.toISOString(), to: now.toISOString() };
       if (meterId !== "all") params.meterId = meterId;
@@ -735,10 +882,19 @@ const ConsumptionReport = ({ meters }) => {
     return () => clearInterval(iv);
   }, [loadPartial]);
 
-  // A meter that already has a real closed row for this period doesn't need
-  // the synthetic "in progress" total too.
-  const visiblePartialRows = partialRows.filter((p) => !rows.some((r) => r.meterId === p.meterId));
-  const displayRows = [...visiblePartialRows, ...rows];
+  // The synthetic "in progress" row only represents the currently-open
+  // period, so it only belongs when the active range still reaches "now" —
+  // e.g. the default Today range, or MTD. A range that ends in the past
+  // (Yesterday, or a manually picked historical end date) is browsing
+  // history and shouldn't grow a "current" row. A meter that already has a
+  // real closed row for this period doesn't need the synthetic total either.
+  const includesNow = !df.active || df.quickFilter === "today" || df.quickFilter === "mtd"
+    || (df.endTime && Date.now() - new Date(df.endTime).getTime() < 5 * 60 * 1000);
+  const displayRows = useMemo(() => {
+    const visiblePartialRows = includesNow ? partialRows.filter((p) => !rows.some((r) => r.meterId === p.meterId)) : [];
+    return [...visiblePartialRows, ...rows];
+  }, [partialRows, rows, includesNow]);
+  const chartData = useMemo(() => buildConsumptionChartData(displayRows, periodType), [displayRows, periodType]);
 
   const exportExcel = () => {
     const headers = ["Meter", "Meter Code", "Period", "Start", "End", "Consumption (kWh)", "Start Counter", "End Counter"];
@@ -765,20 +921,18 @@ const ConsumptionReport = ({ meters }) => {
         </div>
         <div>
           <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Period</label>
-          <div className="flex gap-1.5">
-            {["Hour", "Day", "Month"].map((p) => (
-              <button key={p} onClick={() => setPeriodType(p)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
-                  periodType === p ? "bg-blue-600 text-white border-blue-600" : "text-slate-500 border-slate-200 hover:bg-slate-50"
-                }`}>{p}</button>
-            ))}
-          </div>
+          <select value={periodType} onChange={(e) => setPeriodType(e.target.value)} className={selectCls} style={{ minWidth: 110 }}>
+            {PERIOD_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
         </div>
+        <ReportDateFilter df={df} />
         <button onClick={exportExcel} disabled={!displayRows.length}
           className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm disabled:opacity-40 transition-colors">
           <Download className="w-3.5 h-3.5" /> Export Excel
         </button>
       </div>
+
+      <ConsumptionChart data={chartData} />
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-auto max-h-[60vh]">
@@ -816,18 +970,19 @@ const ConsumptionReport = ({ meters }) => {
 
 const PeakDemandReport = ({ meters }) => {
   const [meterId, setMeterId] = useState("all");
+  const df = useReportDateFilter("today");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { ...df.params };
       if (meterId !== "all") params.meterId = meterId;
       const res = await axios.get(`${API}reports/peak-demand`, { params });
       if (res.data.success) setRows(res.data.data);
     } catch (e) {} finally { setLoading(false); }
-  }, [meterId]);
+  }, [meterId, df.params]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -854,7 +1009,8 @@ const PeakDemandReport = ({ meters }) => {
             {meters.map((m) => <option key={m.id} value={m.id}>{m.meterName}</option>)}
           </select>
         </div>
-        <p className="text-[10px] text-slate-400 max-w-xs">Last 30 days. Load Factor = average demand ÷ peak demand for that day — higher is more efficient.</p>
+        <ReportDateFilter df={df} />
+        <p className="text-[10px] text-slate-400 max-w-xs">{df.active ? "Load Factor" : "Last 30 days. Load Factor"} = average demand ÷ peak demand for that day — higher is more efficient.</p>
         <button onClick={exportExcel} disabled={!rows.length}
           className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm disabled:opacity-40 transition-colors">
           <Download className="w-3.5 h-3.5" /> Export Excel
@@ -892,17 +1048,22 @@ const PeakDemandReport = ({ meters }) => {
 };
 
 const PdpSummaryReport = () => {
-  const [periodType, setPeriodType] = useState("Day");
+  // Hour rollups close every hour, so pairing with the default "Today" date
+  // range actually shows data straight away — a "Day" default would sit
+  // empty until the day itself closes at midnight.
+  const [periodType, setPeriodType] = useState("Hour");
+  const df = useReportDateFilter("today");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}reports/pdp-summary`, { params: { periodType } });
+      const params = { periodType, ...df.params };
+      const res = await axios.get(`${API}reports/pdp-summary`, { params });
       if (res.data.success) setRows(res.data.data);
     } catch (e) {} finally { setLoading(false); }
-  }, [periodType]);
+  }, [periodType, df.params]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -920,15 +1081,11 @@ const PdpSummaryReport = () => {
       <div className="flex flex-wrap items-end gap-4 bg-white border border-slate-200 rounded-xl p-4 mb-4 shadow-sm">
         <div>
           <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Period</label>
-          <div className="flex gap-1.5">
-            {["Hour", "Day", "Month"].map((p) => (
-              <button key={p} onClick={() => setPeriodType(p)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
-                  periodType === p ? "bg-blue-600 text-white border-blue-600" : "text-slate-500 border-slate-200 hover:bg-slate-50"
-                }`}>{p}</button>
-            ))}
-          </div>
+          <select value={periodType} onChange={(e) => setPeriodType(e.target.value)} className={selectCls} style={{ minWidth: 110 }}>
+            {PERIOD_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
         </div>
+        <ReportDateFilter df={df} />
         <p className="text-[10px] text-slate-400">Sums closed {periodType.toLowerCase()} rollups across every meter under each PDP.</p>
         <button onClick={exportExcel} disabled={!rows.length}
           className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm disabled:opacity-40 transition-colors">
@@ -965,18 +1122,19 @@ const PdpSummaryReport = () => {
 
 const AlertSummaryReport = ({ meters }) => {
   const [meterId, setMeterId] = useState("all");
+  const df = useReportDateFilter("today");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { ...df.params };
       if (meterId !== "all") params.meterId = meterId;
       const res = await axios.get(`${API}reports/alert-summary`, { params });
       if (res.data.success) setRows(res.data.data);
     } catch (e) {} finally { setLoading(false); }
-  }, [meterId]);
+  }, [meterId, df.params]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -999,7 +1157,8 @@ const AlertSummaryReport = ({ meters }) => {
             {meters.map((m) => <option key={m.id} value={m.id}>{m.meterName}</option>)}
           </select>
         </div>
-        <p className="text-[10px] text-slate-400">Last 30 days, grouped by alert type.</p>
+        <ReportDateFilter df={df} />
+        <p className="text-[10px] text-slate-400">{df.active ? "Grouped" : "Last 30 days, grouped"} by alert type.</p>
         <button onClick={exportExcel} disabled={!rows.length}
           className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm disabled:opacity-40 transition-colors">
           <Download className="w-3.5 h-3.5" /> Export Excel

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { useSelector } from "react-redux";
 import {
   Plus, Search, RefreshCw, Eye, Pencil, History, Trash2, FileStack,
   Thermometer, Volume2, Box, ArrowLeft, AlertTriangle, CalendarClock, PenLine,
 } from "lucide-react";
 import { baseURL } from "../../../assets/assets";
+import { ROLES } from "../../../config/routes.config";
 import PopupModal from "../../../components/ui/PopupModal";
 import Pagination from "../../../components/ui/Pagination";
 import { BIS_REPORT_TYPES, usePagedSlice, MultiSelectDropdown, mapEquipmentToFormState, reportTypeLabel } from "./shared";
@@ -28,6 +30,9 @@ const FORM_BY_TYPE = { Introduction: BISIntroductionReportForm, Sound: BISSoundR
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—");
 
 const BISTestReportsTab = () => {
+  const { user } = useSelector((store) => store.auth);
+  const isSuperAdmin = user?.roleName === ROLES.SUPER_ADMIN;
+
   const [mode, setMode] = useState("list"); // list | pick-type | create | edit | view
   const [newReportType, setNewReportType] = useState(null);
   const [createPrefill, setCreatePrefill] = useState(null);
@@ -424,12 +429,12 @@ const BISTestReportsTab = () => {
                       <td className="px-3 py-2.5 border-b border-slate-100">
                         <div className="flex items-center gap-1.5">
                           <button onClick={() => openView(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="View"><Eye className="w-3.5 h-3.5" /></button>
-                          {EDITABLE_STATUSES.includes(row.Status) && (
+                          {(isSuperAdmin || EDITABLE_STATUSES.includes(row.Status)) && (
                             <button onClick={() => openEdit(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
                           )}
                           <button onClick={() => openHistory(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-all" title="History"><History className="w-3.5 h-3.5" /></button>
-                          {row.Status === "Draft" && (
-                            <button onClick={() => askDelete(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all" title="Delete Draft"><Trash2 className="w-3.5 h-3.5" /></button>
+                          {(isSuperAdmin || row.Status === "Draft") && (
+                            <button onClick={() => askDelete(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
                           )}
                         </div>
                       </td>
@@ -447,8 +452,8 @@ const BISTestReportsTab = () => {
 
       {showDeleteModal && (
         <PopupModal
-          title="Delete Draft Report"
-          description={`Delete the draft ${reportTypeLabel(reportToDelete?.ReportType)} report for "${reportToDelete?.ModelName}"? This cannot be undone.`}
+          title="Delete Report"
+          description={`Delete the ${reportToDelete?.Status?.toLowerCase() || ""} ${reportTypeLabel(reportToDelete?.ReportType)} report for "${reportToDelete?.ModelName}"? This cannot be undone.`}
           confirmText={deleting ? "Deleting…" : "Yes, Delete"}
           cancelText="Cancel"
           modalId="delete-report-modal"

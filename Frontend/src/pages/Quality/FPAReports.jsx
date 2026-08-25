@@ -1468,6 +1468,13 @@ const FPAReports = () => {
     runQuery(reportType, params);
   };
 
+  // Default to Today's data on first load instead of sitting empty until a
+  // quick filter is clicked.
+  useEffect(() => {
+    handleToday();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const filteredData = useMemo(() => {
     if (reportType !== "fpaReport" || !Array.isArray(reportData))
       return reportData;

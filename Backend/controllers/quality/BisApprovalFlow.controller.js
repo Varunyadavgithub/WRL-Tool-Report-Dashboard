@@ -61,7 +61,15 @@ export const getBisApprovalFlow = tryCatch(async (_, res) => {
    PUT — reassign which user holds each role
 ═══════════════════════════════════════════════════════════════════════ */
 export const updateBisApprovalFlow = tryCatch(async (req, res) => {
-  const { preparerUserCode, reviewerUserCode, authorizerUserCode } = req.body;
+  // Users.UserCode can come back from this driver as a number depending on
+  // the underlying column type, and the frontend's <select> just forwards
+  // whatever value it was given — normalize to a string up front so it's
+  // never handed to sql.NVarChar as anything but a string (NVarChar.validate
+  // throws "Invalid string." for a non-null non-string value).
+  const toCode = (v) => (v === null || v === undefined || v === "" ? null : String(v));
+  const preparerUserCode = toCode(req.body.preparerUserCode);
+  const reviewerUserCode = toCode(req.body.reviewerUserCode);
+  const authorizerUserCode = toCode(req.body.authorizerUserCode);
 
   if (!preparerUserCode || !reviewerUserCode || !authorizerUserCode) {
     throw new AppError("preparerUserCode, reviewerUserCode, and authorizerUserCode are all required.", 400);
@@ -75,7 +83,7 @@ export const updateBisApprovalFlow = tryCatch(async (req, res) => {
     .input("R", sql.NVarChar(50), reviewerUserCode)
     .input("A", sql.NVarChar(50), authorizerUserCode)
     .query(`SELECT UserCode FROM Users WHERE UserCode IN (@P, @R, @A)`);
-  const found = new Set(check.recordset.map((r) => r.UserCode));
+  const found = new Set(check.recordset.map((r) => String(r.UserCode)));
   for (const [label, code] of [["Preparer", preparerUserCode], ["Reviewer", reviewerUserCode], ["Authorizer", authorizerUserCode]]) {
     if (!found.has(code)) throw new AppError(`${label} user code "${code}" was not found.`, 400);
   }

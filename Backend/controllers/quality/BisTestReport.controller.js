@@ -7,7 +7,16 @@ const REPORT_TYPES = ["Introduction", "Sound", "Volume"];
 const SOUND_LOCATIONS = ["Front", "Right", "Left"];
 const VOLUME_CATEGORIES = ["GrossMeasured", "GrossDeductible", "StorageMeasured", "StorageDeductible"];
 
-const num = (v) => (v === "" || v === undefined || v === null ? null : Number(v));
+// Falls back to null for anything that isn't cleanly numeric (blank, stray
+// text, etc.) rather than letting a NaN through — sql.Decimal/sql.Int both
+// reject NaN at the wire-protocol level with a generic, hard-to-trace
+// "not a valid instance of data type decimal" error instead of failing here
+// with a clear cause.
+const num = (v) => {
+  if (v === "" || v === undefined || v === null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
 const str = (v) => (v === "" || v === undefined ? null : v);
 const dateOrNull = (v) => (v ? new Date(v) : null);
 
@@ -345,7 +354,12 @@ export const createBisTestReport = tryCatch(async (req, res) => {
     await transaction.commit();
     res.status(200).json({ success: true, id: reportId, message: "BIS test report saved successfully." });
   } catch (error) {
-    await transaction.rollback();
+    // SQL Server can auto-abort the transaction server-side on a severe
+    // error (bad data type conversion, constraint violation, etc.), which
+    // then makes the client-side rollback() call itself throw "Transaction
+    // has been aborted." Swallow that secondary failure here so it never
+    // replaces/hides the original error below.
+    try { await transaction.rollback(); } catch { /* transaction already gone server-side */ }
     if (error instanceof AppError) throw error;
     throw new AppError(`Failed to save BIS test report: ${error.message}`, 500);
   }
@@ -494,7 +508,7 @@ export const updateBisTestReport = tryCatch(async (req, res) => {
   if (existing.ReportType !== reportType) {
     throw new AppError("Report type cannot be changed on update.", 400);
   }
-  if (existing.Status === "PendingReview" || existing.Status === "PendingApproval") {
+  if ((existing.Status === "PendingReview" || existing.Status === "PendingApproval") && !isSuperAdmin(req)) {
     throw new AppError(
       `This report is currently ${existing.Status === "PendingReview" ? "pending review" : "pending approval"} and cannot be edited. Reject it back to Draft first, or wait for the approval decision.`,
       409,
@@ -586,7 +600,9 @@ export const updateBisTestReport = tryCatch(async (req, res) => {
     await transaction.commit();
     res.status(200).json({ success: true, id: reportId, message: "BIS test report updated successfully." });
   } catch (error) {
-    await transaction.rollback();
+    // See the matching comment in createBisTestReport — don't let a rollback
+    // failure on an already-server-aborted transaction hide the real error.
+    try { await transaction.rollback(); } catch { /* transaction already gone server-side */ }
     if (error instanceof AppError) throw error;
     throw new AppError(`Failed to update BIS test report: ${error.message}`, 500);
   }
@@ -608,7 +624,7 @@ export const deleteBisTestReport = tryCatch(async (req, res) => {
     if (existing.recordset.length === 0) {
       return res.status(404).json({ success: false, message: "Report not found." });
     }
-    if (existing.recordset[0].Status !== "Draft") {
+    if (existing.recordset[0].Status !== "Draft" && !isSuperAdmin(req)) {
       throw new AppError("Only Draft reports can be deleted. Final reports are kept for the audit trail.", 400);
     }
 
@@ -627,8 +643,18 @@ export const deleteBisTestReport = tryCatch(async (req, res) => {
    the report row so a later flow-config change never rewrites who actually
    signed an already-submitted report. A reject at either stage sends the
    report back to Draft (still the same row/version) for the preparer to fix
-   and resubmit.
+   and resubmit. Super Admin bypasses all 3 role checks — full access
+   regardless of who the flow currently assigns.
 ═══════════════════════════════════════════════════════════════════════ */
+const isSuperAdmin = (req) => (req.user?.roleName || "").toLowerCase() === "super admin";
+
+// req.user.usercode (from the JWT, itself read straight off Users.UserCode)
+// and the BISApprovalFlow role columns can each independently come back as a
+// number or a string depending on the underlying column type — normalize
+// both sides before comparing OR binding to sql.NVarChar, which throws
+// "Invalid string." for any non-null, non-string value.
+const toStr = (v) => (v === null || v === undefined ? null : String(v));
+
 const getApprovalFlow = async (pool) => {
   const result = await pool.request().query(`SELECT TOP 1 * FROM BISApprovalFlow ORDER BY Id`);
   if (result.recordset.length === 0) {
@@ -649,7 +675,7 @@ const getCurrentReport = async (pool, reportId) => {
 export const submitBisTestReportForReview = tryCatch(async (req, res) => {
   const { id } = req.params;
   if (!id) throw new AppError("Missing required field: id.", 400);
-  const usercode = req.user?.usercode;
+  const usercode = toStr(req.user?.usercode);
 
   const pool = await connectToDB(dbConfig1);
   const reportId = parseInt(id, 10);
@@ -659,8 +685,10 @@ export const submitBisTestReportForReview = tryCatch(async (req, res) => {
   }
 
   const flow = await getApprovalFlow(pool);
-  if (!flow.PreparerUserCode) throw new AppError("No preparer is configured in the BIS approval flow.", 400);
-  if (usercode !== flow.PreparerUserCode) {
+  if (!flow.PreparerUserCode && !isSuperAdmin(req)) {
+    throw new AppError("No preparer is configured in the BIS approval flow.", 400);
+  }
+  if (usercode !== toStr(flow.PreparerUserCode) && !isSuperAdmin(req)) {
     throw new AppError("Only the assigned preparer can submit this report for review.", 403);
   }
 
@@ -686,7 +714,7 @@ export const reviewBisTestReport = tryCatch(async (req, res) => {
   const { decision, remarks } = req.body;
   if (!id) throw new AppError("Missing required field: id.", 400);
   if (!["approve", "reject"].includes(decision)) throw new AppError("decision must be 'approve' or 'reject'.", 400);
-  const usercode = req.user?.usercode;
+  const usercode = toStr(req.user?.usercode);
 
   const pool = await connectToDB(dbConfig1);
   const reportId = parseInt(id, 10);
@@ -696,7 +724,7 @@ export const reviewBisTestReport = tryCatch(async (req, res) => {
   }
 
   const flow = await getApprovalFlow(pool);
-  if (usercode !== flow.ReviewerUserCode) {
+  if (usercode !== toStr(flow.ReviewerUserCode) && !isSuperAdmin(req)) {
     throw new AppError("Only the assigned reviewer can act on this report.", 403);
   }
 
@@ -729,7 +757,7 @@ export const authorizeBisTestReport = tryCatch(async (req, res) => {
   const { decision, remarks } = req.body;
   if (!id) throw new AppError("Missing required field: id.", 400);
   if (!["approve", "reject"].includes(decision)) throw new AppError("decision must be 'approve' or 'reject'.", 400);
-  const usercode = req.user?.usercode;
+  const usercode = toStr(req.user?.usercode);
 
   const pool = await connectToDB(dbConfig1);
   const reportId = parseInt(id, 10);
@@ -739,7 +767,7 @@ export const authorizeBisTestReport = tryCatch(async (req, res) => {
   }
 
   const flow = await getApprovalFlow(pool);
-  if (usercode !== flow.AuthorizerUserCode) {
+  if (usercode !== toStr(flow.AuthorizerUserCode) && !isSuperAdmin(req)) {
     throw new AppError("Only the assigned authorizer can act on this report.", 403);
   }
 
@@ -772,12 +800,13 @@ export const authorizeBisTestReport = tryCatch(async (req, res) => {
    split by which of their role(s) (reviewer/authorizer) apply.
 ═══════════════════════════════════════════════════════════════════════ */
 export const getBisApprovalQueue = tryCatch(async (req, res) => {
-  const usercode = req.user?.usercode;
+  const usercode = toStr(req.user?.usercode);
   const pool = await connectToDB(dbConfig1);
   const flow = await getApprovalFlow(pool);
 
-  const isReviewer = Boolean(usercode) && usercode === flow.ReviewerUserCode;
-  const isAuthorizer = Boolean(usercode) && usercode === flow.AuthorizerUserCode;
+  const admin = isSuperAdmin(req);
+  const isReviewer = admin || (Boolean(usercode) && usercode === toStr(flow.ReviewerUserCode));
+  const isAuthorizer = admin || (Boolean(usercode) && usercode === toStr(flow.AuthorizerUserCode));
 
   const conditions = [];
   if (isReviewer) conditions.push("Status = 'PendingReview'");

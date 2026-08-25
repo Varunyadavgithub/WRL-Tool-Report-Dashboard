@@ -249,6 +249,14 @@ const GasChargingReport = () => {
     setEndTime("");
   };
 
+  // Default to Today's data on first load — filters live in Redux so they
+  // survive navigating away and back; this only fires when nothing has been
+  // chosen yet, never overriding a range the user already picked.
+  useEffect(() => {
+    if (!filters.startDate || !filters.endDate) handleQuickFilter("today");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const gasChargingData = reportData?.data || [];
   const totalCount = pagination.totalRecords;
   const isLoading = reportLoading || reportFetching;
