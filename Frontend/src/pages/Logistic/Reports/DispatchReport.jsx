@@ -172,6 +172,13 @@ const DispatchReport = () => {
     fetchFgDispatchData(1);
   };
 
+  // Default to Today's data on first load instead of sitting empty until a
+  // quick filter is clicked.
+  useEffect(() => {
+    runQuickFilter("tday");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const anyLoading = ydayLoading || todayLoading || monthLoading;
 
   const sessionFilteredData = selectedSessionID

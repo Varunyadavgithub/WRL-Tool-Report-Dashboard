@@ -41,7 +41,11 @@ const BISApprovalFlowSettings = ({ approvalFlow, approvalFlowLoading, approvalUs
     );
   }
 
-  const userOptions = approvalUsers.map((u) => ({ value: u.UserCode, label: `${u.UserName} (${u.UserCode})` }));
+  // Users.UserCode can come back as a number depending on the underlying
+  // column type; SearchableSelect matches by strict equality against the
+  // (always-string) saved flow value, so this must be a string too or the
+  // dropdown silently fails to show the already-assigned user.
+  const userOptions = approvalUsers.map((u) => ({ value: String(u.UserCode), label: `${u.UserName} (${u.UserCode})` }));
 
   const handleSave = async () => {
     setSaving(true);

@@ -919,6 +919,13 @@ const PartProcessProductionReport = () => {
     setStartTime(start); setEndTime(end); fetchData(start, end, setYdayLoading);
   };
 
+  // Default to Today's data on first load instead of sitting empty until a
+  // quick filter is clicked.
+  useEffect(() => {
+    handleToday();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* ----- filtered records (model / shift advanced filters) ----- */
   const filteredRecords = useMemo(() => records.filter((r) => {
     if (modelFilter !== "ALL" && r.model !== modelFilter) return false;

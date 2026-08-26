@@ -204,6 +204,13 @@ const NFCReport = () => {
     if (page > 1) fetchNFCReportData(page);
   }, [page]);
 
+  // Default to Today's data on first load instead of sitting empty until a
+  // quick filter is clicked.
+  useEffect(() => {
+    fetchTodaynfcReportData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleQuery = () => {
     setPage(1);
     setNfcReportData([]);

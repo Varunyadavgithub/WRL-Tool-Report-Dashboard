@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import Loader from "../../components/ui/Loader";
 import DateTimePicker from "../../components/ui/DateTimePicker";
@@ -531,6 +531,14 @@ const FpaHistory = () => {
     setSearchTerm("");
     setPage(1);
   };
+
+  // Default to Today's data on first load — filters live in Redux so they
+  // survive navigating away and back; this only fires when nothing has been
+  // chosen yet, never overriding a range the user already picked.
+  useEffect(() => {
+    if (!hasFilters) handleQuickFilter("today");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSort = (field) => {
     if (!field) return;

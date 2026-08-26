@@ -10,12 +10,16 @@ import {
 import axios from "axios";
 import toast from "react-hot-toast";
 import ExcelJS from "exceljs";
-import { Bar } from "react-chartjs-2";
+import { Chart } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   BarElement,
+  LineElement,
+  PointElement,
+  BarController,
+  LineController,
   Title as ChartTitle,
   Tooltip as ChartTooltip,
   Legend as ChartLegend,
@@ -53,6 +57,10 @@ ChartJS.register(
   CategoryScale,
   LinearScale,
   BarElement,
+  LineElement,
+  PointElement,
+  BarController,
+  LineController,
   ChartTitle,
   ChartTooltip,
   ChartLegend,
@@ -64,6 +72,53 @@ ChartJS.register(
 const formatDate = (date) => {
   const pad = (n) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+// Shared Cp/Cpk math for a single range of readings — used independently by
+// both the automatic (bar/modal) capability panel and the custom-range one,
+// so the two can be computed and shown side by side rather than one
+// replacing the other.
+const computeRangeStats = (rangeValues, lsl, usl) => {
+  const n = rangeValues.length;
+  if (n === 0) return null;
+
+  const mean = rangeValues.reduce((a, v) => a + v, 0) / n;
+  const variance =
+    n > 1
+      ? rangeValues.reduce((a, v) => a + (v - mean) ** 2, 0) / (n - 1)
+      : 0;
+  const stdDev = Math.sqrt(variance);
+
+  const cp = stdDev > 0 ? (usl - lsl) / (6 * stdDev) : null;
+  const cpk =
+    stdDev > 0
+      ? Math.min((usl - mean) / (3 * stdDev), (mean - lsl) / (3 * stdDev))
+      : null;
+
+  // Final USL/LSL — the natural process limits (μ ± 3σ), shown alongside
+  // the range-edge LSL/USL that Cp/Cpk are actually computed from. Not fed
+  // into Cp/Cpk itself: since these move with the mean/σ they're derived
+  // from, using them as the spec would make Cp/Cpk a fixed 1.00 by
+  // construction rather than a real capability reading.
+  const finalUsl = mean + 3 * stdDev;
+  const finalLsl = mean - 3 * stdDev;
+
+  return {
+    n,
+    min: Math.min(...rangeValues),
+    max: Math.max(...rangeValues),
+    mean,
+    stdDev,
+    usl,
+    lsl,
+    finalUsl,
+    finalLsl,
+    cp,
+    cpk,
+    modalLower: lsl,
+    modalUpper: usl,
+    modalCount: n,
+  };
 };
 
 const formatTimestamp = (ts) =>
@@ -334,6 +389,7 @@ const AteqProgramPanel = ({ data }) => {
 
 const ModelMultiSelect = ({ options, selected, onChange }) => {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const ref = useRef(null);
 
   useEffect(() => {
@@ -343,6 +399,10 @@ const ModelMultiSelect = ({ options, selected, onChange }) => {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  useEffect(() => {
+    if (!open) setSearch("");
+  }, [open]);
 
   const toggle = (val) => {
     onChange(
@@ -358,6 +418,11 @@ const ModelMultiSelect = ({ options, selected, onChange }) => {
       : selected.length === 1
         ? selected[0]
         : `${selected.length} models selected`;
+
+  const q = search.trim().toLowerCase();
+  const filteredOptions = q
+    ? options.filter((opt) => opt.toLowerCase().includes(q))
+    : options;
 
   return (
     <div className="relative" ref={ref}>
@@ -376,10 +441,31 @@ const ModelMultiSelect = ({ options, selected, onChange }) => {
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-56 max-h-64 overflow-auto bg-white border border-slate-200 rounded-lg shadow-lg py-1">
+        <div className="absolute z-50 mt-1 w-56 max-h-80 flex flex-col bg-white border border-slate-200 rounded-lg shadow-lg">
+          <div className="p-1.5 border-b border-slate-100 sticky top-0 bg-white">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+              <input
+                autoFocus
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search models…"
+                className="w-full pl-6 pr-6 py-1.5 text-xs border border-slate-200 rounded-md outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-100 sticky top-0 bg-white">
             <button
-              onClick={() => onChange(options)}
+              onClick={() => onChange(filteredOptions)}
               className="text-[11px] text-blue-600 font-semibold hover:underline"
             >
               Select all
@@ -391,28 +477,272 @@ const ModelMultiSelect = ({ options, selected, onChange }) => {
               Clear
             </button>
           </div>
-          {options.length > 0 ? (
-            options.map((opt) => (
-              <label
-                key={opt}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={selected.includes(opt)}
-                  onChange={() => toggle(opt)}
-                  className="w-3.5 h-3.5 accent-blue-600 shrink-0"
-                />
-                <span className="truncate">{opt}</span>
-              </label>
-            ))
-          ) : (
-            <div className="px-3 py-2 text-xs text-slate-400">
-              No models in current results
-            </div>
-          )}
+          <div className="overflow-auto py-1">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((opt) => (
+                <label
+                  key={opt}
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(opt)}
+                    onChange={() => toggle(opt)}
+                    className="w-3.5 h-3.5 accent-blue-600 shrink-0"
+                  />
+                  <span className="truncate">{opt}</span>
+                </label>
+              ))
+            ) : (
+              <div className="px-3 py-2 text-xs text-slate-400">
+                {options.length > 0
+                  ? "No models match your search"
+                  : "No models in current results"}
+              </div>
+            )}
+          </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// ─── Process Capability Stat Tiles ──────────────────────────────────────────────
+
+const CapabilityStats = ({ stats }) => {
+  if (!stats) return null;
+  const fmtNum = (v, d = 2) =>
+    v == null || !Number.isFinite(v) ? "—" : v.toFixed(d);
+
+  const cpRating = (v) =>
+    v == null ? "" : v >= 1.33 ? "text-emerald-600" : v >= 1 ? "text-amber-600" : "text-rose-600";
+
+  const rangeLabel = stats.isCustomRange
+    ? "Custom Range"
+    : stats.isUserSelected
+      ? "Selected Range"
+      : "Modal Range";
+
+  const tiles = [
+    { label: "Min", value: fmtNum(stats.min) },
+    { label: "Max", value: fmtNum(stats.max) },
+    {
+      label: rangeLabel,
+      value:
+        stats.modalLower != null
+          ? `${fmtNum(stats.modalLower, 1)}–${fmtNum(stats.modalUpper, 1)}`
+          : "—",
+      sub: stats.modalCount >= 0 ? `${stats.modalCount} readings` : null,
+    },
+    { label: "Mean (μ)", value: fmtNum(stats.mean, 3) },
+    { label: "Std Dev (σ)", value: fmtNum(stats.stdDev, 3) },
+    { label: "LSL", value: fmtNum(stats.lsl, 1) },
+    { label: "USL", value: fmtNum(stats.usl, 1) },
+    { label: "Cp", value: fmtNum(stats.cp), cls: cpRating(stats.cp) },
+    { label: "Cpk", value: fmtNum(stats.cpk), cls: cpRating(stats.cpk) },
+    { label: "Final LSL (μ-3σ)", value: fmtNum(stats.finalLsl, 3) },
+    { label: "Final USL (μ+3σ)", value: fmtNum(stats.finalUsl, 3) },
+  ];
+
+  const rangeSourceText = stats.isCustomRange
+    ? "the custom range you entered"
+    : stats.isUserSelected
+      ? "the bar you selected"
+      : "the highest-count range (default)";
+
+  const rangeHintText = stats.isCustomRange
+    ? " Clear the custom range fields (or click any bar) to go back to the default."
+    : stats.isUserSelected
+      ? " Click that bar again to go back to the modal (highest-count) range."
+      : " Click any bar on the chart, or type a custom From/To range above, to recalculate against that instead.";
+
+  return (
+    <div className="mt-3">
+      <p className="text-[10px] text-slate-400 mb-1.5">
+        Computed from the{" "}
+        <span className="font-semibold text-slate-500">{stats.n} reading{stats.n === 1 ? "" : "s"}</span>{" "}
+        in {rangeSourceText}{" "}
+        ({fmtNum(stats.modalLower, 1)}–{fmtNum(stats.modalUpper, 1)}) only, not the full filtered dataset.
+        {rangeHintText}
+        {" "}LSL/USL are that range's own edges — Cp/Cpk show how tightly this cluster sits within its own range.
+        {" "}Final LSL/USL are the natural μ±3σ limits, shown for reference only (not used in Cp/Cpk).
+      </p>
+      <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-11 gap-2">
+        {tiles.map((t) => (
+          <div
+            key={t.label}
+            className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-center"
+          >
+            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide truncate">
+              {t.label}
+            </p>
+            <p className={`text-sm font-bold font-mono ${t.cls || "text-slate-800"}`}>
+              {t.value}
+            </p>
+            {t.sub && <p className="text-[9px] text-slate-400 truncate">{t.sub}</p>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ─── Bell Curve (Fitted Normal Distribution) ────────────────────────────────────
+// Its own chart, separate from the histogram — a smooth normal curve fitted to
+// a range's mean/σ/n (the same numbers behind Cp/Cpk), with LSL/USL/Mean
+// marked, so you can eyeball whether that cluster actually looks normal.
+// Overlays the automatic (bar/modal) curve and, when present, the custom-range
+// curve on the same axes so the two can be compared directly.
+
+const bellCurvePoints = (stats, binSize) => {
+  if (!stats || !(stats.stdDev > 0)) return [];
+  const { mean, stdDev, n } = stats;
+  const from = mean - 4 * stdDev;
+  const to = mean + 4 * stdDev;
+  const steps = 80;
+  const coeff = (n * binSize) / (stdDev * Math.sqrt(2 * Math.PI));
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const x = from + ((to - from) * i) / steps;
+    const z = (x - mean) / stdDev;
+    return { x, y: coeff * Math.exp(-0.5 * z * z) };
+  });
+};
+
+const BellCurveChart = ({ primary, secondary, binSize }) => {
+  const primaryPoints = useMemo(() => bellCurvePoints(primary, binSize), [primary, binSize]);
+  const secondaryPoints = useMemo(() => bellCurvePoints(secondary, binSize), [secondary, binSize]);
+
+  const chartData = useMemo(() => {
+    if (!primaryPoints.length && !secondaryPoints.length) return null;
+
+    const peakY = Math.max(
+      0,
+      ...primaryPoints.map((p) => p.y),
+      ...secondaryPoints.map((p) => p.y),
+    );
+    const marker = (x, color, label, dash) => ({
+      type: "line",
+      label,
+      data: [
+        { x, y: 0 },
+        { x, y: peakY },
+      ],
+      borderColor: color,
+      borderWidth: 2,
+      borderDash: dash,
+      pointRadius: 0,
+      fill: false,
+      order: 0,
+    });
+
+    const datasets = [];
+    if (primaryPoints.length) {
+      datasets.push({
+        type: "line",
+        label: "Fitted Normal (Auto)",
+        data: primaryPoints,
+        borderColor: "#db2777",
+        backgroundColor: "rgba(219,39,119,0.10)",
+        borderWidth: 2.5,
+        pointRadius: 0,
+        tension: 0.35,
+        fill: true,
+        order: 2,
+      });
+      datasets.push(marker(primary.lsl, "#f59e0b", `Auto LSL (${primary.lsl.toFixed(1)})`, [6, 4]));
+      datasets.push(marker(primary.usl, "#f59e0b", `Auto USL (${primary.usl.toFixed(1)})`, [6, 4]));
+      datasets.push(marker(primary.mean, "#0891b2", `Auto Mean (${primary.mean.toFixed(2)})`, [6, 4]));
+    }
+    if (secondaryPoints.length) {
+      datasets.push({
+        type: "line",
+        label: "Fitted Normal (Custom)",
+        data: secondaryPoints,
+        borderColor: "#7c3aed",
+        backgroundColor: "rgba(124,58,237,0.10)",
+        borderWidth: 2.5,
+        pointRadius: 0,
+        tension: 0.35,
+        fill: true,
+        order: 1,
+      });
+      datasets.push(marker(secondary.lsl, "#16a34a", `Custom LSL (${secondary.lsl.toFixed(1)})`, [2, 3]));
+      datasets.push(marker(secondary.usl, "#16a34a", `Custom USL (${secondary.usl.toFixed(1)})`, [2, 3]));
+      datasets.push(marker(secondary.mean, "#4338ca", `Custom Mean (${secondary.mean.toFixed(2)})`, [2, 3]));
+    }
+    return { datasets };
+  }, [primaryPoints, secondaryPoints, primary, secondary]);
+
+  const chartOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: "top",
+          align: "end",
+          labels: { boxWidth: 12, font: { size: 11 } },
+        },
+        tooltip: {
+          backgroundColor: "#1e293b",
+          titleColor: "#f8fafc",
+          bodyColor: "#e2e8f0",
+          padding: 12,
+          cornerRadius: 10,
+          callbacks: {
+            title: (items) => `Flow ${Number(items[0].parsed.x).toFixed(2)}`,
+            label: (item) => `${item.dataset.label}: ${Number(item.parsed.y).toFixed(2)}`,
+          },
+        },
+        datalabels: { display: false },
+      },
+      scales: {
+        x: {
+          type: "linear",
+          grid: { display: false },
+          border: { color: "#94a3b8" },
+          ticks: { color: "#1e293b", font: { size: 11, weight: "bold" } },
+          title: {
+            display: true,
+            text: "Flow Value",
+            color: "#1e293b",
+            font: { size: 12, weight: "bold" },
+          },
+        },
+        y: {
+          beginAtZero: true,
+          grace: "10%",
+          border: { display: false },
+          ticks: { color: "#1e293b", font: { size: 11, weight: "bold" } },
+          grid: { color: "#e2e8f0" },
+          title: {
+            display: true,
+            text: "Expected Count",
+            color: "#1e293b",
+            font: { size: 12, weight: "bold" },
+          },
+        },
+      },
+    }),
+    [],
+  );
+
+  if (!chartData) return null;
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mt-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Activity className="w-3.5 h-3.5 text-pink-600" />
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+          Fitted Normal Distribution
+        </span>
+        <span className="px-2 py-0.5 bg-pink-50 text-pink-700 text-[11px] font-semibold rounded-full border border-pink-100">
+          {secondaryPoints.length ? "auto + custom range" : "auto (bar/modal) range"}
+        </span>
+      </div>
+      <div className="h-64 relative">
+        <Chart type="line" data={chartData} options={chartOptions} />
+      </div>
     </div>
   );
 };
@@ -423,6 +753,12 @@ const FlowValueHistogram = forwardRef(({ data }, ref) => {
   const [binSize, setBinSize] = useState(10);
   const [selectedModels, setSelectedModels] = useState([]);
   const [selectedBinIndex, setSelectedBinIndex] = useState(null);
+  // Manual, additional analysis — lets the user type an arbitrary
+  // flow-value range (not tied to any bin boundary) and see its own
+  // capability numbers alongside the automatic (bar/modal) ones, never
+  // replacing them.
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const chartRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
@@ -462,9 +798,9 @@ const FlowValueHistogram = forwardRef(({ data }, ref) => {
 
   const values = useMemo(() => scopedRows.map((r) => r.v), [scopedRows]);
 
-  const { labels, counts, binRows } = useMemo(() => {
+  const { labels, counts, binRows, binStart } = useMemo(() => {
     if (!values.length || !binSize || binSize <= 0) {
-      return { labels: [], counts: [], binRows: [] };
+      return { labels: [], counts: [], binRows: [], binStart: 0 };
     }
     const min = Math.min(...values);
     const max = Math.max(...values);
@@ -484,8 +820,64 @@ const FlowValueHistogram = forwardRef(({ data }, ref) => {
     const lbls = bins.map(
       (_, i) => `${fmt(start + i * binSize)}-${fmt(start + (i + 1) * binSize)}`,
     );
-    return { labels: lbls, counts: bins, binRows: rowsByBin };
+    return { labels: lbls, counts: bins, binRows: rowsByBin, binStart: start };
   }, [values, scopedRows, binSize]);
+
+  // ── Process capability (Cp / Cpk) — automatic, off one bin's readings ──────
+  // Defaults to the modal bin (the bar with the highest count) — but if the
+  // user has clicked a different bar (selectedBinIndex, the same click that
+  // drives the drill-down table below), that bar's range is used instead.
+  // Clicking the same bar again clears the selection and falls back to the
+  // modal bin automatically (see the chart's onClick toggle).
+  // This always reflects the automatic pick — the custom range typed below
+  // is a separate, additional calculation (customCapability) and never
+  // replaces this one.
+  const capability = useMemo(() => {
+    if (!counts.length) return null;
+
+    let activeIndex = selectedBinIndex;
+    let isUserSelected = activeIndex != null && counts[activeIndex] > 0;
+
+    if (!isUserSelected) {
+      let modalIndex = -1;
+      let modalCount = -1;
+      counts.forEach((c, i) => {
+        if (c > modalCount) {
+          modalCount = c;
+          modalIndex = i;
+        }
+      });
+      activeIndex = modalIndex;
+      isUserSelected = false;
+    }
+    if (activeIndex == null || activeIndex < 0) return null;
+
+    const lsl = binStart + activeIndex * binSize;
+    const usl = binStart + (activeIndex + 1) * binSize;
+    const rangeValues = (binRows[activeIndex] || [])
+      .map((row) => Number(row.leak_value))
+      .filter(Number.isFinite);
+
+    const stats = computeRangeStats(rangeValues, lsl, usl);
+    return stats ? { ...stats, isUserSelected, isCustomRange: false } : null;
+  }, [counts, binRows, binStart, binSize, selectedBinIndex]);
+
+  // ── Process capability — custom range, entered by the user ─────────────────
+  // Independent of the automatic pick above: shown alongside it, not instead
+  // of it. Any From/To works, doesn't need to line up with a bin edge.
+  const customCapability = useMemo(() => {
+    const fromNum = customFrom !== "" ? Number(customFrom) : null;
+    const toNum = customTo !== "" ? Number(customTo) : null;
+    const isValid =
+      fromNum != null && toNum != null &&
+      Number.isFinite(fromNum) && Number.isFinite(toNum) &&
+      fromNum < toNum;
+    if (!isValid) return null;
+
+    const rangeValues = values.filter((v) => v >= fromNum && v <= toNum);
+    const stats = computeRangeStats(rangeValues, fromNum, toNum);
+    return stats ? { ...stats, isUserSelected: false, isCustomRange: true } : null;
+  }, [values, customFrom, customTo]);
 
   // Bin layout just changed (new data, new bin size) — any previously
   // selected bin index may now point at a different range, so drop it.
@@ -807,6 +1199,36 @@ const FlowValueHistogram = forwardRef(({ data }, ref) => {
               ))}
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            <label className="text-[11px] font-semibold text-slate-500">
+              Custom Range
+            </label>
+            <input
+              type="number"
+              step="any"
+              placeholder="From"
+              value={customFrom}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              className="w-20 px-2 py-1 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+            />
+            <span className="text-slate-400 text-xs">–</span>
+            <input
+              type="number"
+              step="any"
+              placeholder="To"
+              value={customTo}
+              onChange={(e) => setCustomTo(e.target.value)}
+              className="w-20 px-2 py-1 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+            />
+            {(customFrom !== "" || customTo !== "") && (
+              <button
+                onClick={() => { setCustomFrom(""); setCustomTo(""); }}
+                className="text-[11px] text-slate-400 font-semibold hover:text-slate-600 hover:underline"
+              >
+                Clear
+              </button>
+            )}
+          </div>
           <button
             onClick={handleHistogramExport}
             disabled={exportingChart || !values.length}
@@ -827,13 +1249,29 @@ const FlowValueHistogram = forwardRef(({ data }, ref) => {
       </div>
       {values.length > 0 ? (
         <div className="h-64 relative">
-          <Bar ref={chartRef} data={chartData} options={chartOptions} />
+          <Chart type="bar" ref={chartRef} data={chartData} options={chartOptions} />
         </div>
       ) : (
         <div className="h-40 flex items-center justify-center text-xs text-slate-400">
           No numeric flow values for the selected model(s).
         </div>
       )}
+
+      <CapabilityStats stats={capability} />
+
+      {customCapability && (
+        <div className="mt-4 pt-4 border-t border-dashed border-slate-200">
+          <div className="flex items-center gap-2 mb-1">
+            <Target className="w-3.5 h-3.5 text-indigo-600" />
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+              Custom Range Analysis
+            </span>
+          </div>
+          <CapabilityStats stats={customCapability} />
+        </div>
+      )}
+
+      <BellCurveChart primary={capability} secondary={customCapability} binSize={binSize} />
 
       {selectedBinIndex != null && binRows[selectedBinIndex] && (
         <div className="mt-3 border border-cyan-200 bg-cyan-50/40 rounded-lg overflow-hidden">

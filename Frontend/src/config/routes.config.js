@@ -23,6 +23,7 @@ import {
   BookOpen,
   Database,
   ScanEye,
+  Droplets,
 } from "lucide-react";
 
 // Lazy loaded components
@@ -200,6 +201,11 @@ const PartProcessOEEReport = lazy(
 
 // ── Vision Report ─────────────────────────────────────────────────────────
 const VisionReport = lazy(() => import("../pages/VisionReport/VisionReport"));
+
+// ── Chemical ─────────────────────────────────────────────────────────────
+const ChemBulkStorageMailConfig = lazy(
+  () => import("../pages/Chemical/ChemBulkStorageMailConfig"),
+);
 
 // ─── Role Constants ───────────────────────────────────────────────────────────
 export const ROLES = {
@@ -841,6 +847,21 @@ export const ROUTE_CONFIG = [
       {
         path: "/auditreport/audits/:id/view",
         component: AuditView,
+      },
+    ],
+  },
+
+  // ── Chemical ─────────────────────────────────────────────────────────────
+  {
+    key: "chemical",
+    icon: Droplets,
+    label: "Chemical",
+    basePath: "/chemical",
+    items: [
+      {
+        path: "/chemical/bulk-storage-mail-config",
+        label: "Bulk Storage Mail Config",
+        component: ChemBulkStorageMailConfig,
       },
     ],
   },

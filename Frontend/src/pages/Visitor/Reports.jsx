@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import DateTimePicker from "../../components/ui/DateTimePicker";
@@ -82,6 +82,13 @@ const Reports = () => {
       return toast.error("Please select the Time Range.");
     await fetchVisitorData(startTime, endTime, setLoading);
   };
+
+  // Default to Today's data on first load instead of sitting empty until a
+  // quick filter is clicked.
+  useEffect(() => {
+    fetchTdayVisitorData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredReports = visitors.filter((item) => {
     const { term, field } = searchParams;

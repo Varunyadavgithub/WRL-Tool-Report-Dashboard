@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { Doughnut, Bar } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from "chart.js";
@@ -153,6 +153,13 @@ const PartProcessQualityReport = () => {
     setStartTime(win.startDatetime); setEndTime(win.endDatetime);
     fetchData(win.startDatetime, win.endDatetime, (v) => setShiftLoading(v ? shift.shiftName : null));
   };
+  // Default to Today's data on first load instead of sitting empty until a
+  // quick filter is clicked.
+  useEffect(() => {
+    handleToday();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const isAnyLoading = loading || ydayLoading || todayLoading || shiftLoading !== null;
 
   // Quality analysis - production records only

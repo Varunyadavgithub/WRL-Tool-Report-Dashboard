@@ -18,6 +18,7 @@ import partProcessRoute   from "./partProcess.route.js";
 import masterConfigRoute  from "./masterConfig.route.js";
 import energyMeterRoute   from "./energyMeter.route.js";
 import visionReportRoute  from "./visionReport.route.js";
+import chemicalRoute      from "./chemical.route.js";
 
 const routers = Router();
 
@@ -40,5 +41,6 @@ routers.use("/part-process", partProcessRoute);
 routers.use("/master-config", masterConfigRoute);
 routers.use("/energy-meters", energyMeterRoute);
 routers.use("/vision-report", visionReportRoute);
+routers.use("/chemical", chemicalRoute);
 
 export default routers;

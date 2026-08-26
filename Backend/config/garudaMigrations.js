@@ -397,8 +397,6 @@ export const runGarudaMigrations = async (pool1) => {
     END
   `);
 
-<<<<<<< HEAD
-=======
   // ── BISApprovalFlow: single-row config naming which user currently holds
   //    each of the 3 BIS report sign-off roles (Preparer/Reviewer/Authorizer)
   //    and their signature image, used to route the approval queue and to
@@ -454,7 +452,5 @@ export const runGarudaMigrations = async (pool1) => {
       END
     `);
   }
-
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   console.log("GARUDA migrations completed.");
 };

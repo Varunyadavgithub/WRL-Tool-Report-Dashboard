@@ -996,6 +996,13 @@ const LPTReport = () => {
     runQuery(buildParams(formatDate(startOfMonth), formatDate(now)));
   };
 
+  // Default to Today's data on first load instead of sitting empty until a
+  // quick filter is clicked.
+  useEffect(() => {
+    handleTodayQuery();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const filteredData = useMemo(() => {
     if (!Array.isArray(reportData)) return reportData;
     let data = reportData;
