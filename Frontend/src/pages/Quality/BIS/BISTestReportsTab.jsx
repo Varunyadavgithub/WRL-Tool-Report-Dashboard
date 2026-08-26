@@ -429,7 +429,7 @@ const BISTestReportsTab = () => {
                       <td className="px-3 py-2.5 border-b border-slate-100">
                         <div className="flex items-center gap-1.5">
                           <button onClick={() => openView(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="View"><Eye className="w-3.5 h-3.5" /></button>
-                          {(isSuperAdmin || EDITABLE_STATUSES.includes(row.Status)) && (
+                          {EDITABLE_STATUSES.includes(row.Status) && (
                             <button onClick={() => openEdit(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
                           )}
                           <button onClick={() => openHistory(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-all" title="History"><History className="w-3.5 h-3.5" /></button>

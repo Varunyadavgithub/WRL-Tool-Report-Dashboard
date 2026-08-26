@@ -1,6 +1,11 @@
+<<<<<<< HEAD
+import { Printer, X } from "lucide-react";
+import { mapHeaderToFormState, mapRowToCamel, mapEquipmentToFormState, reportTypeLabel } from "./shared";
+=======
 import { Printer, X, FileDown, FileSpreadsheet } from "lucide-react";
 import { mapHeaderToFormState, mapRowToCamel, mapEquipmentToFormState, reportTypeLabel } from "./shared";
 import { exportBisReportPDF, exportBisReportExcel } from "./bisReportExport";
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 
 const fmt = (v) => (v === null || v === undefined || v === "" ? "—" : String(v));
 const fmtDate = (v) => (v ? new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—");
@@ -62,9 +67,12 @@ const BISReportDetailView = ({ data, onClose }) => {
   const equipment = mapEquipmentToFormState(data.equipment);
   const reportType = header.reportType;
 
+<<<<<<< HEAD
+=======
   const handleExportPDF = () => exportBisReportPDF({ header, equipment, reportType, data });
   const handleExportExcel = () => exportBisReportExcel({ header, equipment, reportType, data });
 
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between print:hidden">
@@ -73,12 +81,15 @@ const BISReportDetailView = ({ data, onClose }) => {
           <p className="text-[11px] text-slate-400">Version {header.version} · {header.status}</p>
         </div>
         <div className="flex items-center gap-2">
+<<<<<<< HEAD
+=======
           <button onClick={handleExportPDF} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:text-red-600 transition-all" title="Export PDF">
             <FileDown className="w-3.5 h-3.5" /> PDF
           </button>
           <button onClick={handleExportExcel} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-600 transition-all" title="Export Excel">
             <FileSpreadsheet className="w-3.5 h-3.5" /> Excel
           </button>
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
           <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-600 transition-all">
             <Printer className="w-3.5 h-3.5" /> Print
           </button>
@@ -102,6 +113,12 @@ const BISReportDetailView = ({ data, onClose }) => {
           <Row label="Test Date" value={header.testDateFrom ? `${fmtDate(header.testDateFrom)} to ${fmtDate(header.testDateTo)}` : fmtDate(header.testDateTo)} />
           <Row label="Tested By" value={header.testedBy} />
           <Row label="Test Standard" value={header.testStandard} />
+<<<<<<< HEAD
+          {reportType === "Introduction" && (
+            <>
+              <Row label="Appliance Type" value={header.applianceType} />
+              <Row label="Manufacturer" value={header.manufacturer} />
+=======
           <Row label="Appliance Type" value={header.applianceType} />
           <Row label="Manufacturer" value={header.manufacturer} />
           <Row label="Unit Picked From" value={header.unitPickedFrom} />
@@ -111,17 +128,30 @@ const BISReportDetailView = ({ data, onClose }) => {
           <Row label="Purpose of Testing" value={header.purposeOfTesting} />
           {reportType === "Introduction" && (
             <>
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
               <Row label="Product Variant" value={header.productVariant} />
               <Row label="Refrigerant" value={header.refrigerantName} />
               <Row label="Rated Voltage/Freq/Phase" value={header.ratedVoltageFreqPhase} />
               <Row label="Rated Gross Volume (L)" value={header.ratedGrossVolumeLitre} />
               <Row label="Rated Storage Volume (L)" value={header.ratedStorageVolumeLitre} />
               <Row label="Annual Electricity (kWh/yr)" value={header.annualElectricityConsumptionKwh} />
+<<<<<<< HEAD
+              <Row label="Report Issue Date" value={fmtDate(header.reportIssueDate)} />
+              <Row label="Sample Receipt Date" value={fmtDate(header.sampleReceiptDate)} />
+              <Row label="Sample Condition" value={header.sampleCondition} />
+              <Row label="Purpose of Testing" value={header.purposeOfTesting} />
+              <Row label="Prepared By" value={header.preparedBy} />
+              <Row label="Reviewed By" value={header.reviewedBy} />
+              <Row label="Authorized By" value={header.authorizedBy} />
+            </>
+          )}
+=======
             </>
           )}
           <Row label="Prepared By" value={header.preparedBy} />
           <Row label="Reviewed By" value={header.reviewedBy} />
           <Row label="Authorized By" value={header.authorizedBy} />
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
         </div>
         {header.remarks && (
           <div className="mt-3 pt-3 border-t border-slate-100">

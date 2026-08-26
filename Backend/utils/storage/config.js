@@ -15,7 +15,10 @@ export const DIRS = {
   auditTemplates: path.resolve(UPLOADS_DIR, "AuditTemplates"),
   machineImages: path.resolve(UPLOADS_DIR, "MachineImages"),
   materialDrawings: path.resolve(UPLOADS_DIR, "MaterialDrawings"),
+<<<<<<< HEAD
+=======
   bisSignatures: path.resolve(UPLOADS_DIR, "BISSignatures"),
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 };
 
 /* ===================== ENSURE DIRS EXIST ===================== */
@@ -97,12 +100,15 @@ export const UPLOAD_CONFIGS = {
     errorMessage: "Only PDF or image files (JPG, PNG) are allowed for drawings",
     maxSize: 20 * 1024 * 1024, // 20MB
   },
+<<<<<<< HEAD
+=======
 
   bisSignature: {
     ...FILE_TYPES.image,
     errorMessage: "Only JPEG, JPG or PNG images are allowed for signatures",
     maxSize: 5 * 1024 * 1024, // 5MB — signatures are small
   },
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 };
 
 /* ===================== SHARED HELPERS ===================== */

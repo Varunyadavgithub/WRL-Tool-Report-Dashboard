@@ -651,6 +651,29 @@ export const ReportHeaderFields = ({ header, onChange, models, showIntroFields, 
           <ResultToggle value={header.result} onChange={(v) => onChange("result")(v)} readOnly={resultReadOnly} />
         </div>
 
+<<<<<<< HEAD
+        {showIntroFields && (
+          <>
+            <div><FieldLabel>Appliance Type</FieldLabel><input type="text" value={header.applianceType || ""} onChange={set("applianceType")} className={inputCls} placeholder="e.g. Deep Freezer" /></div>
+            <div><FieldLabel>Manufacturer</FieldLabel><input type="text" value={header.manufacturer || ""} onChange={set("manufacturer")} className={inputCls} /></div>
+            <div><FieldLabel>Product Variant / Type</FieldLabel><input type="text" value={header.productVariant || ""} onChange={set("productVariant")} className={inputCls} placeholder="e.g. Glass Top Deep Freezer" /></div>
+            <div><FieldLabel>Refrigerant Name</FieldLabel><input type="text" value={header.refrigerantName || ""} onChange={set("refrigerantName")} className={inputCls} placeholder="e.g. R-290 (77 gram)" /></div>
+            <div><FieldLabel>Rated Voltage / Freq / Phase</FieldLabel><input type="text" value={header.ratedVoltageFreqPhase || ""} onChange={set("ratedVoltageFreqPhase")} className={inputCls} placeholder="e.g. 230V / 50Hz / 1 Ph" /></div>
+            <div><FieldLabel>Unit Picked From</FieldLabel><input type="text" value={header.unitPickedFrom || ""} onChange={set("unitPickedFrom")} className={inputCls} /></div>
+            <div><FieldLabel>Rated Gross Volume (L)</FieldLabel><input type="number" step="any" value={header.ratedGrossVolumeLitre || ""} onChange={set("ratedGrossVolumeLitre")} className={inputCls} /></div>
+            <div><FieldLabel>Rated Storage Volume (L)</FieldLabel><input type="number" step="any" value={header.ratedStorageVolumeLitre || ""} onChange={set("ratedStorageVolumeLitre")} className={inputCls} /></div>
+            <div><FieldLabel>Annual Electricity Consumption (kWh/yr)</FieldLabel><input type="number" step="any" value={header.annualElectricityConsumptionKwh || ""} onChange={set("annualElectricityConsumptionKwh")} className={inputCls} /></div>
+            <div><FieldLabel>Report Issue Date</FieldLabel><input type="date" value={header.reportIssueDate || ""} onChange={set("reportIssueDate")} className={inputCls} /></div>
+            <div><FieldLabel>Total Pages</FieldLabel><input type="number" value={header.totalPages || ""} onChange={set("totalPages")} className={inputCls} /></div>
+            <div><FieldLabel>Sample Receipt Date</FieldLabel><input type="date" value={header.sampleReceiptDate || ""} onChange={set("sampleReceiptDate")} className={inputCls} /></div>
+            <div><FieldLabel>Condition of Sample on Receipt</FieldLabel><input type="text" value={header.sampleCondition || ""} onChange={set("sampleCondition")} className={inputCls} placeholder="e.g. Satisfactory" /></div>
+            <div><FieldLabel>Purpose of Testing</FieldLabel><input type="text" value={header.purposeOfTesting || ""} onChange={set("purposeOfTesting")} className={inputCls} placeholder="e.g. For BIS Requirement" /></div>
+            <div><FieldLabel>Prepared By</FieldLabel><input type="text" value={header.preparedBy || ""} onChange={set("preparedBy")} className={inputCls} /></div>
+            <div><FieldLabel>Reviewed By</FieldLabel><input type="text" value={header.reviewedBy || ""} onChange={set("reviewedBy")} className={inputCls} /></div>
+            <div><FieldLabel>Authorized By</FieldLabel><input type="text" value={header.authorizedBy || ""} onChange={set("authorizedBy")} className={inputCls} /></div>
+          </>
+        )}
+=======
         {/* Sample/report metadata — common to all 3 report types, since every
             BIS report's cover page (Test Report No., sample condition, purpose
             of testing, etc.) needs these regardless of test type. */}
@@ -676,6 +699,7 @@ export const ReportHeaderFields = ({ header, onChange, models, showIntroFields, 
         {/* Prepared/Reviewed/Authorized By are no longer typed here — they're
             stamped automatically (name + signature) as the report moves
             through the Preparer → Reviewer → Authorizer approval flow. */}
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 
         <div className="md:col-span-3">
           <FieldLabel>Remarks</FieldLabel>

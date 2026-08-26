@@ -452,46 +452,5 @@ export const runGarudaMigrations = async (pool1) => {
       END
     `);
   }
-
-  // ── ChemBulkStorageRecipients: recipient list for the daily Chemical Bulk
-  //    Storage tank report email (ported from the standalone Python script
-  //    that used to run this externally). Seeded once, on table creation,
-  //    with the addresses that script had hardcoded — editable afterward
-  //    from Chemical → Bulk Storage Mail Config.
-  await pool1.request().query(`
-    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'ChemBulkStorageRecipients')
-    BEGIN
-      CREATE TABLE ChemBulkStorageRecipients (
-        Id        INT IDENTITY(1,1) PRIMARY KEY,
-        Name      NVARCHAR(150) NULL,
-        Email     NVARCHAR(200) NOT NULL,
-        Status    BIT NOT NULL DEFAULT 1,
-        CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
-        UpdatedAt DATETIME NOT NULL DEFAULT GETDATE(),
-        CONSTRAINT UQ_ChemBulkStorageRecipients_Email UNIQUE (Email)
-      );
-      INSERT INTO ChemBulkStorageRecipients (Email) VALUES
-        ('avinash.wadaskar@westernequipments.com'),
-        ('sabirahmad.s@westernequipments.com'),
-        ('mitul.patel@westernequipments.com'),
-        ('viren.p@westernequipments.com'),
-        ('rahul.dangodra@westernequipments.com'),
-        ('sujith.s@westernequipments.com'),
-        ('vinay.yadav@westernequipments.com'),
-        ('navin.kumar@westernequipments.com'),
-        ('durgesh.pradhan@westernequipments.com'),
-        ('alok.pandey@westernequipments.com'),
-        ('ashutosh.jena@westernequipments.com'),
-        ('shubhanshu.dixit@westernequipments.com'),
-        ('rahul.bagul@westernequipments.com'),
-        ('ganesh.shinde@westernequipments.com'),
-        ('kaustubh.thombare@westernequipments.com'),
-        ('kunal.patole@westernequipments.com'),
-        ('vikash.kumar@westernequipments.com'),
-        ('jaberkhan.p@westernequipments.com');
-      PRINT 'Migration: Created ChemBulkStorageRecipients table (GARUDA)';
-    END
-  `);
-
   console.log("GARUDA migrations completed.");
 };

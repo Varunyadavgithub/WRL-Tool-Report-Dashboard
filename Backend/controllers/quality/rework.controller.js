@@ -10,7 +10,10 @@ import { convertToIST } from "../../utils/convertToIST.js";
 // router.get("/rework-report-export",   getReworkReportExport);   ← detail tab
 // router.get("/rework-summary-export",  getReworkSummaryExport);  ← summary tab
 // router.get("/rework-defect-export",   getReworkDefectExport);   ← defect tab
+<<<<<<< HEAD
+=======
 // router.get("/rework-defect-options",  getReworkDefectOptions);  ← Defect filter dropdown
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 // router.get("/production-report",      getProductionReport);
 
 // ─── Category reverse-map ─────────────────────────────────────────────────────
@@ -54,6 +57,8 @@ const expandCategories = (categoriesStr) => {
   return dbNames.length > 0 ? dbNames.join("|") : null;
 };
 
+<<<<<<< HEAD
+=======
 /**
  * Converts a pipe-separated string of exact Defect (DefectCodeMaster.Name)
  * values into a pipe-separated string for use with STRING_SPLIT. Unlike
@@ -70,6 +75,7 @@ const expandDefects = (defectsStr) => {
   return list.length > 0 ? list.join("|") : null;
 };
 
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 // ─── Reusable SQL fragment: 1 when a record is "closed", else 0 ───────────────
 const CLOSED_CASE = `
   CASE
@@ -94,12 +100,15 @@ const CAT_FILTER_MC2 = `(
   OR mc2.Name IN (SELECT value FROM STRING_SPLIT(@dbCategories, '|'))
 )`;
 
+<<<<<<< HEAD
+=======
 // ─── Reusable SQL fragment: defect IN filter ──────────────────────────────────
 const DEFECT_FILTER = `(
   @dbDefects IS NULL
   OR Defect IN (SELECT value FROM STRING_SPLIT(@dbDefects, '|'))
 )`;
 
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 // ─── Shared base CTE ──────────────────────────────────────────────────────────
 const REWORK_BASE_CTE = `
   WITH ReworkBase AS (
@@ -159,10 +168,14 @@ const REWORK_BASE_CTE = `
 const getPool = () => new sql.ConnectionPool(dbConfig1).connect();
 
 // ─── Helper: bind all shared parameters onto an mssql Request ─────────────────
+<<<<<<< HEAD
+const bindInputs = (request, { istStart, istEnd, model, dbCategories }) =>
+=======
 const bindInputs = (
   request,
   { istStart, istEnd, model, dbCategories, dbDefects },
 ) =>
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   request
     .input("startTime", sql.DateTime, istStart)
     .input("endTime", sql.DateTime, istEnd)
@@ -172,12 +185,20 @@ const bindInputs = (
       sql.VarChar,
       model && model !== "0" && model.trim() !== "" ? model.trim() : null,
     )
+<<<<<<< HEAD
+    .input("dbCategories", sql.VarChar, dbCategories ?? null);
+
+// ─── Helper: validate + parse common query params ─────────────────────────────
+const parseCommonParams = (query) => {
+  const { startTime, endTime, model, categories } = query;
+=======
     .input("dbCategories", sql.VarChar, dbCategories ?? null)
     .input("dbDefects", sql.VarChar, dbDefects ?? null);
 
 // ─── Helper: validate + parse common query params ─────────────────────────────
 const parseCommonParams = (query) => {
   const { startTime, endTime, model, categories, defects } = query;
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   if (!startTime || !endTime)
     throw new AppError(
       "Missing required query parameters: startTime, endTime",
@@ -188,7 +209,10 @@ const parseCommonParams = (query) => {
     istEnd: convertToIST(endTime),
     model: model ?? null,
     dbCategories: expandCategories(categories),
+<<<<<<< HEAD
+=======
     dbDefects: expandDefects(defects),
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   };
 };
 
@@ -213,7 +237,10 @@ export const getReworkReport = tryCatch(async (req, res) => {
         SELECT * FROM ReworkBase
         WHERE (@model IS NULL OR MatCode = @model)
           AND ${CAT_FILTER}
+<<<<<<< HEAD
+=======
           AND ${DEFECT_FILTER}
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
       )
       SELECT
         (SELECT COUNT(*) FROM Filtered) AS totalCount,
@@ -258,7 +285,10 @@ export const getReworkReportQuick = tryCatch(async (req, res) => {
       FROM ReworkBase
       WHERE (@model IS NULL OR MatCode = @model)
         AND ${CAT_FILTER}
+<<<<<<< HEAD
+=======
         AND ${DEFECT_FILTER}
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
       ORDER BY Rework_IN;
     `;
 
@@ -274,6 +304,8 @@ export const getReworkReportQuick = tryCatch(async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
+=======
 // ─── GET /rework-defect-options  (full master list for the filter dropdown) ──
 // Reads straight from DefectCodeMaster (the source of dc.Name AS Defect in
 // ReworkBase) rather than enumerating what's present in the current query
@@ -299,6 +331,7 @@ export const getReworkDefectOptions = tryCatch(async (req, res) => {
   }
 });
 
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 // ─── GET /rework-report-export  (Detail tab — all raw rows) ───────────────────
 export const getReworkReportExport = tryCatch(async (req, res) => {
   const params = parseCommonParams(req.query);
@@ -318,7 +351,10 @@ export const getReworkReportExport = tryCatch(async (req, res) => {
       FROM ReworkBase
       WHERE (@model IS NULL OR MatCode = @model)
         AND ${CAT_FILTER}
+<<<<<<< HEAD
+=======
         AND ${DEFECT_FILTER}
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
       ORDER BY Rework_IN;
     `;
 
@@ -348,7 +384,10 @@ export const getReworkSummaryExport = tryCatch(async (req, res) => {
         SELECT * FROM ReworkBase
         WHERE (@model IS NULL OR MatCode = @model)
           AND ${CAT_FILTER}
+<<<<<<< HEAD
+=======
           AND ${DEFECT_FILTER}
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
       )
       SELECT
         ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC)   AS Sr_No,
@@ -394,7 +433,10 @@ export const getReworkDefectExport = tryCatch(async (req, res) => {
         SELECT * FROM ReworkBase
         WHERE (@model IS NULL OR MatCode = @model)
           AND ${CAT_FILTER}
+<<<<<<< HEAD
+=======
           AND ${DEFECT_FILTER}
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
       )
 
       , ReworkAgg AS (

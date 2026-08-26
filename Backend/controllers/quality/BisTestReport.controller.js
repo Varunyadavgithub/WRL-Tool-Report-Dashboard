@@ -508,7 +508,7 @@ export const updateBisTestReport = tryCatch(async (req, res) => {
   if (existing.ReportType !== reportType) {
     throw new AppError("Report type cannot be changed on update.", 400);
   }
-  if ((existing.Status === "PendingReview" || existing.Status === "PendingApproval") && !isSuperAdmin(req)) {
+  if (existing.Status === "PendingReview" || existing.Status === "PendingApproval") {
     throw new AppError(
       `This report is currently ${existing.Status === "PendingReview" ? "pending review" : "pending approval"} and cannot be edited. Reject it back to Draft first, or wait for the approval decision.`,
       409,

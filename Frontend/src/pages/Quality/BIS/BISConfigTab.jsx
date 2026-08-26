@@ -1,4 +1,9 @@
 import { useState, useMemo, useEffect, Fragment } from "react";
+<<<<<<< HEAD
+import { Search, RefreshCw, Plus, Pencil, Trash2, CalendarClock, Save, X, SlidersHorizontal } from "lucide-react";
+import Pagination from "../../../components/ui/Pagination";
+import { usePagedSlice, FieldLabel, inputCls, reportTypeLabel } from "./shared";
+=======
 import { Search, RefreshCw, Plus, Pencil, Trash2, CalendarClock, Save, X, SlidersHorizontal, UserCheck, Upload, PenTool } from "lucide-react";
 import Pagination from "../../../components/ui/Pagination";
 import { fileBaseURL } from "../../../assets/assets";
@@ -102,6 +107,7 @@ const BISApprovalFlowSettings = ({ approvalFlow, approvalFlowLoading, approvalUs
     </div>
   );
 };
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 
 const FREQUENCY_FIELDS = [
   { type: "Introduction", freqKey: "introductionFrequencyMonths", durKey: "introductionDurationDays", freqUnit: "months", durUnit: "days" },
@@ -222,7 +228,10 @@ const BISTestFrequencySettings = ({ testConfig, testConfigLoading, onSaveTestCon
 const BISConfigTab = ({
   categories, categorySearch, setCategorySearch, categoryLoading, onRefresh, onAddCategory, onEditCategory, onDeleteCategory,
   testConfig, testConfigLoading, onSaveTestConfig, onInlineUpdateOverrides,
+<<<<<<< HEAD
+=======
   approvalFlow, approvalFlowLoading, approvalUsers, onSaveApprovalFlow, onUploadApprovalSignature,
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 }) => {
   const [limit, setLimit] = useState(25);
   const [editingOverrideId, setEditingOverrideId] = useState(null);
@@ -239,6 +248,8 @@ const BISConfigTab = ({
 
   return (
     <div className="flex flex-col gap-4">
+<<<<<<< HEAD
+=======
       <BISApprovalFlowSettings
         approvalFlow={approvalFlow}
         approvalFlowLoading={approvalFlowLoading}
@@ -246,6 +257,7 @@ const BISConfigTab = ({
         onSaveApprovalFlow={onSaveApprovalFlow}
         onUploadSignature={onUploadApprovalSignature}
       />
+>>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
       <BISTestFrequencySettings testConfig={testConfig} testConfigLoading={testConfigLoading} onSaveTestConfig={onSaveTestConfig} />
 
       {/* Category management */}
