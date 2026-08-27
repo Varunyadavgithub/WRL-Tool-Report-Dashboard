@@ -19,6 +19,7 @@ import masterConfigRoute  from "./masterConfig.route.js";
 import energyMeterRoute   from "./energyMeter.route.js";
 import visionReportRoute  from "./visionReport.route.js";
 import chemicalRoute      from "./chemical.route.js";
+import settingsRoute      from "./settings.route.js";
 
 const routers = Router();
 
@@ -42,5 +43,6 @@ routers.use("/master-config", masterConfigRoute);
 routers.use("/energy-meters", energyMeterRoute);
 routers.use("/vision-report", visionReportRoute);
 routers.use("/chemical", chemicalRoute);
+routers.use("/settings", settingsRoute);
 
 export default routers;

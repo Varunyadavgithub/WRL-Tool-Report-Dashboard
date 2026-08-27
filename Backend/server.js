@@ -19,6 +19,7 @@ import { startChemBulkStorageReportCron } from "./cron/chemBulkStorageReport.cro
 import { globalErrorHandler } from "./middlewares/errorHandler.js";
 import { runMigrations } from "./config/migrations.js";
 import { runGarudaMigrations } from "./config/garudaMigrations.js";
+import { rebuildSmtpTransporter } from "./config/email.config.js";
 // const _dirname = path.resolve();
 
 const app = express();
@@ -45,6 +46,13 @@ app.use("/uploads", express.static(path.resolve("uploads"))); // Static files
 
     await runGarudaMigrations(global.pool1);
     await runMigrations(global.pool3);
+
+    // Pick up any previously-saved Settings > Mail Server override now that
+    // pool3 is up — the transporter built at module-load time (email.config.js)
+    // only had .env to go on, since it runs before this IIFE.
+    rebuildSmtpTransporter(global.pool3).catch((err) =>
+      console.error("[Mail] Failed to load DB-saved SMTP override at startup:", err.message),
+    );
 
     // Server 2 (WWMS) and Server 4 (CLMS) are remote-only with no local backup —
     // skip them instead of crashing the app when offline.

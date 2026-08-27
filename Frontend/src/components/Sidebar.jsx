@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ChevronRight, Settings, PanelLeftClose, PanelLeftOpen, Menu } from "lucide-react";
 import { useRoleAccess } from "../hooks/useRoleAccess.js";
 import { ROLES } from "../config/routes.config.js";
@@ -138,13 +138,17 @@ const SubgroupHeader = ({ label, color }) => (
 const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
   const { accessibleMenu, userRole } = useRoleAccess();
   const [expandedModules, setExpandedModules] = useState({});
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
   const sidebarRef = useRef(null);
 
   const isSuperAdmin = userRole === ROLES.SUPER_ADMIN;
-  const isSettingsActive = location.pathname === "/settings";
+  const SETTINGS_ITEMS = [
+    { path: "/settings", label: "Permission Manager" },
+    { path: "/settings/mail-server", label: "Mail Server" },
+  ];
+  const isSettingsGroupActive = SETTINGS_ITEMS.some((i) => location.pathname === i.path);
   const isExpanded = isSidebarExpanded || isMobile;
 
   // Auto-expand the module containing the active route
@@ -156,6 +160,11 @@ const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
       setExpandedModules((prev) => ({ ...prev, [activeModule.key]: true }));
     }
   }, [location.pathname, accessibleMenu]);
+
+  // Auto-expand the Settings group when its own page is active
+  useEffect(() => {
+    if (isSettingsGroupActive) setSettingsExpanded(true);
+  }, [isSettingsGroupActive]);
 
   // Mobile detection
   useEffect(() => {
@@ -326,31 +335,56 @@ const Sidebar = ({ isSidebarExpanded, toggleSidebar }) => {
         {/* ── Footer ──────────────────────────────────────────────────── */}
         <div className="flex-shrink-0 border-t border-slate-100 p-2 space-y-0.5">
           {isSuperAdmin && (
-            <button
-              onClick={() => navigate("/settings")}
-              title={!isExpanded ? "Permission Manager" : undefined}
-              className={`
-                w-full flex items-center gap-2.5 px-2 py-2 rounded-xl text-[13px] font-medium
-                transition-all duration-200 cursor-pointer group border-l-2
-                ${isSettingsActive
-                  ? "bg-indigo-50 text-indigo-700 border-l-indigo-500 font-semibold"
-                  : "border-l-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                }
-              `}
-            >
-              <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${
-                  isSettingsActive ? "bg-indigo-600 text-white shadow-sm" : "bg-indigo-100 text-indigo-600"
-                }`}
+            <div>
+              <button
+                onClick={() => {
+                  if (!isExpanded) { toggleSidebar(); return; }
+                  setSettingsExpanded((v) => !v);
+                }}
+                title={!isExpanded ? "Settings" : undefined}
+                className={`
+                  relative w-full flex items-center gap-2.5 px-2 py-2 rounded-xl text-[13px] font-medium
+                  transition-all duration-200 cursor-pointer group border-l-2
+                  ${isSettingsGroupActive
+                    ? "bg-indigo-50 text-indigo-700 border-l-indigo-500 font-semibold"
+                    : "border-l-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                  }
+                `}
               >
-                <Settings
-                  className={`w-[15px] h-[15px] transition-transform duration-500 ${
-                    isSettingsActive ? "rotate-45" : "group-hover:rotate-45"
+                <div
+                  className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${
+                    isSettingsGroupActive ? "bg-indigo-600 text-white shadow-sm" : "bg-indigo-100 text-indigo-600"
                   }`}
-                />
-              </div>
-              {isExpanded && <span>Permission Manager</span>}
-            </button>
+                >
+                  <Settings
+                    className={`w-[15px] h-[15px] transition-transform duration-500 ${
+                      settingsExpanded ? "rotate-45" : "group-hover:rotate-45"
+                    }`}
+                  />
+                </div>
+                {isExpanded && (
+                  <>
+                    <span className="flex-1 text-left truncate">Settings</span>
+                    <ChevronRight
+                      className={`w-3.5 h-3.5 flex-shrink-0 text-slate-300 transition-transform duration-200 ${
+                        settingsExpanded ? "rotate-90" : ""
+                      }`}
+                    />
+                  </>
+                )}
+                {!isExpanded && isSettingsGroupActive && (
+                  <span className="absolute right-1 top-1 w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                )}
+              </button>
+
+              {isExpanded && settingsExpanded && (
+                <div className="mt-0.5 ml-[14px] pl-3 border-l-2 border-slate-100 pb-1.5">
+                  {SETTINGS_ITEMS.map((item) => (
+                    <NavItem key={item.path} item={item} active={isActive(item.path)} color={PALETTE[6]} />
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {isExpanded && (

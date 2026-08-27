@@ -94,7 +94,6 @@ const FGDispatchScan = lazy(() => import("../pages/Logistic/Scanning/FGDispatchS
 const ProductionPlaning = lazy(
   () => import("../pages/Planing/ProductionPlaning"),
 );
-const DailyPlan = lazy(() => import("../pages/Planing/DailyPlan"));
 const PlanStatus = lazy(() => import("../pages/Planing/PlanStatus"));
 
 const Dashboard = lazy(() => import("../pages/Visitor/Dashboard"));
@@ -282,11 +281,6 @@ export const ROUTE_CONFIG = [
         path: "/planing/production-planing",
         label: "Production Planning",
         component: ProductionPlaning,
-      },
-      {
-        path: "/planing/daily-planing",
-        label: "Daily Plan",
-        component: DailyPlan,
       },
       {
         path: "/planing/plan-status",

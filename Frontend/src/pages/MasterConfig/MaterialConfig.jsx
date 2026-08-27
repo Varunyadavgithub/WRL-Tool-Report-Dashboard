@@ -1,10 +1,11 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect, Fragment } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import * as XLSX from "xlsx";
 import {
   Package2, Upload, Download, Eye, Trash2,
   CheckCircle2, AlertTriangle, FileSpreadsheet,
   Info, Loader2, X, RefreshCw,
+  Columns3, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -31,6 +32,27 @@ const INIT = {
 };
 
 const round2 = (n) => Math.round(n * 100) / 100;
+
+// Rotates a fixed palette by category name so badges read as distinct at a
+// glance, instead of every category sharing the same flat grey pill.
+const CATEGORY_BADGE_COLORS = [
+  "bg-blue-50 text-blue-700 border-blue-200",
+  "bg-cyan-50 text-cyan-700 border-cyan-200",
+  "bg-violet-50 text-violet-700 border-violet-200",
+  "bg-amber-50 text-amber-700 border-amber-200",
+  "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "bg-rose-50 text-rose-700 border-rose-200",
+  "bg-slate-100 text-slate-600 border-slate-200",
+];
+const categoryBadgeCls = (cat) => {
+  if (!cat) return CATEGORY_BADGE_COLORS[CATEGORY_BADGE_COLORS.length - 1];
+  let hash = 0;
+  for (let i = 0; i < cat.length; i++) hash = (hash * 31 + cat.charCodeAt(i)) >>> 0;
+  return CATEGORY_BADGE_COLORS[hash % CATEGORY_BADGE_COLORS.length];
+};
+
+// Entries-per-page choices for the pagination bar.
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 // No of Sheet is the ONLY auto-derived field. Default comes from sheet thickness
 // (THK in mm) and the user can always override it. When nothing can be derived
@@ -484,6 +506,33 @@ const MaterialConfig = () => {
   const [search, setSearch]                   = useState("");
   const [showBulk, setShowBulk]               = useState(false);
   const [confirmClear, setConfirmClear]       = useState(false);
+  const [sort, setSort]                       = useState({ key: null, dir: null });
+  const [entriesPerPage, setEntriesPerPage]   = useState(25);
+  const [currentPage, setCurrentPage]         = useState(1);
+  const [hiddenCols, setHiddenCols]           = useState(() => new Set());
+  const [colMenuOpen, setColMenuOpen]         = useState(false);
+  const [colMenuPos, setColMenuPos]           = useState(null);
+  const colMenuRef                            = useRef(null);
+  const colMenuBtnRef                         = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (
+        colMenuRef.current && !colMenuRef.current.contains(e.target) &&
+        colMenuBtnRef.current && !colMenuBtnRef.current.contains(e.target)
+      ) setColMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggleColMenu = () => {
+    if (!colMenuOpen && colMenuBtnRef.current) {
+      const rect = colMenuBtnRef.current.getBoundingClientRect();
+      setColMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+    }
+    setColMenuOpen((v) => !v);
+  };
 
   const handleDirectUpload = async (r, file) => {
     if (!file) return;
@@ -506,6 +555,46 @@ const MaterialConfig = () => {
       String(r.partName ?? "").toLowerCase().includes(q)
     );
   }, [data, search]);
+
+  const toggleSort = (key) => {
+    setSort(prev => {
+      if (prev.key !== key) return { key, dir: "asc" };
+      if (prev.dir === "asc") return { key, dir: "desc" };
+      return { key: null, dir: null };
+    });
+  };
+
+  const sorted = useMemo(() => {
+    if (!sort.key) return filtered;
+    const { key, dir } = sort;
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      const av = a[key], bv = b[key];
+      const an = parseFloat(av), bn = parseFloat(bv);
+      const bothNumeric = av !== "" && av != null && bv !== "" && bv != null && !isNaN(an) && !isNaN(bn);
+      const cmp = bothNumeric
+        ? an - bn
+        : String(av ?? "").localeCompare(String(bv ?? ""), undefined, { numeric: true, sensitivity: "base" });
+      return dir === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  }, [filtered, sort]);
+
+  useEffect(() => { setCurrentPage(1); }, [search, sort, entriesPerPage]);
+
+  const pageCount = Math.max(1, Math.ceil(sorted.length / entriesPerPage));
+  const safePage = Math.min(currentPage, pageCount);
+  const pageStart = sorted.length === 0 ? 0 : (safePage - 1) * entriesPerPage;
+  const pageEnd = Math.min(pageStart + entriesPerPage, sorted.length);
+  const pageRows = sorted.slice(pageStart, pageEnd);
+
+  const toggleColVisible = (key) => {
+    setHiddenCols((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
 
   const openAdd  = () => { setForm(INIT); setNoOfSheetEdited(false); setModal({ open: true, mode: "add", row: null }); };
   const openEdit = (row) => { setForm({ ...row }); setNoOfSheetEdited(true); setModal({ open: true, mode: "edit", row }); };
@@ -586,11 +675,166 @@ const MaterialConfig = () => {
     setForm(f => ({ ...f, noOfSheet: e.target.value }));
   };
 
+  // ── Column definitions — drives colgroup widths, the two-tier grouped
+  // header, sorting and the Column Visibility toggle from one place. `srNo`
+  // and `actions` are locked (always visible); everything else can be hidden.
+  const COLUMNS = [
+    { key: "srNo", label: "Sr. No.", width: 3, locked: true,
+      render: (r, i) => <TD dense cls="text-slate-400">{pageStart + i + 1}</TD> },
+    { key: "sapCode", label: "SAP Code", width: 5, sortKey: "sapCode",
+      render: (r) => <TD dense mono cls="text-blue-600 font-bold break-words">{r.sapCode}</TD> },
+    { key: "partName", label: "Description", width: 8, sortKey: "partName",
+      render: (r) => <TD dense cls="font-medium text-slate-700 break-words">{r.partName}</TD> },
+    { key: "category", label: "Category", width: 5, sortKey: "category",
+      render: (r) => <TD dense><span className={`text-[10px] px-2 py-0.5 rounded-full border ${categoryBadgeCls(r.category)}`}>{r.category || "—"}</span></TD> },
+    { key: "sheetSapCode", label: "Sheet SAP Code", width: 5, sortKey: "sheetSapCode",
+      render: (r) => <TD dense mono cls="text-slate-500 break-words">{r.sheetSapCode || "—"}</TD> },
+    { key: "sheetDescription", label: "Sheet Description", width: 8, sortKey: "sheetDescription",
+      render: (r) => <TD dense cls="text-slate-500 break-words">{r.sheetDescription || "—"}</TD> },
+    { key: "length", label: "Length", width: 4, center: true, sortKey: "length",
+      render: (r) => <TD dense center cls="font-mono text-slate-600">{r.length || "—"}</TD> },
+    { key: "width", label: "Width", width: 4, center: true, sortKey: "width",
+      render: (r) => <TD dense center cls="font-mono text-slate-600">{r.width || "—"}</TD> },
+    { key: "thickness", label: "THK", width: 4, center: true, sortKey: "thickness",
+      render: (r) => <TD dense center cls="font-mono text-slate-600">{r.thickness || "—"}</TD> },
+    { key: "weight", label: "Weight", width: 4, center: true, sortKey: "weight",
+      render: (r) => <TD dense center cls="font-mono text-slate-600">{r.weight || "—"}</TD> },
+    { key: "componentWeight", label: "Component Weight", width: 4, center: true, sortKey: "componentWeight", group: "Component / Scrap",
+      render: (r) => <TD dense center cls="font-mono text-slate-600">{r.componentWeight || "—"}</TD> },
+    { key: "scrapWeight", label: "Scrap Weight", width: 4, center: true, sortKey: "scrapWeight", group: "Component / Scrap",
+      render: (r) => <TD dense center cls="font-mono text-slate-600">{r.scrapWeight || "—"}</TD> },
+    { key: "noOfSheet", label: "No of Sheet", width: 4, center: true, sortKey: "noOfSheet",
+      render: (r) => <TD dense center cls="font-mono font-bold text-slate-700">{r.noOfSheet || "—"}</TD> },
+    { key: "actualComponentsPerSheet", label: "No of Component per Sheet", width: 4, center: true, sortKey: "actualComponentsPerSheet",
+      render: (r) => <TD dense center cls="font-mono font-bold text-slate-700">{r.actualComponentsPerSheet || "—"}</TD> },
+    { key: "pncLoadingUnloading", label: "Loading/Unloading Time", width: 5, center: true, sortKey: "pncLoadingUnloading",
+      render: (r) => <TD dense center cls="font-mono text-amber-600">{r.pncLoadingUnloading || "—"}</TD> },
+    { key: "definedComponentCycleTime", label: "Cycle Time (Secs)", width: 5, center: true, sortKey: "definedComponentCycleTime", group: "Defined",
+      render: (r) => <TD dense center cls="font-mono font-bold text-rose-600">{r.definedComponentCycleTime ? `${round2(+r.definedComponentCycleTime)}s` : "—"}</TD> },
+    { key: "actualComponentCycleTime", label: "Actual CT (Secs)", width: 5, center: true, sortKey: "actualComponentCycleTime", group: "Defined",
+      render: (r) => (
+        <TD dense center cls="font-mono font-bold text-emerald-600">
+          {r.actualComponentCycleTime ? (
+            <span title={`${r.actualCTSampleCount ?? 0} samples${r.actualCTUpdatedAt ? ` · updated ${new Date(r.actualCTUpdatedAt).toLocaleDateString("en-IN")}` : ""}`}>
+              {round2(+r.actualComponentCycleTime)}s
+            </span>
+          ) : "—"}
+        </TD>
+      ) },
+    { key: "drawingNumber", label: "Drawing No.", width: 4, sortKey: "drawingNumber",
+      render: (r) => <TD dense mono cls="text-slate-500 break-words">{r.drawingNumber}</TD> },
+    { key: "drawingRevision", label: "Rev.", width: 4, sortKey: "drawingRevision",
+      render: (r) => (
+        <TD dense>
+          {r.drawingRevision && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">{r.drawingRevision}</span>
+          )}
+        </TD>
+      ) },
+    { key: "drawingFile", label: "Drawing File", width: 6, center: true,
+      render: (r) => (
+        <TD dense center>
+          <div className="flex flex-wrap items-center justify-center gap-1">
+            {uploadingId === r.id ? (
+              <span className="flex items-center gap-1 text-[10px] text-blue-500 font-semibold">
+                <Loader2 className="w-3 h-3 animate-spin" /> Uploading…
+              </span>
+            ) : r.drawingPath ? (
+              <>
+                <a
+                  href={`${fileBaseURL}${r.drawingPath}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                  title="Open Drawing in New Tab"
+                >
+                  <Eye className="w-3 h-3" /> View
+                </a>
+                <label className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer" title="Replace Drawing">
+                  <Upload className="w-3 h-3" /> Replace
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" hidden onChange={(e) => { handleDirectUpload(r, e.target.files?.[0]); e.target.value = ""; }} />
+                </label>
+              </>
+            ) : (
+              <label className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer" title="Upload Drawing">
+                <Upload className="w-3 h-3" /> Upload
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" hidden onChange={(e) => { handleDirectUpload(r, e.target.files?.[0]); e.target.value = ""; }} />
+              </label>
+            )}
+          </div>
+        </TD>
+      ) },
+    { key: "actions", label: "Actions", width: 5, center: true, locked: true,
+      render: (r) => <TD dense center><TableActions onEdit={() => openEdit(r)} onDelete={() => handleDelete(r.id)} /></TD> },
+  ];
+
+  const visibleCols = COLUMNS.filter((c) => c.locked || !hiddenCols.has(c.key));
+  const visibleWidthSum = visibleCols.reduce((s, c) => s + c.width, 0);
+
+  const renderTH = (col, extra = {}) => (
+    <TH
+      key={col.key}
+      dense
+      center={col.center}
+      wrap
+      sortable={!!col.sortKey}
+      sortDir={col.sortKey && sort.key === col.sortKey ? sort.dir : null}
+      onSort={col.sortKey ? () => toggleSort(col.sortKey) : undefined}
+      rowSpan={extra.rowSpan}
+    >
+      {col.label}
+    </TH>
+  );
+
+  // Two-tier header: ungrouped columns span both header rows; grouped
+  // columns get a merged group-label cell on row 1 and their own cell on row 2.
+  const groupHeaderCells = [];
+  for (let i = 0; i < visibleCols.length; ) {
+    const col = visibleCols[i];
+    if (!col.group) {
+      groupHeaderCells.push(renderTH(col, { rowSpan: 2 }));
+      i += 1;
+      continue;
+    }
+    let runEnd = i + 1;
+    while (runEnd < visibleCols.length && visibleCols[runEnd].group === col.group) runEnd += 1;
+    groupHeaderCells.push(
+      <th
+        key={`grp-${col.group}-${i}`}
+        colSpan={runEnd - i}
+        className="px-1.5 py-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-widest text-center border-b border-slate-200 bg-slate-100"
+      >
+        {col.group}
+      </th>,
+    );
+    i = runEnd;
+  }
+  const subHeaderCells = visibleCols.filter((c) => c.group).map((c) => renderTH(c));
+
+  const getPageList = (current, total) => {
+    const delta = 1;
+    const range = [];
+    for (let i = 1; i <= total; i++) {
+      if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) range.push(i);
+    }
+    const withDots = [];
+    let last;
+    range.forEach((i) => {
+      if (last != null) {
+        if (i - last === 2) withDots.push(last + 1);
+        else if (i - last > 2) withDots.push("…");
+      }
+      withDots.push(i);
+      last = i;
+    });
+    return withDots;
+  };
+
   return (
     <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
       <PageHeader title="Material Configuration" subtitle="Manage SAP codes, part masters, cycle times and drawing revisions" icon={Package2} onAdd={openAdd} addLabel="Add Material" search={search} onSearch={setSearch} />
 
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto p-4" onScroll={() => colMenuOpen && setColMenuOpen(false)}>
         {/* Action bar */}
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <button
@@ -631,105 +875,138 @@ const MaterialConfig = () => {
           <span className="ml-auto text-[11px] text-slate-400">{filtered.length} of {data.length} materials</span>
         </div>
 
-        {/* Table */}
+        {/* Table toolbar — entries-per-page + column visibility, DataTables-style */}
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <label className="flex items-center gap-1.5 text-xs text-slate-500">
+            Show
+            <select
+              value={entriesPerPage}
+              onChange={(e) => setEntriesPerPage(Number(e.target.value))}
+              className="px-2 py-1 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+            entries
+          </label>
+
+          <div className="relative">
+            <button
+              ref={colMenuBtnRef}
+              onClick={toggleColMenu}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors"
+            >
+              <Columns3 className="w-3.5 h-3.5" /> Column Visibility
+            </button>
+            {colMenuOpen && colMenuPos && (
+              <div
+                ref={colMenuRef}
+                style={{ position: "fixed", top: colMenuPos.top, right: colMenuPos.right, maxHeight: "min(24rem, 70vh)" }}
+                className="w-64 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2"
+              >
+                <div className="flex items-center justify-between px-2 pb-1.5 mb-1 border-b border-slate-100">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Columns</span>
+                  <button
+                    onClick={() => setHiddenCols(new Set())}
+                    className="text-[10px] font-semibold text-blue-600 hover:underline"
+                  >
+                    Show all
+                  </button>
+                </div>
+                {COLUMNS.filter((c) => !c.locked).map((c) => (
+                  <label key={c.key} className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-600 hover:bg-slate-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!hiddenCols.has(c.key)}
+                      onChange={() => toggleColVisible(c.key)}
+                      className="accent-blue-600"
+                    />
+                    {c.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Table — table-fixed + colgroup so visible columns auto-fit one screen width, no horizontal scroll */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="overflow-auto">
-            <table className="min-w-full border-separate border-spacing-0">
+            <table className="w-full table-fixed border-separate border-spacing-0">
+              <colgroup>
+                {visibleCols.map((c) => (
+                  <col key={c.key} style={{ width: `${(c.width / visibleWidthSum * 100).toFixed(3)}%` }} />
+                ))}
+              </colgroup>
               <thead className="sticky top-0 z-10">
-                <tr className="bg-slate-50">
-                  <TH>Sr. No.</TH>
-                  <TH>SAP Code</TH>
-                  <TH>Description</TH>
-                  <TH>Category</TH>
-                  <TH>Sheet SAP Code</TH>
-                  <TH>Sheet Description</TH>
-                  <TH center>Length</TH>
-                  <TH center>Width</TH>
-                  <TH center>THK</TH>
-                  <TH center>Weight</TH>
-                  <TH center>Component Weight</TH>
-                  <TH center>Scrap Weight</TH>
-                  <TH center>No of Sheet</TH>
-                  <TH center>No of Component per Sheet</TH>
-                  <TH center>Loading/Unloading Time</TH>
-                  <TH center>Defined Component Cycle Time (Secs)</TH>
-                  <TH center>Actual CT (Secs)</TH>
-                  <TH>Drawing No.</TH>
-                  <TH>Rev.</TH>
-                  <TH center>Drawing File</TH>
-                  <TH center>Actions</TH>
-                </tr>
+                <tr className="bg-slate-50">{groupHeaderCells}</tr>
+                {subHeaderCells.length > 0 && <tr className="bg-slate-50">{subHeaderCells}</tr>}
               </thead>
               <tbody>
-                {filtered.length > 0 ? filtered.map((r, idx) => (
+                {pageRows.length > 0 ? pageRows.map((r, idx) => (
                   <tr key={r.id} className="hover:bg-blue-50/40 transition-colors even:bg-slate-50/30">
-                    <TD cls="text-slate-400">{idx + 1}</TD>
-                    <TD mono cls="text-blue-600 font-bold">{r.sapCode}</TD>
-                    <TD cls="font-medium text-slate-700 whitespace-nowrap">{r.partName}</TD>
-                    <TD><span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{r.category || "—"}</span></TD>
-                    <TD mono cls="text-slate-500">{r.sheetSapCode || "—"}</TD>
-                    <TD cls="text-slate-500 whitespace-nowrap">{r.sheetDescription || "—"}</TD>
-                    <TD center cls="font-mono text-slate-600">{r.length || "—"}</TD>
-                    <TD center cls="font-mono text-slate-600">{r.width || "—"}</TD>
-                    <TD center cls="font-mono text-slate-600">{r.thickness || "—"}</TD>
-                    <TD center cls="font-mono text-slate-600">{r.weight || "—"}</TD>
-                    <TD center cls="font-mono text-slate-600">{r.componentWeight || "—"}</TD>
-                    <TD center cls="font-mono text-slate-600">{r.scrapWeight || "—"}</TD>
-                    <TD center cls="font-mono font-bold text-slate-700">{r.noOfSheet || "—"}</TD>
-                    <TD center cls="font-mono font-bold text-slate-700">{r.actualComponentsPerSheet || "—"}</TD>
-                    <TD center cls="font-mono text-amber-600">{r.pncLoadingUnloading || "—"}</TD>
-                    <TD center cls="font-mono font-bold text-rose-600">{r.definedComponentCycleTime ? `${round2(+r.definedComponentCycleTime)}s` : "—"}</TD>
-                    <TD center cls="font-mono font-bold text-emerald-600">
-                      {r.actualComponentCycleTime ? (
-                        <span title={`${r.actualCTSampleCount ?? 0} samples${r.actualCTUpdatedAt ? ` · updated ${new Date(r.actualCTUpdatedAt).toLocaleDateString("en-IN")}` : ""}`}>
-                          {round2(+r.actualComponentCycleTime)}s
-                        </span>
-                      ) : "—"}
-                    </TD>
-                    <TD mono cls="text-slate-500">{r.drawingNumber}</TD>
-                    <TD>
-                      {r.drawingRevision && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">{r.drawingRevision}</span>
-                      )}
-                    </TD>
-                    {/* Drawing File column */}
-                    <TD center>
-                      <div className="flex items-center justify-center gap-1">
-                        {uploadingId === r.id ? (
-                          <span className="flex items-center gap-1 text-[10px] text-blue-500 font-semibold">
-                            <Loader2 className="w-3 h-3 animate-spin" /> Uploading…
-                          </span>
-                        ) : r.drawingPath ? (
-                          <>
-                            <a
-                              href={`${fileBaseURL}${r.drawingPath}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-                              title="Open Drawing in New Tab"
-                            >
-                              <Eye className="w-3 h-3" /> View
-                            </a>
-                            <label className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer" title="Replace Drawing">
-                              <Upload className="w-3 h-3" /> Replace
-                              <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" hidden onChange={(e) => { handleDirectUpload(r, e.target.files?.[0]); e.target.value = ""; }} />
-                            </label>
-                          </>
-                        ) : (
-                          <label className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer" title="Upload Drawing">
-                            <Upload className="w-3 h-3" /> Upload
-                            <input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" hidden onChange={(e) => { handleDirectUpload(r, e.target.files?.[0]); e.target.value = ""; }} />
-                          </label>
-                        )}
-                      </div>
-                    </TD>
-                    <TD center>
-                      <TableActions onEdit={() => openEdit(r)} onDelete={() => handleDelete(r.id)} />
-                    </TD>
+                    {visibleCols.map((c) => (
+                      <Fragment key={c.key}>{c.render(r, idx)}</Fragment>
+                    ))}
                   </tr>
-                )) : <EmptyState colSpan={20} message="No materials found. Add or upload your first material." />}
+                )) : <EmptyState colSpan={visibleCols.length} message="No materials found. Add or upload your first material." />}
               </tbody>
             </table>
+          </div>
+
+          {/* Pagination footer */}
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 flex-wrap">
+            <span className="text-[11px] text-slate-400">
+              {sorted.length === 0
+                ? "Showing 0 entries"
+                : `Showing ${pageStart + 1} to ${pageEnd} of ${sorted.length} entries`}
+            </span>
+            {pageCount > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={safePage === 1}
+                  className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronsLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                {getPageList(safePage, pageCount).map((p, i) =>
+                  p === "…" ? (
+                    <span key={`dots-${i}`} className="px-2 text-xs text-slate-400">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setCurrentPage(p)}
+                      className={`min-w-[28px] px-2 py-1 text-xs font-semibold rounded-lg transition-colors ${
+                        p === safePage ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ),
+                )}
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(pageCount, p + 1))}
+                  disabled={safePage === pageCount}
+                  className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setCurrentPage(pageCount)}
+                  disabled={safePage === pageCount}
+                  className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronsRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

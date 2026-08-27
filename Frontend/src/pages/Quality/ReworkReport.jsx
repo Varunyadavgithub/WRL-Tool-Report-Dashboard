@@ -25,15 +25,10 @@ import { useGetModelVariantsQuery } from "../../redux/api/commonApi.js";
 import {
   RefreshCw,
   Filter,
-<<<<<<< HEAD
-  X,
-  BarChart2,
-=======
   Search,
   X,
   BarChart2,
   Table2,
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   List,
   Target,
   AlertTriangle,
@@ -411,8 +406,6 @@ const CategoryMultiSelect = ({ selected, onChange }) => {
   );
 };
 
-<<<<<<< HEAD
-=======
 // ── Defect Multi-Select ─────────────────────────────────────────────────────────
 // Options are derived from whatever data is currently loaded (see
 // `defectOptions` in the main component) rather than a static list, since
@@ -612,7 +605,6 @@ const DefectMultiSelect = ({ options, selected, onChange }) => {
   );
 };
 
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 // ── Recharts DonutChart ────────────────────────────────────────────────────────
 const DonutChart = ({ open, closed }) => {
   const total = (Number(open) || 0) + (Number(closed) || 0);
@@ -1160,8 +1152,6 @@ const BreakdownTable = ({ data, selectedModel, onModelClick }) => {
   );
 };
 
-<<<<<<< HEAD
-=======
 // ── Group By options (Detail row fields available to group/breakdown by) ───────
 const GROUP_OPTIONS = [
   { label: "Model", value: "Model_Name" },
@@ -1258,7 +1248,6 @@ const GroupSummaryTable = ({ grouped, groupLabel, totalCount }) => {
   );
 };
 
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 // ── KPI Card ───────────────────────────────────────────────────────────────────
 const KpiCard = ({
   label,
@@ -1393,10 +1382,7 @@ const svgToDataURL = (containerEl) =>
 const ReworkReport = () => {
   const [loadingKey, setLoadingKey] = useState(null);
   const [activeTab, setActiveTab] = useState("summary");
-<<<<<<< HEAD
-=======
   const [groupBy, setGroupBy] = useState(GROUP_OPTIONS[0]);
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   const [exporting, setExporting] = useState(null); // 'excel' | 'pdf'
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
@@ -1410,11 +1396,8 @@ const ReworkReport = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [selectedModel, setSelectedModel] = useState(null);
   const [selectedCategories, setSelectedCategories] = useState([]);
-<<<<<<< HEAD
-=======
   const [selectedDefects, setSelectedDefects] = useState([]);
   const [defectOptions, setDefectOptions] = useState([]);
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 
   const [productionMap, setProductionMap] = useState({});
   const [totalProduction, setTotalProduction] = useState(0);
@@ -1450,26 +1433,17 @@ const ReworkReport = () => {
   }, []);
 
   // ── Build API params ────────────────────────────────────────────────────────
-<<<<<<< HEAD
-=======
   // NOTE: defects are pipe-joined (not comma) since defect descriptions can
   // contain commas — must match Backend's expandDefects().
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   const buildParams = useCallback(
     (extra = {}) => ({
       model: selectedModelVariant?.value || null,
       categories:
         selectedCategories.length > 0 ? selectedCategories.join(",") : null,
-<<<<<<< HEAD
-      ...extra,
-    }),
-    [selectedModelVariant, selectedCategories],
-=======
       defects: selectedDefects.length > 0 ? selectedDefects.join("|") : null,
       ...extra,
     }),
     [selectedModelVariant, selectedCategories, selectedDefects],
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   );
 
   // ── Infinite-scroll sentinel ────────────────────────────────────────────────
@@ -1513,11 +1487,6 @@ const ReworkReport = () => {
     }
   }, []);
 
-<<<<<<< HEAD
-  // ── Paginated rework fetch ──────────────────────────────────────────────────
-  const fetchReworkPage = useCallback(
-    async ({ pageNumber, st, et, modelVal, cats }) => {
-=======
   // ── Defect options fetch ────────────────────────────────────────────────────
   // Full master list from DefectCodeMaster — static reference data, unrelated
   // to the current date/model/category filter, so it's fetched once on mount
@@ -1537,7 +1506,6 @@ const ReworkReport = () => {
   // ── Paginated rework fetch ──────────────────────────────────────────────────
   const fetchReworkPage = useCallback(
     async ({ pageNumber, st, et, modelVal, cats, defs }) => {
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
       try {
         setLoadingKey("query");
         const res = await axios.get(`${baseURL}quality/rework-report`, {
@@ -1546,10 +1514,7 @@ const ReworkReport = () => {
             endTime: et,
             model: modelVal || null,
             categories: cats.length > 0 ? cats.join(",") : null,
-<<<<<<< HEAD
-=======
             defects: defs && defs.length > 0 ? defs.join("|") : null,
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
             page: pageNumber,
             limit,
           },
@@ -1578,28 +1543,14 @@ const ReworkReport = () => {
       return;
     }
     const cats = selectedCategories;
-<<<<<<< HEAD
-    const modelVal = selectedModelVariant?.value || null;
-    fetchParamsRef.current = { st: startTime, et: endTime, modelVal, cats };
-=======
     const defs = selectedDefects;
     const modelVal = selectedModelVariant?.value || null;
     fetchParamsRef.current = { st: startTime, et: endTime, modelVal, cats, defs };
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
     setPage(1);
     setReworkData([]);
     setSelectedModel(null);
     setProductionMap({});
     setTotalProduction(0);
-<<<<<<< HEAD
-    fetchReworkPage({ pageNumber: 1, st: startTime, et: endTime, modelVal, cats });
-  }, [startTime, endTime, selectedCategories, selectedModelVariant, fetchReworkPage]);
-
-  useEffect(() => {
-    if (page > 1) {
-      const { st, et, modelVal, cats } = fetchParamsRef.current;
-      fetchReworkPage({ pageNumber: page, st, et, modelVal, cats });
-=======
     fetchReworkPage({ pageNumber: 1, st: startTime, et: endTime, modelVal, cats, defs });
   }, [
     startTime,
@@ -1614,7 +1565,6 @@ const ReworkReport = () => {
     if (page > 1) {
       const { st, et, modelVal, cats, defs } = fetchParamsRef.current;
       fetchReworkPage({ pageNumber: page, st, et, modelVal, cats, defs });
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
@@ -1626,10 +1576,7 @@ const ReworkReport = () => {
       abortRef.current = new AbortController();
 
       const catsSnapshot = selectedCategories.slice();
-<<<<<<< HEAD
-=======
       const defsSnapshot = selectedDefects.slice();
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
       const modelVal = selectedModelVariant?.value || null;
 
       try {
@@ -1648,10 +1595,7 @@ const ReworkReport = () => {
             endTime: end,
             model: modelVal,
             categories: catsSnapshot.length > 0 ? catsSnapshot.join(",") : null,
-<<<<<<< HEAD
-=======
             defects: defsSnapshot.length > 0 ? defsSnapshot.join("|") : null,
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
           },
           signal: abortRef.current.signal,
         });
@@ -1661,9 +1605,6 @@ const ReworkReport = () => {
           setReworkData(nd);
           setTotalCount(res.data.totalCount || 0);
           setHasMore(false);
-<<<<<<< HEAD
-          fetchParamsRef.current = { st: start, et: end, modelVal, cats: catsSnapshot };
-=======
           fetchParamsRef.current = {
             st: start,
             et: end,
@@ -1671,7 +1612,6 @@ const ReworkReport = () => {
             cats: catsSnapshot,
             defs: defsSnapshot,
           };
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
           fetchProductionData(start, end, modelVal, catsSnapshot);
         }
       } catch (err) {
@@ -1680,11 +1620,7 @@ const ReworkReport = () => {
         setLoadingKey((k) => (k === loaderKey ? null : k));
       }
     },
-<<<<<<< HEAD
-    [selectedModelVariant, selectedCategories, fetchProductionData],
-=======
     [selectedModelVariant, selectedCategories, selectedDefects, fetchProductionData],
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   );
 
   const fetchYesterdayData = useCallback(() => {
@@ -1790,11 +1726,6 @@ const ReworkReport = () => {
     [modelFilteredData, selectedCategories, categoryLookup],
   );
 
-<<<<<<< HEAD
-  const aggregated = useMemo(() => {
-    const map = {};
-    categoryFilteredData.forEach((item) => {
-=======
   // Defect filtering is now applied server-side (sent as a `defects` param,
   // same as `categories`) so the loaded data is already scoped to it — this
   // is just an alias kept so the rest of the component doesn't need touching.
@@ -1803,7 +1734,6 @@ const ReworkReport = () => {
   const aggregated = useMemo(() => {
     const map = {};
     defectFilteredData.forEach((item) => {
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
       const model = item.Model_Name?.trim() || "Not Logged In";
       if (!map[model]) map[model] = { total: 0, open: 0, closed: 0 };
       map[model].total++;
@@ -1814,9 +1744,6 @@ const ReworkReport = () => {
     return Object.entries(map)
       .map(([k, v]) => ({ Model_Name: k, ...v, reworkTotal: v.total }))
       .sort((a, b) => b.total - a.total);
-<<<<<<< HEAD
-  }, [categoryFilteredData]);
-=======
   }, [defectFilteredData]);
 
   // ── Group By (any detail column) breakdown ────────────────────────────────
@@ -1831,7 +1758,6 @@ const ReworkReport = () => {
       .map(([key, count]) => ({ key, count }))
       .sort((a, b) => b.count - a.count);
   }, [defectFilteredData, groupBy]);
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 
   const { totalOpen, totalClosed } = useMemo(
     () =>
@@ -1847,11 +1773,7 @@ const ReworkReport = () => {
 
   const hasProd = totalProduction > 0;
   const overallRatio = hasProd
-<<<<<<< HEAD
-    ? (categoryFilteredData.length / totalProduction) * 100
-=======
     ? (defectFilteredData.length / totalProduction) * 100
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
     : null;
   const overallRl = ratioLevel(overallRatio);
 
@@ -1876,11 +1798,7 @@ const ReworkReport = () => {
   const isLoading = loadingKey === "query";
   const isProd = loadingKey === "prod";
   // Total shown in KPIs reflects the currently-filtered view
-<<<<<<< HEAD
-  const filteredTotal = categoryFilteredData.length;
-=======
   const filteredTotal = defectFilteredData.length;
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 
   const handleModelClick = (model) => {
     setSelectedModel((prev) => (prev === model ? null : model));
@@ -2147,11 +2065,7 @@ const ReworkReport = () => {
       });
 
       // ── Page 3: Detail Records ──
-<<<<<<< HEAD
-      if (categoryFilteredData.length > 0) {
-=======
       if (defectFilteredData.length > 0) {
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
         doc.addPage();
         doc.setFillColor(30, 41, 59);
         doc.rect(0, 0, PW, 10, "F");
@@ -2159,20 +2073,12 @@ const ReworkReport = () => {
         doc.setFont("helvetica", "bold");
         doc.setTextColor(255, 255, 255);
         doc.text(
-<<<<<<< HEAD
-          `Detail Records  (${categoryFilteredData.length.toLocaleString()} rows — first 500 shown in PDF)`,
-=======
           `Detail Records  (${defectFilteredData.length.toLocaleString()} rows — first 500 shown in PDF)`,
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
           margin,
           7,
         );
 
-<<<<<<< HEAD
-        const sliceData = categoryFilteredData.slice(0, 500);
-=======
         const sliceData = defectFilteredData.slice(0, 500);
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
         autoTable(doc, {
           startY: 14,
           head: [
@@ -2371,14 +2277,6 @@ const ReworkReport = () => {
               <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
                 Filters
               </p>
-<<<<<<< HEAD
-              {hasData && selectedCategories.length > 0 && (
-                <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
-                  <Zap className="w-2.5 h-2.5" />
-                  Re-run query to update results
-                </span>
-              )}
-=======
               {hasData &&
                 (selectedCategories.length > 0 || selectedDefects.length > 0) && (
                   <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
@@ -2386,7 +2284,6 @@ const ReworkReport = () => {
                     Re-run query to update results
                   </span>
                 )}
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
             </div>
             <div className="flex flex-wrap gap-3 items-end">
               <div className="min-w-[190px] flex-1">
@@ -2407,8 +2304,6 @@ const ReworkReport = () => {
                   onChange={setSelectedCategories}
                 />
               </div>
-<<<<<<< HEAD
-=======
               <div className="min-w-[190px] flex-1">
                 <DefectMultiSelect
                   options={defectOptions}
@@ -2416,7 +2311,6 @@ const ReworkReport = () => {
                   onChange={setSelectedDefects}
                 />
               </div>
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
               <div className="min-w-[185px] flex-1">
                 <DateTimePicker
                   label="Start Time"
@@ -2462,11 +2356,7 @@ const ReworkReport = () => {
               onRemove={(c) =>
                 setSelectedCategories((prev) => prev.filter((x) => x !== c))
               }
-<<<<<<< HEAD
-              recordCount={categoryFilteredData.length}
-=======
               recordCount={defectFilteredData.length}
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
               totalCount={hasData ? reworkData.length : 0}
             />
           </div>
@@ -2477,25 +2367,15 @@ const ReworkReport = () => {
               <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
                 Quick Filters
               </p>
-<<<<<<< HEAD
-              {selectedCategories.length > 0 && (
-                <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full">
-                  <Tag className="w-2.5 h-2.5" /> {selectedCategories.length} cat
-=======
               {(selectedCategories.length > 0 || selectedDefects.length > 0) && (
                 <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full">
                   <Tag className="w-2.5 h-2.5" />
                   {selectedCategories.length + selectedDefects.length} filter
                   {selectedCategories.length + selectedDefects.length === 1 ? "" : "s"}
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
                 </span>
               )}
             </div>
             <p className="text-[10px] text-slate-400 mb-3">
-<<<<<<< HEAD
-              {selectedCategories.length > 0
-                ? `Category filter will apply: ${selectedCategories.join(", ")}`
-=======
               {selectedCategories.length > 0 || selectedDefects.length > 0
                 ? [
                     selectedCategories.length > 0 &&
@@ -2505,7 +2385,6 @@ const ReworkReport = () => {
                   ]
                     .filter(Boolean)
                     .join(" · ")
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
                 : "Select a preset time range."}
             </p>
             <div className="flex flex-col gap-2">
@@ -2515,11 +2394,7 @@ const ReworkReport = () => {
                 loading={loadingKey === "yesterday"}
                 onClick={fetchYesterdayData}
                 colorClass="bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
-<<<<<<< HEAD
-                categoryCount={selectedCategories.length}
-=======
                 categoryCount={selectedCategories.length + selectedDefects.length}
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
               />
               <QuickBtn
                 label="TODAY"
@@ -2527,11 +2402,7 @@ const ReworkReport = () => {
                 loading={loadingKey === "today"}
                 onClick={fetchTodayData}
                 colorClass="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-<<<<<<< HEAD
-                categoryCount={selectedCategories.length}
-=======
                 categoryCount={selectedCategories.length + selectedDefects.length}
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
               />
               <QuickBtn
                 label="MTD"
@@ -2539,11 +2410,7 @@ const ReworkReport = () => {
                 loading={loadingKey === "mtd"}
                 onClick={fetchMTDData}
                 colorClass="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-<<<<<<< HEAD
-                categoryCount={selectedCategories.length}
-=======
                 categoryCount={selectedCategories.length + selectedDefects.length}
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
               />
             </div>
           </div>
@@ -2596,11 +2463,7 @@ const ReworkReport = () => {
                             : "bg-slate-200 text-slate-500"
                         }`}
                       >
-<<<<<<< HEAD
-                        {categoryFilteredData.length.toLocaleString()}
-=======
                         {defectFilteredData.length.toLocaleString()}
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
                       </span>
                     )}
                     {tab.id === "defect" && overallRatio != null && (
@@ -2733,8 +2596,6 @@ const ReworkReport = () => {
                     onModelClick={handleModelClick}
                   />
                 </div>
-<<<<<<< HEAD
-=======
 
                 {/* ── Group By (any column) ── */}
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
@@ -2821,7 +2682,6 @@ const ReworkReport = () => {
                     </div>
                   </div>
                 </div>
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
               </div>
             )}
 
@@ -2931,14 +2791,6 @@ const ReworkReport = () => {
                     <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
                       {selectedModel
                         ? `Filtered: ${selectedModel}`
-<<<<<<< HEAD
-                        : selectedCategories.length > 0
-                          ? `Categories: ${selectedCategories.join(", ")}`
-                          : "All Records"}
-                    </span>
-                    <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono">
-                      {categoryFilteredData.length.toLocaleString()} rows
-=======
                         : selectedCategories.length > 0 || selectedDefects.length > 0
                           ? [
                               selectedCategories.length > 0 &&
@@ -2952,7 +2804,6 @@ const ReworkReport = () => {
                     </span>
                     <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono">
                       {defectFilteredData.length.toLocaleString()} rows
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
                     </span>
                     {selectedModel && (
                       <button
@@ -2970,8 +2821,6 @@ const ReworkReport = () => {
                         Clear categories <X className="w-2.5 h-2.5" />
                       </button>
                     )}
-<<<<<<< HEAD
-=======
                     {selectedDefects.length > 0 && (
                       <button
                         onClick={() => setSelectedDefects([])}
@@ -2980,7 +2829,6 @@ const ReworkReport = () => {
                         Clear defects <X className="w-2.5 h-2.5" />
                       </button>
                     )}
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
                   </div>
                   <div className="flex items-center gap-2">
                     {hasMore && (
@@ -3023,19 +2871,11 @@ const ReworkReport = () => {
                       </tr>
                     </thead>
                     <tbody>
-<<<<<<< HEAD
-                      {categoryFilteredData.map((row, i) => (
-                        <tr
-                          key={i}
-                          ref={
-                            i === categoryFilteredData.length - 1 ? lastRowRef : null
-=======
                       {defectFilteredData.map((row, i) => (
                         <tr
                           key={i}
                           ref={
                             i === defectFilteredData.length - 1 ? lastRowRef : null
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
                           }
                           className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
                         >

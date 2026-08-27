@@ -7,6 +7,7 @@ import { useSelector } from "react-redux";
 import { baseURL } from "../../assets/assets";
 import { useNavigate } from "react-router-dom";
 import { useGetEmployeesWithDepartmentsQuery } from "../../redux/api/commonApi.js";
+import { canUseGetUserMedia } from "../../utils/mediaCapture.js";
 
 const GeneratePass = () => {
   const { user } = useSelector((store) => store.auth);
@@ -59,8 +60,33 @@ const GeneratePass = () => {
   const [loading, setLoading] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const nativeCamRef = useRef(null);
+
+  // getUserMedia() only works in a secure context (HTTPS, or localhost) —
+  // over plain HTTP in production `navigator.mediaDevices` is undefined, so
+  // fall back to the OS's native camera/file picker via a hidden
+  // <input capture> instead of leaving the visitor stuck with no way to add
+  // the (required) photo.
+  const handleNativeCapture = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting/retaking the same file later
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCapturedPhoto(reader.result);
+      setVisitorData((prev) => ({ ...prev, visitorPhoto: reader.result }));
+      setError(null);
+    };
+    reader.onerror = () => setError("Could not read the captured photo. Please try again.");
+    reader.readAsDataURL(file);
+  };
 
   const startCamera = async () => {
+    if (!canUseGetUserMedia()) {
+      nativeCamRef.current?.click();
+      return;
+    }
+
     try {
       await navigator.mediaDevices.getUserMedia({ video: true });
 
@@ -106,6 +132,12 @@ const GeneratePass = () => {
       } else {
         setError("Could not access camera. Please check device connection.");
       }
+
+      // In-page camera access failed (denied, no device, or in-use) — the
+      // OS's native camera app runs under a separate permission model on
+      // several mobile browsers and can still succeed here, so try it
+      // instead of leaving the visitor stuck with no way to add the photo.
+      nativeCamRef.current?.click();
     }
   };
 
@@ -133,6 +165,7 @@ const GeneratePass = () => {
   };
 
   const renderPhotoCaptureSection = () => {
+    const secure = canUseGetUserMedia();
     return (
       <div className="photo-capture-section flex flex-col gap-2 items-center justify-center mb-4">
         {error && (
@@ -141,18 +174,31 @@ const GeneratePass = () => {
           </div>
         )}
 
+        {/* Hidden native fallback — used directly when getUserMedia isn't
+            available (no secure context), and as a backup if it fails. */}
+        <input
+          ref={nativeCamRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={handleNativeCapture}
+        />
+
         <div className="camera-preview flex flex-col items-center justify-center w-full">
           {!capturedPhoto ? (
             <>
-              <video
-                ref={videoRef}
-                autoPlay
-                style={{
-                  display: capturedPhoto ? "none" : "block",
-                  transform: "scaleX(-1)",
-                }}
-                className="bg-gray-50 border border-gray-200 rounded-lg w-full max-w-xs"
-              />
+              {secure && (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  style={{
+                    display: capturedPhoto ? "none" : "block",
+                    transform: "scaleX(-1)",
+                  }}
+                  className="bg-gray-50 border border-gray-200 rounded-lg w-full max-w-xs"
+                />
+              )}
               <div className="flex gap-4 mt-4">
                 <button
                   type="button"
@@ -162,22 +208,24 @@ const GeneratePass = () => {
                   Open Camera
                 </button>
 
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!videoRef.current?.srcObject) {
-                      toast.error(
-                        "Camera is not active. Please allow camera access or connect a camera device.",
-                      );
-                      await startCamera();
-                      return;
-                    }
-                    capturePhoto();
-                  }}
-                  className="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-green-600 transition cursor-pointer"
-                >
-                  Capture Photo
-                </button>
+                {secure && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!videoRef.current?.srcObject) {
+                        toast.error(
+                          "Camera is not active. Please allow camera access or connect a camera device.",
+                        );
+                        await startCamera();
+                        return;
+                      }
+                      capturePhoto();
+                    }}
+                    className="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-green-600 transition cursor-pointer"
+                  >
+                    Capture Photo
+                  </button>
+                )}
               </div>
             </>
           ) : (

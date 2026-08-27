@@ -134,16 +134,34 @@ export const EmptyState = ({ colSpan, message = "No records found." }) => (
   </tr>
 );
 
-// Table header cell
-export const TH = ({ children, center }) => (
-  <th className={`px-3 py-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-widest border-b border-slate-200 whitespace-nowrap ${center ? "text-center" : "text-left"}`}>
-    {children}
+// Table header cell — pass `sortable` + `sortDir` ("asc" | "desc" | null) + `onSort`
+// to make a column clickable for ascending/descending sort. `wrap` lets long
+// header labels wrap instead of forcing the column wider. `dense` tightens
+// padding for tables with many columns that need to fit on one screen.
+import { ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+export const TH = ({ children, center, wrap, sortable, sortDir, onSort, dense, rowSpan }) => (
+  <th
+    onClick={sortable ? onSort : undefined}
+    rowSpan={rowSpan}
+    className={`${dense ? "px-1 py-1.5" : "px-3 py-2.5"} text-[10px] font-semibold text-slate-500 uppercase tracking-widest border-b border-slate-200 overflow-hidden ${wrap ? "whitespace-normal break-words" : "whitespace-nowrap"} ${center ? "text-center" : "text-left"} ${sortable ? "cursor-pointer select-none hover:text-slate-700 transition-colors" : ""}`}
+  >
+    <span className={dense ? "flex flex-col items-center gap-0.5" : `inline-flex items-center gap-1 ${center ? "justify-center" : ""}`}>
+      {children}
+      {sortable &&
+        (sortDir === "asc" ? (
+          <ArrowUp className="w-3 h-3 text-blue-600" />
+        ) : sortDir === "desc" ? (
+          <ArrowDown className="w-3 h-3 text-blue-600" />
+        ) : (
+          <ArrowUpDown className="w-3 h-3 opacity-30" />
+        ))}
+    </span>
   </th>
 );
 
 // Table data cell
-export const TD = ({ children, mono, center, cls = "" }) => (
-  <td className={`px-3 py-2.5 border-b border-slate-100 text-xs ${mono ? "font-mono" : ""} ${center ? "text-center" : ""} ${cls}`}>
+export const TD = ({ children, mono, center, cls = "", dense }) => (
+  <td className={`${dense ? "px-1.5 py-2" : "px-3 py-2.5"} border-b border-slate-100 text-xs ${mono ? "font-mono" : ""} ${center ? "text-center" : ""} ${cls}`}>
     {children}
   </td>
 );
