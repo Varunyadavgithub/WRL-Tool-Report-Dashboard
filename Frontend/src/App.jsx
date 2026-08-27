@@ -11,6 +11,7 @@ const Home       = lazy(() => import("./pages/Home"));
 const NotFound   = lazy(() => import("./pages/NotFound"));
 const Monitoring = lazy(() => import("./pages/Display/Monitoring"));
 const Settings   = lazy(() => import("./pages/Settings/Settings"));
+const MailServerConfig = lazy(() => import("./pages/Settings/MailServerConfig"));
 
 // ── Seed permissions from routeConfig on first ever load ─────────────────────
 // This runs once. After that, the stored permissions are used.
@@ -51,6 +52,7 @@ function App() {
 
             {/* Settings — always registered, guarded inside the component */}
             <Route path="/settings" element={<Settings />} />
+            <Route path="/settings/mail-server" element={<MailServerConfig />} />
 
             {/* Dynamic role-based routes */}
             {accessibleRoutes.map((route) => (

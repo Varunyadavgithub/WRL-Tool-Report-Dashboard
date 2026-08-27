@@ -320,13 +320,6 @@ const HourlyReport = () => {
     fetchAllData(start, end, setTodayLoading);
   }, [fetchAllData]);
 
-  // Default to Today's data on first load instead of sitting empty until a
-  // quick filter is clicked.
-  useEffect(() => {
-    handleToday();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   useEffect(() => {
     if (!autoRefresh) return;
     const interval = setInterval(handleQuery, 300_000);

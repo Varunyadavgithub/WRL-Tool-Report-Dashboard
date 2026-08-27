@@ -2,11 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import {
   FileText, Layers, CheckCircle, Clock, RefreshCw,
   Zap, Settings2, ShieldCheck, AlertTriangle, Pencil, FileUp, CloudUpload as CloudUploadIcon,
-<<<<<<< HEAD
-  CalendarClock, FileStack, Archive,
-=======
   CalendarClock, FileStack, Archive, UserCheck,
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
@@ -19,17 +15,11 @@ import BISComplianceTab from "./BISComplianceTab";
 import BISEnergyTab from "./BISEnergyTab";
 import BISConfigTab from "./BISConfigTab";
 import BISTestScheduleTab from "./BISTestScheduleTab";
-<<<<<<< HEAD
-
-const TABS = [
-  { key: "testReports", label: "Test Reports", icon: FileStack },
-=======
 import BISApprovalQueue from "./BISApprovalQueue";
 
 const TABS = [
   { key: "testReports", label: "Test Reports", icon: FileStack },
   { key: "approvals", label: "Approvals", icon: UserCheck },
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   { key: "schedule", label: "Test Schedule", icon: CalendarClock },
   { key: "reports", label: "Legacy PDF Reports (Archive)", icon: Archive },
   { key: "compliance", label: "Compliance Status", icon: ShieldCheck },
@@ -85,14 +75,11 @@ const BISDashboard = () => {
   const [categoryToDelete, setCategoryToDelete] = useState(null);
   const [showOverrideSection, setShowOverrideSection] = useState(false);
 
-<<<<<<< HEAD
-=======
   // ── BIS Approval Flow (Preparer/Reviewer/Authorizer assignment + signatures) ──
   const [approvalFlow, setApprovalFlow] = useState(null);
   const [approvalFlowLoading, setApprovalFlowLoading] = useState(false);
   const [approvalUsers, setApprovalUsers] = useState([]);
 
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   // ── BIS Test Schedule (frequency config + computed schedule) ──────────────
   const [testConfig, setTestConfig] = useState(null);
   const [testConfigLoading, setTestConfigLoading] = useState(false);
@@ -150,8 +137,6 @@ const BISDashboard = () => {
   };
   useEffect(() => { fetchBisCategories(); }, []);
 
-<<<<<<< HEAD
-=======
   // ── BIS Approval Flow API ───────────────────────────────────────────────
   const fetchApprovalFlow = async () => {
     try {
@@ -198,7 +183,6 @@ const BISDashboard = () => {
     }
   };
 
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
   const fetchType100Materials = async () => {
     try {
       const res = await axios.get(`${baseURL}quality/type100-materials`);
@@ -571,11 +555,8 @@ const BISDashboard = () => {
 
         {activeTab === "testReports" && <BISTestReportsTab />}
 
-<<<<<<< HEAD
-=======
         {activeTab === "approvals" && <BISApprovalQueue />}
 
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
         {activeTab === "reports" && (
           <BISReportsTab files={uploadedFiles} onEdit={handleUpdate} onDownload={handleDownload} onDelete={handleDeleteFile} onFetchData={handleFetchEnergyData} />
         )}
@@ -626,14 +607,11 @@ const BISDashboard = () => {
             testConfigLoading={testConfigLoading}
             onSaveTestConfig={saveTestConfig}
             onInlineUpdateOverrides={saveCategoryOverridesInline}
-<<<<<<< HEAD
-=======
             approvalFlow={approvalFlow}
             approvalFlowLoading={approvalFlowLoading}
             approvalUsers={approvalUsers}
             onSaveApprovalFlow={saveApprovalFlow}
             onUploadApprovalSignature={uploadApprovalSignature}
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
           />
         )}
       </div>

@@ -52,6 +52,7 @@ import { useGetModelVariantsByAssemblyQuery } from "../../../redux/api/commonApi
 import toast from "react-hot-toast";
 import { getCurrentShift } from "../../../utils/shiftUtils.js";
 import { formatDuration } from "../../../utils/dateUtils.js";
+import { canUseGetUserMedia } from "../../../utils/mediaCapture.js";
 import { baseURL } from "../../../assets/assets.js";
 import { ROLES } from "../../../config/routes.config";
 
@@ -234,9 +235,6 @@ const AutoSaveIndicator = ({ status }) => {
     </div>
   );
 };
-
-const canUseGetUserMedia = () =>
-  window.isSecureContext && !!navigator.mediaDevices?.getUserMedia;
 
 const ImageZone = ({ onFile, uploadRef }) => {
   const [open, setOpen]         = useState(false);

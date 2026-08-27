@@ -204,7 +204,6 @@ WRL-Tool-Report-Dashboard/
 │   │   │   ├── gateEntry.controller.js
 │   │   │   ├── performanceReport.controller.js
 │   │   └── planing/
-│   │   │   ├── dailyPlan.controller.js
 │   │   │   ├── productionPlaning.controller.js
 │   │   └── production/
 │   │   │   ├── componentDetails.controller.js
@@ -383,7 +382,6 @@ WRL-Tool-Report-Dashboard/
 │   │   │   ├── PerformanceDisplays/
 │   │   │   │   └── LogisticsDisplay.jsx
 │   │   │   ├── Planing/
-│   │   │   │   └── DailyPlan.jsx
 │   │   │   │   └── ProductionPlaning.jsx
 │   │   │   ├── Production/
 │   │   │   │   └── ComponentDetails.jsx

@@ -228,11 +228,7 @@ const BISIntroductionReportForm = ({ initialData, prefillHeader, models, onSave,
           <Save className="w-3.5 h-3.5" /> Save Draft
         </button>
         <button type="button" onClick={() => handleSubmit("Final")} disabled={saving} className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 transition-all disabled:opacity-50">
-<<<<<<< HEAD
-          <Send className="w-3.5 h-3.5" /> {saving ? "Saving…" : "Submit Final"}
-=======
           <Send className="w-3.5 h-3.5" /> {saving ? "Submitting…" : "Submit for Review"}
->>>>>>> 03ac1332bb57d4fc6436f1650f76f21cda4f0d61
         </button>
       </div>
     </div>

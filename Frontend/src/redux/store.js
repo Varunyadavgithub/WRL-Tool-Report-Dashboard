@@ -15,6 +15,7 @@ import { fpaReportApi } from "./api/fpaReportApi.js";
 import { partProcessApi } from "./api/partProcessApi.js";
 import { masterConfigApi } from "./api/masterConfigApi.js";
 import { chemicalApi } from "./api/chemicalApi.js";
+import { settingsApi } from "./api/settingsApi.js";
 
 import {
   persistReducer,
@@ -59,6 +60,7 @@ const persistConfig = {
     partProcessApi.reducerPath,
     masterConfigApi.reducerPath,
     chemicalApi.reducerPath,
+    settingsApi.reducerPath,
   ],
 };
 
@@ -80,6 +82,7 @@ const rootReducer = combineReducers({
   [partProcessApi.reducerPath]: partProcessApi.reducer,
   [masterConfigApi.reducerPath]: masterConfigApi.reducer,
   [chemicalApi.reducerPath]: chemicalApi.reducer,
+  [settingsApi.reducerPath]: settingsApi.reducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
@@ -111,6 +114,7 @@ const store = configureStore({
       partProcessApi.middleware,
       masterConfigApi.middleware,
       chemicalApi.middleware,
+      settingsApi.middleware,
       authExpiryMiddleware,
     ),
 });
