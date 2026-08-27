@@ -160,9 +160,6 @@ const WIPCapture = lazy(() => import("../pages/Production/WIPCapture"));
 const MaterialConfig = lazy(
   () => import("../pages/IOT/MasterConfig/MaterialConfig"),
 );
-const CheckpointLibraryConfig = lazy(
-  () => import("../pages/IOT/MasterConfig/CheckpointLibraryConfig"),
-);
 const ShiftConfig = lazy(() => import("../pages/IOT/MasterConfig/ShiftConfig"));
 const DowntimeConfig = lazy(
   () => import("../pages/IOT/MasterConfig/DowntimeConfig"),
@@ -406,12 +403,6 @@ export const ROUTE_CONFIG = [
         path: "/master-config/material",
         label: "Material",
         component: MaterialConfig,
-        group: "config",
-      },
-      {
-        path: "/master-config/checkpoint-library",
-        label: "Checkpoint Library",
-        component: CheckpointLibraryConfig,
         group: "config",
       },
       {
