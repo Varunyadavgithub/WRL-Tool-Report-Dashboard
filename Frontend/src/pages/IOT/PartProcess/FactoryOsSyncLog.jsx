@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { CheckCircle2, CircleAlert, Clock3, RefreshCw, Database } from "lucide-react";
-import { PART_PROCESS_API } from "../../utils/factoryOsClient";
+import { PART_PROCESS_API } from "../../../utils/factoryOsClient";
 
 const stamp = (value) => value ? new Date(value).toLocaleString() : "—";
 

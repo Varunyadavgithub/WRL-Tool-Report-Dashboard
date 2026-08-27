@@ -12,12 +12,12 @@ import {
   inputCls, selectCls, Field, Modal,
   TableActions, PageHeader, EmptyState, TH, TD,
 } from "./_shared";
-import { selectMaterials, updateMaterial as updateMaterialSlice } from "../../redux/slices/masterConfigSlice";
+import { selectMaterials, updateMaterial as updateMaterialSlice } from "../../../redux/slices/masterConfigSlice";
 import {
   useAddMaterialMutation, useUpdateMaterialMutation, useDeleteMaterialMutation, useBulkAddMaterialsMutation,
   useUploadMaterialDrawingMutation, useDeleteMaterialDrawingMutation, useRecalculateActualCycleTimeMutation,
-} from "../../redux/api/masterConfigApi";
-import { fileBaseURL } from "../../assets/assets";
+} from "../../../redux/api/masterConfigApi";
+import { fileBaseURL } from "../../../assets/assets";
 
 // ─── Static options ────────────────────────────────────────────────────────────
 const CATEGORIES = ["ALUMINIUM","GP","GPSP","PC RED","PC WHITE","SS304 2B","SS304 HL","SS430 HL","SSS430 2B"];

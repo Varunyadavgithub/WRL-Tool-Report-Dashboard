@@ -10,11 +10,11 @@ import { inputCls, selectCls, Field, Modal, TableActions, PageHeader, EmptyState
 import {
   selectPlans, selectShifts, selectMachines, selectMaterials,
   selectMachineShiftAllocationHistory, selectShiftHistory, shiftPlannedProductionMins,
-} from "../../redux/slices/masterConfigSlice";
-import { resolveMachineShiftsAsOf, resolveShiftAsOf } from "../../utils/productionLogic";
+} from "../../../redux/slices/masterConfigSlice";
+import { resolveMachineShiftsAsOf, resolveShiftAsOf } from "../../../utils/productionLogic";
 import {
   useAddPlanMutation, useUpdatePlanMutation, useDeletePlanMutation, useBulkAddPlansMutation,
-} from "../../redux/api/masterConfigApi";
+} from "../../../redux/api/masterConfigApi";
 
 const PRIORITIES = ["High","Medium","Low"];
 

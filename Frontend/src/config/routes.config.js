@@ -85,11 +85,17 @@ const DispatchUnloading = lazy(
 const RemoveDispatchSerials = lazy(
   () => import("../pages/Logistic/Scanning/RemoveDispatchSerials"),
 );
-const FGCasting = lazy(() => import("../pages/Logistic/Reports/FGCastingReport"));
+const FGCasting = lazy(
+  () => import("../pages/Logistic/Reports/FGCastingReport"),
+);
 const GateEntry = lazy(() => import("../pages/Logistic/Scanning/GateEntry"));
 const ErrorLog = lazy(() => import("../pages/Logistic/Log/ErrorLog"));
-const FGUnloadingScan = lazy(() => import("../pages/Logistic/Scanning/FGUnloadingScan"));
-const FGDispatchScan = lazy(() => import("../pages/Logistic/Scanning/FGDispatchScan"));
+const FGUnloadingScan = lazy(
+  () => import("../pages/Logistic/Scanning/FGUnloadingScan"),
+);
+const FGDispatchScan = lazy(
+  () => import("../pages/Logistic/Scanning/FGDispatchScan"),
+);
 
 const ProductionPlaning = lazy(
   () => import("../pages/Planing/ProductionPlaning"),
@@ -150,52 +156,51 @@ const Management = lazy(() => import("../pages/Display/Management"));
 const WIPCapture = lazy(() => import("../pages/Production/WIPCapture"));
 
 // ── Master Config ─────────────────────────────────────────────────────────────
-const MasterConfigOverview = lazy(
-  () => import("../pages/MasterConfig/Overview"),
-);
 const MaterialConfig = lazy(
-  () => import("../pages/MasterConfig/MaterialConfig"),
+  () => import("../pages/IOT/MasterConfig/MaterialConfig"),
 );
-const CheckpointLibraryConfig = lazy(
-  () => import("../pages/MasterConfig/CheckpointLibraryConfig"),
-);
-const ShiftConfig = lazy(() => import("../pages/MasterConfig/ShiftConfig"));
+const ShiftConfig = lazy(() => import("../pages/IOT/MasterConfig/ShiftConfig"));
 const DowntimeConfig = lazy(
-  () => import("../pages/MasterConfig/DowntimeConfig"),
+  () => import("../pages/IOT/MasterConfig/DowntimeConfig"),
 );
-const QualityConfig = lazy(() => import("../pages/MasterConfig/QualityConfig"));
-const MachineConfig = lazy(() => import("../pages/MasterConfig/MachineConfig"));
+const QualityConfig = lazy(
+  () => import("../pages/IOT/MasterConfig/QualityConfig"),
+);
+const MachineConfig = lazy(
+  () => import("../pages/IOT/MasterConfig/MachineConfig"),
+);
 const PlanningConfig = lazy(
-  () => import("../pages/MasterConfig/PlanningConfig"),
+  () => import("../pages/IOT/MasterConfig/PlanningConfig"),
 );
-const MailConfig = lazy(() => import("../pages/MasterConfig/MailConfig"));
-const AuditTrail = lazy(() => import("../pages/MasterConfig/AuditTrail"));
+const MailConfig = lazy(() => import("../pages/IOT/MasterConfig/MailConfig"));
 
 // ── Part Process ──────────────────────────────────────────────────────────────
-const PartProcessOverview = lazy(() => import("../pages/PartProcess/Overview"));
+const PartProcessOverview = lazy(
+  () => import("../pages/IOT/PartProcess/Overview"),
+);
 const PartProcessDashboard = lazy(
-  () => import("../pages/PartProcess/Dashboard"),
+  () => import("../pages/IOT/PartProcess/Dashboard"),
 );
 const PartProcessProductionReport = lazy(
-  () => import("../pages/PartProcess/ProductionReport"),
+  () => import("../pages/IOT/PartProcess/ProductionReport"),
 );
 const PartProcessHourlyReport = lazy(
-  () => import("../pages/PartProcess/HourlyReport"),
+  () => import("../pages/IOT/PartProcess/HourlyReport"),
 );
 const PartProcessQualityReport = lazy(
-  () => import("../pages/PartProcess/QualityReport"),
+  () => import("../pages/IOT/PartProcess/QualityReport"),
 );
 const PartProcessDowntimeReport = lazy(
-  () => import("../pages/PartProcess/DowntimeReport"),
+  () => import("../pages/IOT/PartProcess/DowntimeReport"),
 );
 const FactoryMonitor = lazy(
-  () => import("../pages/PartProcess/FactoryMonitor"),
+  () => import("../pages/IOT/PartProcess/FactoryMonitor"),
 );
 const FactoryOsSyncLog = lazy(
-  () => import("../pages/PartProcess/FactoryOsSyncLog"),
+  () => import("../pages/IOT/PartProcess/FactoryOsSyncLog"),
 );
 const PartProcessOEEReport = lazy(
-  () => import("../pages/PartProcess/OEEReport"),
+  () => import("../pages/IOT/PartProcess/OEEReport"),
 );
 
 // ── Vision Report ─────────────────────────────────────────────────────────
@@ -383,33 +388,15 @@ export const ROUTE_CONFIG = [
     ],
     items: [
       {
-        path: "/master-config/overview",
-        label: "Overview",
-        component: MasterConfigOverview,
-        group: "admin",
-      },
-      {
         path: "/master-config/mail",
         label: "Mail & Notifications",
         component: MailConfig,
         group: "admin",
       },
       {
-        path: "/master-config/audit",
-        label: "Audit Trail",
-        component: AuditTrail,
-        group: "admin",
-      },
-      {
         path: "/master-config/material",
         label: "Material",
         component: MaterialConfig,
-        group: "config",
-      },
-      {
-        path: "/master-config/checkpoint-library",
-        label: "Checkpoint Library",
-        component: CheckpointLibraryConfig,
         group: "config",
       },
       {

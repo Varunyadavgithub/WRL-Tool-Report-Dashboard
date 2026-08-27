@@ -16,7 +16,7 @@ import {
   PackageOpen, AlertTriangle, TimerOff, ArrowRightLeft, Search, BarChart3,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { shiftPlannedProductionMins } from "../../redux/slices/masterConfigSlice";
+import { shiftPlannedProductionMins } from "../../../redux/slices/masterConfigSlice";
 import { usePartProcessOEE, computeOEE, parseDurSecs } from "./usePartProcessOEE";
 import { detectChangeovers, changeoverStats, resolveShiftAsOf } from "../../utils/productionLogic.js";
 import { getLastNDaysRange } from "../../utils/dateUtils.js";

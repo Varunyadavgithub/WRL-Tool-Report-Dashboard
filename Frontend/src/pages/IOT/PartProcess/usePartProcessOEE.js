@@ -4,12 +4,12 @@ import toast from "react-hot-toast";
 import {
   selectMaterials, selectShifts, selectShiftHistory, getMaterialByModel,
   isActiveShift, shiftElapsedMins, shiftDurationMins, shiftPlannedProductionMins, toMins as sliceToMins,
-} from "../../redux/slices/masterConfigSlice";
+} from "../../../redux/slices/masterConfigSlice.js";
 import axios from "axios";
-import { mapDbRecord } from "../../utils/mapDbRecord.js";
-import { PART_PROCESS_API } from "../../utils/factoryOsClient";
-import { enrichRecords, detectChangeovers, changeoverStats, isPunchingPart, resolveShiftAsOf, mergedDurationMins } from "../../utils/productionLogic.js";
-import { getTodayRange, getYesterdayRange, formatDateTimeLocal } from "../../utils/dateUtils.js";
+import { mapDbRecord } from "../../../utils/mapDbRecord.js";
+import { PART_PROCESS_API } from "../../../utils/factoryOsClient.js";
+import { enrichRecords, detectChangeovers, changeoverStats, isPunchingPart, resolveShiftAsOf, mergedDurationMins } from "../../../utils/productionLogic.js";
+import { getTodayRange, getYesterdayRange, formatDateTimeLocal } from "../../../utils/dateUtils.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PURE HELPERS  (shared between the Part Process Overview card and Dashboard)

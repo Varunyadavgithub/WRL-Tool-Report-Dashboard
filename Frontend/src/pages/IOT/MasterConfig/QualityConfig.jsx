@@ -3,8 +3,8 @@ import { useSelector, useDispatch } from "react-redux";
 import { ShieldCheck, Lock, Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
 import { inputCls, selectCls, Field, StatusBadge, Modal, TableActions, PageHeader, EmptyState, TH, TD } from "./_shared";
-import { selectQualityDefects, selectQualityPassword, setQualityPassword } from "../../redux/slices/masterConfigSlice";
-import { useAddQualityDefectMutation, useUpdateQualityDefectMutation, useDeleteQualityDefectMutation } from "../../redux/api/masterConfigApi";
+import { selectQualityDefects, selectQualityPassword, setQualityPassword } from "../../../redux/slices/masterConfigSlice";
+import { useAddQualityDefectMutation, useUpdateQualityDefectMutation, useDeleteQualityDefectMutation } from "../../../redux/api/masterConfigApi";
 
 const DEF_CATS = ["Dimensional","Surface Finish","Assembly","Material","Process","Cosmetic","Functional","Documentation"];
 const SEVERITIES = ["Critical","Major","Minor","Observation"];
