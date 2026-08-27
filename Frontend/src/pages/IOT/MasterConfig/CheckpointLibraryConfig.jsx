@@ -3,12 +3,12 @@ import { useSelector } from "react-redux";
 import { ListChecks } from "lucide-react";
 import toast from "react-hot-toast";
 import { inputCls, selectCls, Field, StatusBadge, Modal, TableActions, PageHeader, EmptyState, TH, TD } from "./_shared";
-import { selectCheckpointLibrary } from "../../redux/slices/masterConfigSlice";
+import { selectCheckpointLibrary } from "../../../redux/slices/masterConfigSlice";
 import {
   useAddCheckpointLibraryEntryMutation,
   useUpdateCheckpointLibraryEntryMutation,
   useDeleteCheckpointLibraryEntryMutation,
-} from "../../redux/api/masterConfigApi";
+} from "../../../redux/api/masterConfigApi";
 
 const CATEGORIES = ["", "process", "quality", "safety", "other"];
 const INIT = { checkPoint: "", method: "", specification: "", category: "", required: false, status: true };

@@ -17,11 +17,11 @@ import axios from "axios";
 import fosClient, {
   FACTORY_OS_BASE, FACTORY_MACHINE_ID,
   PART_PROCESS_API,
-} from "../../utils/factoryOsClient";
+} from "../../../utils/factoryOsClient";
 import {
   extractSapCode, extractProgramName, getMaterialByModel,
   selectMaterials,
-} from "../../redux/slices/masterConfigSlice";
+} from "../../../redux/slices/masterConfigSlice";
 
 // Re-export so Dashboard / ProductionReport can still import from this file
 export { FACTORY_OS_BASE, FACTORY_MACHINE_ID };

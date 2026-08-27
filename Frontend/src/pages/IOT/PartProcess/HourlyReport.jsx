@@ -5,23 +5,20 @@ import {
   Search, Calendar, Clock, Filter, Loader2, PackageOpen,
   BarChart2, List, AlertTriangle, CheckCircle2, FileSpreadsheet, FileText, ArrowLeft,
 } from "lucide-react";
-import DateTimePicker from "../../components/ui/DateTimePicker";
+import DateTimePicker from "../../../components/ui/DateTimePicker";
 import toast from "react-hot-toast";
-import { baseURL } from "../../assets/assets.js";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { mapDbRecord } from "../../utils/mapDbRecord.js";
-import { PART_PROCESS_API } from "../../utils/factoryOsClient";
-import { selectMaterials, selectShifts, getMaterialByModel, extractSapCode, toMins } from "../../redux/slices/masterConfigSlice";
-import { componentQtyFromMachine } from "../../utils/productionLogic.js";
-import { exportSectionsToExcel, exportMultiSectionPDF } from "../../utils/reportExport.js";
+import { mapDbRecord } from "../../../utils/mapDbRecord.js";
+import { PART_PROCESS_API } from "../../../utils/factoryOsClient";
+import { selectMaterials, selectShifts, getMaterialByModel, extractSapCode, toMins } from "../../../redux/slices/masterConfigSlice";
+import { componentQtyFromMachine } from "../../../utils/productionLogic.js";
+import { exportSectionsToExcel, exportMultiSectionPDF } from "../../../utils/reportExport.js";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 const pad = (n) => (n < 10 ? "0" + n : n);
-const fmtDate = (d) =>
-  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
 const extractHHMM = (t) => { if (!t) return null; const s = String(t); if (s.includes("T")) return s.split("T")[1].substring(0,5); if (s.length > 10 && s.includes(" ")) return s.split(" ")[1].substring(0,5); return s.substring(0,5); };

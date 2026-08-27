@@ -3,9 +3,9 @@ import { useSelector } from "react-redux";
 import { Mail } from "lucide-react";
 import toast from "react-hot-toast";
 import { inputCls, selectCls, Field, StatusBadge, Modal, TableActions, PageHeader, EmptyState, TH, TD } from "./_shared";
-import DateTimePicker from "../../components/ui/DateTimePicker";
-import { selectMailSubscribers } from "../../redux/slices/masterConfigSlice";
-import { useAddMailSubscriberMutation, useUpdateMailSubscriberMutation, useDeleteMailSubscriberMutation, useTestMailSubscriberMutation } from "../../redux/api/masterConfigApi";
+import DateTimePicker from "../../../components/ui/DateTimePicker";
+import { selectMailSubscribers } from "../../../redux/slices/masterConfigSlice";
+import { useAddMailSubscriberMutation, useUpdateMailSubscriberMutation, useDeleteMailSubscriberMutation, useTestMailSubscriberMutation } from "../../../redux/api/masterConfigApi";
 
 const DEPTS       = ["Production","Quality","Maintenance","Operations","Store","HR","Logistics","Manufacturing Engineering"];
 const FREQUENCIES = ["Hourly","Shift-wise","Daily","Weekly","Monthly"];

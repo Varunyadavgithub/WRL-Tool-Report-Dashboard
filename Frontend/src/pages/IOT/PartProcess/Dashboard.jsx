@@ -51,7 +51,7 @@ import {
   toMins as sliceToMins,
   selectMachines,
   selectPlans,
-} from "../../redux/slices/masterConfigSlice";
+} from "../../../redux/slices/masterConfigSlice";
 import {
   TimerOff,
   ShieldCheck,

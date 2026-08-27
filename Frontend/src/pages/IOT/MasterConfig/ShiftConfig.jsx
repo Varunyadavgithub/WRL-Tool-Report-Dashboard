@@ -8,14 +8,14 @@ import {
   selectShifts, selectShiftHistory, selectMachines,
   selectMachineShiftAllocations, selectMachineShiftAllocationHistory,
   shiftDurationMins,
-} from "../../redux/slices/masterConfigSlice";
+} from "../../../redux/slices/masterConfigSlice";
 import {
   useAddShiftMutation, useUpdateShiftMutation, useDeleteShiftMutation,
   useSetMachineShiftAllocationsMutation,
-} from "../../redux/api/masterConfigApi";
-import { resolveShiftAsOf, resolveMachineShiftsAsOf, enrichRecords, parseDurSecs } from "../../utils/productionLogic.js";
-import { mapDbRecord } from "../../utils/mapDbRecord.js";
-import { PART_PROCESS_API } from "../../utils/factoryOsClient";
+} from "../../../redux/api/masterConfigApi";
+import { resolveShiftAsOf, resolveMachineShiftsAsOf, enrichRecords, parseDurSecs } from "../../../utils/productionLogic.js";
+import { mapDbRecord } from "../../../utils/mapDbRecord.js";
+import { PART_PROCESS_API } from "../../../utils/factoryOsClient";
 
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const INIT = { shiftName:"", shiftCode:"", startTime:"08:00", endTime:"16:00", breakStart:"12:00", breakEnd:"12:30", teaBreaks:"2", overtimeShift:false, weeklyOff:["Sunday"], color:"#3b82f6", status:true };

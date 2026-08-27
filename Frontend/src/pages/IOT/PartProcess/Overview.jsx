@@ -7,8 +7,8 @@ import {
   Wifi, WifiOff, Gauge, X,
 } from "lucide-react";
 import { usePartProcessOEE, oeeColor, p2 } from "./usePartProcessOEE";
-import { isActiveShift, selectMachines } from "../../redux/slices/masterConfigSlice";
-import { fileBaseURL } from "../../assets/assets";
+import { isActiveShift, selectMachines } from "../../../redux/slices/masterConfigSlice";
+import { fileBaseURL } from "../../../assets/assets";
 
 const RingProgress = ({ value, max, size = 84, stroke = 8, color = "#3b82f6" }) => {
   const r = (size - stroke * 2) / 2;

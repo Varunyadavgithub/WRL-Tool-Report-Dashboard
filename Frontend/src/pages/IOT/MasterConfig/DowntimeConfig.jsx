@@ -3,11 +3,11 @@ import { useSelector } from "react-redux";
 import { TimerOff, Building2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { inputCls, selectCls, Field, StatusBadge, Modal, TableActions, PageHeader, EmptyState, TH, TD } from "./_shared";
-import { selectDowntimeReasons, selectDepartments } from "../../redux/slices/masterConfigSlice";
+import { selectDowntimeReasons, selectDepartments } from "../../../redux/slices/masterConfigSlice";
 import {
   useAddDowntimeReasonMutation, useUpdateDowntimeReasonMutation, useDeleteDowntimeReasonMutation,
   useAddDepartmentMutation, useUpdateDepartmentMutation, useDeleteDepartmentMutation,
-} from "../../redux/api/masterConfigApi";
+} from "../../../redux/api/masterConfigApi";
 
 const INIT = { dtCode:"", reason:"", department:"", status:true };
 const DEPT_INIT = { name:"" };

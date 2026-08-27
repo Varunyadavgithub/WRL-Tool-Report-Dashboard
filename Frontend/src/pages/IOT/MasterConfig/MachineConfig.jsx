@@ -3,9 +3,9 @@ import { useSelector } from "react-redux";
 import { Cpu, Wifi, WifiOff, Camera } from "lucide-react";
 import toast from "react-hot-toast";
 import { inputCls, selectCls, Field, StatusBadge, Modal, TableActions, PageHeader, EmptyState, TH, TD } from "./_shared";
-import { selectMachines } from "../../redux/slices/masterConfigSlice";
-import { useAddMachineMutation, useUpdateMachineMutation, useDeleteMachineMutation, useUploadMachineImageMutation } from "../../redux/api/masterConfigApi";
-import { fileBaseURL } from "../../assets/assets";
+import { selectMachines } from "../../../redux/slices/masterConfigSlice";
+import { useAddMachineMutation, useUpdateMachineMutation, useDeleteMachineMutation, useUploadMachineImageMutation } from "../../../redux/api/masterConfigApi";
+import { fileBaseURL } from "../../../assets/assets";
 
 const CONTROLLERS = ["FANUC","Siemens","Mitsubishi","Allen Bradley","Beckhoff","Delta","Omron","Custom PLC","Other"];
 const DEPARTMENTS  = ["PART PROCESS"];
