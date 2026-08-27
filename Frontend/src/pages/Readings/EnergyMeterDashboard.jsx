@@ -27,7 +27,7 @@ import { baseURL } from "../../assets/assets";
 import {
   inputCls, selectCls, Field, StatusBadge, Modal, TableActions,
   PageHeader, EmptyState, TH, TD,
-} from "../MasterConfig/_shared";
+} from "../IOT/MasterConfig/_shared";
 import DateTimePicker from "../../components/ui/DateTimePicker";
 import { getTodayRange, getYesterdayRange, getMTDRange, formatDateTimeLocal } from "../../utils/dateUtils";
 

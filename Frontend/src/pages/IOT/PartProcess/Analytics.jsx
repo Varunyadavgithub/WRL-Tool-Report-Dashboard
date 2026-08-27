@@ -18,8 +18,8 @@ import {
 import toast from "react-hot-toast";
 import { shiftPlannedProductionMins } from "../../../redux/slices/masterConfigSlice";
 import { usePartProcessOEE, computeOEE, parseDurSecs } from "./usePartProcessOEE";
-import { detectChangeovers, changeoverStats, resolveShiftAsOf } from "../../utils/productionLogic.js";
-import { getLastNDaysRange } from "../../utils/dateUtils.js";
+import { detectChangeovers, changeoverStats, resolveShiftAsOf } from "../../../utils/productionLogic.js";
+import { getLastNDaysRange } from "../../../utils/dateUtils.js";
 
 ChartJS.register(BarElement, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, Filler);
 
@@ -85,12 +85,12 @@ const PartProcessAnalytics = () => {
     rangeStart, rangeEnd, applyRange, loadForRange,
   } = usePartProcessOEE();
 
-  const [preset, setPreset] = useState("7d");
+  const [preset, setPreset] = useState(null);
   const [caFrom, setCaFrom] = useState("");
   const [caTo, setCaTo] = useState("");
 
   useEffect(() => {
-    if (preset === "custom") return;
+    if (!preset || preset === "custom") return;
     const r = getLastNDaysRange(preset === "30d" ? 30 : 7);
     applyRange("custom", r.startDate, r.endDate);
     // eslint-disable-next-line react-hooks/exhaustive-deps

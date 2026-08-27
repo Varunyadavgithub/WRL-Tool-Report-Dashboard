@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Droplets, Send } from "lucide-react";
 import toast from "react-hot-toast";
-import { inputCls, Field, StatusBadge, Modal, TableActions, PageHeader, EmptyState, TH, TD } from "../MasterConfig/_shared";
+import { inputCls, Field, StatusBadge, Modal, TableActions, PageHeader, EmptyState, TH, TD } from "../IOT/MasterConfig/_shared";
 import {
   useGetChemBulkStorageRecipientsQuery,
   useAddChemBulkStorageRecipientMutation,
