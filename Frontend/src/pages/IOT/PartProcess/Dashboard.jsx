@@ -32,10 +32,10 @@ import {
   FileText,
 } from "lucide-react";
 import axios from "axios";
-import { fileBaseURL } from "../../assets/assets.js";
+import { fileBaseURL } from "../../../assets/assets.js";
 import toast from "react-hot-toast";
-import { PART_PROCESS_API } from "../../utils/factoryOsClient";
-import { istToUtcMs } from "../../utils/dateUtils.js";
+import { PART_PROCESS_API } from "../../../utils/factoryOsClient";
+import { istToUtcMs } from "../../../utils/dateUtils.js";
 import {
   selectDowntimeReasons,
   selectQualityDefects,
@@ -67,7 +67,7 @@ import {
   IDLE_THRESHOLD_MINS,
   STD_CHANGEOVER_MINS,
   resolveShiftAsOf,
-} from "../../utils/productionLogic.js";
+} from "../../../utils/productionLogic.js";
 import {
   usePartProcessOEE,
   p2,
