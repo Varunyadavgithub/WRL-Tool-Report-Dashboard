@@ -5,9 +5,9 @@ import {
 } from "chart.js";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { baseURL } from "../../assets/assets.js";
-import { CATEGORY_MAPPINGS } from "../../utils/mapCategories.js";
-import HourlyWidget from "../../components/lineHourly/HourlyWidget.jsx";
+import { baseURL } from "../../../assets/assets.js";
+import { CATEGORY_MAPPINGS } from "../../../utils/mapCategories.js";
+import HourlyWidget from "../../../components/lineHourly/HourlyWidget.jsx";
 import {
   Factory, Truck, Settings, Search, Download, Calendar, History,
   Gauge, Loader2, RefreshCw, Zap, Wind, Eye, Layers, Thermometer,

@@ -1,4 +1,3 @@
-import EmptyState from "../../../../components/ui/EmptyState";
 import { CheckCircle, AlertTriangle, Clock, Wrench, PackageOpen } from "lucide-react";
 
 function StatusBadge({ status }) {

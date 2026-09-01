@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { List, Clock, PackageOpen } from "lucide-react";
-import EmptyState from "../../../../components/ui/EmptyState";
 
 function ActivityBadge({ type }) {
   const styles = {

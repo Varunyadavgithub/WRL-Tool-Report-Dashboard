@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { baseURL } from "../../assets/assets";
+import { baseURL } from "../../../assets/assets.js";
 import {
   useGetModelVariantsQuery,
   useGetComponentTypesQuery,
-} from "../../redux/api/commonApi.js";
-import SelectField from "../../components/ui/SelectField";
-import DateTimePicker from "../../components/ui/DateTimePicker";
-import Loader from "../../components/ui/Loader";
-import ExportButton from "../../components/ui/ExportButton";
+} from "../../../redux/api/commonApi.js";
+import SelectField from "../../../components/ui/SelectField.jsx";
+import DateTimePicker from "../../../components/ui/DateTimePicker.jsx";
+import Loader from "../../../components/ui/Loader.jsx";
+import ExportButton from "../../../components/ui/ExportButton.jsx";
 import {
   Search,
   X,
@@ -416,7 +416,7 @@ const GroupPanel = ({ rows, groupBy, onGroupByChange }) => {
 };
 
 /* ═══════════════════════ MAIN COMPONENT ═══════════════════════ */
-const ComponentTraceabilityReport = () => {
+const ComponentTraceability = () => {
   /* filters */
   const [selectedModelVariant, setSelectedModelVariant] = useState(null);
   const [selectedCompType, setSelectedCompType] = useState(null);
@@ -1042,4 +1042,4 @@ const ComponentTraceabilityReport = () => {
   );
 };
 
-export default ComponentTraceabilityReport;
+export default ComponentTraceability;

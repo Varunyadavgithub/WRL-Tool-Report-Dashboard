@@ -1,9 +1,18 @@
 import express from "express";
 import { authenticate } from "../middlewares/auth.js";
 import {
-  componentTraceabilityExportData,
-  generateReport,
-} from "../controllers/production/componentTraceabilityReport.controller.js";
+  productionReportExportData,
+  fetchFGData,
+  fetchQuickFiltersData,
+} from "../controllers/production/ProductionReport.controller.js";
+import {
+  captureWIP,
+  getLatestWIPCaptures,
+} from "../controllers/production/wipcapture.controller.js";
+import {
+  getModelName,
+  modelNameUpdate,
+} from "../controllers/production/modelNameUpdate.controller.js";
 import {
   getHourlyCategoryCount,
   getHourlyModelCount,
@@ -31,6 +40,7 @@ import {
   getFinalHPVISI,
   getPostHPVISI,
 } from "../controllers/production/lineHourlyReport.controller.js";
+
 import {
   getFinalLoadingModelBreakdown,
   getFinalLoadingHPFrzModelBreakdown,
@@ -50,20 +60,7 @@ import {
   getFoamingHpFomAModelBreakdown,
   getFoamingHpFomBModelBreakdown,
 } from "../controllers/production/modelBreakdown.controller.js";
-import {
-  getModelName,
-  modelNameUpdate,
-} from "../controllers/production/modelNameUpdate.controller.js";
-import {
-  nfcReportExportData,
-  getNfcReoprts,
-  getQuickFiltersNfcReports,
-} from "../controllers/production/nfcReport.controller.js";
-import {
-  productionReportExportData,
-  fetchFGData,
-  fetchQuickFiltersData,
-} from "../controllers/production/ProductionReport.controller.js";
+
 import {
   getCurrentStageStatus,
   getHistoryCard,
@@ -74,6 +71,11 @@ import {
   getFunctionalTest,
   getSerialNumbers,
 } from "../controllers/production/consolidatedReport.controller.js";
+import {
+  nfcReportExportData,
+  getNfcReoprts,
+  getQuickFiltersNfcReports,
+} from "../controllers/production/nfcReport.controller.js";
 import {
   totalProductionExportData,
   getBarcodeDetails,
@@ -86,34 +88,55 @@ import {
   getStopLossSummary,
   getStopLossStations,
   getStopLossLive,
-  getStopLossToday, // ← new
-  getStopLossYesterday, // ← new
-  getStopLossMTD, // ← new
+  getStopLossToday,
+  getStopLossYesterday,
+  getStopLossMTD,
 } from "../controllers/production/stopLoss.controller.js";
-//import { getManpower, getManpowerHourly } from "../controllers/production/manpower.controller.js";
-//import { getManpowerReport } from "../controllers/production/getManPowerReport.controller.js";
 import {
-  captureWIP,
-  getLatestWIPCaptures,
-} from "../controllers/production/wipcapture.controller.js";
+  componentTraceabilityExportData,
+  generateReport,
+} from "../controllers/production/componentTraceabilityReport.controller.js";
+import {
+  getFoamingBarcodeSummary,
+  FoamingBarcodeSummaryExportData,
+  getFoamingBarcodeSummarySummary,
+} from "../controllers/production/traceability/barcode.controller.js";
 
 const router = express.Router();
 
-// -----------------> Component Details
-router.get("/component-details", authenticate, getComponentDetails);
-// -----------------> Component Traceability
-router.get("/component-traceability", authenticate, generateReport);
-router.get("/export-component-traceability", authenticate, componentTraceabilityExportData);
+// -----------------> Production Report
+router.get("/fgdata", authenticate, fetchFGData);
+router.get(
+  "/export-production-report",
+  authenticate,
+  productionReportExportData,
+);
+router.get("/yday-fgdata", authenticate, fetchQuickFiltersData);
+router.get("/today-fgdata", authenticate, fetchQuickFiltersData);
+router.get("/month-fgdata", authenticate, fetchQuickFiltersData);
+
+// -----------------> WIP Capture
+router.post("/wip-capture", authenticate, captureWIP);
+router.get("/wip-latest", authenticate, getLatestWIPCaptures);
+
+// -----------------> Model Name Update
+router.get("/get-model-name", authenticate, getModelName);
+router.put("/update-model-name", authenticate, modelNameUpdate);
+
 // -----------------> Hourly Report
 router.get("/hourly-summary", authenticate, getHourlySummary);
 router.get("/hourly-model-count", authenticate, getHourlyModelCount);
 router.get("/hourly-category-count", authenticate, getHourlyCategoryCount);
+
 // -----------------> Line Hourly Report
-// Final Loading Routes
 router.get("/final-loading-hp-frz", authenticate, getFinalLoadingHPFrz);
 router.get("/final-loading-hp-choc", authenticate, getFinalLoadingHPChoc);
 router.get("/final-loading-hp-sus", authenticate, getFinalLoadingHPSUS);
 router.get("/final-loading-hp-cat", authenticate, getFinalLoadingHPCAT);
+
+// -----------------> Line Wise Report
+// Component Details
+router.get("/component-details", authenticate, getComponentDetails);
 
 // Final Line Routes
 router.get("/final-hp-frz", authenticate, getFinalHPFrz);
@@ -139,52 +162,28 @@ router.get("/visi-loading-hp", authenticate, getFinalLoadingHPVISI);
 router.get("/visi-final-hp", authenticate, getFinalHPVISI);
 router.get("/visi-post-hp", authenticate, getPostHPVISI);
 
-// -----------------> Model Name Update
-router.get("/get-model-name", authenticate, getModelName);
-router.put("/update-model-name", authenticate, modelNameUpdate);
-// -----------------> NFC Report
-router.get("/nfc-details", authenticate, getNfcReoprts);
-router.get("/export-nfc-report", authenticate, nfcReportExportData);
-router.get("/yday-nfc-report", authenticate, getQuickFiltersNfcReports);
-router.get("/today-nfc-report", authenticate, getQuickFiltersNfcReports);
-router.get("/month-nfc-report", authenticate, getQuickFiltersNfcReports);
-// -----------------> Production Report
-router.get("/fgdata", authenticate, fetchFGData);
-router.get("/export-production-report", authenticate, productionReportExportData);
-router.get("/yday-fgdata", authenticate, fetchQuickFiltersData);
-router.get("/today-fgdata", authenticate, fetchQuickFiltersData);
-router.get("/month-fgdata", authenticate, fetchQuickFiltersData);
-// -----------------> Consolidated Report
-router.get("/stage-history", authenticate, getCurrentStageStatus);
-router.get("/logistic-status", authenticate, getLogisticStatus);
-router.get("/history-card", authenticate, getHistoryCard);
-router.get("/rework-report", authenticate, getReworkReport);
-router.get("/reprint-history", authenticate, getReprintHistory);
-router.get("/component-details", authenticate, getComponentDetails);
-router.get("/functional-test", authenticate, getFunctionalTest);
-router.get("/serial-numbers", authenticate, getSerialNumbers);
-// -----------------> Total Production
-router.get("/barcode-details", authenticate, getBarcodeDetails);
-router.get("/export-total-production", authenticate, totalProductionExportData);
-router.get("/yday-total-production", authenticate, getQuickFiltersBarcodeDetails);
-router.get("/today-total-production", authenticate, getQuickFiltersBarcodeDetails);
-router.get("/month-total-production", authenticate, getQuickFiltersBarcodeDetails);
-// -----------------> Stop Loss Report
-router.get("/stop-loss/summary", authenticate, getStopLossSummary);
-router.get("/stop-loss/detail", authenticate, getStopLossDetail);
-router.get("/stop-loss/lines", authenticate, getStopLossLines);
-router.get("/stop-loss/locations", authenticate, getStopLossLocations);
-router.get("/stop-loss/stations", authenticate, getStopLossStations);
-router.get("/stop-loss/live", authenticate, getStopLossLive);
-router.get("/stop-loss/today", authenticate, getStopLossToday); // ← new
-router.get("/stop-loss/yesterday", authenticate, getStopLossYesterday); // ← new
-router.get("/stop-loss/mtd", authenticate, getStopLossMTD); // ← new
 // Final Loading — model breakdown
 router.get("/final-loading-model", authenticate, getFinalLoadingModelBreakdown);
-router.get("/final-loading-hp-frz-model", authenticate, getFinalLoadingHPFrzModelBreakdown);
-router.get("/final-loading-hp-choc-model", authenticate, getFinalLoadingHPChocModelBreakdown);
-router.get("/final-loading-hp-visi-model", authenticate, getFinalLoadingHPVISIModelBreakdown);
-router.get("/final-loading-hp-sus-model", authenticate, getFinalLoadingHPSUSModelBreakdown);
+router.get(
+  "/final-loading-hp-frz-model",
+  authenticate,
+  getFinalLoadingHPFrzModelBreakdown,
+);
+router.get(
+  "/final-loading-hp-choc-model",
+  authenticate,
+  getFinalLoadingHPChocModelBreakdown,
+);
+router.get(
+  "/final-loading-hp-visi-model",
+  authenticate,
+  getFinalLoadingHPVISIModelBreakdown,
+);
+router.get(
+  "/final-loading-hp-sus-model",
+  authenticate,
+  getFinalLoadingHPSUSModelBreakdown,
+);
 
 // Final Line — model breakdown
 router.get("/final-hp-frz-model", authenticate, getFinalHPFrzModelBreakdown);
@@ -201,16 +200,75 @@ router.get("/visi-post-hp-model", authenticate, getPostHPVISIModelBreakdown);
 router.get("/post-hp-sus-model", authenticate, getPostHPSUSModelBreakdown);
 
 // Foaming — model breakdown
-router.get("/Foaming-hp-fom-a-model", authenticate, getFoamingHpFomAModelBreakdown);
-router.get("/Foaming-hp-fom-b-model", authenticate, getFoamingHpFomBModelBreakdown);
+router.get(
+  "/Foaming-hp-fom-a-model",
+  authenticate,
+  getFoamingHpFomAModelBreakdown,
+);
+router.get(
+  "/Foaming-hp-fom-b-model",
+  authenticate,
+  getFoamingHpFomBModelBreakdown,
+);
 
-//router.get("/manpower", getManpower);
+// -----------------> Consolidated Report
+router.get("/stage-history", authenticate, getCurrentStageStatus);
+router.get("/logistic-status", authenticate, getLogisticStatus);
+router.get("/history-card", authenticate, getHistoryCard);
+router.get("/rework-report", authenticate, getReworkReport);
+router.get("/reprint-history", authenticate, getReprintHistory);
+router.get("/component-details", authenticate, getComponentDetails);
+router.get("/functional-test", authenticate, getFunctionalTest);
+router.get("/serial-numbers", authenticate, getSerialNumbers);
 
-// manpower
-//router.get("/manpower-report", getManpowerReport);
+// -----------------> NFC Report
+router.get("/nfc-details", authenticate, getNfcReoprts);
+router.get("/export-nfc-report", authenticate, nfcReportExportData);
+router.get("/yday-nfc-report", authenticate, getQuickFiltersNfcReports);
+router.get("/today-nfc-report", authenticate, getQuickFiltersNfcReports);
+router.get("/month-nfc-report", authenticate, getQuickFiltersNfcReports);
 
-// WIP Capture
-router.post("/wip-capture", authenticate, captureWIP);
-router.get("/wip-latest", authenticate, getLatestWIPCaptures);
+// -----------------> Total Production
+router.get("/barcode-details", authenticate, getBarcodeDetails);
+router.get("/export-total-production", authenticate, totalProductionExportData);
+router.get(
+  "/yday-total-production",
+  authenticate,
+  getQuickFiltersBarcodeDetails,
+);
+router.get(
+  "/today-total-production",
+  authenticate,
+  getQuickFiltersBarcodeDetails,
+);
+router.get(
+  "/month-total-production",
+  authenticate,
+  getQuickFiltersBarcodeDetails,
+);
+
+// -----------------> Stop Loss Report
+router.get("/stop-loss/summary", authenticate, getStopLossSummary);
+router.get("/stop-loss/detail", authenticate, getStopLossDetail);
+router.get("/stop-loss/lines", authenticate, getStopLossLines);
+router.get("/stop-loss/locations", authenticate, getStopLossLocations);
+router.get("/stop-loss/stations", authenticate, getStopLossStations);
+router.get("/stop-loss/live", authenticate, getStopLossLive);
+router.get("/stop-loss/today", authenticate, getStopLossToday); // ← new
+router.get("/stop-loss/yesterday", authenticate, getStopLossYesterday); // ← new
+router.get("/stop-loss/mtd", authenticate, getStopLossMTD); // ← new
+
+// -----------------> Component Traceability
+router.get("/component-traceability", authenticate, generateReport);
+router.get(
+  "/export-component-traceability",
+  authenticate,
+  componentTraceabilityExportData,
+);
+
+// -----------------> Barcode (Foaming)
+router.get("/foaming-barcode-summary", getFoamingBarcodeSummary);
+router.get("/export-foaming-barcode-summary", FoamingBarcodeSummaryExportData);
+router.get("/foaming-barcode-summary-summary", getFoamingBarcodeSummarySummary);
 
 export default router;

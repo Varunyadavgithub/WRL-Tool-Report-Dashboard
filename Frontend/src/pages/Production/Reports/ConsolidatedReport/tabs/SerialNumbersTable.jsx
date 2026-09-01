@@ -11,7 +11,7 @@ import {
   Zap,
   Hash,
 } from "lucide-react";
-import EmptyState from "../../../../components/ui/EmptyState";
+import EmptyState from "../../../../../components/ui/EmptyState";
 
 // ── Classify a barcode ─────────────────────────────────────────────────────────
 function classifySerial(barcode) {

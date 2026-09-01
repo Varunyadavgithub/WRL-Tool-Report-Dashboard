@@ -1,5 +1,5 @@
 import { useState } from "react";
-import EmptyState from "../../../../components/ui/EmptyState";
+import EmptyState from "../../../../../components/ui/EmptyState";
 import {
   CheckCircle,
   XCircle,

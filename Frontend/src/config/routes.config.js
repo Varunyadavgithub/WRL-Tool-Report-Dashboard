@@ -27,26 +27,35 @@ import {
 } from "lucide-react";
 
 // Lazy loaded components
-const ProductionOverview = lazy(() => import("../pages/Production/Overview"));
-const ComponentTraceabilityReport = lazy(
-  () => import("../pages/Production/ComponentTraceabilityReport"),
+const Overview = lazy(() => import("../pages/Production/Operations/Overview"));
+const ComponentTraceability = lazy(
+  () => import("../pages/Production/Traceability/ComponentTraceability"),
 );
-const HourlyReport = lazy(() => import("../pages/Production/HourlyReport"));
+const Barcodes = lazy(
+  () => import("../pages/Production/Traceability/Barcodes"),
+);
+const HourlyReport = lazy(
+  () => import("../pages/Production/Reports/HourlyReport"),
+);
 const LineHourlyReport = lazy(
-  () => import("../pages/Production/LineHourlyReport"),
+  () => import("../pages/Production/Reports/LineHourlyReport"),
 );
-const LineWiseReport = lazy(() => import("../pages/Production/LineWiseReport"));
+const LineWiseReport = lazy(
+  () => import("../pages/Production/Reports/LineWiseReport"),
+);
 const ConsolidatedReport = lazy(
-  () => import("../pages/Production/ConsolidatedReport/ConsolidatedReport"),
+  () => import("../pages/Production/Reports/ConsolidatedReport/ConsolidatedReport"),
 );
 const ModelNameUpdate = lazy(
-  () => import("../pages/Production/ModelNameUpdate"),
+  () => import("../pages/Production/Operations/ModelNameUpdate"),
 );
-const NFCReport = lazy(() => import("../pages/Production/NFCReport"));
+const NFCReport = lazy(() => import("../pages/Production/Reports/NFCReport"));
 const TotalProduction = lazy(
-  () => import("../pages/Production/TotalProduction"),
+  () => import("../pages/Production/Reports/TotalProduction"),
 );
-const StopLossReport = lazy(() => import("../pages/Production/StopLossReport"));
+const StopLossReport = lazy(
+  () => import("../pages/Production/Reports/StopLossReport"),
+);
 
 const ReworkReport = lazy(() => import("../pages/Quality/ReworkReport"));
 const GasChargingReport = lazy(
@@ -153,7 +162,7 @@ const EnergyMeterDashboard = lazy(
 );
 const Monitoring = lazy(() => import("../pages/Display/Monitoring"));
 const Management = lazy(() => import("../pages/Display/Management"));
-const WIPCapture = lazy(() => import("../pages/Production/WIPCapture"));
+const WIPCapture = lazy(() => import("../pages/Production/Operations/WIPCapture"));
 
 // ── Master Config ─────────────────────────────────────────────────────────────
 const MaterialConfig = lazy(
@@ -309,8 +318,8 @@ export const ROUTE_CONFIG = [
     items: [
       {
         path: "/production/overview",
-        label: "Production Report",
-        component: ProductionOverview,
+        label: "Overview",
+        component: Overview,
         group: "operations",
       },
       {
@@ -369,8 +378,14 @@ export const ROUTE_CONFIG = [
       },
       {
         path: "/production/component-traceability-report",
-        label: "Component Traceability Report",
-        component: ComponentTraceabilityReport,
+        label: "Component Traceability",
+        component: ComponentTraceability,
+        group: "traceability",
+      },
+      {
+        path: "/production/barcode-report",
+        label: "Barcodes",
+        component: Barcodes,
         group: "traceability",
       },
     ],

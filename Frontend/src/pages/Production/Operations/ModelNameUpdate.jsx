@@ -2,8 +2,8 @@ import { useState } from "react";
 import ExcelJS from "exceljs";
 import toast from "react-hot-toast";
 import axios from "axios";
-import { baseURL } from "../../assets/assets";
-import InputField from "../../components/ui/InputField";
+import { baseURL } from "../../../assets/assets";
+import InputField from "../../../components/ui/InputField";
 import {
   Plus,
   RefreshCw,

@@ -8,18 +8,18 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-import SelectField from "../../components/ui/SelectField";
-import DateTimePicker from "../../components/ui/DateTimePicker";
+import SelectField from "../../../components/ui/SelectField.jsx";
+import DateTimePicker from "../../../components/ui/DateTimePicker.jsx";
 import axios from "axios";
-import Loader from "../../components/ui/Loader";
+import Loader from "../../../components/ui/Loader.jsx";
 import toast from "react-hot-toast";
-import { CATEGORY_MAPPINGS } from "../../utils/mapCategories.js";
-import { baseURL } from "../../assets/assets.js";
+import { CATEGORY_MAPPINGS } from "../../../utils/mapCategories.js";
+import { baseURL } from "../../../assets/assets.js";
 import {
   useGetModelVariantsQuery,
   useGetStagesQuery,
   useGetProductionLineQuery,
-} from "../../redux/api/commonApi.js";
+} from "../../../redux/api/commonApi.js";
 import {
   Search,
   RefreshCw,
