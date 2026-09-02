@@ -44,7 +44,8 @@ const LineWiseReport = lazy(
   () => import("../pages/Production/Reports/LineWiseReport"),
 );
 const ConsolidatedReport = lazy(
-  () => import("../pages/Production/Reports/ConsolidatedReport/ConsolidatedReport"),
+  () =>
+    import("../pages/Production/Reports/ConsolidatedReport/ConsolidatedReport"),
 );
 const ModelNameUpdate = lazy(
   () => import("../pages/Production/Operations/ModelNameUpdate"),
@@ -106,9 +107,7 @@ const FGDispatchScan = lazy(
   () => import("../pages/Logistic/Scanning/FGDispatchScan"),
 );
 
-const ProductionPlaning = lazy(
-  () => import("../pages/Planing/ProductionPlaning"),
-);
+const Production = lazy(() => import("../pages/Planing/Production"));
 const PlanStatus = lazy(() => import("../pages/Planing/PlanStatus"));
 
 const Dashboard = lazy(() => import("../pages/Visitor/Dashboard"));
@@ -162,7 +161,9 @@ const EnergyMeterDashboard = lazy(
 );
 const Monitoring = lazy(() => import("../pages/Display/Monitoring"));
 const Management = lazy(() => import("../pages/Display/Management"));
-const WIPCapture = lazy(() => import("../pages/Production/Operations/WIPCapture"));
+const WIPCapture = lazy(
+  () => import("../pages/Production/Operations/WIPCapture"),
+);
 
 // ── Master Config ─────────────────────────────────────────────────────────────
 const MaterialConfig = lazy(
@@ -293,8 +294,8 @@ export const ROUTE_CONFIG = [
     items: [
       {
         path: "/planing/production-planing",
-        label: "Production Planning",
-        component: ProductionPlaning,
+        label: "Production",
+        component: Production,
       },
       {
         path: "/planing/plan-status",
