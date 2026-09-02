@@ -2,7 +2,6 @@ import { useState, useMemo, useCallback } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { baseURL } from "../../../assets/assets";
-import DateTimePicker from "../../../components/ui/DateTimePicker";
 import ExportButton from "../../../components/ui/ExportButton";
 import {
   Search,
@@ -12,11 +11,13 @@ import {
   Factory,
   TrendingUp,
   CalendarDays,
-  Filter,
   ChevronUp,
   ChevronDown,
   PackageOpen,
   BarChart3,
+  History,
+  Calendar,
+  CalendarRange,
 } from "lucide-react";
 
 /* ─────────────────────────────────────────────────────────────
@@ -38,6 +39,11 @@ const formatDate = (date) => {
     year: "numeric",
   });
 };
+
+// Plain "YYYY-MM-DD" — matches a date-only DB column, no time component.
+const pad = (n) => String(n).padStart(2, "0");
+const formatDateOnly = (d) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
 const Spinner = ({ cls = "w-4 h-4" }) => (
   <Loader2 className={`animate-spin ${cls}`} />
@@ -107,9 +113,12 @@ const StatusPill = ({ children, color = "slate" }) => {
 ═══════════════════════════════════════════════════════════ */
 
 const Barcodes = () => {
-  /* Filters */
+  /* Last queried range (no manual inputs — set only by quick-select buttons) */
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  /* Which quick-select is currently active, for button highlighting */
+  const [activeRange, setActiveRange] = useState(null); // "today" | "yesterday" | "month"
 
   /* Data */
   const [rows, setRows] = useState([]);
@@ -121,25 +130,15 @@ const Barcodes = () => {
   /* UI */
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState({ key: null, dir: "asc" });
-  const [filtersChanged, setFiltersChanged] = useState(false);
-
-  /* ─────────────────────────────────────────────
-     Query Parameters
-  ───────────────────────────────────────────── */
-
-  const buildParams = useCallback(
-    () => ({ startDate, endDate }),
-    [startDate, endDate],
-  );
 
   /* ─────────────────────────────────────────────
      Fetch Data — table rows + KPI summary
   ───────────────────────────────────────────── */
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (start, end) => {
     setLoading(true);
 
-    const params = buildParams();
+    const params = { startDate: start, endDate: end };
 
     const [summaryRes, kpiRes] = await Promise.allSettled([
       axios.get(`${baseURL}prod/foaming-barcode-summary`, { params }),
@@ -169,41 +168,39 @@ const Barcodes = () => {
     }
 
     setLoading(false);
-  }, [buildParams]);
+  }, []);
 
   /* ─────────────────────────────────────────────
-     Query
+     Quick-select: Today / Yesterday / Month
   ───────────────────────────────────────────── */
 
-  const handleQuery = () => {
-    if (!startDate || !endDate) {
-      toast.error("Please select both Start Date and End Date.");
-      return;
-    }
-
-    if (new Date(endDate) < new Date(startDate)) {
-      toast.error("End Date must be after Start Date.");
-      return;
-    }
-
+  const runQuickRange = (start, end, rangeKey) => {
+    setStartDate(start);
+    setEndDate(end);
+    setActiveRange(rangeKey);
     setQueried(true);
-    setFiltersChanged(false);
     setSearch("");
     setSort({ key: null, dir: "asc" });
 
-    fetchData();
+    fetchData(start, end);
   };
 
-  /* ─────────────────────────────────────────────
-     Filter Change
-  ───────────────────────────────────────────── */
+  const handleToday = () => {
+    const today = formatDateOnly(new Date());
+    runQuickRange(today, today, "today");
+  };
 
-  const handleFilterChange = (setter) => (value) => {
-    setter(value);
+  const handleYesterday = () => {
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    const yStr = formatDateOnly(y);
+    runQuickRange(yStr, yStr, "yesterday");
+  };
 
-    if (queried) {
-      setFiltersChanged(true);
-    }
+  const handleMonth = () => {
+    const now = new Date();
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    runQuickRange(formatDateOnly(firstOfMonth), formatDateOnly(now), "month");
   };
 
   /* ─────────────────────────────────────────────
@@ -212,7 +209,7 @@ const Barcodes = () => {
 
   const fetchExportData = async () => {
     if (!startDate || !endDate) {
-      toast.error("Please select a date range.");
+      toast.error("Select a range first (Today / Yesterday / Month).");
       return [];
     }
 
@@ -220,11 +217,20 @@ const Barcodes = () => {
       const res = await axios.get(
         `${baseURL}prod/export-foaming-barcode-summary`,
         {
-          params: buildParams(),
+          params: { startDate, endDate },
         },
       );
 
-      return res?.data?.success ? res.data.data : [];
+      if (!res?.data?.success) return [];
+
+      // Reformat OrderDate from "2026-09-01T00:00:00.000Z" to "2026-09-01"
+      // before handing rows off to ExportButton.
+      return (res.data.data || []).map((row) => ({
+        ...row,
+        OrderDate: row.OrderDate
+          ? formatDateOnly(new Date(row.OrderDate))
+          : row.OrderDate,
+      }));
     } catch (error) {
       toast.error("Failed to fetch export data.");
       return [];
@@ -290,10 +296,19 @@ const Barcodes = () => {
      Render
   ───────────────────────────────────────────── */
 
+  const rangeBtnCls = (active, base) =>
+    `flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+      loading
+        ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+        : active
+          ? `${base} text-white shadow-sm ring-2 ring-offset-1 ring-slate-300`
+          : `${base} text-white shadow-sm opacity-90 hover:opacity-100`
+    }`;
+
   return (
-    <div className="h-full flex flex-col bg-slate-100 overflow-y-auto">
-      {/* Header — sticky within the page's own scroll container */}
-      <div className="sticky top-0 z-30 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
+    <div className="h-full flex flex-col bg-slate-100 overflow-hidden">
+      {/* Header — sibling of the scrolling body, so it can never "unstick" */}
+      <div className="z-30 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0">
         <div>
           <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-tight">
             Barcode Print Summary
@@ -331,73 +346,73 @@ const Barcodes = () => {
       </div>
 
       {/* Body */}
-      <div className="flex-1 flex flex-col p-4 gap-3">
-        {/* Filters */}
+      <div className="flex-1 overflow-y-auto flex flex-col p-4 gap-3">
+        {/* Quick-select range buttons */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
-          <div className="flex items-center gap-1.5 mb-3">
-            <Filter className="w-3 h-3 text-slate-400" />
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-              Filters
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-3 items-end">
-            <div className="min-w-[210px] flex-1">
-              <DateTimePicker
-                label="Start Date"
-                name="startDate"
-                value={startDate}
-                onChange={(e) =>
-                  handleFilterChange(setStartDate)(e.target.value)
-                }
-              />
-            </div>
-
-            <div className="min-w-[210px] flex-1">
-              <DateTimePicker
-                label="End Date"
-                name="endDate"
-                value={endDate}
-                onChange={(e) => handleFilterChange(setEndDate)(e.target.value)}
-              />
-            </div>
-
-            <div className="flex items-center gap-2 pb-0.5">
-              <button
-                onClick={handleQuery}
-                disabled={loading}
-                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  loading
-                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
-                }`}
-              >
-                {loading ? (
-                  <>
-                    <Spinner />
-                    Loading…
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4" />
-                    Query
-                  </>
-                )}
-              </button>
-
-              {rows.length > 0 && (
-                <ExportButton
-                  fetchData={fetchExportData}
-                  filename="Foaming_Barcode_Summary"
-                />
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleYesterday}
+              disabled={loading}
+              className={rangeBtnCls(
+                activeRange === "yesterday",
+                "bg-amber-500 hover:bg-amber-600 cursor-pointer",
               )}
+            >
+              {loading && activeRange === "yesterday" ? (
+                <Spinner cls="w-4 h-4" />
+              ) : (
+                <History className="w-4 h-4" />
+              )}
+              Yesterday
+            </button>
 
-              {filtersChanged && (
-                <span className="flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold">
-                  Filters changed — re-run
+            <button
+              onClick={handleToday}
+              disabled={loading}
+              className={rangeBtnCls(
+                activeRange === "today",
+                "bg-emerald-600 hover:bg-emerald-700 cursor-pointer",
+              )}
+            >
+              {loading && activeRange === "today" ? (
+                <Spinner cls="w-4 h-4" />
+              ) : (
+                <Calendar className="w-4 h-4" />
+              )}
+              Today
+            </button>
+
+            <button
+              onClick={handleMonth}
+              disabled={loading}
+              className={rangeBtnCls(
+                activeRange === "month",
+                "bg-indigo-600 hover:bg-indigo-700 cursor-pointer",
+              )}
+            >
+              {loading && activeRange === "month" ? (
+                <Spinner cls="w-4 h-4" />
+              ) : (
+                <CalendarRange className="w-4 h-4" />
+              )}
+              Month
+            </button>
+
+            {rows.length > 0 && (
+              <ExportButton
+                fetchData={fetchExportData}
+                filename="Foaming_Barcode_Summary"
+              />
+            )}
+
+            {queried && startDate && endDate && (
+              <span className="ml-1 text-[11px] text-slate-400">
+                Showing:{" "}
+                <span className="font-semibold text-slate-600">
+                  {formatDate(startDate)} – {formatDate(endDate)}
                 </span>
-              )}
-            </div>
+              </span>
+            )}
           </div>
         </div>
 
@@ -566,7 +581,7 @@ const Barcodes = () => {
                           <p className="text-sm">
                             {search
                               ? `No models match "${search}"`
-                              : "No production data found for the selected date range."}
+                              : "No production data found for the selected range."}
                           </p>
                           {search && (
                             <button
@@ -590,10 +605,11 @@ const Barcodes = () => {
                             strokeWidth={1.2}
                           />
                           <p className="text-sm">
-                            Select a date range and click{" "}
+                            Pick{" "}
                             <span className="text-blue-600 font-semibold">
-                              Query
-                            </span>
+                              Yesterday, Today, or Month
+                            </span>{" "}
+                            to view data
                           </p>
                         </div>
                       </td>
