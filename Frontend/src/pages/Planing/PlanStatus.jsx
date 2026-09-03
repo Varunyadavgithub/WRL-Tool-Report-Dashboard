@@ -145,15 +145,15 @@ const PlanStatus = () => {
       if (res?.data?.success) {
         toast.success(
           res?.data?.message ||
-            (isPlanned ? "Plan updated successfully." : "Plan added successfully."),
+            (isPlanned
+              ? "Plan updated successfully."
+              : "Plan added successfully."),
         );
         closeActionModal();
         await fetchPlanStatusData();
       }
     } catch (error) {
-      toast.error(
-        error.response?.data?.message || "Failed to save plan.",
-      );
+      toast.error(error.response?.data?.message || "Failed to save plan.");
     } finally {
       setSavingAction(false);
     }
@@ -232,48 +232,41 @@ const PlanStatus = () => {
       {/* ── Body ── */}
       <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3">
         {/* ── Filters row ── */}
-        <div className="flex gap-3 shrink-0">
-          {/* Filters card */}
-          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
-              Filters
-            </p>
-            <div className="flex flex-wrap gap-3 items-end">
-              <div className="min-w-[190px] flex-1">
-                <SelectField
-                  label="Plan Type"
-                  options={planTypeOptions}
-                  value={selectedPlan || ""}
-                  onChange={(e) => setSelectedPlan(e.target.value)}
-                />
-              </div>
-              <div className="min-w-[190px] flex-1">
-                <SelectField
-                  label="Plan Month Year"
-                  options={planMonthOptions}
-                  value={selectedPlanMonth?.value || ""}
-                  onChange={(e) =>
-                    setSelectedPlanMonth(
-                      planMonthOptions.find(
-                        (opt) => opt.value === e.target.value,
-                      ) || null,
-                    )
-                  }
-                />
-              </div>
+        {/* ── Filters (single card, Search inline) ── */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
+          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
+            Filters
+          </p>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="min-w-[190px] flex-1">
+              <SelectField
+                label="Plan Type"
+                options={planTypeOptions}
+                value={selectedPlan || ""}
+                onChange={(e) => setSelectedPlan(e.target.value)}
+              />
             </div>
-          </div>
 
-          {/* Action card */}
-          <div className="w-48 shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
-              Action
-            </p>
-            <div className="flex flex-col gap-2 mt-auto">
+            <div className="min-w-[190px] flex-1">
+              <SelectField
+                label="Plan Month Year"
+                options={planMonthOptions}
+                value={selectedPlanMonth?.value || ""}
+                onChange={(e) =>
+                  setSelectedPlanMonth(
+                    planMonthOptions.find(
+                      (opt) => opt.value === e.target.value,
+                    ) || null,
+                  )
+                }
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pb-0.5">
               <button
                 onClick={fetchPlanStatusData}
                 disabled={loading}
-                className={`flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
                   loading
                     ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                     : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
@@ -284,7 +277,7 @@ const PlanStatus = () => {
                 ) : (
                   <Search className="w-4 h-4" />
                 )}
-                {loading ? "Fetching..." : "Search"}
+                {loading ? "Fetching…" : "Search"}
               </button>
             </div>
           </div>
