@@ -445,170 +445,176 @@ const Overview = () => {
 
       {/* ── Body ── */}
       <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3">
-        {/* ── Filters + Quick filters row ── */}
-        <div className="flex gap-3 shrink-0">
-          {/* Filters card */}
-          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                Filters
-              </p>
-              {/* Mode toggle */}
-              <button
-                onClick={() => setIsDetailReport((v) => !v)}
-                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
-                  isDetailReport
-                    ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                    : "bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600"
-                }`}
-              >
-                {isDetailReport ? (
-                  <ToggleRight className="w-3.5 h-3.5" />
-                ) : (
-                  <ToggleLeft className="w-3.5 h-3.5" />
-                )}
-                {isDetailReport ? "Detail Mode" : "Simple Mode"}
-              </button>
-              <span className="text-[11px] text-slate-400">
-                {isDetailReport
-                  ? "Manually select stage code"
-                  : "Pick a line and stage — codes resolved automatically"}
-              </span>
+        {/* ── Filters (single card, everything inline) ── */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
+          <div className="flex items-center gap-3 mb-3 flex-wrap">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+              Filters
+            </p>
+            {/* Mode toggle */}
+            <button
+              onClick={() => setIsDetailReport((v) => !v)}
+              className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                isDetailReport
+                  ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                  : "bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600"
+              }`}
+            >
+              {isDetailReport ? (
+                <ToggleRight className="w-3.5 h-3.5" />
+              ) : (
+                <ToggleLeft className="w-3.5 h-3.5" />
+              )}
+              {isDetailReport ? "Detail Mode" : "Simple Mode"}
+            </button>
+            <span className="text-[11px] text-slate-400">
+              {isDetailReport
+                ? "Manually select stage code"
+                : "Pick a line and stage — codes resolved automatically"}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="min-w-[190px] flex-1">
+              <SelectField
+                label="Model Variant"
+                options={variants}
+                value={selectedModelVariant?.value || ""}
+                onChange={(e) =>
+                  setSelectedModelVariant(
+                    variants.find((o) => o.value === e.target.value) || null,
+                  )
+                }
+              />
             </div>
-            <div className="flex flex-wrap gap-3 items-end">
+
+            {isDetailReport ? (
               <div className="min-w-[190px] flex-1">
                 <SelectField
-                  label="Model Variant"
-                  options={variants}
-                  value={selectedModelVariant?.value || ""}
+                  label="Stage Name"
+                  options={stages}
+                  value={selectedStage?.value || ""}
                   onChange={(e) =>
-                    setSelectedModelVariant(
-                      variants.find((o) => o.value === e.target.value) || null,
+                    setSelectedStage(
+                      stages.find((o) => o.value === e.target.value) || null,
                     )
                   }
                 />
               </div>
-
-              {isDetailReport ? (
-                <div className="min-w-[190px] flex-1">
+            ) : (
+              <>
+                <div className="min-w-[170px] flex-1">
                   <SelectField
-                    label="Stage Name"
-                    options={stages}
-                    value={selectedStage?.value || ""}
-                    onChange={(e) =>
-                      setSelectedStage(
-                        stages.find((o) => o.value === e.target.value) || null,
-                      )
-                    }
+                    label="Line"
+                    value={simpleLine}
+                    options={[
+                      { value: "", label: "Select Line" },
+                      ...SIMPLE_LINE_OPTIONS,
+                    ]}
+                    onChange={(e) => setSimpleLine(e.target.value)}
                   />
                 </div>
-              ) : (
-                <>
-                  <div className="min-w-[170px] flex-1">
-                    <SelectField
-                      label="Line"
-                      value={simpleLine}
-                      options={[
-                        { value: "", label: "Select Line" },
-                        ...SIMPLE_LINE_OPTIONS,
-                      ]}
-                      onChange={(e) => setSimpleLine(e.target.value)}
-                    />
-                  </div>
-                  <div className="min-w-[170px] flex-1">
-                    <SelectField
-                      label="Stage"
-                      value={simpleStage}
-                      options={[
-                        {
-                          value: "",
-                          label: simpleLine
-                            ? "Select Stage"
-                            : "Select a line first",
-                        },
-                        ...simpleStageOptions,
-                      ]}
-                      onChange={(e) => setSimpleStage(e.target.value)}
-                      disabled={!simpleLine}
-                    />
-                  </div>
-                </>
-              )}
-              <div className="min-w-[185px] flex-1">
-                <DateTimePicker
-                  label="Start Time"
-                  name="startTime"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                />
-              </div>
-              <div className="min-w-[185px] flex-1">
-                <DateTimePicker
-                  label="End Time"
-                  name="endTime"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                />
-              </div>
-              <div className="flex items-center gap-2 pb-0.5 shrink-0">
-                <button
-                  onClick={handleFgData}
-                  disabled={loading}
-                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    loading
-                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
-                  }`}
-                >
-                  {loading ? (
-                    <Spinner cls="w-4 h-4" />
-                  ) : (
-                    <Search className="w-4 h-4" />
-                  )}
-                  {loading ? "Fetching…" : "Query"}
-                </button>
-                {productionData.length > 0 && !isQuickMode && (
-                  <ExportButton
-                    fetchData={fetchExportData}
-                    filename="Production_Report"
+                <div className="min-w-[170px] flex-1">
+                  <SelectField
+                    label="Stage"
+                    value={simpleStage}
+                    options={[
+                      {
+                        value: "",
+                        label: simpleLine
+                          ? "Select Stage"
+                          : "Select a line first",
+                      },
+                      ...simpleStageOptions,
+                    ]}
+                    onChange={(e) => setSimpleStage(e.target.value)}
+                    disabled={!simpleLine}
                   />
-                )}
-              </div>
-            </div>
-          </div>
+                </div>
+              </>
+            )}
 
-          {/* Quick filters card */}
-          <div className="w-60 shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">
-              Quick Filters
-            </p>
-            <p className="text-[10px] text-slate-400 mb-3">
-              {isDetailReport
-                ? "Select a stage first."
-                : "Select a line & stage first."}
-            </p>
-            <div className="flex flex-col gap-2">
-              <QuickBtn
-                label="YESTERDAY"
-                sublabel="Prev day 08:00 → today 08:00"
-                loading={ydayLoading}
+            <div className="min-w-[185px] flex-1">
+              <DateTimePicker
+                label="Start Time"
+                name="startTime"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
+            <div className="min-w-[185px] flex-1">
+              <DateTimePicker
+                label="End Time"
+                name="endTime"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+              />
+            </div>
+
+            {/* All action buttons — Query, quick filters, Export — inline */}
+            <div className="flex items-center gap-2 pb-0.5 flex-wrap">
+              <button
+                onClick={handleFgData}
+                disabled={loading}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  loading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                }`}
+              >
+                {loading ? (
+                  <Spinner cls="w-4 h-4" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+                {loading ? "Fetching…" : "Query"}
+              </button>
+
+              <button
                 onClick={fetchYesterdayProductionData}
-                colorClass="bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
-              />
-              <QuickBtn
-                label="TODAY"
-                sublabel="08:00 → now"
-                loading={todayLoading}
+                disabled={ydayLoading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  ydayLoading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                }`}
+              >
+                {ydayLoading ? <Spinner cls="w-4 h-4" /> : null}
+                {ydayLoading ? "Loading…" : "Yesterday"}
+              </button>
+
+              <button
                 onClick={fetchTodayProductionData}
-                colorClass="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-              />
-              <QuickBtn
-                label="MTD"
-                sublabel="Month to date"
-                loading={monthLoading}
+                disabled={todayLoading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  todayLoading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                }`}
+              >
+                {todayLoading ? <Spinner cls="w-4 h-4" /> : null}
+                {todayLoading ? "Loading…" : "Today"}
+              </button>
+
+              <button
                 onClick={fetchMTDProductionData}
-                colorClass="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-              />
+                disabled={monthLoading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  monthLoading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                }`}
+              >
+                {monthLoading ? <Spinner cls="w-4 h-4" /> : null}
+                {monthLoading ? "Loading…" : "MTD"}
+              </button>
+
+              {productionData.length > 0 && !isQuickMode && (
+                <ExportButton
+                  fetchData={fetchExportData}
+                  filename="Production_Report"
+                />
+              )}
             </div>
           </div>
         </div>
