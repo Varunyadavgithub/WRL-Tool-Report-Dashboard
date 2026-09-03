@@ -699,7 +699,7 @@ const ComponentTraceability = () => {
               <button
                 onClick={handleQuery}
                 disabled={loading}
-                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
                   loading
                     ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                     : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
@@ -825,7 +825,7 @@ const ComponentTraceability = () => {
               </div>
               <button
                 onClick={() => setShowGroups((v) => !v)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all shrink-0 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all shrink-0 cursor-pointer ${
                   showGroups
                     ? "bg-blue-600 text-white border-blue-600"
                     : "bg-white text-slate-500 border-slate-200 hover:border-blue-300 hover:text-blue-600"

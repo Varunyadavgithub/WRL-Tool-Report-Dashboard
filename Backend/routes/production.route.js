@@ -87,7 +87,6 @@ import {
   getStopLossLines,
   getStopLossSummary,
   getStopLossStations,
-  getStopLossLive,
   getStopLossToday,
   getStopLossYesterday,
   getStopLossMTD,
@@ -253,7 +252,6 @@ router.get("/stop-loss/detail", authenticate, getStopLossDetail);
 router.get("/stop-loss/lines", authenticate, getStopLossLines);
 router.get("/stop-loss/locations", authenticate, getStopLossLocations);
 router.get("/stop-loss/stations", authenticate, getStopLossStations);
-router.get("/stop-loss/live", authenticate, getStopLossLive);
 router.get("/stop-loss/today", authenticate, getStopLossToday); // ← new
 router.get("/stop-loss/yesterday", authenticate, getStopLossYesterday); // ← new
 router.get("/stop-loss/mtd", authenticate, getStopLossMTD); // ← new
