@@ -831,7 +831,7 @@ const LineHourlyReport = () => {
                   <button
                     onClick={handleYesterday}
                     disabled={loading}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-amber-500 hover:bg-amber-600 text-white shadow-sm"}`}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-amber-500 hover:bg-amber-600 text-white shadow-sm"}`}
                   >
                     {loading ? (
                       <Spinner cls="w-4 h-4" />
@@ -843,7 +843,7 @@ const LineHourlyReport = () => {
                   <button
                     onClick={handleToday}
                     disabled={loading}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"}`}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"}`}
                   >
                     {loading ? (
                       <Spinner cls="w-4 h-4" />
@@ -855,7 +855,7 @@ const LineHourlyReport = () => {
                   <button
                     onClick={handleQuery}
                     disabled={loading}
-                    className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"}`}
+                    className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"}`}
                   >
                     {loading ? (
                       <Spinner cls="w-4 h-4" />
