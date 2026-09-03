@@ -1006,7 +1006,7 @@ const Management = () => {
           <button
             onClick={fetchConfigs}
             disabled={loading}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 font-semibold text-[13px] transition-all ${loading ? "opacity-60 cursor-not-allowed" : "bg-white hover:bg-slate-50"}`}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 font-semibold text-[13px] transition-all cursor-pointer ${loading ? "opacity-60 cursor-not-allowed" : "bg-white hover:bg-slate-50"}`}
           >
             {loading ? (
               <Spinner cls="w-3.5 h-3.5" />
@@ -1014,44 +1014,6 @@ const Management = () => {
               <RefreshCw className="w-3.5 h-3.5" />
             )}
             Refresh
-          </button>
-
-          {/* Export */}
-          <button
-            onClick={handleExport}
-            disabled={exporting || loading || configs.length === 0}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border font-semibold text-[13px] transition-all ${
-              exporting || loading || configs.length === 0
-                ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
-                : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-            }`}
-            title="Download all configs as Excel"
-          >
-            {exporting ? (
-              <Spinner cls="w-3.5 h-3.5" />
-            ) : (
-              <Download className="w-3.5 h-3.5" />
-            )}
-            Export
-          </button>
-
-          {/* Import */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing || loading}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border font-semibold text-[13px] transition-all ${
-              importing || loading
-                ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
-                : "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100"
-            }`}
-            title="Upload Excel to create / update configs"
-          >
-            {importing ? (
-              <Spinner cls="w-3.5 h-3.5" />
-            ) : (
-              <Upload className="w-3.5 h-3.5" />
-            )}
-            Import
           </button>
 
           {/* New Config */}
@@ -1107,7 +1069,7 @@ const Management = () => {
               <button
                 onClick={handleExport}
                 disabled={exporting || configs.length === 0}
-                className={`flex items-center gap-1 text-[11px] font-semibold transition-colors ${exporting || configs.length === 0 ? "text-slate-300 cursor-not-allowed" : "text-emerald-600 hover:text-emerald-700"}`}
+                className={`flex items-center gap-1 text-[11px] font-semibold transition-colors cursor-pointer ${exporting || configs.length === 0 ? "text-slate-300 cursor-not-allowed" : "text-emerald-600 hover:text-emerald-700"}`}
               >
                 {exporting ? (
                   <Spinner cls="w-3 h-3" />
@@ -1120,7 +1082,7 @@ const Management = () => {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={importing}
-                className={`flex items-center gap-1 text-[11px] font-semibold transition-colors ${importing ? "text-slate-300 cursor-not-allowed" : "text-violet-600 hover:text-violet-700"}`}
+                className={`flex items-center gap-1 text-[11px] font-semibold transition-colors cursor-pointer ${importing ? "text-slate-300 cursor-not-allowed" : "text-violet-600 hover:text-violet-700"}`}
               >
                 {importing ? (
                   <Spinner cls="w-3 h-3" />
