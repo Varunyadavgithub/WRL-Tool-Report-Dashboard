@@ -656,7 +656,7 @@ const FpaHistory = () => {
 
       {/* ── BODY ── */}
       <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
-        {/* ── FILTERS CARD ── */}
+        {/* ── FILTERS CARD (single card, everything inline) ── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
           <div className="flex items-center gap-1.5 mb-3">
             <Filter className="w-3 h-3 text-slate-400" />
@@ -665,105 +665,103 @@ const FpaHistory = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto] gap-4">
-            {/* Left: controls */}
-            <div className="flex flex-wrap gap-3 items-end">
-              <div className="min-w-[170px] flex-1">
-                <DateTimePicker
-                  label="Start Date / Time"
-                  name="startTime"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                />
-              </div>
-              <div className="min-w-[170px] flex-1">
-                <DateTimePicker
-                  label="End Date / Time"
-                  name="endTime"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                />
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex items-center gap-2 pb-0.5 shrink-0">
-                <button
-                  onClick={handleQuery}
-                  disabled={isLoading}
-                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    isLoading
-                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
-                  }`}
-                >
-                  {isLoading ? (
-                    <Spinner cls="w-4 h-4" />
-                  ) : (
-                    <Search className="w-4 h-4" />
-                  )}
-                  {isLoading ? "Loading…" : "Search"}
-                </button>
-
-                <button
-                  onClick={() => hasFilters && refetchHistory()}
-                  disabled={isLoading || !hasFilters}
-                  title="Refresh"
-                  className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors disabled:opacity-40"
-                >
-                  <RefreshCw
-                    className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
-                  />
-                </button>
-
-                <button
-                  onClick={handleReset}
-                  title="Reset Filters"
-                  className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200 rounded-lg transition-colors"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                </button>
-              </div>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="min-w-[170px] flex-1">
+              <DateTimePicker
+                label="Start Date / Time"
+                name="startTime"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
+            <div className="min-w-[170px] flex-1">
+              <DateTimePicker
+                label="End Date / Time"
+                name="endTime"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+              />
             </div>
 
-            {/* Right: Quick Filters */}
-            <div className="border-l border-slate-100 pl-5 flex flex-col justify-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <Zap className="w-3 h-3 text-amber-400" />
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                  Quick Select
-                </p>
-              </div>
-              <div className="flex flex-col gap-2">
-                {[
-                  { key: "yesterday", label: "Yesterday", color: "amber" },
-                  { key: "today", label: "Today", color: "blue" },
-                  { key: "mtd", label: "Month to Date", color: "emerald" },
-                ].map(({ key, label, color }) => {
-                  const active = activeQuickFilter === key;
-                  const colorMap = {
-                    amber: active
-                      ? "bg-amber-500 text-white border-amber-500 shadow-sm shadow-amber-200"
-                      : "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100",
-                    blue: active
-                      ? "bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-200"
-                      : "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100",
-                    emerald: active
-                      ? "bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-200"
-                      : "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100",
-                  };
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => !isLoading && handleQuickFilter(key)}
-                      disabled={isLoading}
-                      className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${colorMap[color]} ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
-                    >
-                      {label}
-                      <ChevronRight className="w-3 h-3" />
-                    </button>
-                  );
-                })}
-              </div>
+            {/* All action buttons — Search, quick filters, Refresh, Reset — inline */}
+            <div className="flex items-center gap-2 pb-0.5 flex-wrap">
+              <button
+                onClick={handleQuery}
+                disabled={isLoading}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  isLoading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                }`}
+              >
+                {isLoading ? (
+                  <Spinner cls="w-4 h-4" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+                {isLoading ? "Loading…" : "Query"}
+              </button>
+
+              <button
+                onClick={() => handleQuickFilter("yesterday")}
+                disabled={isLoading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  isLoading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : activeQuickFilter === "yesterday"
+                      ? "bg-amber-500 text-white shadow-sm ring-2 ring-offset-1 ring-amber-300"
+                      : "bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                }`}
+              >
+                Yesterday
+              </button>
+
+              <button
+                onClick={() => handleQuickFilter("today")}
+                disabled={isLoading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  isLoading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : activeQuickFilter === "today"
+                      ? "bg-emerald-600 text-white shadow-sm ring-2 ring-offset-1 ring-emerald-300"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                }`}
+              >
+                Today
+              </button>
+
+              <button
+                onClick={() => handleQuickFilter("mtd")}
+                disabled={isLoading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  isLoading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : activeQuickFilter === "mtd"
+                      ? "bg-indigo-600 text-white shadow-sm ring-2 ring-offset-1 ring-indigo-300"
+                      : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                }`}
+              >
+                MTD
+              </button>
+
+              <button
+                onClick={() => hasFilters && refetchHistory()}
+                disabled={isLoading || !hasFilters}
+                title="Refresh"
+                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors disabled:opacity-40"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
+                />
+              </button>
+
+              <button
+                onClick={handleReset}
+                title="Reset Filters"
+                className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200 rounded-lg transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
