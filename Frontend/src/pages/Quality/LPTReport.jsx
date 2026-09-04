@@ -227,47 +227,6 @@ const LptSummary = ({ data }) => {
           sub={`${passCount} pass / ${failCount} fail`}
         />
       </div>
-
-      {/* Pass/Fail Bar */}
-      {totalRecords > 0 && (
-        <div className="mb-3">
-          <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-2">
-            Performance Breakdown
-          </div>
-          <div className="flex h-5 rounded-lg overflow-hidden gap-0.5">
-            {passCount > 0 && (
-              <div
-                className="bg-emerald-500 flex items-center justify-center"
-                style={{ flex: passCount }}
-              >
-                <span className="text-[9px] text-white font-bold">
-                  {passRate}% Pass
-                </span>
-              </div>
-            )}
-            {failCount > 0 && (
-              <div
-                className="bg-rose-500 flex items-center justify-center"
-                style={{ flex: failCount }}
-              >
-                <span className="text-[9px] text-white font-bold">
-                  {((failCount / totalRecords) * 100).toFixed(1)}% Fail
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="flex gap-4 mt-1.5 text-[11px] text-slate-500">
-            <span>
-              <span className="text-emerald-500 font-bold">●</span> Pass{" "}
-              {passCount}
-            </span>
-            <span>
-              <span className="text-rose-500 font-bold">●</span> Fail{" "}
-              {failCount}
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -443,24 +402,44 @@ const SummaryRow = ({ label, rows, isBisGroup = false }) => {
   const pending = lpt - tested;
   const isOver = pending < 0;
   return (
-    <tr className={`font-bold text-center ${isBisGroup ? "bg-slate-50" : "bg-slate-100"}`}>
+    <tr
+      className={`font-bold text-center ${isBisGroup ? "bg-slate-50" : "bg-slate-100"}`}
+    >
       <td
         className={`px-3 py-2 text-left text-[11px] uppercase tracking-wide ${
-          isBisGroup ? "border-t border-slate-200 text-slate-500 pl-4" : "border-t-2 border-slate-300 text-slate-700"
+          isBisGroup
+            ? "border-t border-slate-200 text-slate-500 pl-4"
+            : "border-t-2 border-slate-300 text-slate-700"
         }`}
         colSpan={isBisGroup ? 1 : 1}
       >
         {label}
       </td>
-      <td className={`px-3 py-2 text-slate-600 ${isBisGroup ? "border-t border-slate-200" : "border-t-2 border-slate-300"}`}>{prod}</td>
-      <td className={`px-3 py-2 text-indigo-600 ${isBisGroup ? "border-t border-slate-200" : "border-t-2 border-slate-300"}`}>{lpt}</td>
-      <td className={`px-3 py-2 text-emerald-600 ${isBisGroup ? "border-t border-slate-200" : "border-t-2 border-slate-300"}`}>{tested}</td>
-      <td className={`px-3 py-2 ${isBisGroup ? "border-t border-slate-200" : "border-t-2 border-slate-300"}`}>
+      <td
+        className={`px-3 py-2 text-slate-600 ${isBisGroup ? "border-t border-slate-200" : "border-t-2 border-slate-300"}`}
+      >
+        {prod}
+      </td>
+      <td
+        className={`px-3 py-2 text-indigo-600 ${isBisGroup ? "border-t border-slate-200" : "border-t-2 border-slate-300"}`}
+      >
+        {lpt}
+      </td>
+      <td
+        className={`px-3 py-2 text-emerald-600 ${isBisGroup ? "border-t border-slate-200" : "border-t-2 border-slate-300"}`}
+      >
+        {tested}
+      </td>
+      <td
+        className={`px-3 py-2 ${isBisGroup ? "border-t border-slate-200" : "border-t-2 border-slate-300"}`}
+      >
         <span className={isOver ? "text-emerald-600" : "text-rose-600"}>
           {isOver ? `(${Math.abs(pending)})` : pending}
         </span>
       </td>
-      <td className={`px-3 py-2 text-slate-700 ${isBisGroup ? "border-t border-slate-200" : "border-t-2 border-slate-300"}`}>
+      <td
+        className={`px-3 py-2 text-slate-700 ${isBisGroup ? "border-t border-slate-200" : "border-t-2 border-slate-300"}`}
+      >
         {lpt > 0 ? `${((tested / lpt) * 100).toFixed(2)}%` : "—"}
       </td>
     </tr>
@@ -494,12 +473,15 @@ const ModelSummaryPanel = ({ data, resolveBIS = deriveBIS }) => {
 
   const renderRows = (rows) =>
     rows.map((row, i) => {
-      const pending = row.PendingSample ?? (row.LPT - row.SampleInspected);
+      const pending = row.PendingSample ?? row.LPT - row.SampleInspected;
       const pct = row.LPT_Percentage ?? 0;
       const isOver = pending < 0;
       const isComplete = pending <= 0;
       return (
-        <tr key={i} className="hover:bg-indigo-50/50 transition-colors text-center">
+        <tr
+          key={i}
+          className="hover:bg-indigo-50/50 transition-colors text-center"
+        >
           <td className="px-3 py-2 border-b border-slate-100 font-bold text-slate-800 text-left whitespace-nowrap pl-6">
             {row.ModelName}
           </td>
@@ -570,7 +552,14 @@ const ModelSummaryPanel = ({ data, resolveBIS = deriveBIS }) => {
         <table className="min-w-full text-xs text-left border-separate border-spacing-0">
           <thead className="sticky top-0 z-10">
             <tr className="bg-slate-100">
-              {["Model Name", "Production", "LPT", "Tested", "Pending", "LPT %"].map((h) => (
+              {[
+                "Model Name",
+                "Production",
+                "LPT",
+                "Tested",
+                "Pending",
+                "LPT %",
+              ].map((h) => (
                 <th
                   key={h}
                   className="px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap text-center first:text-left"
@@ -588,7 +577,9 @@ const ModelSummaryPanel = ({ data, resolveBIS = deriveBIS }) => {
                   <td colSpan={6} className="px-4 py-2.5">
                     <span className="inline-flex items-center gap-2 text-xs font-bold text-white uppercase tracking-widest">
                       <Shield className="w-3.5 h-3.5" /> BIS
-                      <span className="ml-1 font-normal text-blue-200">({bisGroup.length} models)</span>
+                      <span className="ml-1 font-normal text-blue-200">
+                        ({bisGroup.length} models)
+                      </span>
                     </span>
                   </td>
                 </tr>
@@ -600,7 +591,10 @@ const ModelSummaryPanel = ({ data, resolveBIS = deriveBIS }) => {
             {/* ── Gap between groups ── */}
             {bisGroup.length > 0 && nonBisGroup.length > 0 && (
               <tr>
-                <td colSpan={6} className="py-2 bg-slate-100 border-y border-slate-200" />
+                <td
+                  colSpan={6}
+                  className="py-2 bg-slate-100 border-y border-slate-200"
+                />
               </tr>
             )}
 
@@ -611,12 +605,18 @@ const ModelSummaryPanel = ({ data, resolveBIS = deriveBIS }) => {
                   <td colSpan={6} className="px-4 py-2.5">
                     <span className="inline-flex items-center gap-2 text-xs font-bold text-white uppercase tracking-widest">
                       <Shield className="w-3.5 h-3.5" /> Non BIS
-                      <span className="ml-1 font-normal text-slate-300">({nonBisGroup.length} models)</span>
+                      <span className="ml-1 font-normal text-slate-300">
+                        ({nonBisGroup.length} models)
+                      </span>
                     </span>
                   </td>
                 </tr>
                 {renderRows(nonBisGroup)}
-                <SummaryRow label="Non BIS Sub-total" rows={nonBisGroup} isBisGroup />
+                <SummaryRow
+                  label="Non BIS Sub-total"
+                  rows={nonBisGroup}
+                  isBisGroup
+                />
               </>
             )}
           </tbody>
@@ -745,7 +745,8 @@ const LptReportTable = ({ data, resolveBIS = deriveBIS }) => {
                 >
                   <span className="inline-flex items-center gap-1">
                     {label}
-                    {key && sort.key === key &&
+                    {key &&
+                      sort.key === key &&
                       (sort.dir === "asc" ? (
                         <ArrowUp className="w-2.5 h-2.5" />
                       ) : (
@@ -822,11 +823,13 @@ const LptReportTable = ({ data, resolveBIS = deriveBIS }) => {
                   {(() => {
                     const bis = resolveBIS(row.ModelName);
                     return (
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
-                        bis === "BIS"
-                          ? "bg-blue-50 text-blue-800 border-blue-200"
-                          : "bg-slate-50 text-slate-600 border-slate-200"
-                      }`}>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                          bis === "BIS"
+                            ? "bg-blue-50 text-blue-800 border-blue-200"
+                            : "bg-slate-50 text-slate-600 border-slate-200"
+                        }`}
+                      >
                         {bis}
                       </span>
                     );
@@ -907,18 +910,26 @@ const LPTReport = () => {
   }, [searchTerm]);
 
   useEffect(() => {
-    axios.get(`${baseURL}quality/lpt-recipe`)
-      .then((res) => { if (res?.data?.success) setRecipes(res.data.data || []); })
+    axios
+      .get(`${baseURL}quality/lpt-recipe`)
+      .then((res) => {
+        if (res?.data?.success) setRecipes(res.data.data || []);
+      })
       .catch((err) => console.error("Failed to fetch LPT recipes:", err));
   }, []);
 
   // ModelName -> manually-set "BIS"/"Non BIS" from LPT Recipe, where set.
-  const bisOverrideByModel = useMemo(() => recipes.reduce((map, r) => {
-    if (r.BIS && r.ModelName) map[r.ModelName.trim()] = r.BIS;
-    return map;
-  }, {}), [recipes]);
+  const bisOverrideByModel = useMemo(
+    () =>
+      recipes.reduce((map, r) => {
+        if (r.BIS && r.ModelName) map[r.ModelName.trim()] = r.BIS;
+        return map;
+      }, {}),
+    [recipes],
+  );
   const resolveBIS = useCallback(
-    (modelName) => bisOverrideByModel[(modelName || "").trim()] || deriveBIS(modelName),
+    (modelName) =>
+      bisOverrideByModel[(modelName || "").trim()] || deriveBIS(modelName),
     [bisOverrideByModel],
   );
 
@@ -929,8 +940,13 @@ const LPTReport = () => {
   }, []);
 
   const fetchModelSummary = useCallback(async (params) => {
-    const summaryParams = { startDate: params.startDate, endDate: params.endDate };
-    const res = await axios.get(`${baseURL}quality/lpt-model-summary`, { params: summaryParams });
+    const summaryParams = {
+      startDate: params.startDate,
+      endDate: params.endDate,
+    };
+    const res = await axios.get(`${baseURL}quality/lpt-model-summary`, {
+      params: summaryParams,
+    });
     if (res?.data?.success) return res.data.data || [];
     return [];
   }, []);
@@ -992,7 +1008,14 @@ const LPTReport = () => {
 
   const handleMTDQuery = () => {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 8, 0, 0);
+    const startOfMonth = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1,
+      8,
+      0,
+      0,
+    );
     runQuery(buildParams(formatDate(startOfMonth), formatDate(now)));
   };
 
@@ -1007,7 +1030,9 @@ const LPTReport = () => {
     if (!Array.isArray(reportData)) return reportData;
     let data = reportData;
     if (selectedBisType !== "All") {
-      data = data.filter((item) => resolveBIS(item.ModelName) === selectedBisType);
+      data = data.filter(
+        (item) => resolveBIS(item.ModelName) === selectedBisType,
+      );
     }
     if (!details) return data;
     const q = details.toLowerCase();
@@ -1022,7 +1047,9 @@ const LPTReport = () => {
 
   const filteredModelSummary = useMemo(() => {
     if (selectedBisType === "All") return modelSummary;
-    return modelSummary.filter((r) => resolveBIS(r.ModelName) === selectedBisType);
+    return modelSummary.filter(
+      (r) => resolveBIS(r.ModelName) === selectedBisType,
+    );
   }, [modelSummary, selectedBisType, resolveBIS]);
 
   if (variantsLoading) return <Loader />;
@@ -1065,7 +1092,7 @@ const LPTReport = () => {
 
       {/* ── BODY ── */}
       <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
-        {/* ── FILTERS CARD ── */}
+        {/* ── FILTERS CARD (single card, everything inline) ── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
           <div className="flex items-center gap-1.5 mb-3">
             <Filter className="w-3 h-3 text-slate-400" />
@@ -1074,150 +1101,130 @@ const LPTReport = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto] gap-4">
-            {/* Left: controls */}
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-3 items-end">
-                <div className="min-w-[170px] flex-1">
-                  <DateTimePicker
-                    label="Start Time"
-                    name="startTime"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                  />
-                </div>
-                <div className="min-w-[170px] flex-1">
-                  <DateTimePicker
-                    label="End Time"
-                    name="endTime"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                  />
-                </div>
-                <div className="min-w-[170px] flex-1">
-                  <SelectField
-                    label="Model Variant"
-                    options={[{ value: "", label: "All Models" }, ...variants]}
-                    value={selectedModelVariant?.value || ""}
-                    onChange={(e) =>
-                      setSelectedModelVariant(
-                        variants.find((o) => o.value === e.target.value) ||
-                          null,
-                      )
-                    }
-                  />
-                </div>
-                <div className="min-w-[170px] flex-1">
-                  <SelectField
-                    label="BIS Type"
-                    name="bisType"
-                    value={selectedBisType}
-                    onChange={(e) => setSelectedBisType(e.target.value)}
-                    options={[
-                      { label: "All", value: "All" },
-                      { label: "BIS", value: "BIS" },
-                      { label: "Non BIS", value: "Non BIS" },
-                    ]}
-                  />
-                </div>
-                <div className="min-w-[170px] flex-1">
-                  <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                    Search
-                  </label>
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Model, Assembly No..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-8 pr-8 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
-                    />
-                    {searchTerm && (
-                      <button
-                        onClick={() => setSearchTerm("")}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2"
-                      >
-                        <X className="w-3 h-3 text-slate-400 hover:text-slate-600" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Action buttons */}
-                <div className="flex items-center gap-2 pb-0.5 shrink-0">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="min-w-[170px] flex-1">
+              <DateTimePicker
+                label="Start Time"
+                name="startTime"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
+            <div className="min-w-[170px] flex-1">
+              <DateTimePicker
+                label="End Time"
+                name="endTime"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+              />
+            </div>
+            <div className="min-w-[170px] flex-1">
+              <SelectField
+                label="Model Variant"
+                options={[{ value: "", label: "All Models" }, ...variants]}
+                value={selectedModelVariant?.value || ""}
+                onChange={(e) =>
+                  setSelectedModelVariant(
+                    variants.find((o) => o.value === e.target.value) || null,
+                  )
+                }
+              />
+            </div>
+            <div className="min-w-[170px] flex-1">
+              <SelectField
+                label="BIS Type"
+                name="bisType"
+                value={selectedBisType}
+                onChange={(e) => setSelectedBisType(e.target.value)}
+                options={[
+                  { label: "All", value: "All" },
+                  { label: "BIS", value: "BIS" },
+                  { label: "Non BIS", value: "Non BIS" },
+                ]}
+              />
+            </div>
+            <div className="min-w-[170px] flex-1">
+              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                Search
+              </label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Model, Assembly No..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-8 pr-8 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+                />
+                {searchTerm && (
                   <button
-                    onClick={handleQuery}
-                    disabled={loading}
-                    className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                      loading
-                        ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                        : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
-                    }`}
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2"
                   >
-                    {loading ? (
-                      <Spinner cls="w-4 h-4" />
-                    ) : (
-                      <Search className="w-4 h-4" />
-                    )}
-                    {loading ? "Loading..." : "Query"}
+                    <X className="w-3 h-3 text-slate-400 hover:text-slate-600" />
                   </button>
-                  {reportData.length > 0 && (
-                    <ExportButton data={reportData} filename="LPT_Report" />
-                  )}
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Right: Quick Filters */}
-            <div className="border-l border-slate-100 pl-5 flex flex-col justify-center gap-2.5 min-w-[160px]">
-              <div>
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <Zap className="w-3 h-3 text-amber-400" />
-                  <p className="text-[11px] font-bold text-slate-600 uppercase tracking-widest">
-                    Quick Filters
-                  </p>
-                </div>
-                <p className="text-[10px] text-slate-400">Select a preset time range.</p>
-              </div>
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={handleYesterdayQuery}
-                  disabled={loading}
-                  className={`w-full flex flex-col items-center justify-center px-4 py-3 rounded-xl font-bold transition-all ${
-                    loading
-                      ? "opacity-50 cursor-not-allowed bg-slate-200 text-slate-400"
-                      : "bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-200 active:scale-95"
-                  }`}
-                >
-                  <span className="text-sm font-extrabold uppercase tracking-wide leading-tight">Yesterday</span>
-                  <span className="text-[10px] font-normal opacity-90 mt-0.5">Prev day 08:00 → today 08:00</span>
-                </button>
-                <button
-                  onClick={handleTodayQuery}
-                  disabled={loading}
-                  className={`w-full flex flex-col items-center justify-center px-4 py-3 rounded-xl font-bold transition-all ${
-                    loading
-                      ? "opacity-50 cursor-not-allowed bg-slate-200 text-slate-400"
-                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 active:scale-95"
-                  }`}
-                >
-                  <span className="text-sm font-extrabold uppercase tracking-wide leading-tight">Today</span>
-                  <span className="text-[10px] font-normal opacity-90 mt-0.5">08:00 → now</span>
-                </button>
-                <button
-                  onClick={handleMTDQuery}
-                  disabled={loading}
-                  className={`w-full flex flex-col items-center justify-center px-4 py-3 rounded-xl font-bold transition-all ${
-                    loading
-                      ? "opacity-50 cursor-not-allowed bg-slate-200 text-slate-400"
-                      : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-200 active:scale-95"
-                  }`}
-                >
-                  <span className="text-sm font-extrabold uppercase tracking-wide leading-tight">MTD</span>
-                  <span className="text-[10px] font-normal opacity-90 mt-0.5">Month to date</span>
-                </button>
-              </div>
+            {/* All action buttons — Query, quick filters, Export — inline */}
+            <div className="flex items-center gap-2 pb-0.5 flex-wrap">
+              <button
+                onClick={handleQuery}
+                disabled={loading}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  loading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                }`}
+              >
+                {loading ? (
+                  <Spinner cls="w-4 h-4" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+                {loading ? "Loading..." : "Query"}
+              </button>
+
+              <button
+                onClick={handleYesterdayQuery}
+                disabled={loading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  loading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                }`}
+              >
+                Yesterday
+              </button>
+
+              <button
+                onClick={handleTodayQuery}
+                disabled={loading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  loading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                }`}
+              >
+                Today
+              </button>
+
+              <button
+                onClick={handleMTDQuery}
+                disabled={loading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  loading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                }`}
+              >
+                MTD
+              </button>
+
+              {reportData.length > 0 && (
+                <ExportButton data={reportData} filename="LPT_Report" />
+              )}
             </div>
           </div>
         </div>
@@ -1246,7 +1253,10 @@ const LPTReport = () => {
 
             {/* Model Summary */}
             {filteredModelSummary.length > 0 && (
-              <ModelSummaryPanel data={filteredModelSummary} resolveBIS={resolveBIS} />
+              <ModelSummaryPanel
+                data={filteredModelSummary}
+                resolveBIS={resolveBIS}
+              />
             )}
 
             {/* Analysis Panels */}
