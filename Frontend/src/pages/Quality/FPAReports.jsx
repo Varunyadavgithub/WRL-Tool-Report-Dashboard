@@ -160,28 +160,6 @@ const getFpqiStatus = (value) => {
 const calcFpqi = (critical, major, minor, samples) =>
   samples > 0 ? (critical * 9 + major * 6 + minor * 1) / samples : null;
 
-/* ── Quick filter button ── */
-const QuickBtn = ({ label, sublabel, loading, onClick, colorClass }) => (
-  <button
-    disabled={loading}
-    onClick={onClick}
-    className={`w-full flex flex-col items-center justify-center gap-0.5 px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-150 ${
-      loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : colorClass
-    }`}
-  >
-    {loading ? (
-      <span className="flex items-center gap-2">
-        <Spinner /> Loading...
-      </span>
-    ) : (
-      <>
-        <span className="text-[15px] font-bold tracking-widest">{label}</span>
-        <span className="text-[10px] opacity-75 font-normal">{sublabel}</span>
-      </>
-    )}
-  </button>
-);
-
 // ─── FPQI Badge ─────────────────────────────────────────────────────────────────
 const FpqiBadge = ({ value }) => {
   if (value === null || value === undefined)
@@ -393,7 +371,6 @@ const FpaDetailSummary = ({ data }) => {
           />
         )}
       </div>
-      <DefectBar critical={critical} major={major} minor={minor} />
     </div>
   );
 };
@@ -1534,154 +1511,156 @@ const FPAReports = () => {
 
       {/* ── Body ── */}
       <div className="flex-1 overflow-auto flex flex-col p-4 gap-3">
-        {/* ── Filters + Quick row ── */}
-        <div className="flex gap-3 shrink-0">
-          {/* Filters card */}
-          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
-              Filters & Report Type
-            </p>
+        {/* ── Filters (single card, everything inline) ── */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
+          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
+            Filters & Report Type
+          </p>
 
-            {/* Report type tabs */}
-            <div className="flex bg-slate-50 border border-slate-200 rounded-lg overflow-hidden mb-3 w-fit">
-              {REPORT_TYPES.map((rt) => {
-                const Icon = rt.icon;
-                return (
-                  <button
-                    key={rt.value}
-                    onClick={() => setReportType(rt.value)}
-                    className={`flex flex-col items-center gap-0.5 px-5 py-2.5 border-r border-slate-200 last:border-r-0 transition-all min-w-[80px] ${
-                      reportType === rt.value
-                        ? "bg-indigo-600 text-white"
-                        : "text-slate-500 hover:bg-slate-100"
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="text-[11px] font-bold">{rt.label}</span>
-                    <span className="text-[9px] opacity-75">{rt.desc}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-wrap gap-3 items-end">
-              <div className="min-w-[185px] flex-1">
-                <DateTimePicker
-                  label="Start Time"
-                  name="startTime"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                />
-              </div>
-              <div className="min-w-[185px] flex-1">
-                <DateTimePicker
-                  label="End Time"
-                  name="endTime"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                />
-              </div>
-
-              {reportType === "fpaReport" && (
-                <>
-                  <div className="min-w-[190px] flex-1">
-                    <SelectField
-                      label="Model Variant"
-                      options={variants}
-                      value={selectedModelVariant?.value || ""}
-                      onChange={(e) =>
-                        setSelectedModelVariant(
-                          variants.find((o) => o.value === e.target.value) ||
-                            null,
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="min-w-[180px] flex-1">
-                    <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1 block">
-                      <Search className="w-3 h-3" /> Search
-                    </label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
-                      <input
-                        type="text"
-                        placeholder="Model, FGSRNO, defect..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-8 pr-8 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
-                      />
-                      {searchTerm && (
-                        <button
-                          onClick={() => setSearchTerm("")}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              <div className="flex items-center gap-2 pb-0.5 shrink-0">
+          {/* Report type tabs */}
+          <div className="flex bg-slate-50 border border-slate-200 rounded-lg overflow-hidden mb-3 w-fit">
+            {REPORT_TYPES.map((rt) => {
+              const Icon = rt.icon;
+              return (
                 <button
-                  onClick={handleQuery}
-                  disabled={loading}
-                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    loading
-                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                  key={rt.value}
+                  onClick={() => setReportType(rt.value)}
+                  className={`flex flex-col items-center gap-0.5 px-5 py-2.5 border-r border-slate-200 last:border-r-0 transition-all min-w-[80px] ${
+                    reportType === rt.value
+                      ? "bg-indigo-600 text-white"
+                      : "text-slate-500 hover:bg-slate-100"
                   }`}
                 >
-                  {loading ? (
-                    <Spinner cls="w-4 h-4" />
-                  ) : (
-                    <Search className="w-4 h-4" />
-                  )}
-                  {loading ? "Fetching..." : "Query"}
+                  <Icon className="w-4 h-4" />
+                  <span className="text-[11px] font-bold">{rt.label}</span>
+                  <span className="text-[9px] opacity-75">{rt.desc}</span>
                 </button>
-                {reportData.length > 0 && (
-                  <ExportButton data={reportData} filename="FPA_Report" />
-                )}
-              </div>
-            </div>
+              );
+            })}
           </div>
 
-          {/* Quick filters card */}
-          <div className="w-60 shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">
-              Quick Filters
-            </p>
-            <p className="text-[10px] text-slate-400 mb-3">
-              Pre-defined time ranges.
-            </p>
-            <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="min-w-[185px] flex-1">
+              <DateTimePicker
+                label="Start Time"
+                name="startTime"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
+            <div className="min-w-[185px] flex-1">
+              <DateTimePicker
+                label="End Time"
+                name="endTime"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+              />
+            </div>
+
+            {reportType === "fpaReport" && (
+              <>
+                <div className="min-w-[190px] flex-1">
+                  <SelectField
+                    label="Model Variant"
+                    options={variants}
+                    value={selectedModelVariant?.value || ""}
+                    onChange={(e) =>
+                      setSelectedModelVariant(
+                        variants.find((o) => o.value === e.target.value) ||
+                          null,
+                      )
+                    }
+                  />
+                </div>
+                <div className="min-w-[180px] flex-1">
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1 block">
+                    <Search className="w-3 h-3" /> Search
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
+                    <input
+                      type="text"
+                      placeholder="Model, FGSRNO, defect..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-8 pr-8 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+                    />
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* All action buttons — Query, quick filters, Export — inline */}
+            <div className="flex items-center gap-2 pb-0.5 flex-wrap">
+              <button
+                onClick={handleQuery}
+                disabled={loading}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  loading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                }`}
+              >
+                {loading ? (
+                  <Spinner cls="w-4 h-4" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+                {loading ? "Fetching..." : "Query"}
+              </button>
+
               {showQuickYesterday && (
-                <QuickBtn
-                  label="YESTERDAY"
-                  sublabel="Prev day 08:00 → today 08:00"
-                  loading={loading}
+                <button
                   onClick={handleYesterday}
-                  colorClass="bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
-                />
+                  disabled={loading}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                    loading
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      : "bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                  }`}
+                >
+                  Yesterday
+                </button>
               )}
+
               {showQuickToday && (
-                <QuickBtn
-                  label="TODAY"
-                  sublabel="08:00 → now"
-                  loading={loading}
+                <button
                   onClick={handleToday}
-                  colorClass="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-                />
+                  disabled={loading}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                    loading
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                  }`}
+                >
+                  Today
+                </button>
               )}
+
               {showQuickMTD && (
-                <QuickBtn
-                  label="MTD"
-                  sublabel="Month to date"
-                  loading={loading}
+                <button
                   onClick={handleMTD}
-                  colorClass="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-                />
+                  disabled={loading}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                    loading
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                  }`}
+                >
+                  MTD
+                </button>
+              )}
+
+              {reportData.length > 0 && (
+                <ExportButton data={reportData} filename="FPA_Report" />
               )}
             </div>
           </div>
