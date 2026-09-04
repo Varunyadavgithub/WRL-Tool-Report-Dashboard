@@ -1,15 +1,19 @@
+import { useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { assets, baseURL } from "../assets/assets";
 import { Link, useNavigate } from "react-router-dom";
-import { FiLogOut } from "react-icons/fi";
+import { FiLogOut, FiKey } from "react-icons/fi";
 import axios from "axios";
 import { logoutUser } from "../redux/slices/authSlice.js";
 import toast from "react-hot-toast";
+import ChangePasswordModal from "./ChangePasswordModal.jsx";
 
 const NavBar = () => {
   const { user } = useSelector((store) => store.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -54,6 +58,15 @@ const NavBar = () => {
           </div>
 
           <button
+            onClick={() => setShowChangePassword(true)}
+            title="Change Password"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 text-xs md:text-sm font-semibold hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer"
+          >
+            <FiKey size={16} />
+            <span className="hidden sm:inline">Change Password</span>
+          </button>
+
+          <button
             onClick={handleLogout}
             title="Logout"
             className="text-gray-600 hover:text-red-600 transition-colors cursor-pointer p-2"
@@ -61,6 +74,10 @@ const NavBar = () => {
             <FiLogOut size={22} />
           </button>
         </div>
+
+        {showChangePassword && (
+          <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
+        )}
       </div>
     </nav>
   );

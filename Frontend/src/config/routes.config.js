@@ -78,6 +78,7 @@ const HoldCabinateDetails = lazy(
 const TagUpdate = lazy(() => import("../pages/Quality/TagUpdate"));
 const LPTRecipe = lazy(() => import("../pages/Quality/LPTRecipe"));
 const BISDashboard = lazy(() => import("../pages/Quality/BIS/BISDashboard"));
+const BISTestLabDashboard = lazy(() => import("../pages/Quality/BIS/BISTestLabDashboard"));
 const BEECalculation = lazy(() => import("../pages/Quality/BEECalculation"));
 
 const DispatchPerformanceReport = lazy(
@@ -599,8 +600,50 @@ export const ROUTE_CONFIG = [
       },
       {
         path: "/quality/bis-reports",
-        label: "BIS Reports",
+        label: "BIS Test Reports",
         component: BISDashboard,
+        group: "bis",
+      },
+      {
+        path: "/quality/bis-approvals",
+        label: "BIS Approvals",
+        component: BISDashboard,
+        group: "bis",
+      },
+      {
+        path: "/quality/bis-test-schedule",
+        label: "BIS Test Schedule",
+        component: BISDashboard,
+        group: "bis",
+      },
+      {
+        path: "/quality/bis-legacy-reports",
+        label: "BIS Legacy PDF Reports",
+        component: BISDashboard,
+        group: "bis",
+      },
+      {
+        path: "/quality/bis-compliance",
+        label: "BIS Compliance Status",
+        component: BISDashboard,
+        group: "bis",
+      },
+      {
+        path: "/quality/bis-energy",
+        label: "BIS Energy Analysis",
+        component: BISDashboard,
+        group: "bis",
+      },
+      {
+        path: "/quality/bis-config",
+        label: "BIS Config",
+        component: BISDashboard,
+        group: "bis",
+      },
+      {
+        path: "/quality/bis-test-lab",
+        label: "Test Lab Dashboard",
+        component: BISTestLabDashboard,
         group: "bis",
       },
       {

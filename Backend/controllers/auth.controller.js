@@ -280,6 +280,68 @@ export const login = tryCatch(async (req, res) => {
   }
 });
 
+// ================= CHANGE PASSWORD =================
+// Self-service only — always scoped to req.user.id (the authenticated
+// caller), never a client-supplied user id. Mirrors login()'s verify logic
+// (PasswordHash if migrated, else plaintext fallback) and signup()'s
+// dual-column write (Password + PasswordHash) so the legacy plaintext column
+// stays in sync for any consumer of Users outside this app.
+export const changePassword = tryCatch(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const empcod = req.user.id;
+
+  if (!currentPassword || !newPassword) {
+    throw new AppError("Current password and new password are required.", 400);
+  }
+  if (newPassword.length < 6) {
+    throw new AppError("New password must be at least 6 characters.", 400);
+  }
+
+  const pool = await new sql.ConnectionPool(dbConfig1).connect();
+
+  try {
+    const result = await pool
+      .request()
+      .input("empcod", sql.VarChar, empcod)
+      .query(`SELECT Password, PasswordHash FROM Users WHERE UserID = @empcod`);
+
+    const user = result.recordset[0];
+    if (!user) {
+      throw new AppError("User not found", 404);
+    }
+
+    let passwordMatches = false;
+    if (user.PasswordHash) {
+      passwordMatches = await bcrypt.compare(currentPassword, user.PasswordHash);
+    } else if (user.Password === currentPassword) {
+      passwordMatches = true;
+    }
+
+    if (!passwordMatches) {
+      throw new AppError("Current password is incorrect", 401);
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
+
+    await pool
+      .request()
+      .input("empcod", sql.VarChar, empcod)
+      .input("newPassword", sql.VarChar, newPassword)
+      .input("newPasswordHash", sql.VarChar, newPasswordHash).query(`
+        UPDATE Users
+        SET Password = @newPassword, PasswordHash = @newPasswordHash, LastPwChOn = GETDATE()
+        WHERE UserID = @empcod
+      `);
+
+    res.status(200).json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } finally {
+    await pool.close();
+  }
+});
+
 // ================= LOGOUT =================
 export const logout = tryCatch(async (_, res) => {
   res.clearCookie("token", {

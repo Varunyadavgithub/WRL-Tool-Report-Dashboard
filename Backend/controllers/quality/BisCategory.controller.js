@@ -1,7 +1,10 @@
 import sql from "mssql";
+import path from "path";
+import fs from "fs";
 import { dbConfig1, connectToDB } from "../../config/db.config.js";
 import { tryCatch } from "../../utils/tryCatch.js";
 import { AppError } from "../../utils/AppError.js";
+import { UPLOADS_DIR } from "../../utils/storage/config.js";
 
 // Per-model schedule overrides — every field is optional; blank/undefined
 // means "fall back to the BISTestFrequencyConfig global default" (NULL).
@@ -32,7 +35,7 @@ export const getBisCategories = tryCatch(async (_, res) => {
     // Type 100 drops out here — and surfaces Material's own Name alongside
     // BISCategory's ModelName for reference/future material codes.
     const result = await pool.request().query(`
-      SELECT BC.Id, BC.MaterialCode, m.Name AS MaterialName, BC.ModelName, BC.Category, BC.CreatedAt, BC.UpdatedAt,
+      SELECT BC.Id, BC.MaterialCode, m.Name AS MaterialName, BC.ModelName, BC.Category, BC.PhotoPath, BC.CreatedAt, BC.UpdatedAt,
              BC.IntroductionFrequencyMonths, BC.IntroductionDurationDays,
              BC.SoundFrequencyMonths, BC.SoundDurationDays,
              BC.VolumeFrequencyMonths, BC.VolumeDurationDays
@@ -48,6 +51,7 @@ export const getBisCategories = tryCatch(async (_, res) => {
       materialName: row.MaterialName,
       modelName: row.ModelName,
       category: row.Category,
+      photoPath: row.PhotoPath,
       createdAt: row.CreatedAt,
       updatedAt: row.UpdatedAt,
       introductionFrequencyMonths: row.IntroductionFrequencyMonths,
@@ -258,3 +262,105 @@ export const deleteBisCategory = tryCatch(async (req, res) => {
     throw new AppError(`Failed to delete BIS category: ${error.message}`, 500);
   }
 });
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MODEL PHOTO UPLOAD
+═══════════════════════════════════════════════════════════════════════ */
+export const uploadBisCategoryPhoto = tryCatch(async (req, res) => {
+  const { id } = req.params;
+  if (!req.file) throw new AppError("Photo file is required.", 400);
+
+  const pool = await connectToDB(dbConfig1);
+  const existing = await pool
+    .request()
+    .input("Id", sql.Int, parseInt(id, 10))
+    .query(`SELECT Id, PhotoPath FROM BISCategory WHERE Id = @Id`);
+
+  if (existing.recordset.length === 0) {
+    throw new AppError("Record not found.", 404);
+  }
+
+  const newPath = `/uploads/BISModelPhotos/${req.file.filename}`;
+  await pool
+    .request()
+    .input("Id", sql.Int, parseInt(id, 10))
+    .input("Path", sql.NVarChar(300), newPath)
+    .query(`UPDATE BISCategory SET PhotoPath = @Path, UpdatedAt = GETDATE() WHERE Id = @Id`);
+
+  const oldPath = existing.recordset[0].PhotoPath;
+  if (oldPath) {
+    const fullOld = path.join(UPLOADS_DIR, oldPath.replace(/^\/uploads\//, ""));
+    fs.unlink(fullOld, () => {});
+  }
+
+  res.status(200).json({ success: true, message: "Model photo uploaded successfully.", path: newPath });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MODEL SPECS — config-time spec sheet shown on the Test Lab Dashboard in
+   place of live sensor readings, since no chamber telemetry exists.
+═══════════════════════════════════════════════════════════════════════ */
+export const getBisModelSpecs = tryCatch(async (req, res) => {
+  const { materialCode } = req.params;
+  const pool = await connectToDB(dbConfig1);
+
+  const result = await pool
+    .request()
+    .input("MaterialCode", sql.NVarChar(50), materialCode)
+    .query(`
+      SELECT Id, MaterialCode, SpecKey, SpecValue, SortOrder
+      FROM BISModelSpec
+      WHERE MaterialCode = @MaterialCode
+      ORDER BY SortOrder, Id
+    `);
+
+  const specs = result.recordset.map((row) => ({
+    id: row.Id,
+    materialCode: row.MaterialCode,
+    specKey: row.SpecKey,
+    specValue: row.SpecValue,
+    sortOrder: row.SortOrder,
+  }));
+
+  res.status(200).json({ success: true, specs });
+});
+
+// Replaces the full spec list for a model in one call — simplest match for
+// an editable list UI where rows are added/removed/reordered together.
+export const saveBisModelSpecs = tryCatch(async (req, res) => {
+  const { materialCode } = req.params;
+  const { specs } = req.body;
+  if (!materialCode) throw new AppError("Missing required field: materialCode.", 400);
+  if (!Array.isArray(specs)) throw new AppError("specs must be an array.", 400);
+
+  const pool = await connectToDB(dbConfig1);
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    await new sql.Request(transaction)
+      .input("MaterialCode", sql.NVarChar(50), materialCode)
+      .query(`DELETE FROM BISModelSpec WHERE MaterialCode = @MaterialCode`);
+
+    let sortOrder = 0;
+    for (const spec of specs) {
+      if (!spec.specKey) continue;
+      await new sql.Request(transaction)
+        .input("MaterialCode", sql.NVarChar(50), materialCode)
+        .input("SpecKey", sql.NVarChar(150), spec.specKey)
+        .input("SpecValue", sql.NVarChar(300), spec.specValue ?? null)
+        .input("SortOrder", sql.Int, sortOrder++)
+        .query(`
+          INSERT INTO BISModelSpec (MaterialCode, SpecKey, SpecValue, SortOrder)
+          VALUES (@MaterialCode, @SpecKey, @SpecValue, @SortOrder)
+        `);
+    }
+
+    await transaction.commit();
+    res.status(200).json({ success: true, message: "Model specs saved successfully." });
+  } catch (error) {
+    await transaction.rollback();
+    throw new AppError(`Failed to save model specs: ${error.message}`, 500);
+  }
+});
+

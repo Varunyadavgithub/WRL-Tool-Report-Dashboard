@@ -15,29 +15,43 @@ import {
   FaIdCard,
   FaClock,
   FaRedo,
+  FaDoorOpen,
 } from "react-icons/fa";
 import { MdHistory, MdFilterList } from "react-icons/md";
 import { baseURL } from "../../assets/assets";
 import { formatISODateString } from "../../utils/dateUtils";
 
-/* ==================== Dashboard-Style Stat Card ==================== */
-const StatCard = ({ icon: Icon, title, value, color }) => (
-  <div className="bg-white shadow-md rounded-lg p-4 flex items-center">
-    <div className={`mr-4 p-3 rounded-full ${color}`}>
-      <Icon className="text-white text-2xl" />
+/* ==================== Stat Card ==================== */
+const StatCard = ({ icon: Icon, title, value, color, sub }) => (
+  <div className="bg-white shadow-md rounded-xl p-4 flex items-center gap-4 border border-gray-100">
+    <div className={`shrink-0 p-3 rounded-xl ${color}`}>
+      <Icon className="text-white text-xl" />
     </div>
-    <div>
-      <p className="text-gray-500 text-sm">{title}</p>
-      <h2 className="text-2xl font-bold text-gray-800">{value}</h2>
+    <div className="min-w-0">
+      <p className="text-gray-500 text-xs font-medium uppercase tracking-wide">{title}</p>
+      <h2 className="text-2xl font-bold text-gray-800 leading-tight">{value}</h2>
+      {sub && <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>}
     </div>
   </div>
 );
 
+/* ==================== Presence Badge ==================== */
+const PresenceBadge = ({ checkedOut }) =>
+  checkedOut ? (
+    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+      <span className="w-1.5 h-1.5 rounded-full bg-gray-400" /> Checked Out
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> On Site
+    </span>
+  );
+
 const History = () => {
-  const [allVisitors, setAllVisitors] = useState([]);
   const [visitors, setVisitors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [selectedVisitor, setSelectedVisitor] = useState(null);
@@ -46,16 +60,35 @@ const History = () => {
   const [limit, setLimit] = useState(20);
   const [offset, setOffset] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [companies, setCompanies] = useState(0);
+  const [currentlyOnSite, setCurrentlyOnSite] = useState(0);
+
+  // Debounce free-text search so every keystroke doesn't trigger a request.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Any filter change re-queries from page 1 — a stale offset combined with
+  // a narrower filter used to silently return an empty page.
+  useEffect(() => {
+    setOffset(0);
+  }, [debouncedSearch, from, to]);
 
   const fetchVisitors = async () => {
     setLoading(true);
     try {
       const params = { limit, offset };
+      if (debouncedSearch) params.search = debouncedSearch;
+      if (from) params.from = from;
+      if (to) params.to = to;
+
       const res = await axios.get(`${baseURL}visitor/history`, { params });
       if (res.data?.success) {
-        setAllVisitors(res.data.data || []);
         setVisitors(res.data.data || []);
-        setTotalCount(res.data.data?.length || 0);
+        setTotalCount(res.data.totalCount || 0);
+        setCompanies(res.data.companies || 0);
+        setCurrentlyOnSite(res.data.currentlyOnSite || 0);
       } else {
         toast.error(res.data?.message || "Failed to fetch visitors");
       }
@@ -67,40 +100,18 @@ const History = () => {
     }
   };
 
-  const applyFilters = () => {
-    let filtered = [...allVisitors];
-
-    if (search) {
-      const searchLower = search.toLowerCase();
-      filtered = filtered.filter(
-        (v) =>
-          v.visitor_name?.toLowerCase().includes(searchLower) ||
-          v.company?.toLowerCase().includes(searchLower),
-      );
-    }
-
-    if (from) {
-      filtered = filtered.filter(
-        (v) => new Date(v.check_in_time) >= new Date(from + "T00:00:00"),
-      );
-    }
-    if (to) {
-      filtered = filtered.filter(
-        (v) => new Date(v.check_in_time) <= new Date(to + "T23:59:59"),
-      );
-    }
-
-    setVisitors(filtered);
-    setTotalCount(filtered.length);
-  };
-
-  useEffect(() => {
-    applyFilters();
-  }, [search, from, to, allVisitors]);
-
   useEffect(() => {
     fetchVisitors();
-  }, [limit, offset]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [limit, offset, debouncedSearch, from, to]);
+
+  const clearFilters = () => {
+    setSearch("");
+    setFrom("");
+    setTo("");
+  };
+
+  const hasActiveFilters = search || from || to;
 
   const openDetails = async (visitor) => {
     setSelectedVisitor(visitor);
@@ -125,62 +136,60 @@ const History = () => {
     setVisitLogs([]);
   };
 
-  const uniqueCompanies = [
-    ...new Set(visitors.map((v) => v.company).filter(Boolean)),
-  ].length;
-
-  const totalPasses = visitors.reduce(
-    (acc, v) => acc + (v.total_passes ?? 0),
-    0,
-  );
-
   const currentPage = Math.floor(offset / limit) + 1;
   const totalPages = Math.ceil(totalCount / limit) || 1;
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 max-w-full">
       {/* Page Title */}
-      <h1 className="text-3xl font-bold text-center mb-4 text-gray-800">
-        Visitor History
-      </h1>
+      <div className="text-center mb-5">
+        <h1 className="text-3xl font-bold text-gray-800">Visitor History</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Search and review every visitor who has ever checked in, with their full visit timeline.
+        </p>
+      </div>
 
       {/* ==================== Stats Cards ==================== */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <StatCard
           icon={FaUsers}
-          title="Total Visitors"
+          title="Visitors Found"
           value={totalCount}
           color="bg-blue-500"
+          sub={hasActiveFilters ? "Matching current filters" : "All-time"}
         />
         <StatCard
-          icon={MdHistory}
-          title="Total Visits"
-          value={totalPasses}
+          icon={FaDoorOpen}
+          title="Currently On Site"
+          value={currentlyOnSite}
           color="bg-green-500"
+          sub="Not yet checked out"
         />
         <StatCard
           icon={FaBuilding}
           title="Companies"
-          value={uniqueCompanies}
+          value={companies}
           color="bg-purple-500"
+          sub={hasActiveFilters ? "Matching current filters" : "All-time"}
         />
         <StatCard
-          icon={FaSearch}
-          title="Showing"
-          value={`${visitors.length} of ${allVisitors.length}`}
-          color="bg-red-500"
+          icon={MdHistory}
+          title="Page"
+          value={`${currentPage} / ${totalPages}`}
+          color="bg-amber-500"
+          sub={`${visitors.length} on this page`}
         />
       </div>
 
       {/* ==================== Filters Section ==================== */}
-      <div className="bg-white shadow-md rounded-lg p-6 mb-6">
-        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-800">
+      <div className="bg-white shadow-md rounded-xl p-6 mb-6 border border-gray-100">
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
           <MdFilterList className="text-blue-500" /> Filters
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
           {/* Search */}
-          <div className="md:col-span-4">
+          <div className="md:col-span-6">
             <label className="block text-sm font-semibold text-gray-700 mb-1">
               Search
             </label>
@@ -188,10 +197,10 @@ const History = () => {
               <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
               <input
                 type="text"
-                placeholder="Search by Name or Company..."
+                placeholder="Search by name or company across all visitors..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm 
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm
                   bg-white text-gray-800
                   placeholder-gray-400
                   focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -200,7 +209,7 @@ const History = () => {
           </div>
 
           {/* From Date */}
-          <div className="md:col-span-3">
+          <div className="md:col-span-2">
             <label className="block text-sm font-semibold text-gray-700 mb-1">
               From Date
             </label>
@@ -208,14 +217,14 @@ const History = () => {
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-lg text-sm 
+              className="w-full p-2 border border-gray-300 rounded-lg text-sm
                 bg-white text-gray-800
                 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>
 
           {/* To Date */}
-          <div className="md:col-span-3">
+          <div className="md:col-span-2">
             <label className="block text-sm font-semibold text-gray-700 mb-1">
               To Date
             </label>
@@ -223,41 +232,30 @@ const History = () => {
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-lg text-sm 
+              className="w-full p-2 border border-gray-300 rounded-lg text-sm
                 bg-white text-gray-800
                 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>
 
-          {/* Buttons */}
-          <div className="md:col-span-2 flex gap-2">
+          {/* Clear */}
+          <div className="md:col-span-2">
             <button
-              onClick={applyFilters}
-              className="px-4 py-2 bg-blue-500 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-blue-600 transition cursor-pointer flex items-center gap-1"
+              onClick={clearFilters}
+              disabled={!hasActiveFilters}
+              className="w-full px-4 py-2 bg-gray-400 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-gray-500 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
             >
-              <FaSearch className="text-xs" /> Apply
-            </button>
-            <button
-              onClick={() => {
-                setSearch("");
-                setFrom("");
-                setTo("");
-                setOffset(0);
-                fetchVisitors();
-              }}
-              className="px-4 py-2 bg-gray-400 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-gray-500 transition cursor-pointer flex items-center gap-1"
-            >
-              <FaRedo className="text-xs" /> Reset
+              <FaRedo className="text-xs" /> Clear
             </button>
           </div>
         </div>
       </div>
 
       {/* ==================== Visitors Table ==================== */}
-      <div className="bg-white shadow-md rounded-lg p-6">
+      <div className="bg-white shadow-md rounded-xl p-6 border border-gray-100">
         {/* Table Header with Pagination */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-          <h3 className="text-xl font-semibold text-gray-800">
+          <h3 className="text-lg font-semibold text-gray-800">
             Visitor Records
           </h3>
 
@@ -271,7 +269,7 @@ const History = () => {
                   setLimit(Number(e.target.value));
                   setOffset(0);
                 }}
-                className="border border-gray-300 rounded-lg p-1.5 text-sm 
+                className="border border-gray-300 rounded-lg p-1.5 text-sm
                   bg-white text-gray-800
                   focus:outline-none focus:ring-2 focus:ring-blue-400"
               >
@@ -336,13 +334,13 @@ const History = () => {
                     Company
                   </th>
                   <th className="p-3 text-left text-xs font-semibold text-gray-600">
-                    Last Visited
+                    Last Visit
                   </th>
                   <th className="p-3 text-left text-xs font-semibold text-gray-600">
-                    Employee
+                    Status
                   </th>
                   <th className="p-3 text-left text-xs font-semibold text-gray-600">
-                    Department
+                    Host
                   </th>
                   <th className="p-3 text-center text-xs font-semibold text-gray-600">
                     Total Visits
@@ -356,7 +354,7 @@ const History = () => {
                 {visitors.map((v, index) => (
                   <tr
                     key={v.id || index}
-                    className="border-b border-gray-100 hover:bg-gray-50 transition"
+                    className="border-b border-gray-100 hover:bg-blue-50/40 transition-colors"
                   >
                     {/* Visitor Name + Photo */}
                     <td className="p-3">
@@ -391,14 +389,15 @@ const History = () => {
                       {formatISODateString(v.check_in_time) || "—"}
                     </td>
 
-                    {/* Employee */}
-                    <td className="p-3 text-gray-700">
-                      {v.employee_name || "—"}
+                    {/* Status */}
+                    <td className="p-3">
+                      <PresenceBadge checkedOut={Boolean(v.check_out_time)} />
                     </td>
 
-                    {/* Department */}
+                    {/* Host */}
                     <td className="p-3 text-gray-700">
-                      {v.department_name || "—"}
+                      <p className="text-gray-800">{v.employee_name || "—"}</p>
+                      <p className="text-xs text-gray-400">{v.department_name || "—"}</p>
                     </td>
 
                     {/* Total Visits */}
@@ -429,8 +428,16 @@ const History = () => {
               No visitors found
             </h3>
             <p className="text-gray-400 text-sm mt-1">
-              Try adjusting your search or date filters
+              {hasActiveFilters ? "Try adjusting your search or date filters" : "No visitors have checked in yet"}
             </p>
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="mt-4 px-4 py-2 bg-blue-500 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-blue-600 transition cursor-pointer"
+              >
+                Clear Filters
+              </button>
+            )}
           </div>
         )}
 
@@ -490,9 +497,12 @@ const History = () => {
 
                   {/* Info Grid */}
                   <div className="flex-1">
-                    <h3 className="text-2xl font-bold text-gray-800 mb-3">
-                      {selectedVisitor.visitor_name}
-                    </h3>
+                    <div className="flex items-center gap-3 mb-3">
+                      <h3 className="text-2xl font-bold text-gray-800">
+                        {selectedVisitor.visitor_name}
+                      </h3>
+                      <PresenceBadge checkedOut={Boolean(selectedVisitor.check_out_time)} />
+                    </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                       <div className="flex items-center gap-2 text-gray-600">
