@@ -314,169 +314,174 @@ const GasChargingReport = () => {
 
       {/* ── BODY ── */}
       <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3">
-        {/* ── FILTERS + QUICK FILTERS ROW ── */}
-        <div className="flex gap-3 shrink-0">
-          {/* Filters card */}
-          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <div className="flex items-center gap-1.5 mb-3">
-              <Filter className="w-3 h-3 text-slate-400" />
-              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                Filters
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 items-end">
-              <div className="min-w-[150px] flex-1">
-                <SelectField
-                  label="Model"
-                  options={modelOptions}
-                  value={filters.model}
-                  onChange={(e) =>
-                    dispatch(setGasChargingFilters({ model: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="min-w-[150px] flex-1">
-                <SelectField
-                  label="Machine"
-                  options={machineOptions}
-                  value={filters.machine}
-                  onChange={(e) =>
-                    dispatch(setGasChargingFilters({ machine: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="min-w-[150px] flex-1">
-                <SelectField
-                  label="Result"
-                  options={performanceOptions}
-                  value={filters.performance}
-                  onChange={(e) =>
-                    dispatch(
-                      setGasChargingFilters({ performance: e.target.value }),
-                    )
-                  }
-                />
-              </div>
-              <div className="min-w-[150px] flex-1">
-                <SelectField
-                  label="Refrigerant"
-                  options={refrigerantOptions}
-                  value={filters.refrigerant}
-                  onChange={(e) =>
-                    dispatch(
-                      setGasChargingFilters({ refrigerant: e.target.value }),
-                    )
-                  }
-                />
-              </div>
-              <div className="min-w-[175px] flex-1">
-                <DateTimePicker
-                  label="Start Date/Time"
-                  name="startTime"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                />
-              </div>
-              <div className="min-w-[175px] flex-1">
-                <DateTimePicker
-                  label="End Date/Time"
-                  name="endTime"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                />
-              </div>
-              <div className="flex items-center gap-2 pb-0.5 shrink-0">
-                <button
-                  onClick={handleQuery}
-                  disabled={isLoading}
-                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    isLoading
-                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
-                  }`}
-                >
-                  {isLoading ? <Spinner /> : <Search className="w-4 h-4" />}
-                  {isLoading ? "Loading…" : "Query"}
-                </button>
-                <button
-                  onClick={() => refetchReport()}
-                  disabled={isLoading}
-                  title="Refresh"
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all border ${
-                    isLoading
-                      ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
-                      : "bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600"
-                  }`}
-                >
-                  <RefreshCw
-                    className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
-                  />
-                </button>
-                <button
-                  onClick={handleResetFilters}
-                  title="Reset"
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-600 transition-all"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                </button>
-                {gasChargingData.length > 0 && (
-                  <button
-                    onClick={handleExport}
-                    disabled={exportLoading}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                      exportLoading
-                        ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                        : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-                    }`}
-                  >
-                    {exportLoading ? (
-                      <Spinner />
-                    ) : (
-                      <Download className="w-4 h-4" />
-                    )}
-                    {exportLoading ? "Exporting…" : "Export"}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Quick filters card */}
-          <div className="w-60 shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+        {/* ── FILTERS (single card, everything inline) ── */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
+          <div className="flex items-center gap-1.5 mb-3">
+            <Filter className="w-3 h-3 text-slate-400" />
             <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-              Quick Filters
+              Filters
             </p>
-            <p className="text-[10px] text-slate-400 mb-3">
-              Select a preset time range.
-            </p>
-            <div className="flex flex-col gap-2">
-              <QuickBtn
-                label="YESTERDAY"
-                sublabel="Prev day 08:00 → today 08:00"
-                active={activeQuickFilter === "yesterday"}
-                loading={isLoading}
+          </div>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="min-w-[150px] flex-1">
+              <SelectField
+                label="Model"
+                options={modelOptions}
+                value={filters.model}
+                onChange={(e) =>
+                  dispatch(setGasChargingFilters({ model: e.target.value }))
+                }
+              />
+            </div>
+            <div className="min-w-[150px] flex-1">
+              <SelectField
+                label="Machine"
+                options={machineOptions}
+                value={filters.machine}
+                onChange={(e) =>
+                  dispatch(setGasChargingFilters({ machine: e.target.value }))
+                }
+              />
+            </div>
+            <div className="min-w-[150px] flex-1">
+              <SelectField
+                label="Result"
+                options={performanceOptions}
+                value={filters.performance}
+                onChange={(e) =>
+                  dispatch(
+                    setGasChargingFilters({ performance: e.target.value }),
+                  )
+                }
+              />
+            </div>
+            <div className="min-w-[150px] flex-1">
+              <SelectField
+                label="Refrigerant"
+                options={refrigerantOptions}
+                value={filters.refrigerant}
+                onChange={(e) =>
+                  dispatch(
+                    setGasChargingFilters({ refrigerant: e.target.value }),
+                  )
+                }
+              />
+            </div>
+            <div className="min-w-[175px] flex-1">
+              <DateTimePicker
+                label="Start Date/Time"
+                name="startTime"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
+            <div className="min-w-[175px] flex-1">
+              <DateTimePicker
+                label="End Date/Time"
+                name="endTime"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+              />
+            </div>
+
+            {/* All action buttons — Query, quick filters, Refresh, Reset, Export — inline */}
+            <div className="flex items-center gap-2 pb-0.5 flex-wrap">
+              <button
+                onClick={handleQuery}
+                disabled={isLoading}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  isLoading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                }`}
+              >
+                {isLoading ? <Spinner /> : <Search className="w-4 h-4" />}
+                {isLoading ? "Loading…" : "Query"}
+              </button>
+
+              <button
                 onClick={() => handleQuickFilter("yesterday")}
-                colorClass="bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
-                activeClass="bg-amber-700 text-white shadow-sm"
-              />
-              <QuickBtn
-                label="TODAY"
-                sublabel="08:00 → now"
-                active={activeQuickFilter === "today"}
-                loading={isLoading}
+                disabled={isLoading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  isLoading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : activeQuickFilter === "yesterday"
+                      ? "bg-amber-500 text-white shadow-sm ring-2 ring-offset-1 ring-amber-300"
+                      : "bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                }`}
+              >
+                Yesterday
+              </button>
+
+              <button
                 onClick={() => handleQuickFilter("today")}
-                colorClass="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-                activeClass="bg-blue-800 text-white shadow-sm"
-              />
-              <QuickBtn
-                label="MTD"
-                sublabel="Month to date"
-                active={activeQuickFilter === "mtd"}
-                loading={isLoading}
+                disabled={isLoading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  isLoading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : activeQuickFilter === "today"
+                      ? "bg-emerald-600 text-white shadow-sm ring-2 ring-offset-1 ring-emerald-300"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                }`}
+              >
+                Today
+              </button>
+
+              <button
                 onClick={() => handleQuickFilter("mtd")}
-                colorClass="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-                activeClass="bg-emerald-800 text-white shadow-sm"
-              />
+                disabled={isLoading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  isLoading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : activeQuickFilter === "mtd"
+                      ? "bg-indigo-600 text-white shadow-sm ring-2 ring-offset-1 ring-indigo-300"
+                      : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                }`}
+              >
+                MTD
+              </button>
+
+              <button
+                onClick={() => refetchReport()}
+                disabled={isLoading}
+                title="Refresh"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all border ${
+                  isLoading
+                    ? "bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600"
+                }`}
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
+                />
+              </button>
+
+              <button
+                onClick={handleResetFilters}
+                title="Reset"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-600 transition-all"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+
+              {gasChargingData.length > 0 && (
+                <button
+                  onClick={handleExport}
+                  disabled={exportLoading}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                    exportLoading
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                  }`}
+                >
+                  {exportLoading ? (
+                    <Spinner />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                  {exportLoading ? "Exporting…" : "Export"}
+                </button>
+              )}
             </div>
           </div>
         </div>
