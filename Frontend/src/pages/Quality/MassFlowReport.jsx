@@ -84,9 +84,7 @@ const computeRangeStats = (rangeValues, lsl, usl) => {
 
   const mean = rangeValues.reduce((a, v) => a + v, 0) / n;
   const variance =
-    n > 1
-      ? rangeValues.reduce((a, v) => a + (v - mean) ** 2, 0) / (n - 1)
-      : 0;
+    n > 1 ? rangeValues.reduce((a, v) => a + (v - mean) ** 2, 0) / (n - 1) : 0;
   const stdDev = Math.sqrt(variance);
 
   const cp = stdDev > 0 ? (usl - lsl) / (6 * stdDev) : null;
@@ -515,7 +513,13 @@ const CapabilityStats = ({ stats }) => {
     v == null || !Number.isFinite(v) ? "—" : v.toFixed(d);
 
   const cpRating = (v) =>
-    v == null ? "" : v >= 1.33 ? "text-emerald-600" : v >= 1 ? "text-amber-600" : "text-rose-600";
+    v == null
+      ? ""
+      : v >= 1.33
+        ? "text-emerald-600"
+        : v >= 1
+          ? "text-amber-600"
+          : "text-rose-600";
 
   const rangeLabel = stats.isCustomRange
     ? "Custom Range"
@@ -560,12 +564,14 @@ const CapabilityStats = ({ stats }) => {
     <div className="mt-3">
       <p className="text-[10px] text-slate-400 mb-1.5">
         Computed from the{" "}
-        <span className="font-semibold text-slate-500">{stats.n} reading{stats.n === 1 ? "" : "s"}</span>{" "}
-        in {rangeSourceText}{" "}
-        ({fmtNum(stats.modalLower, 1)}–{fmtNum(stats.modalUpper, 1)}) only, not the full filtered dataset.
-        {rangeHintText}
-        {" "}LSL/USL are that range's own edges — Cp/Cpk show how tightly this cluster sits within its own range.
-        {" "}Final LSL/USL are the natural μ±3σ limits, shown for reference only (not used in Cp/Cpk).
+        <span className="font-semibold text-slate-500">
+          {stats.n} reading{stats.n === 1 ? "" : "s"}
+        </span>{" "}
+        in {rangeSourceText} ({fmtNum(stats.modalLower, 1)}–
+        {fmtNum(stats.modalUpper, 1)}) only, not the full filtered dataset.
+        {rangeHintText} LSL/USL are that range's own edges — Cp/Cpk show how
+        tightly this cluster sits within its own range. Final LSL/USL are the
+        natural μ±3σ limits, shown for reference only (not used in Cp/Cpk).
       </p>
       <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-11 gap-2">
         {tiles.map((t) => (
@@ -576,10 +582,14 @@ const CapabilityStats = ({ stats }) => {
             <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide truncate">
               {t.label}
             </p>
-            <p className={`text-sm font-bold font-mono ${t.cls || "text-slate-800"}`}>
+            <p
+              className={`text-sm font-bold font-mono ${t.cls || "text-slate-800"}`}
+            >
               {t.value}
             </p>
-            {t.sub && <p className="text-[9px] text-slate-400 truncate">{t.sub}</p>}
+            {t.sub && (
+              <p className="text-[9px] text-slate-400 truncate">{t.sub}</p>
+            )}
           </div>
         ))}
       </div>
@@ -609,8 +619,14 @@ const bellCurvePoints = (stats, binSize) => {
 };
 
 const BellCurveChart = ({ primary, secondary, binSize }) => {
-  const primaryPoints = useMemo(() => bellCurvePoints(primary, binSize), [primary, binSize]);
-  const secondaryPoints = useMemo(() => bellCurvePoints(secondary, binSize), [secondary, binSize]);
+  const primaryPoints = useMemo(
+    () => bellCurvePoints(primary, binSize),
+    [primary, binSize],
+  );
+  const secondaryPoints = useMemo(
+    () => bellCurvePoints(secondary, binSize),
+    [secondary, binSize],
+  );
 
   const chartData = useMemo(() => {
     if (!primaryPoints.length && !secondaryPoints.length) return null;
@@ -649,9 +665,30 @@ const BellCurveChart = ({ primary, secondary, binSize }) => {
         fill: true,
         order: 2,
       });
-      datasets.push(marker(primary.lsl, "#f59e0b", `Auto LSL (${primary.lsl.toFixed(1)})`, [6, 4]));
-      datasets.push(marker(primary.usl, "#f59e0b", `Auto USL (${primary.usl.toFixed(1)})`, [6, 4]));
-      datasets.push(marker(primary.mean, "#0891b2", `Auto Mean (${primary.mean.toFixed(2)})`, [6, 4]));
+      datasets.push(
+        marker(
+          primary.lsl,
+          "#f59e0b",
+          `Auto LSL (${primary.lsl.toFixed(1)})`,
+          [6, 4],
+        ),
+      );
+      datasets.push(
+        marker(
+          primary.usl,
+          "#f59e0b",
+          `Auto USL (${primary.usl.toFixed(1)})`,
+          [6, 4],
+        ),
+      );
+      datasets.push(
+        marker(
+          primary.mean,
+          "#0891b2",
+          `Auto Mean (${primary.mean.toFixed(2)})`,
+          [6, 4],
+        ),
+      );
     }
     if (secondaryPoints.length) {
       datasets.push({
@@ -666,9 +703,30 @@ const BellCurveChart = ({ primary, secondary, binSize }) => {
         fill: true,
         order: 1,
       });
-      datasets.push(marker(secondary.lsl, "#16a34a", `Custom LSL (${secondary.lsl.toFixed(1)})`, [2, 3]));
-      datasets.push(marker(secondary.usl, "#16a34a", `Custom USL (${secondary.usl.toFixed(1)})`, [2, 3]));
-      datasets.push(marker(secondary.mean, "#4338ca", `Custom Mean (${secondary.mean.toFixed(2)})`, [2, 3]));
+      datasets.push(
+        marker(
+          secondary.lsl,
+          "#16a34a",
+          `Custom LSL (${secondary.lsl.toFixed(1)})`,
+          [2, 3],
+        ),
+      );
+      datasets.push(
+        marker(
+          secondary.usl,
+          "#16a34a",
+          `Custom USL (${secondary.usl.toFixed(1)})`,
+          [2, 3],
+        ),
+      );
+      datasets.push(
+        marker(
+          secondary.mean,
+          "#4338ca",
+          `Custom Mean (${secondary.mean.toFixed(2)})`,
+          [2, 3],
+        ),
+      );
     }
     return { datasets };
   }, [primaryPoints, secondaryPoints, primary, secondary]);
@@ -691,7 +749,8 @@ const BellCurveChart = ({ primary, secondary, binSize }) => {
           cornerRadius: 10,
           callbacks: {
             title: (items) => `Flow ${Number(items[0].parsed.x).toFixed(2)}`,
-            label: (item) => `${item.dataset.label}: ${Number(item.parsed.y).toFixed(2)}`,
+            label: (item) =>
+              `${item.dataset.label}: ${Number(item.parsed.y).toFixed(2)}`,
           },
         },
         datalabels: { display: false },
@@ -737,7 +796,9 @@ const BellCurveChart = ({ primary, secondary, binSize }) => {
           Fitted Normal Distribution
         </span>
         <span className="px-2 py-0.5 bg-pink-50 text-pink-700 text-[11px] font-semibold rounded-full border border-pink-100">
-          {secondaryPoints.length ? "auto + custom range" : "auto (bar/modal) range"}
+          {secondaryPoints.length
+            ? "auto + custom range"
+            : "auto (bar/modal) range"}
         </span>
       </div>
       <div className="h-64 relative">
@@ -869,14 +930,18 @@ const FlowValueHistogram = forwardRef(({ data }, ref) => {
     const fromNum = customFrom !== "" ? Number(customFrom) : null;
     const toNum = customTo !== "" ? Number(customTo) : null;
     const isValid =
-      fromNum != null && toNum != null &&
-      Number.isFinite(fromNum) && Number.isFinite(toNum) &&
+      fromNum != null &&
+      toNum != null &&
+      Number.isFinite(fromNum) &&
+      Number.isFinite(toNum) &&
       fromNum < toNum;
     if (!isValid) return null;
 
     const rangeValues = values.filter((v) => v >= fromNum && v <= toNum);
     const stats = computeRangeStats(rangeValues, fromNum, toNum);
-    return stats ? { ...stats, isUserSelected: false, isCustomRange: true } : null;
+    return stats
+      ? { ...stats, isUserSelected: false, isCustomRange: true }
+      : null;
   }, [values, customFrom, customTo]);
 
   // Bin layout just changed (new data, new bin size) — any previously
@@ -943,7 +1008,9 @@ const FlowValueHistogram = forwardRef(({ data }, ref) => {
       // matches exactly what the on-screen drill-down panel shows.
       const exportLabels = hasSelectedBin ? [labels[selectedBinIndex]] : labels;
       const exportCounts = hasSelectedBin ? [counts[selectedBinIndex]] : counts;
-      const exportRows = hasSelectedBin ? binRows[selectedBinIndex] : scopedData;
+      const exportRows = hasSelectedBin
+        ? binRows[selectedBinIndex]
+        : scopedData;
 
       // Writes the currently-applied filter values (model filter, bin size,
       // selected range, reading count) at the top of a sheet and returns the
@@ -1061,7 +1128,9 @@ const FlowValueHistogram = forwardRef(({ data }, ref) => {
           borderColor: counts.map((_, i) =>
             i === selectedBinIndex ? "#155e75" : "#0e7490",
           ),
-          borderWidth: counts.map((_, i) => (i === selectedBinIndex ? 2.5 : 1.5)),
+          borderWidth: counts.map((_, i) =>
+            i === selectedBinIndex ? 2.5 : 1.5,
+          ),
           borderRadius: 6,
           barPercentage: 0.85,
           categoryPercentage: 0.9,
@@ -1222,7 +1291,10 @@ const FlowValueHistogram = forwardRef(({ data }, ref) => {
             />
             {(customFrom !== "" || customTo !== "") && (
               <button
-                onClick={() => { setCustomFrom(""); setCustomTo(""); }}
+                onClick={() => {
+                  setCustomFrom("");
+                  setCustomTo("");
+                }}
                 className="text-[11px] text-slate-400 font-semibold hover:text-slate-600 hover:underline"
               >
                 Clear
@@ -1249,7 +1321,12 @@ const FlowValueHistogram = forwardRef(({ data }, ref) => {
       </div>
       {values.length > 0 ? (
         <div className="h-64 relative">
-          <Chart type="bar" ref={chartRef} data={chartData} options={chartOptions} />
+          <Chart
+            type="bar"
+            ref={chartRef}
+            data={chartData}
+            options={chartOptions}
+          />
         </div>
       ) : (
         <div className="h-40 flex items-center justify-center text-xs text-slate-400">
@@ -1271,14 +1348,19 @@ const FlowValueHistogram = forwardRef(({ data }, ref) => {
         </div>
       )}
 
-      <BellCurveChart primary={capability} secondary={customCapability} binSize={binSize} />
+      <BellCurveChart
+        primary={capability}
+        secondary={customCapability}
+        binSize={binSize}
+      />
 
       {selectedBinIndex != null && binRows[selectedBinIndex] && (
         <div className="mt-3 border border-cyan-200 bg-cyan-50/40 rounded-lg overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 bg-cyan-50 border-b border-cyan-100">
             <span className="text-xs font-bold text-cyan-800">
-              Flow {labels[selectedBinIndex]} · {binRows[selectedBinIndex].length}{" "}
-              reading{binRows[selectedBinIndex].length === 1 ? "" : "s"}
+              Flow {labels[selectedBinIndex]} ·{" "}
+              {binRows[selectedBinIndex].length} reading
+              {binRows[selectedBinIndex].length === 1 ? "" : "s"}
             </span>
             <button
               onClick={() => setSelectedBinIndex(null)}
@@ -1291,12 +1373,7 @@ const FlowValueHistogram = forwardRef(({ data }, ref) => {
             <table className="w-full text-xs text-left border-separate border-spacing-0">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-white">
-                  {[
-                    "Serial No",
-                    "Model",
-                    "Flow Value",
-                    "Status",
-                  ].map((h) => (
+                  {["Serial No", "Model", "Flow Value", "Status"].map((h) => (
                     <th
                       key={h}
                       className="px-3 py-1.5 font-semibold text-slate-500 border-b border-cyan-100 whitespace-nowrap"
@@ -1714,7 +1791,7 @@ const MassFlowReport = () => {
 
       {/* ── BODY ── */}
       <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
-        {/* ── FILTERS ── */}
+        {/* ── FILTERS (single card, everything inline) ── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
           <div className="flex items-center gap-1.5 mb-3">
             <Filter className="w-3 h-3 text-slate-400" />
@@ -1723,143 +1800,132 @@ const MassFlowReport = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto] gap-4">
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-3 items-end">
-                <div className="min-w-[170px] flex-1">
-                  <DateTimePicker
-                    label="Start Time"
-                    name="startTime"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                  />
-                </div>
-                <div className="min-w-[170px] flex-1">
-                  <DateTimePicker
-                    label="End Time"
-                    name="endTime"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                  />
-                </div>
-                <div className="min-w-[150px] flex-1">
-                  <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                    Model Code
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 1951"
-                    value={modelCode}
-                    onChange={(e) => setModelCode(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
-                  />
-                </div>
-                <div className="min-w-[170px] flex-1">
-                  <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                    Search
-                  </label>
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Serial, Model, Leak Text..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-8 pr-8 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
-                    />
-                    {searchTerm && (
-                      <button
-                        onClick={() => setSearchTerm("")}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2"
-                      >
-                        <X className="w-3 h-3 text-slate-400 hover:text-slate-600" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 pb-0.5 shrink-0">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="min-w-[170px] flex-1">
+              <DateTimePicker
+                label="Start Time"
+                name="startTime"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
+            <div className="min-w-[170px] flex-1">
+              <DateTimePicker
+                label="End Time"
+                name="endTime"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+              />
+            </div>
+            <div className="min-w-[150px] flex-1">
+              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                Model Code
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 1951"
+                value={modelCode}
+                onChange={(e) => setModelCode(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+              />
+            </div>
+            <div className="min-w-[170px] flex-1">
+              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                Search
+              </label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Serial, Model, Leak Text..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-8 pr-8 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+                />
+                {searchTerm && (
                   <button
-                    onClick={handleQuery}
-                    disabled={loading}
-                    className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                      loading
-                        ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                        : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
-                    }`}
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2"
                   >
-                    {loading ? (
-                      <Spinner cls="w-4 h-4" />
-                    ) : (
-                      <Search className="w-4 h-4" />
-                    )}
-                    {loading ? "Loading..." : "Query"}
+                    <X className="w-3 h-3 text-slate-400 hover:text-slate-600" />
                   </button>
-                  {reportData.length > 0 && (
-                    <button
-                      onClick={handleExport}
-                      disabled={exporting}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                        exporting
-                          ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                          : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-200"
-                      }`}
-                    >
-                      {exporting ? (
-                        <Spinner cls="w-4 h-4" />
-                      ) : (
-                        <Download className="w-4 h-4" />
-                      )}
-                      {exporting ? "Exporting..." : "Export"}
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Quick Filters */}
-            <div className="border-l border-slate-100 pl-5 flex flex-col justify-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <Zap className="w-3 h-3 text-amber-400" />
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                  Quick Select
-                </p>
-              </div>
-              <div className="flex flex-col gap-2">
+            {/* All action buttons — Query, quick filters, Export — inline */}
+            <div className="flex items-center gap-2 pb-0.5 flex-wrap">
+              <button
+                onClick={handleQuery}
+                disabled={loading}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  loading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                }`}
+              >
+                {loading ? (
+                  <Spinner cls="w-4 h-4" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+                {loading ? "Loading..." : "Query"}
+              </button>
+
+              <button
+                onClick={handleYesterdayQuery}
+                disabled={loading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  loading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                }`}
+              >
+                Yesterday
+              </button>
+
+              <button
+                onClick={handleTodayQuery}
+                disabled={loading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  loading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                }`}
+              >
+                Today
+              </button>
+
+              <button
+                onClick={handleMTDQuery}
+                disabled={loading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  loading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                }`}
+              >
+                MTD
+              </button>
+
+              {reportData.length > 0 && (
                 <button
-                  onClick={handleYesterdayQuery}
-                  disabled={loading}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all border ${
-                    loading
-                      ? "opacity-50 cursor-not-allowed bg-slate-50 text-slate-400 border-slate-200"
-                      : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                  onClick={handleExport}
+                  disabled={exporting}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                    exporting
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-200"
                   }`}
                 >
-                  Yesterday <ChevronRight className="w-3 h-3" />
+                  {exporting ? (
+                    <Spinner cls="w-4 h-4" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                  {exporting ? "Exporting..." : "Export"}
                 </button>
-                <button
-                  onClick={handleTodayQuery}
-                  disabled={loading}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all border ${
-                    loading
-                      ? "opacity-50 cursor-not-allowed bg-slate-50 text-slate-400 border-slate-200"
-                      : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                  }`}
-                >
-                  Today <ChevronRight className="w-3 h-3" />
-                </button>
-                <button
-                  onClick={handleMTDQuery}
-                  disabled={loading}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all border ${
-                    loading
-                      ? "opacity-50 cursor-not-allowed bg-slate-50 text-slate-400 border-slate-200"
-                      : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                  }`}
-                >
-                  Month to Date <ChevronRight className="w-3 h-3" />
-                </button>
-              </div>
+              )}
             </div>
           </div>
         </div>
