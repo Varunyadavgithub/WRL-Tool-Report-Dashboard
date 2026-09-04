@@ -13,36 +13,46 @@ import complianceRoute from "./compliance.route.js";
 import auditReport from "./auditReport.route.js";
 import readingRoute from "./reading.route.js";
 import dashboardRoute from "./display.route.js";
-import factoryOsRoute     from "./factoryOs.route.js";
-import partProcessRoute   from "./partProcess.route.js";
-import masterConfigRoute  from "./masterConfig.route.js";
-import energyMeterRoute   from "./energyMeter.route.js";
-import visionReportRoute  from "./visionReport.route.js";
-import chemicalRoute      from "./chemical.route.js";
-import settingsRoute      from "./settings.route.js";
+import factoryOsRoute from "./factoryOs.route.js";
+import partProcessRoute from "./partProcess.route.js";
+import masterConfigRoute from "./masterConfig.route.js";
+import energyMeterRoute from "./energyMeter.route.js";
+import visionReportRoute from "./visionReport.route.js";
+import chemicalRoute from "./chemical.route.js";
+import settingsRoute from "./settings.route.js";
 
 const routers = Router();
 
 routers.use("/auth", authRoutes);
-routers.use("/permission", permissionRoutes);
 routers.use("/shared", commonRoutes);
+routers.use("/dashboard", dashboardRoute);
+routers.use("/planing", productionPlaningRoutes);
 routers.use("/prod", productionRoutes);
+// IOT
+routers.use("/master-config", masterConfigRoute);
+routers.use("/factory-os", factoryOsRoute);
+routers.use("/part-process", partProcessRoute);
+
+// Quality
 routers.use("/quality", qualityRoutes);
 routers.use("/est-report", estReportRoutes);
 routers.use("/gas-charging", gasChargingReportRoutes);
+
+// Vision Camera
+routers.use("/vision-report", visionReportRoute);
+
 routers.use("/dispatch", dispatchRoute);
-routers.use("/planing", productionPlaningRoutes);
 routers.use("/visitor", visitorRoutes);
 routers.use("/compliance", complianceRoute);
 routers.use("/audit-report", auditReport);
-routers.use("/reading", readingRoute);
-routers.use("/dashboard", dashboardRoute);
-routers.use("/factory-os",   factoryOsRoute);
-routers.use("/part-process", partProcessRoute);
-routers.use("/master-config", masterConfigRoute);
-routers.use("/energy-meters", energyMeterRoute);
-routers.use("/vision-report", visionReportRoute);
 routers.use("/chemical", chemicalRoute);
+
+// Utility
+routers.use("/reading", readingRoute);
+routers.use("/energy-meters", energyMeterRoute);
+
+// Settings
+routers.use("/permission", permissionRoutes);
 routers.use("/settings", settingsRoute);
 
 export default routers;

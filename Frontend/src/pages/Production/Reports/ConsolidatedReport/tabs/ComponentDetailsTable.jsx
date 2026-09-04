@@ -1,4 +1,3 @@
-import EmptyState from "../../../../components/ui/EmptyState";
 import { PackageOpen } from "lucide-react";
 
 function ComponentDetailsTable({ data }) {

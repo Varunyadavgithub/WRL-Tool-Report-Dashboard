@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
-import SelectField from "../../components/ui/SelectField";
+import SelectField from "../../../components/ui/SelectField";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { baseURL } from "../../assets/assets";
+import { baseURL } from "../../../assets/assets";
 import {
   Loader2,
   ScanLine,

@@ -5,9 +5,9 @@ import {
 } from "chart.js";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { baseURL } from "../../assets/assets.js";
-import { CATEGORY_MAPPINGS } from "../../utils/mapCategories.js";
-import HourlyWidget from "../../components/lineHourly/HourlyWidget.jsx";
+import { baseURL } from "../../../assets/assets.js";
+import { CATEGORY_MAPPINGS } from "../../../utils/mapCategories.js";
+import HourlyWidget from "../../../components/lineHourly/HourlyWidget.jsx";
 import {
   Factory, Truck, Settings, Search, Download, Calendar, History,
   Gauge, Loader2, RefreshCw, Zap, Wind, Eye, Layers, Thermometer,
@@ -390,13 +390,13 @@ const LineWiseReport = () => {
               />
             </div>
             <div className="flex items-center gap-2 pb-0.5">
-              <button onClick={handleYesterday} disabled={loading} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-amber-500 hover:bg-amber-600 text-white shadow-sm"}`}>
+              <button onClick={handleYesterday} disabled={loading} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-amber-500 hover:bg-amber-600 text-white shadow-sm"}`}>
                 {loading ? <Spinner cls="w-4 h-4" /> : <History className="w-4 h-4" />} Yesterday
               </button>
-              <button onClick={handleToday} disabled={loading} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"}`}>
+              <button onClick={handleToday} disabled={loading} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"}`}>
                 {loading ? <Spinner cls="w-4 h-4" /> : <Calendar className="w-4 h-4" />} Today
               </button>
-              <button onClick={handleQuery} disabled={loading} className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"}`}>
+              <button onClick={handleQuery} disabled={loading} className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${loading ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"}`}>
                 {loading ? <Spinner cls="w-4 h-4" /> : <Search className="w-4 h-4" />}
                 {loading ? "Loading…" : "Query"}
               </button>

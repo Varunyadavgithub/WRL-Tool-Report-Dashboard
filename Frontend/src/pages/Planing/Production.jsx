@@ -36,7 +36,7 @@ const Spinner = ({ cls = "w-4 h-4" }) => (
 /* ════════════════════════════════════════════
    MAIN COMPONENT
 ════════════════════════════════════════════ */
-const ProductionPlanning = () => {
+const Production = () => {
   const { user } = useSelector((store) => store.auth);
 
   /* ── Loading ── */
@@ -470,85 +470,83 @@ const ProductionPlanning = () => {
 
       {/* ── Body ── */}
       <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3">
-        {/* ── Filters + Form row ── */}
-        <div className="flex gap-3 shrink-0">
-          {/* Filters & Inputs card */}
-          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
-              Plan Details
+        {/* ── Filters + Actions (single card, Barcode-style) ── */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
+          <div className="flex items-center gap-1.5 mb-3">
+            <Layers className="w-3 h-3 text-slate-400" />
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+              Filter Plan
             </p>
-            <div className="flex flex-wrap gap-3 items-end">
-              <div className="min-w-[190px] flex-1">
-                <SelectField
-                  label="Model Name"
-                  options={modelNameOptions}
-                  value={selectedModelName?.value || ""}
-                  onChange={(e) =>
-                    setSelectedModelName(
-                      modelNameOptions.find(
-                        (opt) => opt.value === e.target.value,
-                      ) || null,
-                    )
-                  }
-                />
-              </div>
-              <div className="min-w-[190px] flex-1">
-                <SelectField
-                  label="Plan Type"
-                  options={planTypeOptions}
-                  value={selectedPlan || ""}
-                  onChange={(e) => setSelectedPlan(e.target.value)}
-                />
-              </div>
-              <div className="min-w-[190px] flex-1">
-                <SelectField
-                  label="Plan Month Year"
-                  options={planMonthOptions}
-                  value={selectedPlanMonth?.value || ""}
-                  onChange={(e) =>
-                    setSelectedPlanMonth(
-                      planMonthOptions.find(
-                        (opt) => opt.value === e.target.value,
-                      ) || null,
-                    )
-                  }
-                />
-              </div>
-              <div className="min-w-[160px] flex-1">
-                <InputField
-                  label="Plan Quantity"
-                  type="number"
-                  placeholder="Enter Quantity"
-                  name="planQuantity"
-                  value={planQuantity}
-                  onChange={(e) => setPlanQuantity(e.target.value)}
-                />
-              </div>
-              <div className="min-w-[160px] flex-1">
-                <InputField
-                  label="Remark"
-                  type="text"
-                  placeholder="Enter Remark"
-                  name="remark"
-                  value={remark}
-                  onChange={(e) => setRemark(e.target.value)}
-                />
-              </div>
-            </div>
           </div>
 
-          {/* Actions card */}
-          <div className="w-64 shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
-              Actions
-            </p>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="min-w-[190px] flex-1">
+              <SelectField
+                label="Model Name"
+                options={modelNameOptions}
+                value={selectedModelName?.value || ""}
+                onChange={(e) =>
+                  setSelectedModelName(
+                    modelNameOptions.find(
+                      (opt) => opt.value === e.target.value,
+                    ) || null,
+                  )
+                }
+              />
+            </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-col gap-2 mt-auto">
+            <div className="min-w-[190px] flex-1">
+              <SelectField
+                label="Plan Type"
+                options={planTypeOptions}
+                value={selectedPlan || ""}
+                onChange={(e) => setSelectedPlan(e.target.value)}
+              />
+            </div>
+
+            <div className="min-w-[190px] flex-1">
+              <SelectField
+                label="Plan Month Year"
+                options={planMonthOptions}
+                value={selectedPlanMonth?.value || ""}
+                onChange={(e) =>
+                  setSelectedPlanMonth(
+                    planMonthOptions.find(
+                      (opt) => opt.value === e.target.value,
+                    ) || null,
+                  )
+                }
+              />
+            </div>
+
+            <div className="min-w-[160px] flex-1">
+              <InputField
+                label="Plan Quantity"
+                type="number"
+                placeholder="Enter Quantity"
+                name="planQuantity"
+                value={planQuantity}
+                onChange={(e) => setPlanQuantity(e.target.value)}
+              />
+            </div>
+
+            <div className="min-w-[160px] flex-1">
+              <InputField
+                label="Remark"
+                type="text"
+                placeholder="Enter Remark"
+                name="remark"
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+              />
+            </div>
+
+            {/* Action buttons — inline, Barcode-style */}
+            <div className="flex items-center gap-2 pb-0.5">
               <button
                 onClick={fetchProductionPlanningData}
                 disabled={loading}
-                className={`flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
                   loading
                     ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                     : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
@@ -559,27 +557,29 @@ const ProductionPlanning = () => {
                 ) : (
                   <Search className="w-4 h-4" />
                 )}
-                {loading ? "Fetching..." : "Search"}
+                {loading ? "Fetching…" : "Search"}
               </button>
+
               <button
                 onClick={handleUpdate}
                 disabled={loading}
-                className={`flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                   loading
                     ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                    : "bg-amber-500 hover:bg-amber-600 text-white shadow-sm shadow-amber-200"
+                    : "bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
                 }`}
               >
                 <RefreshCw className="w-4 h-4" />
                 Update
               </button>
+
               <button
                 onClick={handleAddPlan}
                 disabled={loading}
-                className={`flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                   loading
                     ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                    : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-200"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
                 }`}
               >
                 <Plus className="w-4 h-4" />
@@ -592,14 +592,18 @@ const ProductionPlanning = () => {
         {/* ── Bulk Add via Excel ── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
           <div className="flex items-center justify-between mb-3 flex-wrap gap-1">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-              Bulk Add via Excel
-            </p>
+            <div className="flex items-center gap-1.5">
+              <FileSpreadsheet className="w-3 h-3 text-slate-400" />
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                Bulk Add via Excel
+              </p>
+            </div>
             <span className="text-[10px] text-slate-400">
               Columns: PlanMonthYear, Material (Alias), PlanQty, PlanType
               (FG/ASSEMBLY), Remark (optional)
             </span>
           </div>
+
           <div className="flex flex-wrap gap-3 items-end">
             <div className="min-w-[220px]">
               <InputField
@@ -611,53 +615,55 @@ const ProductionPlanning = () => {
               />
             </div>
 
-            <button
-              onClick={handleDownloadTemplate}
-              className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 transition-all"
-            >
-              <Download className="w-4 h-4" />
-              Download Template
-            </button>
-
-            {bulkPlanFile && (
+            <div className="flex items-center gap-2 pb-0.5">
               <button
-                onClick={handleBulkFileParse}
-                disabled={loading}
-                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  loading
-                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
-                }`}
+                onClick={handleDownloadTemplate}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 hover:border-blue-300 hover:text-blue-600 transition-all"
               >
-                {loading ? (
-                  <Spinner cls="w-4 h-4" />
-                ) : (
-                  <Upload className="w-4 h-4" />
-                )}
-                {loading ? "Processing..." : "Preview File"}
+                <Download className="w-4 h-4" />
+                Download Template
               </button>
-            )}
 
-            {bulkPlanData.length > 0 && (
-              <button
-                onClick={handleBulkAddPlan}
-                disabled={loading}
-                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  loading
-                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                    : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-200"
-                }`}
-              >
-                {loading ? (
-                  <Spinner cls="w-4 h-4" />
-                ) : (
-                  <CloudUpload className="w-4 h-4" />
-                )}
-                {loading
-                  ? "Uploading..."
-                  : `Upload ${bulkPlanData.length} Plan(s)`}
-              </button>
-            )}
+              {bulkPlanFile && (
+                <button
+                  onClick={handleBulkFileParse}
+                  disabled={loading}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    loading
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                  }`}
+                >
+                  {loading ? (
+                    <Spinner cls="w-4 h-4" />
+                  ) : (
+                    <Upload className="w-4 h-4" />
+                  )}
+                  {loading ? "Processing…" : "Preview File"}
+                </button>
+              )}
+
+              {bulkPlanData.length > 0 && (
+                <button
+                  onClick={handleBulkAddPlan}
+                  disabled={loading}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    loading
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                  }`}
+                >
+                  {loading ? (
+                    <Spinner cls="w-4 h-4" />
+                  ) : (
+                    <CloudUpload className="w-4 h-4" />
+                  )}
+                  {loading
+                    ? "Uploading…"
+                    : `Upload ${bulkPlanData.length} Plan(s)`}
+                </button>
+              )}
+            </div>
           </div>
 
           {bulkPlanData.length > 0 && (
@@ -774,7 +780,7 @@ const ProductionPlanning = () => {
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 shrink-0">
             <div className="flex items-center gap-3">
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                Planning Data
+                Plan Details
               </span>
               {selectedPlan && (
                 <span className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium">
@@ -912,4 +918,4 @@ const ProductionPlanning = () => {
   );
 };
 
-export default ProductionPlanning;
+export default Production;

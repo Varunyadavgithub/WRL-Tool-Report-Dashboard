@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { baseURL } from "../../../assets/assets";
+import { baseURL } from "../../../../assets/assets";
 import {
   Search,
   Package,
@@ -697,7 +697,7 @@ function ConsolidatedReport() {
               <button
                 onClick={handleQuery}
                 disabled={isAnyLoading}
-                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
                   isAnyLoading
                     ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                     : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"

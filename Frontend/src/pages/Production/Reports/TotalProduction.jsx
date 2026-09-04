@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import SelectField from "../../components/ui/SelectField";
-import DateTimePicker from "../../components/ui/DateTimePicker";
-import ExportButton from "../../components/ui/ExportButton";
-import Loader from "../../components/ui/Loader";
+import SelectField from "../../../components/ui/SelectField.jsx";
+import DateTimePicker from "../../../components/ui/DateTimePicker.jsx";
+import ExportButton from "../../../components/ui/ExportButton.jsx";
+import Loader from "../../../components/ui/Loader.jsx";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { baseURL } from "../../assets/assets";
-import { useGetModelVariantsQuery } from "../../redux/api/commonApi.js";
+import { baseURL } from "../../../assets/assets.js";
+import { useGetModelVariantsQuery } from "../../../redux/api/commonApi.js";
 import * as XLSX from "xlsx";
 import {
   Search,
@@ -425,112 +425,110 @@ const TotalProduction = () => {
 
       {/* ── BODY ── */}
       <div className="flex-1 overflow-hidden flex flex-col p-4 gap-3">
-        {/* ── FILTERS + QUICK FILTERS ROW ── */}
-        <div className="flex gap-3 shrink-0">
-          {/* Filters card */}
-          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <div className="flex items-center gap-1.5 mb-3">
-              <Filter className="w-3 h-3 text-slate-400" />
-              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                Filters
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 items-end">
-              <div className="min-w-[170px] flex-1">
-                <SelectField
-                  label="Model Variant"
-                  options={variants}
-                  value={selectedModelVariant?.value || ""}
-                  onChange={(e) =>
-                    setSelectedModelVariant(
-                      variants.find((o) => o.value === e.target.value) || null,
-                    )
-                  }
-                />
-              </div>
-              <div className="min-w-[170px] flex-1">
-                <SelectField
-                  label="Department"
-                  options={DEPARTMENT_OPTIONS}
-                  value={selectedDep?.value || ""}
-                  onChange={(e) =>
-                    setSelectedDep(
-                      DEPARTMENT_OPTIONS.find(
-                        (o) => o.value === e.target.value,
-                      ) || null,
-                    )
-                  }
-                />
-              </div>
-              <div className="min-w-[185px] flex-1">
-                <DateTimePicker
-                  label="Start Time"
-                  name="startTime"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                />
-              </div>
-              <div className="min-w-[185px] flex-1">
-                <DateTimePicker
-                  label="End Time"
-                  name="endTime"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                />
-              </div>
-              <div className="flex items-center gap-2 pb-0.5 shrink-0">
-                <button
-                  onClick={handleQuery}
-                  disabled={loading}
-                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    loading
-                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
-                  }`}
-                >
-                  {loading ? <Spinner /> : <Search className="w-4 h-4" />}
-                  {loading ? "Fetching…" : "Query"}
-                </button>
-                {totalProductionData.length > 0 && (
-                  <ExportButton
-                    fetchData={fetchExportData}
-                    filename="Total_Production_Report"
-                  />
-                )}
-              </div>
-            </div>
+        {/* ── FILTERS (single card, everything inline) ── */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
+          <div className="flex items-center gap-1.5 mb-3">
+            <Filter className="w-3 h-3 text-slate-400" />
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+              Filters
+            </p>
           </div>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="min-w-[170px] flex-1">
+              <SelectField
+                label="Model Variant"
+                options={variants}
+                value={selectedModelVariant?.value || ""}
+                onChange={(e) =>
+                  setSelectedModelVariant(
+                    variants.find((o) => o.value === e.target.value) || null,
+                  )
+                }
+              />
+            </div>
+            <div className="min-w-[170px] flex-1">
+              <SelectField
+                label="Department"
+                options={DEPARTMENT_OPTIONS}
+                value={selectedDep?.value || ""}
+                onChange={(e) =>
+                  setSelectedDep(
+                    DEPARTMENT_OPTIONS.find(
+                      (o) => o.value === e.target.value,
+                    ) || null,
+                  )
+                }
+              />
+            </div>
+            <div className="min-w-[185px] flex-1">
+              <DateTimePicker
+                label="Start Time"
+                name="startTime"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
+            <div className="min-w-[185px] flex-1">
+              <DateTimePicker
+                label="End Time"
+                name="endTime"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+              />
+            </div>
 
-          {/* Quick filters card */}
-          <div className="w-60 shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">
-              Quick Filters
-            </p>
-            <p className="text-[10px] text-slate-400 mb-3">
-              Select a preset time range.
-            </p>
-            <div className="flex flex-col gap-2">
-              <QuickBtn
-                label="YESTERDAY"
-                sublabel="Prev day 08:00 → today 08:00"
-                loading={ydayLoading}
+            <div className="flex items-center gap-2 pb-0.5 flex-wrap">
+              <button
+                onClick={handleQuery}
+                disabled={loading}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  loading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                }`}
+              >
+                {loading ? <Spinner /> : <Search className="w-4 h-4" />}
+                {loading ? "Fetching…" : "Query"}
+              </button>
+
+              <button
                 onClick={fetchYesterday}
-                colorClass="bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
-              />
-              <QuickBtn
-                label="TODAY"
-                sublabel="08:00 → now"
-                loading={todayLoading}
+                disabled={ydayLoading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  ydayLoading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                }`}
+              >
+                {ydayLoading && <Spinner cls="w-4 h-4" />}
+                {ydayLoading ? "Loading…" : "Yesterday"}
+              </button>
+
+              <button
                 onClick={fetchToday}
-                colorClass="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-              />
-              <QuickBtn
-                label="MTD"
-                sublabel="Month to date"
-                loading={monthLoading}
+                disabled={todayLoading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  todayLoading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                }`}
+              >
+                {todayLoading && <Spinner cls="w-4 h-4" />}
+                {todayLoading ? "Loading…" : "Today"}
+              </button>
+
+              <button
                 onClick={fetchMTD}
-                colorClass="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-              />
+                disabled={monthLoading}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  monthLoading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                }`}
+              >
+                {monthLoading && <Spinner cls="w-4 h-4" />}
+                {monthLoading ? "Loading…" : "MTD"}
+              </button>
             </div>
           </div>
         </div>

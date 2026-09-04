@@ -39,11 +39,11 @@ const Layout = () => {
 
         <main
           className={`
-            flex-1 overflow-auto transition-all duration-300 ease-in-out
+            flex-1 overflow-hidden transition-all duration-300 ease-in-out
             ${isMobile ? "ml-0" : isSidebarExpanded ? "ml-64" : "ml-[56px]"}
           `}
         >
-          <div className="min-h-full">
+          <div className="h-full">
             <Outlet />
           </div>
         </main>

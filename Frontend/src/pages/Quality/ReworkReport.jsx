@@ -214,7 +214,14 @@ const StatusBadge = ({ status }) => {
 };
 
 // ── QuickBtn ───────────────────────────────────────────────────────────────────
-const QuickBtn = ({ label, sublabel, loading, onClick, colorClass, categoryCount }) => (
+const QuickBtn = ({
+  label,
+  sublabel,
+  loading,
+  onClick,
+  colorClass,
+  categoryCount,
+}) => (
   <button
     disabled={loading}
     onClick={onClick}
@@ -372,7 +379,10 @@ const CategoryMultiSelect = ({ selected, onChange }) => {
                     }`}
                   >
                     {active && (
-                      <CheckCircle className="w-3 h-3 text-white" strokeWidth={3} />
+                      <CheckCircle
+                        className="w-3 h-3 text-white"
+                        strokeWidth={3}
+                      />
                     )}
                   </span>
                   {cat}
@@ -527,7 +537,9 @@ const DefectMultiSelect = ({ options, selected, onChange }) => {
                 type="button"
                 onClick={() =>
                   filteredOptions.every((o) => selected.includes(o))
-                    ? onChange(selected.filter((s) => !filteredOptions.includes(s)))
+                    ? onChange(
+                        selected.filter((s) => !filteredOptions.includes(s)),
+                      )
                     : onChange([...new Set([...selected, ...filteredOptions])])
                 }
                 className="text-[10px] font-semibold text-blue-600 hover:underline transition-colors"
@@ -566,7 +578,10 @@ const DefectMultiSelect = ({ options, selected, onChange }) => {
                       }`}
                     >
                       {active && (
-                        <CheckCircle className="w-3 h-3 text-white" strokeWidth={3} />
+                        <CheckCircle
+                          className="w-3 h-3 text-white"
+                          strokeWidth={3}
+                        />
                       )}
                     </span>
                     <span className="truncate">{d}</span>
@@ -575,7 +590,9 @@ const DefectMultiSelect = ({ options, selected, onChange }) => {
               })
             ) : (
               <div className="px-3 py-4 text-center text-[11px] text-slate-400">
-                {search ? "No defects match your search" : "No defects available"}
+                {search
+                  ? "No defects match your search"
+                  : "No defects available"}
               </div>
             )}
           </div>
@@ -653,10 +670,15 @@ const ReworkTooltip = ({ active, payload, label }) => {
   const total = payload.reduce((s, p) => s + (p.value || 0), 0);
   return (
     <div className="bg-white border border-slate-200 shadow-xl rounded-lg p-3 text-xs font-mono max-w-[220px]">
-      <p className="font-bold text-slate-800 mb-2 text-[11px] leading-tight">{label}</p>
+      <p className="font-bold text-slate-800 mb-2 text-[11px] leading-tight">
+        {label}
+      </p>
       {payload.map((p) => (
         <div key={p.name} className="flex items-center gap-2 mb-0.5">
-          <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: p.fill }} />
+          <span
+            className="w-2.5 h-2.5 rounded-sm shrink-0"
+            style={{ background: p.fill }}
+          />
           <span className="text-slate-600">{p.name}:</span>
           <span className="font-bold" style={{ color: p.fill }}>
             {p.value}
@@ -673,9 +695,7 @@ const ReworkTooltip = ({ active, payload, label }) => {
 const ReworkBarChart = ({ data, chartRef }) => {
   const chartData = data.map((d) => ({
     name:
-      d.Model_Name.length > 30
-        ? d.Model_Name.slice(0, 28) + "…"
-        : d.Model_Name,
+      d.Model_Name.length > 30 ? d.Model_Name.slice(0, 28) + "…" : d.Model_Name,
     Closed: d.closed,
     Open: d.open,
   }));
@@ -690,7 +710,11 @@ const ReworkBarChart = ({ data, chartRef }) => {
           margin={{ top: 4, right: 50, left: 8, bottom: 4 }}
           barSize={16}
         >
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            horizontal={false}
+            stroke="#f1f5f9"
+          />
           <XAxis
             type="number"
             tick={{ fontSize: 10, fill: "#94a3b8", fontFamily: "monospace" }}
@@ -709,10 +733,24 @@ const ReworkBarChart = ({ data, chartRef }) => {
           <Legend
             iconType="square"
             iconSize={10}
-            wrapperStyle={{ fontSize: 11, fontFamily: "monospace", paddingTop: 8 }}
+            wrapperStyle={{
+              fontSize: 11,
+              fontFamily: "monospace",
+              paddingTop: 8,
+            }}
           />
-          <Bar dataKey="Closed" stackId="a" fill="#22c55e" radius={[0, 0, 0, 0]} />
-          <Bar dataKey="Open" stackId="a" fill="#ef4444" radius={[0, 3, 3, 0]} />
+          <Bar
+            dataKey="Closed"
+            stackId="a"
+            fill="#22c55e"
+            radius={[0, 0, 0, 0]}
+          />
+          <Bar
+            dataKey="Open"
+            stackId="a"
+            fill="#ef4444"
+            radius={[0, 3, 3, 0]}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -728,10 +766,14 @@ const DefectTooltip = ({ active, payload, label }) => {
   const rework = payload[0]?.payload?.rework;
   return (
     <div className="bg-white border border-slate-200 shadow-xl rounded-lg p-3 text-xs font-mono max-w-[230px]">
-      <p className="font-bold text-slate-800 mb-2 text-[11px] leading-tight">{label}</p>
+      <p className="font-bold text-slate-800 mb-2 text-[11px] leading-tight">
+        {label}
+      </p>
       <div className="flex items-center gap-2 mb-1">
         <span className="text-slate-500">Defect Ratio:</span>
-        <span className={`font-bold ${rl.color}`}>{val != null ? `${val}%` : "N/A"}</span>
+        <span className={`font-bold ${rl.color}`}>
+          {val != null ? `${val}%` : "N/A"}
+        </span>
         {val != null && (
           <span
             className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${rl.bg} ${rl.color} ${rl.border}`}
@@ -758,9 +800,7 @@ const DefectRatioBars = ({ data, chartRef }) => {
   const withRatio = data.filter((d) => d.defectRatio != null);
   const chartData = withRatio.map((d) => ({
     name:
-      d.Model_Name.length > 30
-        ? d.Model_Name.slice(0, 28) + "…"
-        : d.Model_Name,
+      d.Model_Name.length > 30 ? d.Model_Name.slice(0, 28) + "…" : d.Model_Name,
     "Defect Ratio": Number(d.defectRatio.toFixed(2)),
     production: d.production,
     rework: d.reworkTotal,
@@ -777,7 +817,11 @@ const DefectRatioBars = ({ data, chartRef }) => {
           margin={{ top: 4, right: 60, left: 8, bottom: 4 }}
           barSize={16}
         >
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            horizontal={false}
+            stroke="#f1f5f9"
+          />
           <XAxis
             type="number"
             tick={{ fontSize: 10, fill: "#94a3b8", fontFamily: "monospace" }}
@@ -926,7 +970,9 @@ const DefectRatioTable = ({ data }) => {
                           }}
                         />
                       </div>
-                      <span className={`font-bold font-mono text-sm ${rl.color}`}>
+                      <span
+                        className={`font-bold font-mono text-sm ${rl.color}`}
+                      >
                         {row.defectRatio.toFixed(2)}%
                       </span>
                     </div>
@@ -1024,18 +1070,24 @@ const BreakdownTable = ({ data, selectedModel, onModelClick }) => {
       <table className="min-w-full text-xs border-separate border-spacing-0">
         <thead className="sticky top-0 z-10">
           <tr className="bg-slate-100">
-            {["Sr. No.", "Model", "Total", "Open", "Closed", "Close Rate", ""].map(
-              (h, i) => (
-                <th
-                  key={h}
-                  className={`px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap ${
-                    i <= 1 ? "text-left" : "text-center"
-                  }`}
-                >
-                  {h}
-                </th>
-              ),
-            )}
+            {[
+              "Sr. No.",
+              "Model",
+              "Total",
+              "Open",
+              "Closed",
+              "Close Rate",
+              "",
+            ].map((h, i) => (
+              <th
+                key={h}
+                className={`px-3 py-2.5 font-semibold text-slate-600 border-b border-slate-200 whitespace-nowrap ${
+                  i <= 1 ? "text-left" : "text-center"
+                }`}
+              >
+                {h}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -1092,7 +1144,9 @@ const BreakdownTable = ({ data, selectedModel, onModelClick }) => {
                         style={{ width: `${rate}%`, backgroundColor: rcHex }}
                       />
                     </div>
-                    <span className={`text-[11px] font-mono font-bold min-w-[34px] ${rc}`}>
+                    <span
+                      className={`text-[11px] font-mono font-bold min-w-[34px] ${rc}`}
+                    >
                       {rate}%
                     </span>
                   </div>
@@ -1261,7 +1315,9 @@ const KpiCard = ({
     className={`flex flex-col items-center px-4 py-2 rounded-lg border min-w-[90px] ${colorClass}`}
   >
     <span className={`text-xl font-bold font-mono ${textClass}`}>{value}</span>
-    <span className={`text-[10px] font-medium uppercase tracking-wide ${subClass}`}>
+    <span
+      className={`text-[10px] font-medium uppercase tracking-wide ${subClass}`}
+    >
       {label}
     </span>
     {badge && (
@@ -1294,7 +1350,13 @@ const DETAIL_COLUMNS = [
 ];
 
 // ── Active Filter Banner ───────────────────────────────────────────────────────
-const ActiveFilterBanner = ({ categories, onClear, onRemove, recordCount, totalCount }) => {
+const ActiveFilterBanner = ({
+  categories,
+  onClear,
+  onRemove,
+  recordCount,
+  totalCount,
+}) => {
   if (categories.length === 0) return null;
   return (
     <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 flex-wrap">
@@ -1347,7 +1409,10 @@ const svgToDataURL = (containerEl) =>
     const serializer = new XMLSerializer();
     let svgStr = serializer.serializeToString(svgEl);
     if (!svgStr.includes("xmlns=")) {
-      svgStr = svgStr.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+      svgStr = svgStr.replace(
+        "<svg",
+        '<svg xmlns="http://www.w3.org/2000/svg"',
+      );
     }
     // Ensure white background in the captured image
     svgStr = svgStr.replace(
@@ -1545,13 +1610,26 @@ const ReworkReport = () => {
     const cats = selectedCategories;
     const defs = selectedDefects;
     const modelVal = selectedModelVariant?.value || null;
-    fetchParamsRef.current = { st: startTime, et: endTime, modelVal, cats, defs };
+    fetchParamsRef.current = {
+      st: startTime,
+      et: endTime,
+      modelVal,
+      cats,
+      defs,
+    };
     setPage(1);
     setReworkData([]);
     setSelectedModel(null);
     setProductionMap({});
     setTotalProduction(0);
-    fetchReworkPage({ pageNumber: 1, st: startTime, et: endTime, modelVal, cats, defs });
+    fetchReworkPage({
+      pageNumber: 1,
+      st: startTime,
+      et: endTime,
+      modelVal,
+      cats,
+      defs,
+    });
   }, [
     startTime,
     endTime,
@@ -1620,7 +1698,12 @@ const ReworkReport = () => {
         setLoadingKey((k) => (k === loaderKey ? null : k));
       }
     },
-    [selectedModelVariant, selectedCategories, selectedDefects, fetchProductionData],
+    [
+      selectedModelVariant,
+      selectedCategories,
+      selectedDefects,
+      fetchProductionData,
+    ],
   );
 
   const fetchYesterdayData = useCallback(() => {
@@ -1705,7 +1788,10 @@ const ReworkReport = () => {
   };
 
   // ── Derived data ────────────────────────────────────────────────────────────
-  const categoryLookup = useMemo(() => buildCategoryLookup(reworkData), [reworkData]);
+  const categoryLookup = useMemo(
+    () => buildCategoryLookup(reworkData),
+    [reworkData],
+  );
 
   const modelFilteredData = useMemo(
     () =>
@@ -1807,7 +1893,10 @@ const ReworkReport = () => {
 
   // ── Multi-sheet Excel export ────────────────────────────────────────────────
   const exportAllExcel = async () => {
-    if (!hasData) { toast.error("No data to export."); return; }
+    if (!hasData) {
+      toast.error("No data to export.");
+      return;
+    }
     setExporting("excel");
     setExportMenuOpen(false);
 
@@ -1832,25 +1921,45 @@ const ReworkReport = () => {
       }));
       const ws1 = XLSX.utils.json_to_sheet(summaryRows);
       ws1["!cols"] = [
-        { wch: 8 }, { wch: 35 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 13 },
+        { wch: 8 },
+        { wch: 35 },
+        { wch: 8 },
+        { wch: 8 },
+        { wch: 8 },
+        { wch: 13 },
       ];
       XLSX.utils.book_append_sheet(wb, ws1, "Summary");
 
       // Sheet 2 – Defect Ratio (from API for per-model production accuracy)
-      const defectRows = (defectData.length > 0 ? defectData : ratioData.map((r, i) => ({
-        "Sr. No.": i + 1,
-        Model: r.Model_Name,
-        Production: r.production ?? 0,
-        Rework_Total: r.reworkTotal,
-        Open: r.open,
-        Closed: r.closed,
-        "Defect Ratio %": r.defectRatio != null ? Number(r.defectRatio.toFixed(2)) : null,
-        Severity: r.defectRatio != null ? ratioLevel(r.defectRatio).label : "No Data",
-      })));
-      const ws2 = XLSX.utils.json_to_sheet(defectRows.length ? defectRows : [{ note: "No data" }]);
+      const defectRows =
+        defectData.length > 0
+          ? defectData
+          : ratioData.map((r, i) => ({
+              "Sr. No.": i + 1,
+              Model: r.Model_Name,
+              Production: r.production ?? 0,
+              Rework_Total: r.reworkTotal,
+              Open: r.open,
+              Closed: r.closed,
+              "Defect Ratio %":
+                r.defectRatio != null ? Number(r.defectRatio.toFixed(2)) : null,
+              Severity:
+                r.defectRatio != null
+                  ? ratioLevel(r.defectRatio).label
+                  : "No Data",
+            }));
+      const ws2 = XLSX.utils.json_to_sheet(
+        defectRows.length ? defectRows : [{ note: "No data" }],
+      );
       ws2["!cols"] = [
-        { wch: 8 }, { wch: 35 }, { wch: 12 }, { wch: 10 }, { wch: 8 },
-        { wch: 8 }, { wch: 14 }, { wch: 12 },
+        { wch: 8 },
+        { wch: 35 },
+        { wch: 12 },
+        { wch: 10 },
+        { wch: 8 },
+        { wch: 8 },
+        { wch: 14 },
+        { wch: 12 },
       ];
       XLSX.utils.book_append_sheet(wb, ws2, "Defect Ratio");
 
@@ -1873,7 +1982,10 @@ const ReworkReport = () => {
 
   // ── PDF export with charts ──────────────────────────────────────────────────
   const exportAllPDF = async () => {
-    if (!hasData) { toast.error("No data to export."); return; }
+    if (!hasData) {
+      toast.error("No data to export.");
+      return;
+    }
     setExporting("pdf");
     setExportMenuOpen(false);
 
@@ -1884,7 +1996,11 @@ const ReworkReport = () => {
         svgToDataURL(defectChartRef.current),
       ]);
 
-      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const doc = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
       const PW = doc.internal.pageSize.getWidth(); // 297mm
       const PH = doc.internal.pageSize.getHeight(); // 210mm
       const margin = 12;
@@ -1912,11 +2028,33 @@ const ReworkReport = () => {
       doc.setTextColor(30, 41, 59);
       let kx = margin;
       const kpiItems = [
-        { label: "TOTAL REWORK", value: filteredTotal.toLocaleString(), bg: [239, 246, 255], fg: [29, 78, 216] },
-        { label: "OPEN / PENDING", value: totalOpen.toLocaleString(), bg: [254, 242, 242], fg: [185, 28, 28] },
-        { label: "CLOSED", value: totalClosed.toLocaleString(), bg: [236, 253, 245], fg: [5, 150, 105] },
+        {
+          label: "TOTAL REWORK",
+          value: filteredTotal.toLocaleString(),
+          bg: [239, 246, 255],
+          fg: [29, 78, 216],
+        },
+        {
+          label: "OPEN / PENDING",
+          value: totalOpen.toLocaleString(),
+          bg: [254, 242, 242],
+          fg: [185, 28, 28],
+        },
+        {
+          label: "CLOSED",
+          value: totalClosed.toLocaleString(),
+          bg: [236, 253, 245],
+          fg: [5, 150, 105],
+        },
         ...(overallRatio != null
-          ? [{ label: "DEFECT RATIO", value: `${overallRatio.toFixed(2)}%`, bg: [255, 251, 235], fg: [217, 119, 6] }]
+          ? [
+              {
+                label: "DEFECT RATIO",
+                value: `${overallRatio.toFixed(2)}%`,
+                bg: [255, 251, 235],
+                fg: [217, 119, 6],
+              },
+            ]
           : []),
       ];
       kpiItems.forEach((k) => {
@@ -1949,7 +2087,10 @@ const ReworkReport = () => {
       }
 
       // Summary table
-      if (y > PH - 40) { doc.addPage(); y = margin; }
+      if (y > PH - 40) {
+        doc.addPage();
+        y = margin;
+      }
       doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 41, 59);
@@ -2006,12 +2147,21 @@ const ReworkReport = () => {
         doc.text("Defect Ratio by Model (Rework ÷ Production)", margin, y + 5);
         y += 7;
         const chartW = PW - margin * 2;
-        const chartH = Math.min(75, Math.max(40, ratioData.filter(r => r.defectRatio != null).length * 5 + 30));
+        const chartH = Math.min(
+          75,
+          Math.max(
+            40,
+            ratioData.filter((r) => r.defectRatio != null).length * 5 + 30,
+          ),
+        );
         doc.addImage(defectImg.dataURL, "PNG", margin, y, chartW, chartH);
         y += chartH + 4;
       }
 
-      if (y > PH - 40) { doc.addPage(); y = margin; }
+      if (y > PH - 40) {
+        doc.addPage();
+        y = margin;
+      }
       doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 41, 59);
@@ -2020,7 +2170,18 @@ const ReworkReport = () => {
 
       autoTable(doc, {
         startY: y,
-        head: [["Sr.", "Model", "Production", "Rework", "Open", "Closed", "Defect Ratio %", "Severity"]],
+        head: [
+          [
+            "Sr.",
+            "Model",
+            "Production",
+            "Rework",
+            "Open",
+            "Closed",
+            "Defect Ratio %",
+            "Severity",
+          ],
+        ],
         body: ratioData.map((r, i) => [
           i + 1,
           r.Model_Name,
@@ -2083,9 +2244,17 @@ const ReworkReport = () => {
           startY: 14,
           head: [
             [
-              "Sr.", "Model", "Category", "Station", "Process",
-              "Assy Sr. No.", "Rework IN", "Rework Out", "User",
-              "Status", "Duration",
+              "Sr.",
+              "Model",
+              "Category",
+              "Station",
+              "Process",
+              "Assy Sr. No.",
+              "Rework IN",
+              "Rework Out",
+              "User",
+              "Status",
+              "Duration",
             ],
           ],
           body: sliceData.map((r, i) => [
@@ -2128,7 +2297,9 @@ const ReworkReport = () => {
         doc.setFontSize(7);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(148, 163, 184);
-        doc.text(`Page ${i} of ${pageCount}`, PW - margin, PH - 4, { align: "right" });
+        doc.text(`Page ${i} of ${pageCount}`, PW - margin, PH - 4, {
+          align: "right",
+        });
         doc.text("WRL Dashboard — Rework Report", margin, PH - 4);
       }
 
@@ -2240,7 +2411,9 @@ const ReworkReport = () => {
                     >
                       <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
                       <div>
-                        <div className="font-semibold text-sm">Excel (All Tabs)</div>
+                        <div className="font-semibold text-sm">
+                          Excel (All Tabs)
+                        </div>
                         <div className="text-[10px] text-slate-400">
                           Summary + Defect Ratio + Detail
                         </div>
@@ -2252,7 +2425,9 @@ const ReworkReport = () => {
                     >
                       <FileText className="w-4 h-4 text-red-500 shrink-0" />
                       <div>
-                        <div className="font-semibold text-sm">PDF (with Charts)</div>
+                        <div className="font-semibold text-sm">
+                          PDF (with Charts)
+                        </div>
                         <div className="text-[10px] text-slate-400">
                           Bar charts + formatted tables
                         </div>
@@ -2269,151 +2444,139 @@ const ReworkReport = () => {
       {/* ── BODY ── */}
       <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
         {/* ── FILTERS ROW ── */}
-        <div className="flex gap-3 shrink-0">
-          {/* Main filters */}
-          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <div className="flex items-center gap-1.5 mb-3">
-              <Filter className="w-3 h-3 text-slate-400" />
-              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                Filters
-              </p>
-              {hasData &&
-                (selectedCategories.length > 0 || selectedDefects.length > 0) && (
-                  <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
-                    <Zap className="w-2.5 h-2.5" />
-                    Re-run query to update results
-                  </span>
-                )}
-            </div>
-            <div className="flex flex-wrap gap-3 items-end">
-              <div className="min-w-[190px] flex-1">
-                <SelectField
-                  label="Model Variant"
-                  options={variants}
-                  value={selectedModelVariant?.value || ""}
-                  onChange={(e) =>
-                    setSelectedModelVariant(
-                      variants.find((v) => v.value === e.target.value) || null,
-                    )
-                  }
-                />
-              </div>
-              <div className="min-w-[190px] flex-1">
-                <CategoryMultiSelect
-                  selected={selectedCategories}
-                  onChange={setSelectedCategories}
-                />
-              </div>
-              <div className="min-w-[190px] flex-1">
-                <DefectMultiSelect
-                  options={defectOptions}
-                  selected={selectedDefects}
-                  onChange={setSelectedDefects}
-                />
-              </div>
-              <div className="min-w-[185px] flex-1">
-                <DateTimePicker
-                  label="Start Time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                />
-              </div>
-              <div className="min-w-[185px] flex-1">
-                <DateTimePicker
-                  label="End Time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                />
-              </div>
-              <div className="flex items-center gap-2 pb-0.5 shrink-0">
-                <button
-                  onClick={handleQuery}
-                  disabled={isLoading}
-                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    isLoading
-                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
-                  }`}
-                >
-                  {isLoading ? <Spinner /> : <RefreshCw className="w-4 h-4" />}
-                  {isLoading ? "Loading…" : "Run Query"}
-                </button>
-                {selectedModel && (
-                  <button
-                    onClick={() => setSelectedModel(null)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition-all"
-                  >
-                    <Filter className="w-3 h-3" /> {selectedModel}{" "}
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <ActiveFilterBanner
-              categories={selectedCategories}
-              onClear={() => setSelectedCategories([])}
-              onRemove={(c) =>
-                setSelectedCategories((prev) => prev.filter((x) => x !== c))
-              }
-              recordCount={defectFilteredData.length}
-              totalCount={hasData ? reworkData.length : 0}
-            />
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
+          <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+            <Filter className="w-3 h-3 text-slate-400" />
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+              Filters
+            </p>
+            {(selectedCategories.length > 0 || selectedDefects.length > 0) && (
+              <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                <Tag className="w-2.5 h-2.5" />
+                {selectedCategories.length + selectedDefects.length} filter
+                {selectedCategories.length + selectedDefects.length === 1
+                  ? ""
+                  : "s"}{" "}
+                active — re-run to update
+              </span>
+            )}
           </div>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="min-w-[190px] flex-1">
+              <SelectField
+                label="Model Variant"
+                options={variants}
+                value={selectedModelVariant?.value || ""}
+                onChange={(e) =>
+                  setSelectedModelVariant(
+                    variants.find((v) => v.value === e.target.value) || null,
+                  )
+                }
+              />
+            </div>
+            <div className="min-w-[190px] flex-1">
+              <CategoryMultiSelect
+                selected={selectedCategories}
+                onChange={setSelectedCategories}
+              />
+            </div>
+            <div className="min-w-[190px] flex-1">
+              <DefectMultiSelect
+                options={defectOptions}
+                selected={selectedDefects}
+                onChange={setSelectedDefects}
+              />
+            </div>
+            <div className="min-w-[185px] flex-1">
+              <DateTimePicker
+                label="Start Time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
+            <div className="min-w-[185px] flex-1">
+              <DateTimePicker
+                label="End Time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+              />
+            </div>
 
-          {/* Quick filters */}
-          <div className="w-60 shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
-                Quick Filters
-              </p>
-              {(selectedCategories.length > 0 || selectedDefects.length > 0) && (
-                <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full">
-                  <Tag className="w-2.5 h-2.5" />
-                  {selectedCategories.length + selectedDefects.length} filter
-                  {selectedCategories.length + selectedDefects.length === 1 ? "" : "s"}
-                </span>
+            {/* All action buttons — Run Query, quick filters — inline */}
+            <div className="flex items-center gap-2 pb-0.5 flex-wrap">
+              <button
+                onClick={handleQuery}
+                disabled={isLoading}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  isLoading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
+                }`}
+              >
+                {isLoading ? <Spinner /> : <RefreshCw className="w-4 h-4" />}
+                {isLoading ? "Loading…" : "Run Query"}
+              </button>
+
+              <button
+                onClick={fetchYesterdayData}
+                disabled={loadingKey === "yesterday"}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  loadingKey === "yesterday"
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                }`}
+              >
+                {loadingKey === "yesterday" && <Spinner cls="w-4 h-4" />}
+                {loadingKey === "yesterday" ? "Loading…" : "Yesterday"}
+              </button>
+
+              <button
+                onClick={fetchTodayData}
+                disabled={loadingKey === "today"}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  loadingKey === "today"
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                }`}
+              >
+                {loadingKey === "today" && <Spinner cls="w-4 h-4" />}
+                {loadingKey === "today" ? "Loading…" : "Today"}
+              </button>
+
+              <button
+                onClick={fetchMTDData}
+                disabled={loadingKey === "mtd"}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                  loadingKey === "mtd"
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                }`}
+              >
+                {loadingKey === "mtd" && <Spinner cls="w-4 h-4" />}
+                {loadingKey === "mtd" ? "Loading…" : "MTD"}
+              </button>
+
+              {selectedModel && (
+                <button
+                  onClick={() => setSelectedModel(null)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition-all"
+                >
+                  <Filter className="w-3 h-3" /> {selectedModel}{" "}
+                  <X className="w-3 h-3" />
+                </button>
               )}
             </div>
-            <p className="text-[10px] text-slate-400 mb-3">
-              {selectedCategories.length > 0 || selectedDefects.length > 0
-                ? [
-                    selectedCategories.length > 0 &&
-                      `Category: ${selectedCategories.join(", ")}`,
-                    selectedDefects.length > 0 &&
-                      `Defect: ${selectedDefects.join(", ")}`,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")
-                : "Select a preset time range."}
-            </p>
-            <div className="flex flex-col gap-2">
-              <QuickBtn
-                label="YESTERDAY"
-                sublabel="Prev day 08:00 → today 08:00"
-                loading={loadingKey === "yesterday"}
-                onClick={fetchYesterdayData}
-                colorClass="bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
-                categoryCount={selectedCategories.length + selectedDefects.length}
-              />
-              <QuickBtn
-                label="TODAY"
-                sublabel="08:00 → now"
-                loading={loadingKey === "today"}
-                onClick={fetchTodayData}
-                colorClass="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-                categoryCount={selectedCategories.length + selectedDefects.length}
-              />
-              <QuickBtn
-                label="MTD"
-                sublabel="Month to date"
-                loading={loadingKey === "mtd"}
-                onClick={fetchMTDData}
-                colorClass="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-                categoryCount={selectedCategories.length + selectedDefects.length}
-              />
-            </div>
           </div>
+
+          <ActiveFilterBanner
+            categories={selectedCategories}
+            onClear={() => setSelectedCategories([])}
+            onRemove={(c) =>
+              setSelectedCategories((prev) => prev.filter((x) => x !== c))
+            }
+            recordCount={defectFilteredData.length}
+            totalCount={hasData ? reworkData.length : 0}
+          />
         </div>
 
         {/* ── EMPTY / LOADING STATE ── */}
@@ -2429,7 +2592,9 @@ const ReworkReport = () => {
         {isLoading && !hasData && (
           <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-center gap-3">
             <Spinner cls="w-6 h-6 text-blue-600" />
-            <span className="text-sm text-slate-400">Fetching rework data…</span>
+            <span className="text-sm text-slate-400">
+              Fetching rework data…
+            </span>
           </div>
         )}
 
@@ -2515,9 +2680,14 @@ const ReworkReport = () => {
                       )}
                     </div>
                     {aggregated.length > 0 ? (
-                      <ReworkBarChart data={aggregated} chartRef={summaryChartRef} />
+                      <ReworkBarChart
+                        data={aggregated}
+                        chartRef={summaryChartRef}
+                      />
                     ) : (
-                      <p className="text-xs text-slate-400 font-mono">No model data</p>
+                      <p className="text-xs text-slate-400 font-mono">
+                        No model data
+                      </p>
                     )}
                   </div>
                   <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -2546,7 +2716,9 @@ const ReworkReport = () => {
                             key={s.label}
                             className={`flex justify-between items-center px-3 py-2 rounded-lg border ${s.cls}`}
                           >
-                            <span className="text-[11px] font-mono">{s.label}</span>
+                            <span className="text-[11px] font-mono">
+                              {s.label}
+                            </span>
                             <span className="text-lg font-black font-mono">
                               {s.val.toLocaleString()}
                             </span>
@@ -2567,8 +2739,9 @@ const ReworkReport = () => {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-[11px] text-slate-400">
-                        {aggregated.length} model{aggregated.length !== 1 ? "s" : ""} · Click
-                        row to filter detail
+                        {aggregated.length} model
+                        {aggregated.length !== 1 ? "s" : ""} · Click row to
+                        filter detail
                       </span>
                       <button
                         onClick={async () => {
@@ -2749,7 +2922,10 @@ const ReworkReport = () => {
                       )}
                     </div>
                     <div className="p-4">
-                      <DefectRatioBars data={ratioData} chartRef={defectChartRef} />
+                      <DefectRatioBars
+                        data={ratioData}
+                        chartRef={defectChartRef}
+                      />
                     </div>
                   </div>
                 )}
@@ -2769,7 +2945,10 @@ const ReworkReport = () => {
                           const ws = XLSX.utils.json_to_sheet(data);
                           const wb = XLSX.utils.book_new();
                           XLSX.utils.book_append_sheet(wb, ws, "Defect Ratio");
-                          XLSX.writeFile(wb, `Rework_Defect_${new Date().toISOString().split("T")[0]}.xlsx`);
+                          XLSX.writeFile(
+                            wb,
+                            `Rework_Defect_${new Date().toISOString().split("T")[0]}.xlsx`,
+                          );
                           toast.success("Defect ratio exported!");
                         }
                       }}
@@ -2791,7 +2970,8 @@ const ReworkReport = () => {
                     <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
                       {selectedModel
                         ? `Filtered: ${selectedModel}`
-                        : selectedCategories.length > 0 || selectedDefects.length > 0
+                        : selectedCategories.length > 0 ||
+                            selectedDefects.length > 0
                           ? [
                               selectedCategories.length > 0 &&
                                 `Categories: ${selectedCategories.join(", ")}`,
@@ -2842,8 +3022,15 @@ const ReworkReport = () => {
                         if (data.length) {
                           const ws = XLSX.utils.json_to_sheet(data);
                           const wb = XLSX.utils.book_new();
-                          XLSX.utils.book_append_sheet(wb, ws, "Detail Records");
-                          XLSX.writeFile(wb, `Rework_Detail_${new Date().toISOString().split("T")[0]}.xlsx`);
+                          XLSX.utils.book_append_sheet(
+                            wb,
+                            ws,
+                            "Detail Records",
+                          );
+                          XLSX.writeFile(
+                            wb,
+                            `Rework_Detail_${new Date().toISOString().split("T")[0]}.xlsx`,
+                          );
                           toast.success("Detail records exported!");
                         }
                       }}
@@ -2875,7 +3062,9 @@ const ReworkReport = () => {
                         <tr
                           key={i}
                           ref={
-                            i === defectFilteredData.length - 1 ? lastRowRef : null
+                            i === defectFilteredData.length - 1
+                              ? lastRowRef
+                              : null
                           }
                           className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40"
                         >
