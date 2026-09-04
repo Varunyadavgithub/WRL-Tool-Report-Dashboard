@@ -16,6 +16,7 @@ export const DIRS = {
   machineImages: path.resolve(UPLOADS_DIR, "MachineImages"),
   materialDrawings: path.resolve(UPLOADS_DIR, "MaterialDrawings"),
   bisSignatures: path.resolve(UPLOADS_DIR, "BISSignatures"),
+  bisModelPhotos: path.resolve(UPLOADS_DIR, "BISModelPhotos"),
 };
 
 /* ===================== ENSURE DIRS EXIST ===================== */
@@ -102,6 +103,12 @@ export const UPLOAD_CONFIGS = {
     ...FILE_TYPES.image,
     errorMessage: "Only JPEG, JPG or PNG images are allowed for signatures",
     maxSize: 5 * 1024 * 1024, // 5MB — signatures are small
+  },
+
+  bisModelPhoto: {
+    ...FILE_TYPES.image,
+    errorMessage: "Only JPEG, JPG or PNG images are allowed",
+    maxSize: FILE_TYPES.image.maxSize, // 10MB
   },
 };
 

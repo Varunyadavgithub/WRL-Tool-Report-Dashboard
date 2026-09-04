@@ -452,5 +452,174 @@ export const runGarudaMigrations = async (pool1) => {
       END
     `);
   }
+  // ── BISCategory: PhotoPath for the model photo shown on the BIS Config
+  //    table and on the Test Lab Dashboard's stall cards.
+  await pool1.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'BISCategory' AND COLUMN_NAME = 'PhotoPath'
+    )
+    BEGIN
+      ALTER TABLE BISCategory ADD PhotoPath NVARCHAR(300) NULL;
+      PRINT 'Migration: Added PhotoPath column to BISCategory (GARUDA)';
+    END
+  `);
+
+  // ── BISModelSpec: per-model spec sheet (e.g. Rated Voltage, Compressor
+  //    Type, Refrigerant, Storage Volume) configured once from BIS Config
+  //    and shown on the Test Lab Dashboard in place of live sensor readings,
+  //    which this app has no chamber hardware integration to produce.
+  await pool1.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'BISModelSpec')
+    BEGIN
+      CREATE TABLE BISModelSpec (
+        Id           INT IDENTITY(1,1) PRIMARY KEY,
+        MaterialCode NVARCHAR(50)  NOT NULL,
+        SpecKey      NVARCHAR(150) NOT NULL,
+        SpecValue    NVARCHAR(300) NULL,
+        SortOrder    INT           NOT NULL DEFAULT 0,
+        UpdatedBy    NVARCHAR(100) NULL,
+        UpdatedAt    DATETIME      NOT NULL DEFAULT GETDATE()
+      );
+      CREATE INDEX IX_BISModelSpec_MaterialCode ON BISModelSpec (MaterialCode);
+      PRINT 'Migration: Created BISModelSpec table (GARUDA)';
+    END
+  `);
+
+  // ── BISTestPlanStep: per-model checklist of test steps — part of the
+  //    earlier Start/End-step tracking design, superseded by
+  //    BISTestReport.StallId (see below). Left unused rather than dropped.
+  await pool1.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'BISTestPlanStep')
+    BEGIN
+      CREATE TABLE BISTestPlanStep (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        MaterialCode    NVARCHAR(50)  NOT NULL,
+        StepOrder       INT           NOT NULL,
+        StepName        NVARCHAR(200) NOT NULL,
+        DurationMinutes INT           NOT NULL DEFAULT 0,
+        UpdatedBy       NVARCHAR(100) NULL,
+        UpdatedAt       DATETIME      NOT NULL DEFAULT GETDATE()
+      );
+      CREATE INDEX IX_BISTestPlanStep_MaterialCode ON BISTestPlanStep (MaterialCode, StepOrder);
+      PRINT 'Migration: Created BISTestPlanStep table (GARUDA)';
+    END
+  `);
+
+  // ── BISTestStall: physical test-chamber slots shown on the Test Lab
+  //    Dashboard. Seeded with the four stalls from the lab layout; more can
+  //    be added later directly in the table if the lab expands.
+  await pool1.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'BISTestStall')
+    BEGIN
+      CREATE TABLE BISTestStall (
+        Id         INT IDENTITY(1,1) PRIMARY KEY,
+        StallCode  NVARCHAR(50)  NOT NULL UNIQUE,
+        StallName  NVARCHAR(100) NOT NULL,
+        IsActive   BIT           NOT NULL DEFAULT 1,
+        SortOrder  INT           NOT NULL DEFAULT 0
+      );
+      INSERT INTO BISTestStall (StallCode, StallName, SortOrder) VALUES
+        ('STALL-01', 'Stall 01', 1),
+        ('STALL-02', 'Stall 02', 2),
+        ('STALL-03', 'Stall 03', 3),
+        ('STALL-04', 'Stall 04', 4);
+      PRINT 'Migration: Created BISTestStall table (GARUDA)';
+    END
+  `);
+
+  // Backfill: this table originally shipped seeded with only 2 stalls — add
+  // the other 2 for any environment where it was already created before the
+  // seed above was widened to 4.
+  await pool1.request().query(`
+    IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'BISTestStall')
+    AND NOT EXISTS (SELECT 1 FROM BISTestStall WHERE StallCode = 'STALL-03')
+    BEGIN
+      INSERT INTO BISTestStall (StallCode, StallName, SortOrder) VALUES
+        ('STALL-03', 'Stall 03', 3),
+        ('STALL-04', 'Stall 04', 4);
+      PRINT 'Migration: Added STALL-03/04 to BISTestStall (GARUDA)';
+    END
+  `);
+
+  // ── BISTestReport: StallId — an earlier attempt at tracking which stall a
+  //    unit was tested in via the report itself. Doesn't work: a report is
+  //    only written up after the test is already finished, so it can never
+  //    reflect what's *currently* on a stall. Superseded by BISTestRun below
+  //    (a "put on stall" action independent of report creation). Column left
+  //    in place, unused, rather than dropped.
+  await pool1.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'BISTestReport' AND COLUMN_NAME = 'StallId'
+    )
+    BEGIN
+      ALTER TABLE BISTestReport ADD StallId INT NULL
+        CONSTRAINT FK_BISTestReport_Stall FOREIGN KEY REFERENCES BISTestStall(Id);
+      PRINT 'Migration: Added StallId column to BISTestReport (GARUDA)';
+    END
+  `);
+
+  // ── BISTestRun: one row per stall occupancy — created the moment an
+  //    operator physically puts a unit on a stall to start testing, well
+  //    before any test report exists for it (the report only gets written up
+  //    once the test is done). EndedAt IS NULL is what the Test Lab
+  //    Dashboard reads as "currently in progress" per stall.
+  await pool1.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'BISTestRun')
+    BEGIN
+      CREATE TABLE BISTestRun (
+        Id           INT IDENTITY(1,1) PRIMARY KEY,
+        StallId      INT           NOT NULL,
+        MaterialCode NVARCHAR(50)  NOT NULL,
+        ModelName    NVARCHAR(300) NOT NULL,
+        Status       NVARCHAR(20)  NOT NULL DEFAULT 'InProgress', -- InProgress | Completed
+        StartedBy    NVARCHAR(100) NULL,
+        StartedAt    DATETIME      NOT NULL DEFAULT GETDATE(),
+        EndedBy      NVARCHAR(100) NULL,
+        EndedAt      DATETIME      NULL,
+        CONSTRAINT FK_BISTestRun_Stall FOREIGN KEY (StallId) REFERENCES BISTestStall(Id)
+      );
+      CREATE INDEX IX_BISTestRun_Stall_Status ON BISTestRun (StallId, Status);
+      PRINT 'Migration: Created BISTestRun table (GARUDA)';
+    END
+  `);
+
+  // ── BISTestRun: ReportType — which of the 3 BIS test types (Introduction/
+  //    Sound/Volume) this stall occupancy is for, so "Put Model on Stall"
+  //    can offer the specific pending test rather than just the model.
+  await pool1.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'BISTestRun' AND COLUMN_NAME = 'ReportType'
+    )
+    BEGIN
+      ALTER TABLE BISTestRun ADD ReportType NVARCHAR(20) NULL;
+      PRINT 'Migration: Added ReportType column to BISTestRun (GARUDA)';
+    END
+  `);
+
+  // ── BISTestRunStep: per-step checklist tracking within a run — dropped in
+  //    favor of a single Start/End per stall (no step-by-step breakdown or
+  //    progress bar on the dashboard). Left unused rather than dropped.
+  await pool1.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'BISTestRunStep')
+    BEGIN
+      CREATE TABLE BISTestRunStep (
+        Id              INT IDENTITY(1,1) PRIMARY KEY,
+        RunId           INT           NOT NULL,
+        StepOrder       INT           NOT NULL,
+        StepName        NVARCHAR(200) NOT NULL,
+        DurationMinutes INT           NOT NULL DEFAULT 0,
+        Status          NVARCHAR(20)  NOT NULL DEFAULT 'Pending', -- Pending | InProgress | Completed
+        StartedAt       DATETIME      NULL,
+        EndedAt         DATETIME      NULL,
+        CONSTRAINT FK_BISTestRunStep_Run FOREIGN KEY (RunId) REFERENCES BISTestRun(Id) ON DELETE CASCADE
+      );
+      CREATE INDEX IX_BISTestRunStep_Run ON BISTestRunStep (RunId, StepOrder);
+      PRINT 'Migration: Created BISTestRunStep table (GARUDA)';
+    END
+  `);
+
   console.log("GARUDA migrations completed.");
 };

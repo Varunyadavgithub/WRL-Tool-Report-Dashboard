@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, Fragment } from "react";
-import { Search, RefreshCw, Plus, Pencil, Trash2, CalendarClock, Save, X, SlidersHorizontal, UserCheck, Upload, PenTool } from "lucide-react";
+import { Search, RefreshCw, Plus, Pencil, Trash2, CalendarClock, Save, X, SlidersHorizontal, UserCheck, Upload, PenTool, Image as ImageIcon, ListChecks } from "lucide-react";
 import Pagination from "../../../components/ui/Pagination";
 import { fileBaseURL } from "../../../assets/assets";
 import { usePagedSlice, FieldLabel, inputCls, reportTypeLabel, SearchableSelect } from "./shared";
@@ -124,7 +124,7 @@ const InlineOverrideEditor = ({ row, onSave, onCancel }) => {
 
   return (
     <tr className="bg-indigo-50/40">
-      <td colSpan={7} className="px-4 py-3 border-b border-indigo-100">
+      <td colSpan={8} className="px-4 py-3 border-b border-indigo-100">
         <div className="flex flex-wrap items-end gap-3">
           {FREQUENCY_FIELDS.map(({ type, freqKey, durKey }) => (
             <div key={type} className="border border-slate-200 bg-white rounded-lg p-2.5 flex items-end gap-2">
@@ -223,9 +223,20 @@ const BISConfigTab = ({
   categories, categorySearch, setCategorySearch, categoryLoading, onRefresh, onAddCategory, onEditCategory, onDeleteCategory,
   testConfig, testConfigLoading, onSaveTestConfig, onInlineUpdateOverrides,
   approvalFlow, approvalFlowLoading, approvalUsers, onSaveApprovalFlow, onUploadApprovalSignature,
+  onUploadCategoryPhoto, onOpenSetup,
 }) => {
   const [limit, setLimit] = useState(25);
   const [editingOverrideId, setEditingOverrideId] = useState(null);
+  const [uploadingPhotoId, setUploadingPhotoId] = useState(null);
+
+  const handlePhotoChange = async (row, e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadingPhotoId(row.id);
+    await onUploadCategoryPhoto(row, file);
+    setUploadingPhotoId(null);
+  };
 
   const filteredCategories = useMemo(() => {
     const term = categorySearch.trim().toLowerCase();
@@ -235,7 +246,26 @@ const BISConfigTab = ({
     );
   }, [categories, categorySearch]);
 
-  const { page, setPage, totalPages, slice: pagedCategories } = usePagedSlice(filteredCategories, limit);
+  // Multiple material codes (colour/pack variants etc.) can share the same
+  // derived model name — collapse them to one row per model (the lowest
+  // material code is the representative row all actions apply to) so the
+  // table reads as one entry per model instead of one per material code.
+  const groupedByModel = useMemo(() => {
+    const groups = new Map();
+    for (const row of filteredCategories) {
+      if (!groups.has(row.modelName)) groups.set(row.modelName, []);
+      groups.get(row.modelName).push(row);
+    }
+    return [...groups.values()]
+      .map((rows) => {
+        const sorted = [...rows].sort((a, b) => a.materialCode.localeCompare(b.materialCode));
+        const [representative, ...otherVariants] = sorted;
+        return { ...representative, otherVariants };
+      })
+      .sort((a, b) => a.modelName.localeCompare(b.modelName));
+  }, [filteredCategories]);
+
+  const { page, setPage, totalPages, slice: pagedModels } = usePagedSlice(groupedByModel, limit);
 
   return (
     <div className="flex flex-col gap-4">
@@ -276,71 +306,96 @@ const BISConfigTab = ({
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-slate-50 z-10">
               <tr>
-                {["Material Code", "Material Name", "Model Name", "Category", "Schedule", "Updated", ""].map((h) => (
+                {["Photo", "Model Name", "Material Code", "Material Name", "Category", "Schedule", "Updated", ""].map((h) => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-200">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {pagedCategories.length === 0 ? (
-                <tr><td colSpan={7} className="px-3 py-16 text-center text-slate-400">{categoryLoading ? "Loading…" : "No models found."}</td></tr>
+              {pagedModels.length === 0 ? (
+                <tr><td colSpan={8} className="px-3 py-16 text-center text-slate-400">{categoryLoading ? "Loading…" : "No models found."}</td></tr>
               ) : (
-                pagedCategories.map((row) => {
+                pagedModels.map((row) => {
                   const hasOverride = ["introductionFrequencyMonths", "introductionDurationDays", "soundFrequencyMonths", "soundDurationDays", "volumeFrequencyMonths", "volumeDurationDays"]
                     .some((k) => row[k] !== null && row[k] !== undefined);
                   return (
-                  <Fragment key={row.id}>
-                  <tr className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40">
-                    <td className="px-3 py-2.5 border-b border-slate-100 font-mono text-slate-600">{row.materialCode}</td>
-                    <td className="px-3 py-2.5 border-b border-slate-100 text-slate-500">{row.materialName || "—"}</td>
-                    <td className="px-3 py-2.5 border-b border-slate-100 font-semibold text-slate-800">{row.modelName}</td>
-                    <td className="px-3 py-2.5 border-b border-slate-100">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${row.category === 1 ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
-                        {row.category === 1 ? "BIS" : "Non-BIS"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 border-b border-slate-100">
-                      {row.category === 1 ? (
-                        <button
-                          onClick={() => setEditingOverrideId((id) => (id === row.id ? null : row.id))}
-                          className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
-                            hasOverride ? "bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200"
-                          }`}
-                          title="Edit schedule override"
-                        >
-                          <SlidersHorizontal className="w-2.5 h-2.5" /> {hasOverride ? "Custom" : "Default"}
-                        </button>
-                      ) : (
-                        <span className="text-slate-300 text-[10px]">—</span>
+                    <Fragment key={row.id}>
+                      <tr className="hover:bg-blue-50/60 transition-colors even:bg-slate-50/40">
+                        <td className="px-3 py-2.5 border-b border-slate-100">
+                          <div className="flex items-center gap-1.5">
+                            {row.photoPath ? (
+                              <img src={fileBaseURL + row.photoPath} alt={row.modelName} className="h-9 w-9 object-cover rounded-lg border border-slate-200 bg-white" />
+                            ) : (
+                              <div className="h-9 w-9 flex items-center justify-center border border-dashed border-slate-200 rounded-lg bg-slate-50 text-slate-300">
+                                <ImageIcon className="w-3.5 h-3.5" />
+                              </div>
+                            )}
+                            <label className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 cursor-pointer transition-all" title="Upload model photo">
+                              <Upload className="w-3.5 h-3.5" />
+                              <input type="file" accept="image/png,image/jpeg,image/jpg" className="hidden" onChange={(e) => handlePhotoChange(row, e)} disabled={uploadingPhotoId === row.id} />
+                            </label>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5 border-b border-slate-100 font-semibold text-slate-800">{row.modelName}</td>
+                        <td className="px-3 py-2.5 border-b border-slate-100 font-mono text-slate-600">
+                          {row.materialCode}
+                          {row.otherVariants.length > 0 && (
+                            <span className="ml-1.5 text-[10px] font-sans text-slate-400" title={row.otherVariants.map((v) => v.materialCode).join(", ")}>
+                              +{row.otherVariants.length} more
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 border-b border-slate-100 text-slate-500">{row.materialName || "—"}</td>
+                        <td className="px-3 py-2.5 border-b border-slate-100">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${row.category === 1 ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
+                            {row.category === 1 ? "BIS" : "Non-BIS"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 border-b border-slate-100">
+                          {row.category === 1 ? (
+                            <button
+                              onClick={() => setEditingOverrideId((id) => (id === row.id ? null : row.id))}
+                              className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
+                                hasOverride ? "bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100" : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200"
+                              }`}
+                              title="Edit schedule override"
+                            >
+                              <SlidersHorizontal className="w-2.5 h-2.5" /> {hasOverride ? "Custom" : "Default"}
+                            </button>
+                          ) : (
+                            <span className="text-slate-300 text-[10px]">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 border-b border-slate-100 text-slate-400">{row.updatedAt ? new Date(row.updatedAt).toLocaleDateString("en-IN") : "—"}</td>
+                        <td className="px-3 py-2.5 border-b border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => onOpenSetup(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all" title="Model Specs">
+                              <ListChecks className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => onEditCategory(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Edit">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => onDeleteCategory(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all" title="Delete">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {editingOverrideId === row.id && (
+                        <InlineOverrideEditor
+                          row={row}
+                          onCancel={() => setEditingOverrideId(null)}
+                          onSave={async (draft) => {
+                            try {
+                              await onInlineUpdateOverrides(row, draft);
+                              setEditingOverrideId(null);
+                            } catch {
+                              // Keep the editor open on failure — the toast already reported it.
+                            }
+                          }}
+                        />
                       )}
-                    </td>
-                    <td className="px-3 py-2.5 border-b border-slate-100 text-slate-400">{row.updatedAt ? new Date(row.updatedAt).toLocaleDateString("en-IN") : "—"}</td>
-                    <td className="px-3 py-2.5 border-b border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => onEditCategory(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Edit">
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => onDeleteCategory(row)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all" title="Delete">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  {editingOverrideId === row.id && (
-                    <InlineOverrideEditor
-                      row={row}
-                      onCancel={() => setEditingOverrideId(null)}
-                      onSave={async (draft) => {
-                        try {
-                          await onInlineUpdateOverrides(row, draft);
-                          setEditingOverrideId(null);
-                        } catch {
-                          // Keep the editor open on failure — the toast already reported it.
-                        }
-                      }}
-                    />
-                  )}
-                  </Fragment>
+                    </Fragment>
                   );
                 })
               )}
@@ -348,7 +403,7 @@ const BISConfigTab = ({
           </table>
         </div>
         <div className="px-4 pb-4">
-          <Pagination currentPage={page} totalPages={totalPages} totalRecords={filteredCategories.length} limit={limit} onPageChange={setPage} onLimitChange={setLimit} />
+          <Pagination currentPage={page} totalPages={totalPages} totalRecords={groupedByModel.length} limit={limit} onPageChange={setPage} onLimitChange={setLimit} />
         </div>
       </div>
     </div>

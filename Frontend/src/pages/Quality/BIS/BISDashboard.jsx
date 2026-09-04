@@ -1,8 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import {
-  FileText, Layers, CheckCircle, Clock, RefreshCw,
-  Zap, Settings2, ShieldCheck, AlertTriangle, Pencil, FileUp, CloudUpload as CloudUploadIcon,
-  CalendarClock, FileStack, Archive, UserCheck,
+  RefreshCw, Zap, Settings2, ShieldCheck, AlertTriangle, Pencil, FileUp, CloudUpload as CloudUploadIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
@@ -14,17 +13,23 @@ import BISReportsTab from "./BISReportsTab";
 import BISComplianceTab from "./BISComplianceTab";
 import BISEnergyTab from "./BISEnergyTab";
 import BISConfigTab from "./BISConfigTab";
+import BISModelSetupModal from "./BISModelSetupModal";
 import BISTestScheduleTab from "./BISTestScheduleTab";
 import BISApprovalQueue from "./BISApprovalQueue";
 
+// Each tab is also its own route (see routes.config.js) — all pointing at
+// this same BISDashboard component, which derives which tab is active from
+// the current URL (there's no in-page tab bar; navigation between them
+// happens via the sidebar) while keeping all the fetching/state logic in
+// one place.
 const TABS = [
-  { key: "testReports", label: "Test Reports", icon: FileStack },
-  { key: "approvals", label: "Approvals", icon: UserCheck },
-  { key: "schedule", label: "Test Schedule", icon: CalendarClock },
-  { key: "reports", label: "Legacy PDF Reports (Archive)", icon: Archive },
-  { key: "compliance", label: "Compliance Status", icon: ShieldCheck },
-  { key: "energy", label: "Energy Analysis", icon: Zap },
-  { key: "config", label: "BIS Config", icon: Settings2 },
+  { key: "testReports", path: "/quality/bis-reports" },
+  { key: "approvals", path: "/quality/bis-approvals" },
+  { key: "schedule", path: "/quality/bis-test-schedule" },
+  { key: "reports", path: "/quality/bis-legacy-reports" },
+  { key: "compliance", path: "/quality/bis-compliance" },
+  { key: "energy", path: "/quality/bis-energy" },
+  { key: "config", path: "/quality/bis-config" },
 ];
 
 const OVERRIDE_FIELDS = [
@@ -35,7 +40,8 @@ const OVERRIDE_FIELDS = [
 const emptyOverrides = Object.fromEntries(OVERRIDE_FIELDS.map((k) => [k, ""]));
 
 const BISDashboard = () => {
-  const [activeTab, setActiveTab] = useState("testReports");
+  const location = useLocation();
+  const activeTab = TABS.find((t) => t.path === location.pathname)?.key || "testReports";
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [status, setStatus] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -337,6 +343,21 @@ const BISDashboard = () => {
     }
   };
 
+  const uploadCategoryPhoto = async (row, file) => {
+    const formData = new FormData();
+    formData.append("photo", file);
+    try {
+      await axios.post(`${baseURL}quality/bis-category/${row.id}/photo`, formData, { headers: { "Content-Type": "multipart/form-data" } });
+      toast.success("Model photo uploaded");
+      fetchBisCategories();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to upload model photo");
+    }
+  };
+
+  // ── BIS Test Lab setup (Photo / Specs / Test Plan) modal ──────────────────
+  const [setupModalRow, setSetupModalRow] = useState(null);
+
   const handleDeleteCategory = (row) => {
     setCategoryToDelete(row);
     setShowDeleteCategoryModal(true);
@@ -523,35 +544,22 @@ const BISDashboard = () => {
 
       {/* ── BODY ── */}
       <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
-        {/* ── STAT CARDS ── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
-          {[
-            { icon: FileText, label: "Total Reports", value: stats.totalFiles, cls: "bg-blue-50 border-blue-100", txt: "text-blue-700", sub: "text-blue-500" },
-            { icon: Layers, label: "Unique Models", value: stats.uniqueModels, cls: "bg-violet-50 border-violet-100", txt: "text-violet-700", sub: "text-violet-500" },
-            { icon: CheckCircle, label: "Monthly Reports", value: stats.freqCounts.Monthly || 0, cls: "bg-emerald-50 border-emerald-100", txt: "text-emerald-700", sub: "text-emerald-500" },
-            { icon: Clock, label: "Quarterly Reports", value: stats.freqCounts.Quarterly || 0, cls: "bg-amber-50 border-amber-100", txt: "text-amber-700", sub: "text-amber-500" },
-          ].map(({ icon: Icon, label, value, cls, txt, sub }) => (
-            <div key={label} className={`flex flex-col items-center px-4 py-2.5 rounded-xl border ${cls}`}>
-              <span className={`text-2xl font-bold font-mono ${txt}`}>{value}</span>
-              <span className={`text-[10px] font-medium uppercase tracking-wide ${sub}`}>{label}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* ── TAB BAR ── */}
-        <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit shrink-0 flex-wrap">
-          {TABS.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                activeTab === key ? "bg-white text-blue-700 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-white/60"
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" /> {label}
-            </button>
-          ))}
-        </div>
+        {/* ── STAT CARDS — legacy PDF archive stats, only relevant on that page ── */}
+        {activeTab === "reports" && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
+            {[
+              { label: "Total Reports", value: stats.totalFiles, cls: "bg-blue-50 border-blue-100", txt: "text-blue-700", sub: "text-blue-500" },
+              { label: "Unique Models", value: stats.uniqueModels, cls: "bg-violet-50 border-violet-100", txt: "text-violet-700", sub: "text-violet-500" },
+              { label: "Monthly Reports", value: stats.freqCounts.Monthly || 0, cls: "bg-emerald-50 border-emerald-100", txt: "text-emerald-700", sub: "text-emerald-500" },
+              { label: "Quarterly Reports", value: stats.freqCounts.Quarterly || 0, cls: "bg-amber-50 border-amber-100", txt: "text-amber-700", sub: "text-amber-500" },
+            ].map(({ label, value, cls, txt, sub }) => (
+              <div key={label} className={`flex flex-col items-center px-4 py-2.5 rounded-xl border ${cls}`}>
+                <span className={`text-2xl font-bold font-mono ${txt}`}>{value}</span>
+                <span className={`text-[10px] font-medium uppercase tracking-wide ${sub}`}>{label}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {activeTab === "testReports" && <BISTestReportsTab />}
 
@@ -612,9 +620,15 @@ const BISDashboard = () => {
             approvalUsers={approvalUsers}
             onSaveApprovalFlow={saveApprovalFlow}
             onUploadApprovalSignature={uploadApprovalSignature}
+            onUploadCategoryPhoto={uploadCategoryPhoto}
+            onOpenSetup={setSetupModalRow}
           />
         )}
       </div>
+
+      {setupModalRow && (
+        <BISModelSetupModal row={setupModalRow} onClose={() => setSetupModalRow(null)} />
+      )}
 
       {/* ── UPDATE MODAL ── */}
       {showUpdateModal && (

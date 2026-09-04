@@ -32,6 +32,7 @@ import {
 } from "../controllers/quality/dispatchHold.controller.js";
 import {
   handleMulterError, uploadBISReportPDF, uploadFpaDefectImage, uploadBisSignature,
+  uploadBisModelPhoto,
 } from "../middlewares/uploadMiddleware.js";
 import {
   uploadBisPdfFile, getBisPdfFiles, downloadBisPdfFile,
@@ -40,8 +41,12 @@ import {
 } from "../controllers/quality/UploadBISReport.controller.js";
 import {
   getBisCategories, createBisCategory, updateBisCategory, deleteBisCategory,
-  getType100Materials,
+  getType100Materials, uploadBisCategoryPhoto,
+  getBisModelSpecs, saveBisModelSpecs,
 } from "../controllers/quality/BisCategory.controller.js";
+import {
+  getTestStalls, getTestLabDashboard, startTestRun, endTestRun,
+} from "../controllers/quality/BisTestLab.controller.js";
 import {
   getBisTestFrequencyConfig, updateBisTestFrequencyConfig,
 } from "../controllers/quality/BisTestConfig.controller.js";
@@ -154,6 +159,19 @@ router.post("/bis-category", authenticate, createBisCategory);
 router.put("/bis-category/:id", authenticate, updateBisCategory);
 router.delete("/bis-category/:id", authenticate, deleteBisCategory);
 router.get("/type100-materials", authenticate, getType100Materials);
+router.post("/bis-category/:id/photo", authenticate, uploadBisModelPhoto.single("photo"), handleMulterError, uploadBisCategoryPhoto);
+
+// BIS Model Specs — config-time spec sheet shown on the Test Lab Dashboard
+router.get("/bis-model-specs/:materialCode", authenticate, getBisModelSpecs);
+router.put("/bis-model-specs/:materialCode", authenticate, saveBisModelSpecs);
+
+// BIS Test Lab Dashboard — Start/End is the operator physically putting a
+// unit on a stall, independent of the test report (written up only after
+// the test is already finished)
+router.get("/bis-test-stalls", authenticate, getTestStalls);
+router.get("/bis-test-lab-dashboard", authenticate, getTestLabDashboard);
+router.post("/bis-test-run", authenticate, startTestRun);
+router.post("/bis-test-run/:runId/end", authenticate, endTestRun);
 
 // BIS Test Schedule — frequency/duration config + computed schedule + one-time baseline setup
 router.get("/bis-test-config", authenticate, getBisTestFrequencyConfig);

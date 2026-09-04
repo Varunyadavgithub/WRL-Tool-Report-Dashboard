@@ -1,14 +1,13 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
-import { getWrlLogoBase64 } from "../../../utils/reportLogo.js";
 import { fileBaseURL } from "../../../assets/assets.js";
 import { mapRowToCamel, reportTypeLabel } from "./shared";
 
-// Replicates the lab's original Excel test-report letterhead (logo + lab
-// name, title bar, a single label/value grid, standard disclaimer remarks,
-// and a 3-column sign-off footer) so the PDF and Excel downloads look like
-// the paper template the lab used before this screen existed, instead of a
+// Replicates the lab's original Excel test-report letterhead (lab name,
+// title bar, a single label/value grid, standard disclaimer remarks, and a
+// 3-column sign-off footer) so the PDF and Excel downloads look like the
+// paper template the lab used before this screen existed, instead of a
 // generic data dump. Each sign-off's signature image is whichever image the
 // Preparer/Reviewer/Authorizer had on file in the BIS approval flow at the
 // moment they actually signed this report (see BisApprovalFlow.controller.js) —
@@ -28,9 +27,8 @@ const STANDARD_REMARKS = [
   "This Test Report shall not be reproduced except in full without written approval of the QA Assistant General Manager.",
 ];
 
-// Signature images live at arbitrary uploaded paths (not the one fixed WRL
-// logo asset), so this loads+caches them by path rather than reusing
-// getWrlLogoBase64's single-asset cache.
+// Signature images live at arbitrary uploaded paths, so this loads+caches
+// them by path.
 const signatureImageCache = new Map();
 const loadSignatureImage = (relativePath) => {
   if (!relativePath) return Promise.resolve(null);
@@ -250,7 +248,7 @@ const buildDetailBlocks = ({ equipment, reportType, data }) => {
    detail blocks follow on their own page(s) below it.
 ───────────────────────────────────────────────────────────────────────── */
 export const exportBisReportPDF = async ({ header, equipment, reportType, data }) => {
-  const [logo, signoffImages] = await Promise.all([getWrlLogoBase64(), loadSignoffImages(header)]);
+  const signoffImages = await loadSignoffImages(header);
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const marginX = 40;
   const pageW = doc.internal.pageSize.getWidth();
@@ -258,8 +256,8 @@ export const exportBisReportPDF = async ({ header, equipment, reportType, data }
   const contentW = pageW - marginX * 2;
   const title = reportTitle(header, reportType);
 
-  // Same letterhead (logo + lab name + report title bar) repeats at the top
-  // of every page — via didDrawPage on each autoTable call for pagination
+  // Same letterhead (lab name + report title bar) repeats at the top of
+  // every page — via didDrawPage on each autoTable call for pagination
   // autoTable does on its own, and manually before content this function
   // starts itself — so a multi-page report reads as one consistent document
   // instead of a styled cover glued onto a plain data dump.
@@ -270,7 +268,6 @@ export const exportBisReportPDF = async ({ header, equipment, reportType, data }
     let ly = 40;
     doc.setDrawColor(30, 41, 59);
     doc.rect(marginX, ly, contentW, headBoxH);
-    if (logo) doc.addImage(logo, "PNG", marginX + 8, ly + 9, 70, 35);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
     doc.setTextColor(15, 23, 42);
@@ -368,8 +365,13 @@ export const exportBisReportPDF = async ({ header, equipment, reportType, data }
     doc.text("Detailed Test Data", marginX, y);
     y += 18;
 
-    blocks.forEach((block) => {
-      if (y + 40 > pageH - 40) { doc.addPage(); drawLetterhead(); y = contentTop; }
+    // Each test (Pull Down, Energy Consumption, Thermal Insulation,
+    // Temperature Rise, Test Equipment Used) starts on its own page — a
+    // formal lab report reads as distinct, separately-paginated test
+    // sections, not a continuous data dump where two short tests might
+    // otherwise land on the same page depending on how much room was left.
+    blocks.forEach((block, idx) => {
+      if (idx > 0) { doc.addPage(); drawLetterhead(); y = contentTop; }
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       doc.setTextColor(30, 41, 59);
@@ -415,7 +417,7 @@ export const exportBisReportPDF = async ({ header, equipment, reportType, data }
 const DETAIL_COLS = 7; // widest detail table (Volume items: Category…Volume)
 
 export const exportBisReportExcel = async ({ header, equipment, reportType, data }) => {
-  const [logo, signoffImages] = await Promise.all([getWrlLogoBase64(), loadSignoffImages(header)]);
+  const signoffImages = await loadSignoffImages(header);
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Report");
 
@@ -426,10 +428,6 @@ export const exportBisReportExcel = async ({ header, equipment, reportType, data
   const border = { top: thin, left: thin, bottom: thin, right: thin };
   let row = 1;
 
-  if (logo) {
-    const imgId = workbook.addImage({ base64: logo, extension: "png" });
-    sheet.addImage(imgId, { tl: { col: 0, row: row - 1 }, ext: { width: 90, height: 45 } });
-  }
   sheet.mergeCells(row, 1, row, DETAIL_COLS);
   sheet.getCell(row, 1).value = "QUALITY ASSURANCE TESTING LAB, WESTERN REFRIGERATION PVT. LTD.";
   sheet.getCell(row, 1).font = { bold: true, size: 13, color: { argb: "FF0F172A" } };
@@ -513,7 +511,12 @@ export const exportBisReportExcel = async ({ header, equipment, reportType, data
     sheet.getCell(row, 1).font = { bold: true, size: 12, color: { argb: "FF1E293B" } };
     row += 2;
 
-    blocks.forEach((block) => {
+    // Each test starts on its own printed page — same reasoning as the PDF
+    // export: a formal lab report reads as distinct, separately-paginated
+    // test sections. addPageBreak() only affects printing/PDF-from-Excel,
+    // not the normal on-screen scroll view.
+    blocks.forEach((block, idx) => {
+      if (idx > 0) sheet.getRow(row - 1).addPageBreak();
       sheet.mergeCells(row, 1, row, DETAIL_COLS);
       sheet.getCell(row, 1).value = block.heading;
       sheet.getCell(row, 1).font = { bold: true, size: 10.5, color: { argb: "FF1E293B" } };
