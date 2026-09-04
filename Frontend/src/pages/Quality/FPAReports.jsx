@@ -1573,7 +1573,7 @@ const FPAReports = () => {
                   />
                 </div>
                 <div className="min-w-[180px] flex-1">
-                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1 block">
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5 items-center gap-1 block">
                     <Search className="w-3 h-3" /> Search
                   </label>
                   <div className="relative">

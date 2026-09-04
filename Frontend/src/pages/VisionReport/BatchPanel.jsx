@@ -299,7 +299,7 @@ const BatchPanel = ({ onOpenSerial }) => {
             <button
               onClick={() => runQuery()}
               disabled={loading}
-              className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
                 loading
                   ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                   : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
