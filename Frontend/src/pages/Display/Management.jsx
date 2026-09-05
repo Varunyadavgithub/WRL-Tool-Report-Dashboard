@@ -1183,7 +1183,7 @@ const Management = () => {
                             }
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-emerald-50 text-emerald-600 text-[11px] font-bold hover:bg-emerald-100 transition-colors"
                           >
-                            <Play className="w-3 h-3" /> Launch
+                            <Play className="w-3 h-3" />
                           </button>
                           <button
                             onClick={() =>
