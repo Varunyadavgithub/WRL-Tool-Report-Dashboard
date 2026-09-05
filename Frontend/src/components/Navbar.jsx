@@ -41,6 +41,15 @@ const NavBar = () => {
           </h1>
         </Link>
         <div className="flex items-center gap-3 md:gap-4">
+          <button
+            onClick={() => setShowChangePassword(true)}
+            title="Change Password"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 text-xs md:text-sm font-semibold hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer"
+          >
+            <FiKey size={16} />
+            <span className="hidden sm:inline">Change Password</span>
+          </button>
+
           <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-700 rounded-full flex items-center justify-center text-lg md:text-xl font-bold text-white flex-shrink-0">
             {user?.name?.charAt(0)?.toUpperCase() || "U"}
           </div>
@@ -56,15 +65,6 @@ const NavBar = () => {
               {user.roleName}
             </div>
           </div>
-
-          <button
-            onClick={() => setShowChangePassword(true)}
-            title="Change Password"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 text-xs md:text-sm font-semibold hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer"
-          >
-            <FiKey size={16} />
-            <span className="hidden sm:inline">Change Password</span>
-          </button>
 
           <button
             onClick={handleLogout}

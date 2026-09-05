@@ -78,7 +78,9 @@ const HoldCabinateDetails = lazy(
 const TagUpdate = lazy(() => import("../pages/Quality/TagUpdate"));
 const LPTRecipe = lazy(() => import("../pages/Quality/LPTRecipe"));
 const BISDashboard = lazy(() => import("../pages/Quality/BIS/BISDashboard"));
-const BISTestLabDashboard = lazy(() => import("../pages/Quality/BIS/BISTestLabDashboard"));
+const BISTestLabDashboard = lazy(
+  () => import("../pages/Quality/BIS/BISTestLabDashboard"),
+);
 const BEECalculation = lazy(() => import("../pages/Quality/BEECalculation"));
 
 const DispatchPerformanceReport = lazy(
@@ -120,6 +122,9 @@ const InOut = lazy(() => import("../pages/Visitor/InOut"));
 const Reports = lazy(() => import("../pages/Visitor/Reports"));
 const History = lazy(() => import("../pages/Visitor/History"));
 const ManageEmployee = lazy(() => import("../pages/Visitor/ManageEmployee"));
+const EmployeeGatepass = lazy(
+  () => import("../pages/EmployeeManagement/Gatepass"),
+);
 
 const Calibiration = lazy(() => import("../pages/Compliance/Calibration"));
 
@@ -746,11 +751,11 @@ export const ROUTE_CONFIG = [
     ],
   },
 
-  // ── Visitor ──────────────────────────────────────────────────────────────
+  // ── Visitor Management ──────────────────────────────────────────────────────────────
   {
     key: "visitor",
     icon: UserCheck,
-    label: "Visitor",
+    label: "Visitor Management",
     basePath: "/visitor",
     items: [
       {
@@ -788,6 +793,21 @@ export const ROUTE_CONFIG = [
       {
         path: "/visitor-pass-display/:passId",
         component: VisitorPassDisplay,
+      },
+    ],
+  },
+
+  // ── Employee Management ──────────────────────────────────────────────────────────────
+  {
+    key: "employee",
+    icon: UserCheck,
+    label: "Employee Management",
+    basePath: "/employee",
+    items: [
+      {
+        path: "/employee/gatepass",
+        label: "Gatepass",
+        component: EmployeeGatepass,
       },
     ],
   },
